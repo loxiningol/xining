@@ -931,7 +931,9 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             reason="L1 micro-screen reject: %s" % ",".join(
                 l1.get("reject_reasons") or ["l1_fail"]),
             verdict="funnel_l1_cull",
-            is_mech_absent=True,
+            # Sample-slice cull is NOT proof of mechanism absence — do not
+            # family-block via failure KB (would poison later calibrated retries).
+            is_mech_absent=False,
         )
         record_pipeline_rejection(
             task_id=tid, stage="funnel_l1_micro_screen",
