@@ -81,7 +81,8 @@ def gate_scorecard(result):
     return rows
 
 
-def build_failure_context(result, pack, iteration, symbol, timeframe, direction):
+def build_failure_context(result, pack, iteration, symbol, timeframe, direction,
+                          optimize_goals=None, notes=None):
     """Structured context for 3rd-party AI optimizer prompts."""
     reason = (result or {}).get("reason") or (result or {}).get("stage")
     l1 = extract_l1(result)
@@ -108,6 +109,8 @@ def build_failure_context(result, pack, iteration, symbol, timeframe, direction)
         "mechanism_name": spec.get("mechanism_name"),
         "non_negotiable_rules": list(spec.get("non_negotiable_rules") or [])[:20],
         "forbidden_transformations": list(spec.get("forbidden_transformations") or [])[:20],
+        "optimize_goals": list(optimize_goals or []),
+        "notes": list(notes or [])[:12],
         "dsl_summary": summarize_dsl(dsl),
         "dsl": copy.deepcopy(dsl) if isinstance(dsl, dict) else {},
         "mechanism_spec": copy.deepcopy(spec) if isinstance(spec, dict) else {},
@@ -199,7 +202,23 @@ def composite_score(g2, l1, reason):
     """Higher is better. Used for convergence detection."""
     score = 0.0
     reason = str(reason or "")
-    if reason in ("funnel_l1_fail",) or (l1 and l1.get("pass") is False):
+    g2_has_signal = bool(
+        (g2 or {}).get("payoff_ratio") is not None
+        or (g2 or {}).get("failed_checks")
+        or (g2 or {}).get("gate_pass")
+    )
+    # Prefer Gate2 scoring when fitness evidence exists (L1 may be omitted in
+    # repair_exhausted payloads, which previously collapsed score to 0).
+    l1_only = (
+        reason in ("funnel_l1_fail",)
+        or (
+            l1
+            and l1.get("pass") is False
+            and not g2_has_signal
+            and reason not in ("repair_exhausted_or_drift", "gate2_3_fail", "gate2_fail")
+        )
+    )
+    if l1_only:
         fills = l1.get("filled_entries") or 0
         try:
             score += min(float(fills) / 5.0, 1.0) * 2.0
@@ -213,7 +232,7 @@ def composite_score(g2, l1, reason):
             pass
         return round(score, 6)
 
-    if (g2 or {}).get("missing"):
+    if (g2 or {}).get("missing") and not g2_has_signal:
         return round(score, 6)
 
     def _f(x):

@@ -210,6 +210,8 @@ def run_driver(cfg):
                 ctx = metrics.build_failure_context(
                     result, pack, iteration,
                     cfg["symbol"], cfg["timeframe"], cfg["direction"],
+                    optimize_goals=cfg.get("optimize_goals"),
+                    notes=cfg.get("notes"),
                 )
                 state["iterations"].append(_iter_record(
                     iteration, result, ctx, elapsed,
@@ -221,6 +223,8 @@ def run_driver(cfg):
         ctx = metrics.build_failure_context(
             result, pack, iteration,
             cfg["symbol"], cfg["timeframe"], cfg["direction"],
+            optimize_goals=cfg.get("optimize_goals"),
+            notes=cfg.get("notes"),
         )
         _dump_json(iter_dir / "failure_context.json", ctx)
 
@@ -303,9 +307,10 @@ def run_driver(cfg):
 
         # PATCH
         if ai_decision == "PATCH":
-            # validate / apply with rollback on total failure
+            # sanitize DSL hard bounds then apply; rollback on total failure
+            patches = patch_apply.sanitize_patches(merged.get("patches") or [])
             new_pack, applied, apply_errors = patch_apply.apply_patches(
-                pack, merged.get("patches") or [], direction=cfg["direction"],
+                pack, patches, direction=cfg["direction"],
             )
             _dump_json(iter_dir / "patches.applied.json", {"applied": applied, "errors": apply_errors})
             if apply_errors and not applied:

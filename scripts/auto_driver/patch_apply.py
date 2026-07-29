@@ -73,10 +73,89 @@ def set_by_path(obj, path, value):
     return obj
 
 
+def sanitize_patches(patches):
+    """Clamp known DSL hard bounds so AI patches do not bounce on validate.
+
+    Hard bounds (prod DSL validator):
+      - atr_trailing / partial_tp_atr n_atr ∈ [2.5, 5.0]
+        (partial_tp_atr may use ~2.0; clamp trail-like paths only when >5 or <2.0
+         for trail; see path heuristics below)
+      - swing lookback ∈ [5, 60]
+      - protective stop_pct ∈ (0, 0.009]
+    """
+    out = []
+    for p in patches or []:
+        if not isinstance(p, dict):
+            continue
+        q = dict(p)
+        path = str(q.get("path") or "")
+        op = str(q.get("op") or "").lower()
+        if op in ("set", "set_path", "add") and "value" in q:
+            val = q.get("value")
+            pl = path.lower()
+            if pl.endswith(".n_atr") or pl.endswith("/n_atr") or pl.endswith("n_atr"):
+                try:
+                    v = float(val)
+                    # atr_trailing hard max 5.0; allow partial_tp down to 2.0
+                    if "partial" in pl:
+                        q["value"] = max(2.0, min(5.0, v))
+                    else:
+                        q["value"] = max(2.5, min(5.0, v))
+                except Exception:
+                    pass
+            if pl.endswith(".lookback") or pl.endswith("/lookback") or pl.endswith("lookback"):
+                try:
+                    q["value"] = max(5, min(60, int(float(val))))
+                except Exception:
+                    pass
+            if "stop_pct" in pl or pl.endswith(".stop_loss_pct"):
+                try:
+                    v = abs(float(val))
+                    q["value"] = max(0.001, min(0.009, v))
+                except Exception:
+                    pass
+        if op == "replace_exit" and isinstance(q.get("exit"), dict):
+            q["exit"] = _sanitize_exit_tree(q["exit"])
+        if op in ("replace_dsl", "set_dsl", "merge_dsl") and isinstance(q.get("dsl"), dict):
+            dsl = deep_copy_pack(q["dsl"])
+            if isinstance(dsl.get("exit"), dict):
+                dsl["exit"] = _sanitize_exit_tree(dsl["exit"])
+            q["dsl"] = dsl
+        out.append(q)
+    return out
+
+
+def _sanitize_exit_tree(exit_):
+    out = deep_copy_pack(exit_)
+    any_list = out.get("any")
+    if not isinstance(any_list, list):
+        return out
+    for item in any_list:
+        if not isinstance(item, dict):
+            continue
+        eop = str(item.get("exit_op") or "")
+        if "n_atr" in item:
+            try:
+                v = float(item["n_atr"])
+                if eop == "partial_tp_atr":
+                    item["n_atr"] = max(2.0, min(5.0, v))
+                else:
+                    item["n_atr"] = max(2.5, min(5.0, v))
+            except Exception:
+                pass
+        if "lookback" in item:
+            try:
+                item["lookback"] = max(5, min(60, int(float(item["lookback"]))))
+            except Exception:
+                pass
+    return out
+
+
 def apply_patches(pack, patches, direction="long"):
     out = deep_copy_pack(pack)
     applied = []
     errors = []
+    patches = sanitize_patches(patches)
     for i, patch in enumerate(patches or []):
         if not isinstance(patch, dict):
             errors.append({"i": i, "error": "patch_not_object"})
@@ -188,18 +267,31 @@ def _write_active_dsl(pack, direction, dsl):
 
 
 def bump_family_for_kb(pack, iteration):
+    """Bump mechanism_family to a fresh *_adN that is strictly newer than current.
+
+    Important: if pack is already `foo_ad1` and iteration==1, naive
+    `base + _ad{iteration}` would be a no-op and re-hit kb_blocked.
+    Always choose N = max(current_suffix+1, int(iteration)).
+    """
     out = deep_copy_pack(pack)
     spec = deep_copy_pack(out.get("mechanism_spec") or {})
     fam = str(spec.get("mechanism_family") or "strategy")
+    m = re.search(r"_ad(\d+)$", fam)
+    cur_n = int(m.group(1)) if m else 0
+    try:
+        want = int(iteration)
+    except Exception:
+        want = cur_n + 1
+    new_n = max(cur_n + 1, want)
     base = re.sub(r"_ad\d+$", "", fam)
-    new_fam = "%s_ad%d" % (base, int(iteration))
+    new_fam = "%s_ad%d" % (base, new_n)
     spec["mechanism_family"] = new_fam
     if spec.get("mechanism_name"):
         name = re.sub(r"_ad\d+$", "", str(spec.get("mechanism_name")))
-        spec["mechanism_name"] = "%s_ad%d" % (name, int(iteration))
+        spec["mechanism_name"] = "%s_ad%d" % (name, new_n)
     mid = str(spec.get("mechanism_id") or "mech")
     mid = re.sub(r"_ad\d+$", "", mid)
-    spec["mechanism_id"] = "%s_ad%d" % (mid, int(iteration))
+    spec["mechanism_id"] = "%s_ad%d" % (mid, new_n)
     nn = list(spec.get("non_negotiable_rules") or [])
     tag = "auto_driver_family_lineage_bump"
     if tag not in nn:
