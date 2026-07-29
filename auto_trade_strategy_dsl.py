@@ -299,12 +299,16 @@ def _validate_operand(operand):
         raise DSLValidationError("operand must be object")
     keys = set(operand)
     if "feature" in operand:
-        if keys - {"feature", "offset"}:
+        if keys - {"feature", "offset", "scale"}:
             raise DSLValidationError("feature operand contains unknown fields")
         feature = str(operand.get("feature") or "")
         if feature not in FEATURES:
             raise DSLValidationError("unsupported feature: %s" % feature)
         _offset(operand.get("offset", 0))
+        if "scale" in operand:
+            _number(operand.get("scale"))
+            if float(operand["scale"]) == 0.0:
+                raise DSLValidationError("feature operand scale must be non-zero")
         return
     if "value" in operand:
         if keys != {"value"}:
@@ -467,6 +471,8 @@ def _operand(frame, index, operand, extra_offset=0):
     value = float(_series(frame, operand["feature"]).iloc[position])
     if not math.isfinite(value):
         raise ValueError("indicator is not finite")
+    if "scale" in operand:
+        value *= float(operand["scale"])
     return value
 
 

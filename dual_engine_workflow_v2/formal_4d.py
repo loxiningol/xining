@@ -277,5 +277,20 @@ def run_multidimensional_review(book, packs, definition, ai_json_fn, aux_wr=None
         "backtest_integrity": backtest,
         "execution_friction": execution,
         "auxiliary_wr": aux,
-        "policy": "fatal_any_dimension_blocks; aux_wr_cannot_override; no_model_may_override_another_fatal",
+        "policy": "fatal_any_dimension_blocks; aux_wr_cannot_override; no_model_may_override_another_fatal; phase5_3party_consensus_required",
     }
+
+
+def run_phase5_consensus(candidate, evidence):
+    """Phase 5: 3-party AI unanimous dimensional review (causal/game/production)."""
+    try:
+        import auto_trade_ai_consensus as consensus
+        return consensus.phase5_unanimous_review(candidate, evidence)
+    except Exception as exc:
+        return {
+            "approved": False,
+            "fatal_any": True,
+            "fail_reasons": ["phase5_import_error:%s" % exc],
+            "reviews": [],
+            "policy": "phase5_fail_closed",
+        }

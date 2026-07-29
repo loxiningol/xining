@@ -49,6 +49,7 @@ from .failure_kb import (
     path_is_blocked,
     build_failure_record,
     save_failure_record,
+    record_pipeline_rejection,
 )
 from .gates import (
     evaluate_gate0, evaluate_gate1, evaluate_gate2, evaluate_gate3,
@@ -186,6 +187,8 @@ def codex_implement_from_spec(spec_pack):
     """Faithful implementer — NEVER use legacy hypothesis books (they inject EMA/RSI).
 
     Builds microstructure-proxy DSL from mechanism_spec + allowed features only.
+    If spec_pack provides a validated prebuilt `dsl` (or direction-matched
+    `dsl_long`/`dsl_short`), use that instead of the family template.
     """
     import uuid
     import copy
@@ -205,6 +208,35 @@ def codex_implement_from_spec(spec_pack):
     key = ("wsa_%s_%s_%s" % (
         str(symbol).split("-")[0].lower(), timeframe, uuid.uuid4().hex[:6]
     )).replace("-", "_")
+
+    # Prebuilt DSL path (research handoff / Windtalker pack)
+    prebuilt = spec_pack.get("dsl")
+    if not isinstance(prebuilt, dict):
+        prebuilt = spec_pack.get("dsl_long" if direction == "long" else "dsl_short")
+    if isinstance(prebuilt, dict) and prebuilt.get("schema") == "qiyu_strategy_dsl_v1":
+        dsl = copy.deepcopy(prebuilt)
+        dsl["direction"] = direction
+        dsl["timeframe"] = timeframe or dsl.get("timeframe")
+        dsl["supported_instruments"] = [symbol]
+        dsl.setdefault("key", key)
+        dsl.setdefault("name", str(title)[:120])
+        dsl["live_enabled"] = False
+        dsl["auto_trade_eligible"] = False
+        dsl["origin"] = dsl.get("origin") or "step_a_prebuilt_dsl"
+        return {
+            "title": title,
+            "thesis": meta.get("thesis") or spec.get("why_edge_exists"),
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "direction": direction,
+            "dsl": dsl,
+            "mechanism_spec": spec,
+            "mechanism_statement": stmt,
+            "status": "codex_implemented",
+            "supplements_needed": [],
+            "core_features": [],
+            "prebuilt_dsl": True,
+        }
 
     # Allowed core features from suggestions — strip forbidden
     suggested = [str(x) for x in (meta.get("suggested_core_features") or [])]
@@ -247,6 +279,46 @@ def codex_implement_from_spec(spec_pack):
             entry_leaves.append({"id": "e_dir", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}})
         else:
             entry_leaves.append({"id": "e_dir", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "open"}})
+    elif any(k in fam for k in ("compression_release", "atr_squeeze", "structural_breakout", "squeeze_breakout")):
+        # ATR compression then structural range break (distinct from dead high-vol-only release)
+        entry_leaves.append({
+            "id": "e_atr_compress",
+            "left": {"feature": "atr14"},
+            "op": "lt",
+            "right": {"feature": "close", "scale": 0.0025},
+        })
+        if direction == "long":
+            entry_leaves.append({
+                "id": "e_break_high",
+                "left": {"feature": "close"},
+                "op": "cross_above",
+                "right": {"feature": "prev_high20"},
+            })
+            entry_leaves.append({
+                "id": "e_dir",
+                "left": {"feature": "close"},
+                "op": "gt",
+                "right": {"feature": "open"},
+            })
+        else:
+            entry_leaves.append({
+                "id": "e_break_low",
+                "left": {"feature": "close"},
+                "op": "cross_below",
+                "right": {"feature": "prev_low20"},
+            })
+            entry_leaves.append({
+                "id": "e_dir",
+                "left": {"feature": "close"},
+                "op": "lt",
+                "right": {"feature": "open"},
+            })
+        entry_leaves.append({
+            "id": "e_vol_confirm",
+            "left": {"feature": "vol_z20"},
+            "op": "gt",
+            "right": {"value": 0.5},
+        })
     elif any(k in fam for k in ("failed_breakout", "breakout_fail", "false_break", "liquidity_fail")):
         # Failed breakout ≠ exhaustion_fade: range break then immediate reclaim opposite
         if direction == "short":
@@ -850,6 +922,12 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             verdict="funnel_l1_cull",
             is_mech_absent=True,
         )
+        record_pipeline_rejection(
+            task_id=tid, stage="funnel_l1_micro_screen",
+            failed_tests=["micro_screen"],
+            reject_reasons=l1.get("reject_reasons") or ["l1_fail"],
+            dsl=book.get("dsl"), symbol=sym, timeframe=tf,
+        )
         dual.save_task(task)
         store.save_task_meta(task)
         return {
@@ -969,6 +1047,12 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
                     incubator.get("reject_reasons") or ["incubator_fail"]),
                 verdict="phase4_incubator_reject",
                 is_mech_absent=True,
+            )
+            record_pipeline_rejection(
+                task_id=tid, stage="phase4_incubator",
+                failed_tests=["incubator"],
+                reject_reasons=incubator.get("reject_reasons") or ["incubator_fail"],
+                dsl=definition, symbol=sym, timeframe=tf,
             )
             dual.save_task(task)
             store.save_task_meta(task)
@@ -1220,10 +1304,90 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
                         reason="one or more separate AI reviews failed",
                         verdict="multi_ai_review_fail",
                         counterexamples=(reviews.get("deepseek_logic") or {}).get("counterexamples") or [])
+        record_pipeline_rejection(
+            task_id=tid, stage="gate6_multi_ai",
+            failed_tests=["multi_ai_review"],
+            reject_reasons=["gate6_ai_review_fail"],
+            dsl=book.get("dsl"), symbol=sym, timeframe=tf,
+        )
         dual.save_task(task)
         store.save_task_meta(task)
         return {"ok": False, "task_id": tid, "reason": "gate6_fail",
                 "gate_results": task["gate_results"]}
+
+    # ---- Phase 5: 3-party AI unanimous consensus ----
+    task["stage"] = "phase5_3party_consensus"
+    from .formal_4d import run_phase5_consensus
+    p5_evidence = {
+        "base_metrics": base_m,
+        "walk_forward": task.get("walk_forward"),
+        "split_scores": task.get("split_scores"),
+        "phase3_funnel": {
+            "l1_pass": bool(l1.get("pass")),
+            "l2_pass": bool(l2.get("pass")),
+            "l3_pass": bool(l3.get("pass")),
+        },
+        "phase4_incubator": {
+            "pass": bool((incubator or {}).get("pass")),
+            "cross_asset_score": (incubator or {}).get("cross_asset_score"),
+        },
+        "gate6_reviews": {
+            k: {kk: vv for kk, vv in v.items() if kk != "raw"}
+            for k, v in reviews.items()
+        },
+    }
+    p5_candidate = {
+        "dsl": definition,
+        "mechanism_statement": stmt,
+        "mechanism_spec_summary": {
+            "mechanism_family": spec.get("mechanism_family"),
+            "market_inefficiency": spec.get("market_inefficiency"),
+            "entry_logic": spec.get("entry_logic"),
+        },
+    }
+    p5_result = run_phase5_consensus(p5_candidate, p5_evidence)
+    task["phase5_consensus"] = {
+        "approved": p5_result.get("approved"),
+        "fatal_any": p5_result.get("fatal_any"),
+        "fail_reasons": p5_result.get("fail_reasons"),
+        "policy": p5_result.get("policy"),
+        "reviews": [
+            {k: v for k, v in r.items() if k != "raw"}
+            for r in (p5_result.get("reviews") or [])
+        ],
+    }
+    _save_artifact(tid, "phase5_consensus", task["phase5_consensus"])
+
+    if not p5_result.get("approved"):
+        task["stage"] = "archived"
+        task["gate_results"] = assemble_gate_results(task["gates"], tid)
+        save_gate_results(tid, task["gate_results"])
+        _archive_step_a(
+            task, stage="phase5_3party_consensus",
+            failed_tests=["phase5_unanimous"],
+            reason="Phase5 3-party AI consensus rejected: %s" % ", ".join(
+                p5_result.get("fail_reasons") or ["consensus_fail"]),
+            verdict="phase5_consensus_reject",
+            counterexamples=[
+                "%s:%s" % (r.get("dimension"), r.get("reason") or "")
+                for r in (p5_result.get("reviews") or [])
+                if r.get("decision") != "APPROVE"
+            ][:5],
+        )
+        record_pipeline_rejection(
+            task_id=tid, stage="phase5_3party_consensus",
+            failed_tests=["phase5_unanimous"],
+            reject_reasons=p5_result.get("fail_reasons") or ["consensus_fail"],
+            dsl=definition, symbol=sym, timeframe=tf,
+        )
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": False, "task_id": tid, "reason": "phase5_consensus_fail",
+            "phase5_consensus": task["phase5_consensus"],
+            "gate_results": task["gate_results"],
+            "production_mounted": False,
+        }
 
     # Split scores
     wr = base_m.get("win_rate_pct")

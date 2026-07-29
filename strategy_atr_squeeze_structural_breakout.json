@@ -1,0 +1,167 @@
+{
+  "mechanism_spec": {
+    "mechanism_id": "atr_squeeze_structural_breakout_v1",
+    "mechanism_name": "ATR压缩释放结构突破",
+    "mechanism_family": "compression_release_structural_breakout",
+    "market_inefficiency": "当ATR_14相对价格压缩至 close*0.0025 以下时，区间交易者在prev_high20/prev_low20附近堆积止损单。首次方向性收盘突破20根高低点且伴随量能确认（vol_z20>0.5）与K线方向确认时，被困对手方止损被触发形成自增强定向推力。",
+    "counterparty_source": "区间交易者的止损被扫出：做多突破时，空头止损和低接者保护性止损被连锁触发；做空突破时，多头止损和高抛者保护性止损被连锁触发。",
+    "why_edge_exists": "压缩期间流动性在边界聚集形成可观测的结构特征（ATR收窄+prev_high/low稳定），突破时对手方被迫离场产生短期不可逆方向性。只要成本覆盖率>3倍（单边0.06%总摩擦 vs 预期0.2%+净收益），且突破方向伴随量能确认，这一因果链在多标的多周期下可复现。",
+    "edge_decay_conditions": "高频量化做市商在突破点预埋反向限价单抵消止损cascade；或市场长期处于单边趋势无压缩期；或该模式被过度拥挤导致假突破率上升。",
+    "required_market_regime": "需要先有明显的ATR压缩期（ATR_14 < close*0.0025），然后出现扩张突破。纯单边无回调行情中该策略信号稀少。",
+    "entry_logic": "ALL: (1) ATR_14 < close * 0.0025（相对ATR压缩，跨标的可比）；(2) close 突破 prev_high20（做多）或跌破 prev_low20（做空）；(3) vol_z20 > 0.5（量能确认，排除无量假突破）；(4) close>open（做多）或 close<open（做空），确认突破K线方向。",
+    "exit_logic": "ATR_trailing: 3.0倍ATR_14移动止盈，捕捉突破后的完整推力；保护性0.9% SL由回测引擎/daemon硬编码执行。",
+    "stop_logic": "硬止损0.9%（stop_loss_pct=0.009），由回测引擎和实盘daemon强制执行，DSL不重复表达。",
+    "take_profit_logic": "动态ATR移动止盈（3.0 * ATR_14），跟随价格移动，允许趋势充分发展后在回撤时退出。预期盈亏比2.5:1+。",
+    "invalidation_logic": "Swing extreme: 20根K线高低点反转出场（做多时跌破20根最低点，做空时突破20根最高点），作为趋势失效信号。",
+    "non_negotiable_rules": ["止损0.9%不可修改", "不得使用固定百分比止盈", "不得加仓/马丁/网格", "entry至少4个独立条件", "exit必须含ATR动态算子", "不得使用RSI/MACD/EMA/CCI作为核心过滤"],
+    "tunable_parameters": ["atr_threshold_pct", "vol_z20_min", "atr_trail_n", "swing_lookback", "max_hold_bars"],
+    "forbidden_transformations": ["不得替换为EMA均线交叉", "不得替换为RSI超买超卖", "不得引入CCI/RSI动量指标", "不得移除vol_z20量能确认", "不得移除ATR压缩前置条件"],
+    "expected_trade_frequency_class": "low_to_medium",
+    "expected_holding_period": "4-24根K线",
+    "suitable_symbols": ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "BNB-USDT-SWAP", "XRP-USDT-SWAP", "DOGE-USDT-SWAP", "ADA-USDT-SWAP", "XAU-USDT-SWAP"],
+    "suitable_timeframes": ["15m", "5m", "1h"]
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "atr_squeeze_breakout_long_v1",
+    "name": "ATR压缩释放结构突破-做多",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": ["BTC-USDT-SWAP"],
+    "max_hold_bars": 24,
+    "entry": {
+      "all": [
+        {
+          "id": "e_atr_compress",
+          "left": {"feature": "atr14"},
+          "op": "lt",
+          "right": {"feature": "close", "scale": 0.0025}
+        },
+        {
+          "id": "e_break_high",
+          "left": {"feature": "close"},
+          "op": "cross_above",
+          "right": {"feature": "prev_high20"}
+        },
+        {
+          "id": "e_vol_confirm",
+          "left": {"feature": "vol_z20"},
+          "op": "gt",
+          "right": {"value": 0.5}
+        },
+        {
+          "id": "e_momentum_confirm",
+          "left": {"feature": "close"},
+          "op": "gt",
+          "right": {"feature": "open"}
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_swing_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 20,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "description": "ATR压缩释放结构突破做多：相对ATR压缩+收盘突破20根高点+量能确认+阳线方向确认→3倍ATR移动止盈+20根swing失效退出。预期盈亏比≥2.5:1。"
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "atr_squeeze_breakout_short_v1",
+    "name": "ATR压缩释放结构突破-做空",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": ["BTC-USDT-SWAP"],
+    "max_hold_bars": 24,
+    "entry": {
+      "all": [
+        {
+          "id": "e_atr_compress",
+          "left": {"feature": "atr14"},
+          "op": "lt",
+          "right": {"feature": "close", "scale": 0.0025}
+        },
+        {
+          "id": "e_break_low",
+          "left": {"feature": "close"},
+          "op": "cross_below",
+          "right": {"feature": "prev_low20"}
+        },
+        {
+          "id": "e_vol_confirm",
+          "left": {"feature": "vol_z20"},
+          "op": "gt",
+          "right": {"value": 0.5}
+        },
+        {
+          "id": "e_momentum_confirm",
+          "left": {"feature": "close"},
+          "op": "lt",
+          "right": {"feature": "open"}
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_swing_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 20,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "description": "ATR压缩释放结构突破做空：相对ATR压缩+收盘跌破20根低点+量能确认+阴线方向确认→3倍ATR移动止盈+20根swing失效退出。预期盈亏比≥2.5:1。"
+  },
+  "kb_avoidance_checklist": {
+    "breakout_trap_reversal": "NOT a reversal; follows breakout direction",
+    "liquidity_failed_breakout_high": "NOT a failed breakout; requires confirmed close beyond range",
+    "liquidity_failed_breakout_low": "NOT a failed breakout; requires confirmed close beyond range",
+    "mean_reversion_vwap_deviation": "NOT mean-reversion; pure directional breakout",
+    "mean_reversion_rsi_extreme": "NOT RSI/CCI-based; uses OHLC direction only",
+    "mean_reversion_zscore_dislocation": "NOT Z-score reversion; follows trend",
+    "time_structure_session_breakout": "NOT session-based; uses ATR compression as trigger",
+    "trend_continuation_thrust_retest": "NOT a pullback/retest entry; enters on initial breakout",
+    "vol_regime_compression_release": "DIFFERENT: dead family entered on high vol alone; this requires LOW ATR first then expansion transition",
+    "confirmed_vol_release": "DIFFERENT: not high-vol release alone; requires atr14 < close*0.0025 compression gate",
+    "exhaustion_fade_short": "NOT a fade; same direction as breakout",
+    "orderbook_imbalance_snapback": "NOT orderbook-based; uses OHLCV-only features",
+    "liquidity_sweep_reversal": "NOT a sweep reversal; pure breakout continuation"
+  },
+  "expected_performance": {
+    "payoff_ratio_target": "≥ 2.5:1",
+    "calmar_target": "≥ 1.5",
+    "mae_constraint": "MAE ≤ 2.0 × avg_win (enforced by 0.9% SL + ATR trail)",
+    "frequency": "低至中频，质量优先于数量",
+    "cross_asset": "ATR压缩→释放模式在所有具有周期性波动率结构的标的上普遍存在"
+  },
+  "pipeline_readiness": {
+    "gate0_ready": true,
+    "mechanism_spec_complete": true,
+    "dsl_schema_valid": "qiyu_strategy_dsl_v1",
+    "exit_ops_dynamic": ["atr_trailing", "swing_extreme"],
+    "no_fixed_pct_tp": true,
+    "protective_sl": 0.009,
+    "entry_conditions_ge_2": true,
+    "entry_has_trigger": "cross_above / cross_below (非连续成立条件)",
+    "atr_compress_uses_relative_scale": true
+  }
+}

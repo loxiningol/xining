@@ -350,10 +350,19 @@ def build_factory_context(symbol=None, timeframe=None, days=7):
                          or dossier.get("mandatory_niches") or [])[:5]
     except Exception:
         mandatory = []
+    # Phase 5: inject Failure KB context into creation prompts
+    kb_ctx = {}
+    try:
+        from dual_engine_workflow_v2.failure_kb import kb_context_for_ai
+        kb_ctx = kb_context_for_ai(max_lessons=8, max_cx=5, max_blocked=15)
+    except Exception:
+        kb_ctx = {"must_read": True, "blocked_paths": [], "blocked_families": []}
+
     return {
         "schema": "qiyu_creation_factory_context_v1",
         "built_at": _now(),
         "focus": focus,
+        "failure_kb_must_read": kb_ctx,
         "dossier": {
             "focus_clusters": dossier.get("focus_clusters"),
             "mandatory_niches": mandatory,
@@ -1240,7 +1249,6 @@ def screen_and_push(candidates, source="creation_factory"):
         base_m = cand.get("base_metrics") or cand.get("metrics") or {}
         ai_review = cand.get("ai_review")
         if ai_review and isinstance(ai_review, dict):
-            # Enrich existing review with Phase-4 incubator card fields
             ai_review = dict(ai_review)
             if ai_review.get("calmar") is None:
                 ai_review["calmar"] = incub.get("calmar") or base_m.get("calmar")
@@ -1259,6 +1267,19 @@ def screen_and_push(candidates, source="creation_factory"):
             source="%s:%s" % (source, cand.get("author") or "ai"),
             ai_review=ai_review,
         )
+        # Phase 5: silent drop — rejected candidates go to Failure KB only, no Wx
+        if not out.get("ok") and not out.get("pushed"):
+            try:
+                from dual_engine_workflow_v2.failure_kb import record_pipeline_rejection
+                record_pipeline_rejection(
+                    task_id="factory_%s_%s" % (dsl.get("key") or "?", int(time.time())),
+                    stage="creation_factory_screen",
+                    failed_tests=["screen_reject"],
+                    reject_reasons=[out.get("reason") or "screen_fail"],
+                    dsl=dsl, symbol=symbol, timeframe=timeframe,
+                )
+            except Exception:
+                pass
         results.append({
             "key": dsl.get("key"),
             "author": cand.get("author"),
