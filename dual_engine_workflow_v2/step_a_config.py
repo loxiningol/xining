@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .config import ROOT, AUTO_DIR, DUAL_DIR, WF_DIR, ARTIFACTS_DIR, _now, _atomic
 
-STEP_A_CODE_VERSION = "step_a_strategy_creation_20260729_phase3_funnel"
+STEP_A_CODE_VERSION = "step_a_strategy_creation_20260729_phase4_incubator"
 STEP_A_SCHEMA = "qiyu_step_a_v1"
 
 MECHANISM_SPEC_DIR = WF_DIR / "mechanism_specs"

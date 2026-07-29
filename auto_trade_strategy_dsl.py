@@ -53,6 +53,28 @@ ATR_TRAIL_N_MAX = 4.0
 ATR_TRAIL_PERIOD_DEFAULT = 14
 SWING_LOOKBACK_MIN = 5
 SWING_LOOKBACK_MAX = 60
+
+# ---- Phase-4 dynamic volatility sizing (RESEARCH / incubator BT only) ----
+# Position Size = (Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)
+# Default R in [1.0%, 1.5%]; DD throttle cuts R to 0.5% when current DD is
+# ≥50% of peak-to-trough max DD observed so far.
+#
+# IMPORTANT — production mount interaction:
+#   Live mount via CLI `auto_trade_human_confirm_pipeline.py --confirm` remains
+#   B-grade 30% / 20x leverage / 0.9% protective SL. Dynamic R here is for
+#   candidate evaluation only and must NOT silently change live risk.
+#   Enabling production dynamic sizing requires a separate human-approved change.
+RISK_PCT_DEFAULT = 0.012          # 1.2% mid of 1.0–1.5%
+RISK_PCT_MIN = 0.010
+RISK_PCT_MAX = 0.015
+DD_THROTTLE_RISK_PCT = 0.005      # 0.5% when in deep DD region
+DD_THROTTLE_OF_MAX_DD = 0.50      # ≥50% of peak-to-trough max DD
+ATR_SIZE_PERIOD_DEFAULT = 14
+ATR_TARGET_MULTIPLIER_DEFAULT = 1.0
+PRODUCTION_B_GRADE_POSITION_PCT = 0.30
+PRODUCTION_LEVERAGE = 20
+PRODUCTION_STOP_LOSS_PCT = 0.009
+
 # Hard ban: fixed take-profit below 2.0% price move (e.g. 0.6%/0.9%/1.0%/1.3%).
 # Does NOT silently convert — validation / compile must refuse.
 FIXED_TP_MIN_PCT = 0.02
@@ -462,6 +484,95 @@ def _atr_at(frame, index, period=14):
     return sum(trs) / float(len(trs))
 
 
+def clamp_risk_pct(risk_pct, lo=RISK_PCT_MIN, hi=RISK_PCT_MAX):
+    """Clamp research R into configured band (default 1.0%–1.5%)."""
+    try:
+        r = float(risk_pct)
+    except Exception:
+        r = RISK_PCT_DEFAULT
+    if not math.isfinite(r):
+        r = RISK_PCT_DEFAULT
+    return max(float(lo), min(float(hi), r))
+
+
+def effective_risk_pct(
+    base_risk_pct,
+    equity,
+    peak_equity,
+    max_dd_so_far,
+    dd_throttle_risk_pct=DD_THROTTLE_RISK_PCT,
+    dd_throttle_of_max_dd=DD_THROTTLE_OF_MAX_DD,
+):
+    """Apply DD throttle: cut R to 0.5% when current DD ≥ 50% of max DD.
+
+    max_dd_so_far is peak-to-trough max drawdown fraction observed so far.
+    """
+    base = clamp_risk_pct(base_risk_pct)
+    try:
+        eq = float(equity)
+        peak = float(peak_equity)
+        max_dd = float(max_dd_so_far or 0.0)
+    except Exception:
+        return base
+    if peak <= 0 or max_dd <= 1e-15:
+        return base
+    current_dd = max(0.0, (peak - eq) / peak)
+    if current_dd + 1e-15 >= float(dd_throttle_of_max_dd) * max_dd:
+        return float(dd_throttle_risk_pct)
+    return base
+
+
+def atr_position_size(
+    equity,
+    risk_pct,
+    atr,
+    target_multiplier=ATR_TARGET_MULTIPLIER_DEFAULT,
+    entry_price=None,
+):
+    """ATR-based position size (quantity units).
+
+    Position Size = (Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)
+
+    Returns dict with quantity, notional, account_fraction (notional/equity),
+    and atr inputs. account_fraction is used to scale leveraged pnl in research BT.
+    """
+    eq = max(0.0, float(equity))
+    atr_v = float(atr)
+    mult = float(target_multiplier) if target_multiplier not in (None, 0) else ATR_TARGET_MULTIPLIER_DEFAULT
+    risk = float(risk_pct)
+    if atr_v <= 1e-15 or eq <= 0 or risk <= 0:
+        return {
+            "quantity": 0.0,
+            "notional": 0.0,
+            "account_fraction": 0.0,
+            "atr": atr_v,
+            "risk_pct": risk,
+            "target_multiplier": mult,
+            "formula": "(Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)",
+        }
+    qty = (eq * risk) / (atr_v * mult)
+    px = float(entry_price) if entry_price not in (None, 0) else 1.0
+    notional = qty * px
+    # Fraction of equity notionally deployed (cap at 1.0 for research BT scaling).
+    # High ATR → lower fraction (lower notional risk).
+    account_fraction = min(1.0, notional / eq) if eq > 0 else 0.0
+    return {
+        "quantity": float(qty),
+        "notional": float(notional),
+        "account_fraction": float(account_fraction),
+        "atr": atr_v,
+        "risk_pct": risk,
+        "target_multiplier": mult,
+        "entry_price": px,
+        "formula": "(Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)",
+        # Explicit note: live mount stays B/30%/20x until separately approved.
+        "production_mount_unchanged": True,
+        "production_b_grade_position_pct": PRODUCTION_B_GRADE_POSITION_PCT,
+        "production_leverage": PRODUCTION_LEVERAGE,
+        "production_stop_loss_pct": PRODUCTION_STOP_LOSS_PCT,
+    }
+
+
 def _swing_high_low(frame, index, lookback):
     """Local extremes over last `lookback` bars excluding current bar."""
     if index < lookback:
@@ -829,7 +940,24 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
                  fee_rate_per_side=0.0005, slippage_rate_per_side=0.0002,
                  half_spread_rate_per_side=0.0, impact_rate_per_side=0.0,
                  latency_rate_per_side=0.0, funding_rate_per_8h=0.0,
-                 friction_scenario="legacy"):
+                 friction_scenario="legacy",
+                 dynamic_risk_sizing=False,
+                 risk_pct=RISK_PCT_DEFAULT,
+                 atr_target_multiplier=ATR_TARGET_MULTIPLIER_DEFAULT,
+                 atr_size_period=ATR_SIZE_PERIOD_DEFAULT,
+                 dd_throttle_risk_pct=DD_THROTTLE_RISK_PCT,
+                 dd_throttle_of_max_dd=DD_THROTTLE_OF_MAX_DD,
+                 initial_equity=1.0):
+    """Backtest DSL strategy.
+
+    Protective stop_loss_pct default remains 0.9%.
+
+    dynamic_risk_sizing (Phase-4 research only):
+      Size = (Equity * Risk_Pct) / (ATR_14 * Target_Multiplier), with DD
+      throttle to 0.5% R when current DD ≥ 50% of peak-to-trough max DD.
+      Scales account capital impact by account_fraction — does NOT change
+      production B-grade 30%/20x mount path (CLI --confirm).
+    """
     strategy = validate_strategy(strategy)
     direction = strategy["direction"]
     execution_rate_per_side = (fee_rate_per_side + slippage_rate_per_side +
@@ -838,7 +966,11 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
     round_cost = 2.0 * execution_rate_per_side * leverage
     hours_per_bar = {"5m": 1.0/12.0, "15m": 0.25, "1h": 1.0}.get(
         strategy.get("timeframe"), 1.0)
-    trades = []; position = None; capital = 1.0
+    trades = []; position = None
+    capital = float(initial_equity) if initial_equity else 1.0
+    peak_equity = capital
+    max_dd_so_far = 0.0
+    base_risk = clamp_risk_pct(risk_pct)
     start = max(250, MAX_LOOKBACK + 2)
     for index in range(start, len(frame)):
         if position is None:
@@ -849,6 +981,31 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
             )
             if entered:
                 px = float(frame["close"].iloc[index])
+                size_meta = {
+                    "account_fraction": 1.0,
+                    "risk_pct_used": None,
+                    "dynamic_risk_sizing": bool(dynamic_risk_sizing),
+                }
+                if dynamic_risk_sizing:
+                    try:
+                        atr = _atr_at(frame, index, int(atr_size_period or 14))
+                    except Exception:
+                        atr = max(px * 0.01, 1e-9)
+                    r_eff = effective_risk_pct(
+                        base_risk, capital, peak_equity, max_dd_so_far,
+                        dd_throttle_risk_pct=dd_throttle_risk_pct,
+                        dd_throttle_of_max_dd=dd_throttle_of_max_dd,
+                    )
+                    size_meta = atr_position_size(
+                        capital, r_eff, atr,
+                        target_multiplier=atr_target_multiplier,
+                        entry_price=px,
+                    )
+                    size_meta["risk_pct_used"] = r_eff
+                    size_meta["dynamic_risk_sizing"] = True
+                    size_meta["dd_throttled"] = bool(
+                        abs(float(r_eff) - float(dd_throttle_risk_pct)) < 1e-12
+                    )
                 position = {
                     "index": index,
                     "price": px,
@@ -856,6 +1013,7 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
                     "peak_high": float(frame["high"].iloc[index]),
                     "peak_low": float(frame["low"].iloc[index]),
                     "mae_price_pct": 0.0,
+                    "size_meta": size_meta,
                 }
             continue
         entry_price = position["price"]
@@ -868,7 +1026,7 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
         else:
             adverse = max(0.0, (high - entry_price) / entry_price)
         position["mae_price_pct"] = max(float(position.get("mae_price_pct") or 0.0), adverse)
-        # Protective SL chain — production 0.9% default; NEVER abolished by Phase-2
+        # Protective SL chain — production 0.9% default; NEVER abolished by Phase-2/4
         stop = entry_price * (1-stop_loss_pct if direction == "long" else 1+stop_loss_pct)
         stopped = low <= stop if direction == "long" else high >= stop
         exited, exit_details = evaluate_expression(
@@ -891,8 +1049,19 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
                    else (entry_price-exit_price)/entry_price)
             holding_hours = max(0, index-position["index"])*hours_per_bar
             funding_cost = (holding_hours/8.0)*funding_rate_per_8h*leverage
-            net = raw*leverage-round_cost-funding_cost
+            net_full = raw*leverage-round_cost-funding_cost
+            size_meta = position.get("size_meta") or {"account_fraction": 1.0}
+            frac = float(size_meta.get("account_fraction") or 1.0)
+            if not dynamic_risk_sizing:
+                frac = 1.0
+            net = net_full * frac
             capital *= max(0.0, 1.0+net)
+            if capital > peak_equity:
+                peak_equity = capital
+            if peak_equity > 0:
+                dd = (peak_equity - capital) / peak_equity
+                if dd > max_dd_so_far:
+                    max_dd_so_far = dd
             passed_roles = set(
                 row.get("role") for row in (exit_details or [])
                 if row.get("passed") and row.get("role")
@@ -920,19 +1089,35 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
             trades.append({"entry_index": position["index"], "exit_index": index,
                            "entry_time": str(frame.index[position["index"]]),
                            "exit_time": str(frame.index[index]), "pnl_ratio": net,
-                           "transaction_cost_ratio": round_cost+funding_cost,
+                           "pnl_ratio_full_size": net_full,
+                           "transaction_cost_ratio": (round_cost+funding_cost) * frac,
                            "friction_scenario": friction_scenario,
                            "profit": net > 0, "stop_loss": stopped,
                            "exit_type": exit_type,
                            "leverage": int(leverage),
                            "mae_price_pct": float(position.get("mae_price_pct") or 0.0),
+                           "account_fraction": frac,
+                           "sizing": size_meta,
                            "entry_conditions": position["conditions"],
                            "exit_conditions": exit_details})
             position = None
     wins = sum(1 for row in trades if row["profit"])
     return {"strategy_key": strategy["key"], "total_trades": len(trades),
             "win_rate_percent": wins/float(len(trades))*100.0 if trades else 0.0,
-            "total_return_percent": (capital-1.0)*100.0, "trades": trades,
+            "total_return_percent": (capital-float(initial_equity or 1.0))*100.0
+            if initial_equity else (capital-1.0)*100.0,
+            "trades": trades,
             "dsl_hash": dsl_hash(strategy), "dsl_schema": SCHEMA,
             "stop_loss_pct": float(stop_loss_pct),
-            "structured_exits_enabled": True}
+            "structured_exits_enabled": True,
+            "dynamic_risk_sizing": bool(dynamic_risk_sizing),
+            "risk_pct": float(base_risk) if dynamic_risk_sizing else None,
+            "max_drawdown_observed": float(max_dd_so_far),
+            # Live mount sizing remains human-confirm B-grade until separately approved.
+            "production_mount_sizing": {
+                "grade": "B",
+                "position_pct": PRODUCTION_B_GRADE_POSITION_PCT,
+                "leverage": PRODUCTION_LEVERAGE,
+                "stop_loss_pct": PRODUCTION_STOP_LOSS_PCT,
+                "dynamic_r_applies_to_live": False,
+            }}

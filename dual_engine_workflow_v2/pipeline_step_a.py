@@ -930,6 +930,56 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             task["phase3_funnel"].get("reject_reasons") or []
         ) + list(l3.get("reject_reasons") or [])
 
+    # Phase-4 incubator only when L1–L3 all pass (fail-closed overfit cull)
+    phase3_ok = (
+        bool(l1.get("pass")) and bool(l2.get("pass")) and bool(l3.get("pass"))
+    )
+    incubator = None
+    if phase3_ok:
+        from .incubator import run_incubator, metrics_from_trades as _inc_metrics
+        incub_base = dict(base_m)
+        incub_extra = _inc_metrics(trades)
+        for _k in ("calmar", "payoff_ratio", "classic_expectancy", "mean_mae", "trades"):
+            if incub_base.get(_k) is None:
+                incub_base[_k] = incub_extra.get(_k)
+        incubator = run_incubator(
+            definition=definition,
+            target_symbol=sym,
+            timeframe=tf,
+            baseline_trades=trades,
+            baseline_metrics=incub_base,
+            baseline_frame=frame_for_funnel,
+            backtest_fn=_funnel_bt,
+            stop_loss_pct=0.009,
+        )
+        task["phase4_incubator"] = incubator
+        task["phase3_funnel"]["phase4_incubator"] = {
+            "pass": incubator.get("pass"),
+            "cross_asset_score": incubator.get("cross_asset_score"),
+            "rejected_at": incubator.get("rejected_at"),
+        }
+        if not incubator.get("pass"):
+            task["stage"] = "archived"
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(
+                task, stage="phase4_incubator",
+                failed_tests=["incubator"],
+                reason="Phase4 incubator reject: %s" % ",".join(
+                    incubator.get("reject_reasons") or ["incubator_fail"]),
+                verdict="phase4_incubator_reject",
+                is_mech_absent=True,
+            )
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {
+                "ok": False, "task_id": tid, "reason": "phase4_incubator_fail",
+                "phase4_incubator": incubator,
+                "phase3_funnel": task["phase3_funnel"],
+                "gate_results": task["gate_results"],
+                "production_mounted": False,
+            }
+
     g3 = evaluate_gate3(wf, trades=trades, base_metrics=base_m, null_hypothesis=l3)
     task["gates"].extend([g2, g3])
     task["walk_forward"] = {
@@ -1201,19 +1251,32 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     # ---- Gate7 human confirm (no auto mount) ----
     task["stage"] = "gate7_human_confirm"
     import auto_trade_human_confirm_pipeline as pipeline
+    from .incubator import metrics_from_trades as _inc_metrics_g7
+    incub = task.get("phase4_incubator") or {}
+    incub_m = incub.get("baseline_metrics") or _inc_metrics_g7(trades)
     ai_review = {
         "approved": True,
-        "policy": "step_a_gates_0_6_pass",
+        "policy": "step_a_gates_0_6_pass_phase4_incubator",
         "ai_theoretical_wr_avg": task["split_scores"].get("ai_logic_wr", {}).get("win_rate_pct"),
-        "natural_language": "STEP A gates0-6 pass; awaiting human confirm. NOT live-ready.",
+        "natural_language": (
+            "STEP A gates0-6 + Phase3 funnel + Phase4 incubator pass; "
+            "awaiting human confirm. NOT live-ready. production_mounted=False."
+        ),
         "split_scores": task["split_scores"],
         "step_a": True,
+        "phase4_incubator": True,
+        "calmar": incub.get("calmar") or incub_m.get("calmar") or base_m.get("calmar"),
+        "payoff": incub.get("payoff_ratio") or incub_m.get("payoff_ratio") or base_m.get("payoff_ratio"),
+        "cross_asset_score": incub.get("cross_asset_score"),
+        "mean_mae": incub.get("mean_mae") or incub_m.get("mean_mae"),
     }
     push = pipeline.ingest_and_screen(
         {"dsl": definition, "symbol": sym, "timeframe": tf,
          "thesis": book.get("thesis"), "mechanism_spec": spec,
          "mechanism_statement": stmt, "mechanism_fingerprint": fp_a,
-         "live_enabled": False, "auto_trade_eligible": False},
+         "live_enabled": False, "auto_trade_eligible": False,
+         "production_mounted": False,
+         "phase4_incubator": incub},
         source="dual_engine_step_a",
         ai_review=ai_review,
         require_ai_review=True,
@@ -1230,7 +1293,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     g7 = evaluate_gate7(human_state)
     task["gates"].append(g7)
     task["gate_results"] = assemble_gate_results(task["gates"], tid)
-    # production_mounted stays false
+    # production_mounted stays false until CLI --confirm (B grade 30% only)
     task["gate_results"]["production_mounted"] = False
     save_gate_results(tid, task["gate_results"])
 
@@ -1246,6 +1309,8 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         "annotation": ai_review["natural_language"],
         "workflow_version": WORKFLOW_VERSION,
         "step_a": True,
+        "phase4_incubator_pass": bool(incub.get("pass")),
+        "production_mounted": False,
     })
     return {
         "ok": bool(push.get("ok")),
@@ -1256,6 +1321,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         "counts_as_independent_mechanism": task.get("counts_as_independent_mechanism"),
         "production_mounted": False,
         "split_scores": task["split_scores"],
+        "phase4_incubator": incub,
     }
 
 

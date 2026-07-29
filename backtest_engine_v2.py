@@ -2388,7 +2388,20 @@ def run_backtest(
     timeframe="1h",
     friction_scenario="observed_base",
     account_position_ratio=1.0,
+    # Phase-4 research dynamic R (does NOT alter live B-grade 30%/20x mount).
+    dynamic_risk_sizing=False,
+    risk_pct=0.012,
+    atr_target_multiplier=1.0,
+    atr_size_period=14,
+    dd_throttle_risk_pct=0.005,
+    dd_throttle_of_max_dd=0.50,
 ):
+    """Run engine backtest.
+
+    Protective stop_loss_pct default 0.9%. When dynamic_risk_sizing=True,
+    research/incubator evaluation uses ATR-based R; production CLI --confirm
+    mount remains B/30%/20x until separately approved (do not silently change).
+    """
     logger = init_backtest_logger(strategy_name)
     start_perf = time.time()
 
@@ -2479,10 +2492,23 @@ def run_backtest(
         account_position_ratio = max(0.0, min(1.0, float(account_position_ratio)))
         margin_cap = 1.0
         account_cap = 1.0
+        peak_equity = 1.0
+        max_dd_so_far = 0.0
         pos = None
         entry_p = 0.0
         entry_idx = 0
         entry_data = {}
+        entry_size_frac = account_position_ratio
+        entry_sizing = None
+
+        # Optional Phase-4 ATR sizing helpers (research only)
+        _dsl_size = None
+        if dynamic_risk_sizing:
+            try:
+                import auto_trade_strategy_dsl as _dsl_mod
+                _dsl_size = _dsl_mod
+            except Exception:
+                _dsl_size = None
 
         telemetry = {
             "bars_scanned": 0,
@@ -2521,6 +2547,36 @@ def run_backtest(
                     entry_p = float(info.get("price", c[i]))
                     entry_idx = i
                     entry_data = info
+                    entry_size_frac = account_position_ratio
+                    entry_sizing = None
+                    if dynamic_risk_sizing and _dsl_size is not None:
+                        try:
+                            # ATR from recent bars (price units)
+                            period = int(atr_size_period or 14)
+                            trs = []
+                            for j in range(max(1, i - period + 1), i + 1):
+                                tr = max(
+                                    h[j] - l[j],
+                                    abs(h[j] - c[j - 1]),
+                                    abs(l[j] - c[j - 1]),
+                                )
+                                trs.append(tr)
+                            atr_v = (sum(trs) / float(len(trs))) if trs else entry_p * 0.01
+                            r_eff = _dsl_size.effective_risk_pct(
+                                risk_pct, account_cap, peak_equity, max_dd_so_far,
+                                dd_throttle_risk_pct=dd_throttle_risk_pct,
+                                dd_throttle_of_max_dd=dd_throttle_of_max_dd,
+                            )
+                            entry_sizing = _dsl_size.atr_position_size(
+                                account_cap, r_eff, atr_v,
+                                target_multiplier=atr_target_multiplier,
+                                entry_price=entry_p,
+                            )
+                            entry_size_frac = float(entry_sizing.get("account_fraction") or 0.0)
+                            entry_sizing["risk_pct_used"] = r_eff
+                        except Exception:
+                            entry_size_frac = account_position_ratio
+                            entry_sizing = {"error": "atr_size_fallback"}
                     telemetry["actual_opens"] += 1
             else:
                 sl_price = entry_p * (1 - stop_loss_pct) if direction == "long" else entry_p * (1 + stop_loss_pct)
@@ -2548,7 +2604,14 @@ def run_backtest(
                     transaction_cost_ratio = round_trip_cost_ratio+funding_cost_ratio
                     net_lev_pnl = gross_lev_pnl - transaction_cost_ratio
                     margin_cap *= max(0.0, 1 + net_lev_pnl)
-                    account_cap *= max(0.0, 1 + net_lev_pnl*account_position_ratio)
+                    size_frac = float(entry_size_frac if dynamic_risk_sizing else account_position_ratio)
+                    account_cap *= max(0.0, 1 + net_lev_pnl * size_frac)
+                    if account_cap > peak_equity:
+                        peak_equity = account_cap
+                    if peak_equity > 0:
+                        dd_now = (peak_equity - account_cap) / peak_equity
+                        if dd_now > max_dd_so_far:
+                            max_dd_so_far = dd_now
 
                     _trade = {
                         "instrument": normalized_inst,
@@ -2559,8 +2622,9 @@ def run_backtest(
                         "gross_pnl_ratio": float(gross_lev_pnl),
                         "transaction_cost_ratio": float(transaction_cost_ratio),
                         "friction_scenario": friction_scenario,
-                        "pnl_ratio": float(net_lev_pnl),
-                        "profit": bool(net_lev_pnl > 0),
+                        "pnl_ratio": float(net_lev_pnl * size_frac) if dynamic_risk_sizing else float(net_lev_pnl),
+                        "pnl_ratio_full_size": float(net_lev_pnl),
+                        "profit": bool((net_lev_pnl * size_frac) > 0) if dynamic_risk_sizing else bool(net_lev_pnl > 0),
                         "stop_loss": bool(is_sl),
                         "exit_type": exit_type,
                         "tp_class": tp_class,
@@ -2570,7 +2634,7 @@ def run_backtest(
                         _trade["mae_price_pct"] = float(entry_data.get("mae_price_pct") or 0.0)
                     if isinstance(exit_info, dict) and exit_info.get("mae_price_pct") is not None:
                         _trade["mae_price_pct"] = float(exit_info.get("mae_price_pct") or 0.0)
-                    _bt_ret_pct = round(net_lev_pnl * 100.0, 2)
+                    _bt_ret_pct = round(float(_trade["pnl_ratio"]) * 100.0, 2)
                     _trade['leverage'] = int(leverage)
                     _trade['stop_loss_ratio'] = float(stop_loss_pct)
                     _trade['stop_loss_pct'] = float(stop_loss_pct)
@@ -2581,10 +2645,12 @@ def run_backtest(
                     _trade['roi'] = _bt_ret_pct
                     _trade['roi_pct'] = _bt_ret_pct
                     _trade['leveraged_return_pct'] = _bt_ret_pct
-                    _trade['full_margin_return_pct'] = _bt_ret_pct
-                    _trade['account_position_ratio'] = account_position_ratio
-                    _trade['account_return_pct'] = round(
-                        net_lev_pnl*account_position_ratio*100.0, 2)
+                    _trade['full_margin_return_pct'] = round(net_lev_pnl * 100.0, 2)
+                    _trade['account_position_ratio'] = size_frac
+                    _trade['account_return_pct'] = round(net_lev_pnl * size_frac * 100.0, 2)
+                    _trade['dynamic_risk_sizing'] = bool(dynamic_risk_sizing)
+                    if entry_sizing is not None:
+                        _trade['sizing'] = entry_sizing
                     trades.append(_trade)
                     pos = None
                     telemetry["actual_closes"] += 1

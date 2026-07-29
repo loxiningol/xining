@@ -12,7 +12,7 @@ import json
 import math
 from datetime import datetime
 
-COMPILER_VERSION = "windtalker_phase4_candidate_ir_compiler_v1_phase2_exits"
+COMPILER_VERSION = "windtalker_phase4_candidate_ir_compiler_v1_phase4_risk"
 IR_SCHEMA_VERSION = "windtalker_candidate_ir_v1"
 FORBIDDEN_PROXY_FEATURES = {
     "rsi", "ema", "sma", "macd", "cci", "vwap", "stoch", "bbands",
@@ -63,6 +63,7 @@ def candidate_ir_schema():
         "required_sections": [
             "identity", "data_deps", "state_machine", "event_order",
             "entry", "exit", "causal_structure", "compile_bans",
+            "research_risk_sizing",
         ],
         "identity": {
             "fields": [
@@ -70,6 +71,21 @@ def candidate_ir_schema():
                 "source_research_ast_hash", "candidate_ir_version", "created_at",
                 "promotion_status",
             ]
+        },
+        "research_risk_sizing": {
+            "fields": [
+                "enabled", "formula", "risk_pct_default", "risk_pct_min", "risk_pct_max",
+                "atr_period", "target_multiplier", "dd_throttle_risk_pct",
+                "dd_throttle_of_max_dd", "production_mount_unchanged",
+            ],
+            "formula": "(Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)",
+            "note": (
+                "Research/incubator BT only. Production mount via CLI --confirm "
+                "remains B-grade 30% / 20x / 0.9% SL until separately approved."
+            ),
+            "production_b_grade_position_pct": 0.30,
+            "production_leverage": 20,
+            "production_stop_loss_pct": 0.009,
         },
         "data_deps": {
             "fields": [
@@ -328,6 +344,24 @@ def research_strategy_to_ir(probe_id, strategy, class_name, promotion_status="br
             "expected_event_order_destruction_effect": "overlap_with_base_collapses",
         },
         "compile_bans": list(candidate_ir_schema()["compile_bans"]),
+        "research_risk_sizing": {
+            # Research/incubator evaluation only — live mount stays B/30%/20x
+            # via CLI --confirm until separately approved.
+            "enabled": True,
+            "formula": "(Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)",
+            "risk_pct_default": 0.012,
+            "risk_pct_min": 0.010,
+            "risk_pct_max": 0.015,
+            "atr_period": 14,
+            "target_multiplier": 1.0,
+            "dd_throttle_risk_pct": 0.005,
+            "dd_throttle_of_max_dd": 0.50,
+            "production_mount_unchanged": True,
+            "production_b_grade_position_pct": 0.30,
+            "production_leverage": 20,
+            "production_stop_loss_pct": 0.009,
+            "dynamic_r_applies_to_live": False,
+        },
         "source_research_strategy": strat,
         "equivalence_research_strategy": None,  # filled after ordered normalization
     }
@@ -483,6 +517,21 @@ def _validate_ir(ir):
                 "entry", "exit", "causal_structure", "compile_bans"):
         if sec not in ir:
             raise CompilerError("IR missing section: %s" % sec)
+    # Phase-4 additive: default research dynamic R metadata if absent (legacy IR ok)
+    if "research_risk_sizing" not in ir:
+        ir["research_risk_sizing"] = {
+            "enabled": True,
+            "formula": "(Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)",
+            "risk_pct_default": 0.012,
+            "risk_pct_min": 0.010,
+            "risk_pct_max": 0.015,
+            "atr_period": 14,
+            "target_multiplier": 1.0,
+            "dd_throttle_risk_pct": 0.005,
+            "dd_throttle_of_max_dd": 0.50,
+            "production_mount_unchanged": True,
+            "dynamic_r_applies_to_live": False,
+        }
 
     feats = set(ir["data_deps"].get("all_features") or [])
     for f in feats:
@@ -661,6 +710,14 @@ def compile_candidate_ir(ir, allow_partial=False):
             "description": "phase4 bridge formal from candidate IR",
             "origin": "windtalker_phase4_bridge",
             "version": 1,
+            # Phase-4 research dynamic R metadata (NOT live mount sizing)
+            "research_risk_sizing": ir.get("research_risk_sizing") or {
+                "enabled": True,
+                "formula": "(Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)",
+                "production_mount_unchanged": True,
+                "dynamic_r_applies_to_live": False,
+            },
+            "dynamic_risk_sizing_default": True,
         }
         # Strip None multi_asset
         if formal["multi_asset"] is None:
