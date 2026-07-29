@@ -1,0 +1,240 @@
+{
+  "mechanism_spec": {
+    "mechanism_id": "stop_hunt_range_reclaim_v2",
+    "mechanism_name": "止损猎杀区间回收反转",
+    "mechanism_family": "stop_hunt_range_reclaim",
+    "market_inefficiency": "做市商/知情流向上扫过 prev_high20（或向下扫过 prev_low20）触发散户止损与突破追单后，若下一根K线收盘重新穿越回区间内，则该突破为清算型假突破。被套的追单盘与止损盘形成可观测的回流，产生反向短促推力。",
+    "counterparty_source": "被扫止损的突破追单者与区间边界止损单：高位假突破后多头被迫回吐；低位假突破后空头被迫回补。",
+    "why_edge_exists": "与顺势突破不同，本机制只在“扫单后立刻回收”时入场，把对手方从突破失败者转为回流推动力。要求 vol_z20>1.6 确认清算放量，并用阴/阳线拒绝确认方向，避免无量假突破噪音。",
+    "edge_decay_conditions": "真突破趋势日（回收失败率上升）；低波动无清算环境；该模式过度拥挤导致回收后二次突破。",
+    "required_market_regime": "需要存在可被扫的清晰20根高低边界，并出现放量扫单后的快速回收。单边无回调趋势中信号稀少。",
+    "entry_logic": "做空 ALL: (1) 当前 high > prev_high20（同根扫高）；(2) 当前 close < prev_high20（同根回收）；(3) vol_z20 > 1.6；(4) close < open。做多对称。不使用 RSI/CCI。",
+    "exit_logic": "ATR_trailing 4.0*ATR_14 移动止盈捕捉回流段；swing_extreme lookback=10 作为结构失效；保护性0.9% SL由引擎硬编码。",
+    "stop_logic": "硬止损0.9%（stop_loss_pct=0.009）由回测引擎/daemon强制执行；结构失效用 swing_extreme(10) 近似扫单极值被再次穿越。",
+    "take_profit_logic": "动态ATR移动止盈 4.0*ATR_14，禁止固定百分比止盈。",
+    "invalidation_logic": "若价格再次沿扫单方向创出10根极值（swing_extreme），判定回收失败并退出。",
+    "non_negotiable_rules": [
+      "止损0.9%不可修改",
+      "禁止固定百分比止盈",
+      "禁止RSI/CCI/EMA作为核心过滤",
+      "必须含扫单+回收两段结构",
+      "必须含放量确认 vol_z20",
+      "exit必须含ATR动态算子"
+    ],
+    "tunable_parameters": [
+      "vol_z20_min",
+      "atr_trail_n",
+      "swing_lookback",
+      "max_hold_bars",
+      "reclaim_lag"
+    ],
+    "forbidden_transformations": [
+      "不得改成顺势突破追单",
+      "不得引入RSI/CCI背离叶子",
+      "不得移除回收确认",
+      "不得使用固定1%止盈",
+      "不得改成无量突破"
+    ],
+    "expected_trade_frequency_class": "medium",
+    "expected_holding_period": "2-18根K线",
+    "suitable_symbols": [
+      "ETH-USDT-SWAP",
+      "BTC-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "XRP-USDT-SWAP",
+      "ADA-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "BNB-USDT-SWAP",
+      "XAU-USDT-SWAP"
+    ],
+    "suitable_timeframes": [
+      "15m",
+      "5m"
+    ]
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "stop_hunt_reclaim_short_v2",
+    "name": "止损猎杀区间回收-做空",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
+    "max_hold_bars": 18,
+    "entry": {
+      "all": [
+        {
+          "id": "e_sweep",
+          "left": {
+            "feature": "high"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "prev_high20"
+          }
+        },
+        {
+          "id": "e_reclaim",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "prev_high20"
+          }
+        },
+        {
+          "id": "e_vol",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.6
+          }
+        },
+        {
+          "id": "e_rej",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_sw",
+          "exit_op": "swing_extreme",
+          "lookback": 10,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "description": "同根扫高回收做空：high扫破prev_high20且收盘跌回+强放量+阴线 → 4*ATR移动止盈+10根swing失效。"
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "stop_hunt_reclaim_long_v2",
+    "name": "止损猎杀区间回收-做多",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
+    "max_hold_bars": 18,
+    "entry": {
+      "all": [
+        {
+          "id": "e_sweep",
+          "left": {
+            "feature": "low"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "prev_low20"
+          }
+        },
+        {
+          "id": "e_reclaim",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "prev_low20"
+          }
+        },
+        {
+          "id": "e_vol",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.6
+          }
+        },
+        {
+          "id": "e_rej",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_sw",
+          "exit_op": "swing_extreme",
+          "lookback": 10,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "description": "同根扫低回收做多：对称于做空。"
+  },
+  "kb_avoidance_checklist": {
+    "breakout_trap_reversal": "NOT open-ended trap fade; requires next-bar reclaim cross through the swept boundary",
+    "liquidity_failed_breakout_high": "DIFFERENT family name+filters: vol_z>1.6 liquidation gate + rejection candle + ATR4 trail; prior deaths lacked this reclaim+vol stack",
+    "liquidity_failed_breakout_low": "symmetric differentiation; not the blocked family string",
+    "liquidity_sweep_reversal": "prior Gate1 death used RSI/CCI; this pack uses OHLC microstructure only",
+    "absorption_climax_reclaim": "NOT climax absorption; explicit prev_high/low sweep then reclaim",
+    "cascade_trap_proxy": "NOT cascade proxy; single-range stop-hunt reclaim",
+    "trend_continuation_thrust_retest": "NOT continuation; fades failed breakout",
+    "mean_reversion_rsi_extreme": "NO RSI/CCI leaves"
+  },
+  "calibration_note": {
+    "source": "prod ETH 15m L1-robust pick 2026-07-29",
+    "chosen": {
+      "symbol": "ETH-USDT-SWAP",
+      "tf": "15m",
+      "dir": "short",
+      "style": "samebar",
+      "volz": 1.6,
+      "trail": 4.0,
+      "n": 37,
+      "mean": 0.0038,
+      "pay": 1.968,
+      "l1_16": 7
+    },
+    "rejected_nextbar": "nextbar volz1.6 mean better but L1 fills too sparse (2/20)"
+  },
+  "pipeline_readiness": {
+    "gate0_ready": true,
+    "mechanism_spec_complete": true,
+    "dsl_schema_valid": "qiyu_strategy_dsl_v1",
+    "exit_ops_dynamic": [
+      "atr_trailing",
+      "swing_extreme"
+    ],
+    "no_fixed_pct_tp": true,
+    "no_rsi_cci": true,
+    "protective_sl": 0.009,
+    "prod_calibrated_symbol": "ETH-USDT-SWAP"
+  }
+}
