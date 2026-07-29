@@ -1,0 +1,35 @@
+{
+  "pack_path": "/root/strategy_session_vol_squeeze_v1.json",
+  "symbol": "ETH-USDT-SWAP",
+  "timeframe": "15m",
+  "direction": "long",
+  "tag": "auto_driver_session_vol_squeeze_v1",
+  "max_iterations": 10,
+  "l1_seed_retries": 8,
+  "ai_providers": ["deepseek", "qwen", "glm"],
+  "prefer_provider": "glm",
+  "ai_max_tokens": 2800,
+  "convergence_eps": 0.02,
+  "convergence_patience": 3,
+  "stagnant_reason_patience": 4,
+  "max_kb_family_bumps": 4,
+  "auto_bump_family_after_gate2": true,
+  "enable_multi_symbol_matrix": false,
+  "report_name": "delivery_report.md",
+  "report_copy_to": "/root/delivery_report_session_vol_squeeze.md",
+  "workdir": null,
+  "vector_root": "/root",
+  "dry_run": false,
+  "optimize_goals": [
+    "family=session_vol_squeeze_expansion_v1 — NEW mechanism; never rename into session_liq_engulf* or compression_release*",
+    "keep asia_range_atr_ratio<0.7 squeeze + hour_utc EU/US open window + asia extreme break + vol_z20>1.5",
+    "exit: atr_trailing n_atr∈[2.5,5.0] prefer ~3.0; no fixed % TP",
+    "never_lower_gate2_floors: payoff/calmar/worst5/remove_max_win thresholds stay",
+    "never mount / human confirm"
+  ],
+  "notes": [
+    "session_liq_engulf lineage archived as limit_reached — do not micro-perturb it.",
+    "Gate2 floors absolute unchanged.",
+    "Host RAM ~764MB: enable_multi_symbol_matrix=false for ETH primary."
+  ]
+}

@@ -1,0 +1,173 @@
+{
+  "ok": true,
+  "errors": [],
+  "schema": "qiyu_step_a_v1",
+  "artifact": "strategy_candidate_pack",
+  "call_id": "prebuilt_session_vol_squeeze_expansion_v1",
+  "attempts": 0,
+  "meta": {
+    "symbol": "ETH-USDT-SWAP",
+    "timeframe": "15m",
+    "direction": "long",
+    "title": "session_vol_squeeze_expansion_v1",
+    "thesis": "Asia [00:00,08:00) UTC range compresses (asia_range/(atr14*sqrt(N_asia_bars)) < 0.7). EU/US open window expands: 15m body breaks asia extreme with vol_z20>1.5. Trail 3.0×ATR_14. Distinct from blocked compression_release_structural_breakout (atr-decline+prev_high20) and archived session_liq_engulf (PDL sweep volz1.8).",
+    "source": "handcraft_workflow_v2_session_vol_squeeze_expansion_v1",
+    "primary_submit": "ETH-USDT-SWAP 15m long",
+    "replaces_archived_family": "session_liq_engulf_displace_matrix"
+  },
+  "mechanism_spec": {
+    "mechanism_id": "mech_session_vol_squeeze_expansion_v1_eth15m",
+    "mechanism_name": "session_vol_squeeze_expansion_v1",
+    "mechanism_family": "session_vol_squeeze_expansion_v1",
+    "market_inefficiency": "Overnight Asia session often prints a compressed High-Low pocket (low asia_range/ATR). When London/NY liquidity arrives (08:00 / 13:00 UTC), trapped overnight inventory is forced through the Asia extreme; first expansion bar with elevated vol_z20 captures the squeeze release.",
+    "counterparty_source": "Asia-range breakout chasers and overnight mean-reversion inventory forced to cover as EU/US session expands through the compressed Asia box.",
+    "why_edge_exists": "Asia range is a discrete completed UTC session box (not rolling Donchian20 / not PDL SFP). ATR_Ratio<0.7 selects true compression; timed open-window + vol_z20>1.5 filters dead breaks; 3.0×ATR trail harvests expansion without fixed % TP.",
+    "edge_decay_conditions": "Asia already trending (ATR_Ratio high); holiday Asia with no EU/US follow-through; overcrowded ORB bots on the same box; gap opens that skip the Asia extreme.",
+    "required_market_regime": "Two-way crypto/commodity sessions with a quiet Asia print then EU/US expansion. Features: hour_utc, asia_high/low/mid/range, asia_range_atr_ratio, vol_z20, OHLC. No EMA/CCI/RSI core.",
+    "entry_logic": "LONG ALL: (1) asia_range_atr_ratio < 0.7; (2) 8 <= hour_utc < 16; (3) close > asia_high; (4) vol_z20 > 1.5; (5) close > open. SHORT mirror on asia_low.",
+    "exit_logic": "atr_trailing n_atr=3.0 ATR_14 take_profit; swing_extreme lookback=12 invalidation (asia-box failure proxy); protective SL 0.9% immutable (outer hard stop; logical risk ~asia_mid / ~1.5×ATR when tighter); max_hold_bars=32; no fixed % TP.",
+    "stop_logic": "Logical invalidation: reclaim back through asia_mid / ~1.5×ATR_14 via swing_extreme(12). Outer protective SL 0.9% immutable.",
+    "take_profit_logic": "No fixed % TP. atr_trailing 3.0×ATR_14 only.",
+    "invalidation_logic": "swing_extreme lookback=12; max_hold_bars=32; Asia extreme acceptance without follow-through.",
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "no_ema_cci_rsi_as_core_edge",
+      "must_keep_asia_range_squeeze_anchor",
+      "must_keep_asia_range_atr_ratio_lt_0_7",
+      "must_keep_eu_us_open_window_hour_utc",
+      "must_keep_vol_z20_gt_1_5",
+      "must_keep_directional_expansion_body",
+      "must_use_atr_trailing",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm",
+      "not_rename_into_blocked_session_liq_or_compression_release_families"
+    ],
+    "tunable_parameters": [
+      "asia_range_atr_ratio_max",
+      "vol_z20_min",
+      "atr_trail_n",
+      "swing_lookback",
+      "max_hold_bars",
+      "hour_utc_window"
+    ],
+    "forbidden_transformations": [
+      "rename_into_session_liq_engulf_or_compression_release_structural_breakout",
+      "swap_asia_box_to_pdl_pdh_sfp_sweep",
+      "inject_ema_cci_rsi_as_core_filter",
+      "add_fixed_micro_tp_below_2pct",
+      "remove_asia_range_atr_ratio_or_open_window",
+      "weaken_or_widen_0.9_protective_sl",
+      "auto_mount_or_confirm_without_human",
+      "lower_gate2_floors"
+    ],
+    "expected_trade_frequency_class": "selective_0.2_to_1_0_per_day_15m",
+    "expected_holding_period": "2_to_32_bars_15m",
+    "suitable_symbols": [
+      "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP", "DOGE-USDT-SWAP",
+      "BNB-USDT-SWAP", "ADA-USDT-SWAP", "LTC-USDT-SWAP", "LINK-USDT-SWAP", "AVAX-USDT-SWAP",
+      "SUI-USDT-SWAP", "PEPE-USDT-SWAP", "BONK-USDT-SWAP", "WIF-USDT-SWAP", "NEAR-USDT-SWAP",
+      "APT-USDT-SWAP", "ARB-USDT-SWAP", "OP-USDT-SWAP", "INJ-USDT-SWAP", "SEI-USDT-SWAP",
+      "TIA-USDT-SWAP", "DOT-USDT-SWAP", "ATOM-USDT-SWAP", "UNI-USDT-SWAP", "AAVE-USDT-SWAP",
+      "FIL-USDT-SWAP", "ICP-USDT-SWAP", "RENDER-USDT-SWAP", "ONDO-USDT-SWAP", "JUP-USDT-SWAP",
+      "ORDI-USDT-SWAP", "WLD-USDT-SWAP", "TRX-USDT-SWAP", "BCH-USDT-SWAP", "ETC-USDT-SWAP",
+      "XAU-USDT-SWAP", "XAG-USDT-SWAP", "CL-USDT-SWAP"
+    ],
+    "suitable_timeframes": ["15m", "5m"]
+  },
+  "dsl": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "session_vol_squeeze_expansion_v1_eth15m_long",
+    "name": "session_vol_squeeze_expansion_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": ["ETH-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {"id": "e_asia_squeeze", "left": {"feature": "asia_range_atr_ratio"}, "op": "lt", "right": {"value": 0.7}},
+        {"id": "e_eu_us_open_ge", "left": {"feature": "hour_utc"}, "op": "gte", "right": {"value": 8.0}},
+        {"id": "e_eu_us_open_lt", "left": {"feature": "hour_utc"}, "op": "lt", "right": {"value": 16.0}},
+        {"id": "e_break_asia_high", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "asia_high"}},
+        {"id": "e_vol_expand", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.5}},
+        {"id": "e_bull_body", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}}
+      ]
+    },
+    "exit": {
+      "any": [
+        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.0, "atr_period": 14, "role": "take_profit"},
+        {"id": "x_sw_inv", "exit_op": "swing_extreme", "lookback": 12, "role": "invalidation"}
+      ]
+    },
+    "max_hold_bars": 32,
+    "description": "step_a|session_vol_squeeze_expansion_v1|asia_atr_ratio_lt0.7|hour8_16|break_asia_high|volz1.5|atr_trail3.0|sw12|sl0.9",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "session_vol_squeeze_expansion_v1_eth15m_long",
+    "name": "session_vol_squeeze_expansion_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": ["ETH-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {"id": "e_asia_squeeze", "left": {"feature": "asia_range_atr_ratio"}, "op": "lt", "right": {"value": 0.7}},
+        {"id": "e_eu_us_open_ge", "left": {"feature": "hour_utc"}, "op": "gte", "right": {"value": 8.0}},
+        {"id": "e_eu_us_open_lt", "left": {"feature": "hour_utc"}, "op": "lt", "right": {"value": 16.0}},
+        {"id": "e_break_asia_high", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "asia_high"}},
+        {"id": "e_vol_expand", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.5}},
+        {"id": "e_bull_body", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}}
+      ]
+    },
+    "exit": {
+      "any": [
+        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.0, "atr_period": 14, "role": "take_profit"},
+        {"id": "x_sw_inv", "exit_op": "swing_extreme", "lookback": 12, "role": "invalidation"}
+      ]
+    },
+    "max_hold_bars": 32,
+    "description": "step_a|session_vol_squeeze_expansion_v1|asia_atr_ratio_lt0.7|hour8_16|break_asia_high|volz1.5|atr_trail3.0|sw12|sl0.9",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "session_vol_squeeze_expansion_v1_eth15m_short",
+    "name": "session_vol_squeeze_expansion_short",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": ["ETH-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {"id": "e_asia_squeeze", "left": {"feature": "asia_range_atr_ratio"}, "op": "lt", "right": {"value": 0.7}},
+        {"id": "e_eu_us_open_ge", "left": {"feature": "hour_utc"}, "op": "gte", "right": {"value": 8.0}},
+        {"id": "e_eu_us_open_lt", "left": {"feature": "hour_utc"}, "op": "lt", "right": {"value": 16.0}},
+        {"id": "e_break_asia_low", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "asia_low"}},
+        {"id": "e_vol_expand", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.5}},
+        {"id": "e_bear_body", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "open"}}
+      ]
+    },
+    "exit": {
+      "any": [
+        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.0, "atr_period": 14, "role": "take_profit"},
+        {"id": "x_sw_inv", "exit_op": "swing_extreme", "lookback": 12, "role": "invalidation"}
+      ]
+    },
+    "max_hold_bars": 32,
+    "description": "step_a|session_vol_squeeze_expansion_v1|short|asia_atr_ratio_lt0.7|hour8_16|break_asia_low|volz1.5|atr_trail3.0|sw12|sl0.9",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "pipeline_readiness": {
+    "prebuilt": true,
+    "human_confirm_required_for_mount": true,
+    "auto_mount": false
+  }
+}

@@ -476,6 +476,93 @@ def precompute_indicators(df, timeframe="1h"):
     vol_std = vol.rolling(20, min_periods=20).std()
     df["vol_z20"] = (vol - vol_mean) / vol_std.replace(0, np.nan)
 
+    # Prior-day high/low/close (PDH/PDL/PDC): completed UTC day only.
+    # daily.shift(1) + ffill ⇒ intraday bars on day D see only day D-1 (no lookahead).
+    ohlc_cols = ["open", "high", "low", "close"]
+    daily = df[ohlc_cols].resample("1D", label="left", closed="left").agg({
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+    }).dropna()
+    prior_day = daily.shift(1)
+    df["pdh"] = prior_day["high"].reindex(df.index, method="ffill")
+    df["pdl"] = prior_day["low"].reindex(df.index, method="ffill")
+    df["pdc"] = prior_day["close"].reindex(df.index, method="ffill")
+
+    # 4h swing extremes over prior 24 completed 4h bars (~4 days).
+    # Rolling uses shift(1) so the forming 4h bar is excluded; outer shift(1)
+    # before LTF align matches h1_* (only previous fully closed HTF bar).
+    h4 = df[ohlc_cols].resample("4h", label="left", closed="left").agg({
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+    }).dropna()
+    h4_feats = pd.DataFrame(index=h4.index)
+    h4_feats["h4_high24"] = h4["high"].shift(1).rolling(24, min_periods=24).max()
+    h4_feats["h4_low24"] = h4["low"].shift(1).rolling(24, min_periods=24).min()
+    h4_feats = h4_feats.shift(1).reindex(df.index, method="ffill")
+    for column in h4_feats.columns:
+        df[column] = h4_feats[column]
+
+    # Asia session [00:00, 08:00) UTC range anchors (no lookahead).
+    # Completed Asia high/low for UTC day D becomes visible only on bars with
+    # hour_utc >= 8.0; bars still inside Asia see the previous day's Asia range.
+    try:
+        idx = df.index
+        if getattr(idx, "tz", None) is not None:
+            idx_utc = idx.tz_convert("UTC")
+        else:
+            idx_utc = idx
+        hour_utc = pd.Series(
+            [float(ts.hour) + float(ts.minute) / 60.0 for ts in idx_utc],
+            index=df.index,
+        )
+        df["hour_utc"] = hour_utc
+        day_keys = pd.Series([ts.strftime("%Y-%m-%d") for ts in idx_utc], index=df.index)
+        asia_mask = hour_utc < 8.0
+        asia_high_map = {}
+        asia_low_map = {}
+        if bool(asia_mask.any()):
+            asia_df = pd.DataFrame({
+                "high": h[asia_mask].astype(float),
+                "low": l[asia_mask].astype(float),
+                "day": day_keys[asia_mask].values,
+            })
+            grouped = asia_df.groupby("day")
+            asia_high_map = grouped["high"].max().to_dict()
+            asia_low_map = grouped["low"].min().to_dict()
+        sorted_days = sorted(asia_high_map.keys())
+        prev_day = {}
+        for i, d in enumerate(sorted_days):
+            prev_day[d] = sorted_days[i - 1] if i else None
+        ah_vals = []
+        al_vals = []
+        for hr, day in zip(hour_utc.tolist(), day_keys.tolist()):
+            key = day if float(hr) >= 8.0 else prev_day.get(day)
+            if key is None or key not in asia_high_map:
+                ah_vals.append(np.nan)
+                al_vals.append(np.nan)
+            else:
+                ah_vals.append(float(asia_high_map[key]))
+                al_vals.append(float(asia_low_map[key]))
+        df["asia_high"] = ah_vals
+        df["asia_low"] = al_vals
+        df["asia_mid"] = (df["asia_high"] + df["asia_low"]) * 0.5
+        df["asia_range"] = (df["asia_high"] - df["asia_low"]).astype(float)
+        atr = df["atr14"].astype(float).replace(0, np.nan)
+        # Session-length normalized ratio: Asia is ~8h, while atr14 is a
+        # per-bar measure. Scale by sqrt(N_asia_bars) so "ATR_Ratio<0.7"
+        # means Asia box is compressed vs expected 8h ATR move.
+        tf_norm = normalize_timeframe(timeframe)
+        asia_bars = {"5m": 96.0, "15m": 32.0, "1h": 8.0}.get(tf_norm, 32.0)
+        df["asia_range_atr_ratio"] = df["asia_range"] / (atr * (asia_bars ** 0.5))
+    except Exception:
+        # Fail-open: leave features absent; DSL validate will reject strategies
+        # that require them rather than silently inventing levels.
+        pass
+
     if normalize_timeframe(timeframe) in ("15m", "5m"):
         hourly = df[["open","high","low","close"]].resample(
             "1h",label="left",closed="left"
@@ -544,6 +631,9 @@ def _build_kwargs(df):
         "k","d","j","cci","macd_stick","open","high","low","close",
         "atr14","h1_ema19","h1_ema53","h1_atr14",
         "rsi14","z20","prev_high20","prev_low20","h1_slope4",
+        "vol_z20","pdh","pdl","pdc","h4_high24","h4_low24",
+        "hour_utc","asia_high","asia_low","asia_mid","asia_range",
+        "asia_range_atr_ratio",
     ]:
         if col in df.columns:
             try:
@@ -2322,34 +2412,62 @@ def _dsl_exit_factory(definition):
             "peak_high": peak_high,
             "peak_low": peak_low,
             "mae_price_pct": entry["mae_price_pct"],
+            "partial_taken": bool(entry.get("partial_taken")),
         }
         met, details = dsl.evaluate_expression(
             frame, idx, definition["exit"], explain=True,
             position=position, direction=direction,
         )
         timed = idx - entry_idx >= int(definition["max_hold_bars"])
+        partial_rows, full_rows = dsl.classify_exit_details(details, position)
         structured_px = None
         exit_ops = set()
         for row in (details or []):
             if row.get("passed") and row.get("exit_op"):
                 exit_ops.add(row.get("exit_op"))
+        if timed or full_rows:
+            for row in full_rows:
                 if row.get("exit_price") is not None:
                     structured_px = float(row["exit_price"])
-        if "atr_trailing" in exit_ops:
-            exit_type = "ATR动态追踪退出"
-        elif "swing_extreme" in exit_ops:
-            exit_type = "Swing极值退出"
-        elif timed:
-            exit_type = "定时强制平仓"
-        else:
-            exit_type = "DSL策略止盈"
-        px = structured_px if structured_px is not None else float(c[idx])
-        return met or timed, {
-            "price": px,
-            "exit_type": exit_type,
+                    break
+            if "atr_trailing" in exit_ops:
+                exit_type = "ATR动态追踪退出"
+            elif "swing_extreme" in exit_ops:
+                exit_type = "Swing极值退出"
+            elif timed:
+                exit_type = "定时强制平仓"
+            else:
+                exit_type = "DSL策略止盈"
+            px = structured_px if structured_px is not None else float(c[idx])
+            return True, {
+                "price": px,
+                "exit_type": exit_type,
+                "condition_checks": details,
+                "mae_price_pct": float(entry.get("mae_price_pct") or 0.0),
+                "dsl_hash": dsl.dsl_hash(definition),
+                "partial_exit": False,
+            }
+        if partial_rows and not entry.get("partial_taken"):
+            row0 = partial_rows[0]
+            ratio = float(row0.get("partial_tp_ratio") or 0.5)
+            px = float(row0["exit_price"]) if row0.get("exit_price") is not None else float(c[idx])
+            return True, {
+                "price": px,
+                "exit_type": "ATR分批止盈",
+                "condition_checks": details,
+                "mae_price_pct": float(entry.get("mae_price_pct") or 0.0),
+                "dsl_hash": dsl.dsl_hash(definition),
+                "partial_exit": True,
+                "partial_tp_ratio": ratio,
+            }
+        # met may be True solely from already-taken partial leaf — ignore
+        return False, {
+            "price": float(c[idx]),
+            "exit_type": "DSL持有",
             "condition_checks": details,
             "mae_price_pct": float(entry.get("mae_price_pct") or 0.0),
             "dsl_hash": dsl.dsl_hash(definition),
+            "partial_exit": False,
         }
     return exit_f
 
@@ -2591,6 +2709,20 @@ def run_backtest(
                 if is_sl or is_exit:
                     exit_p = sl_price if is_sl else float(exit_info.get("price", c[i]))
                     tp_class = int(entry_data.get("tp_class", 2)) if isinstance(entry_data, dict) else 2
+                    is_partial = (
+                        (not is_sl)
+                        and bool(exit_info.get("partial_exit"))
+                        and not bool(entry_data.get("partial_taken"))
+                    )
+                    remaining = float(entry_data.get("remaining_frac", 1.0)) if isinstance(entry_data, dict) else 1.0
+                    if is_partial:
+                        ratio = float(exit_info.get("partial_tp_ratio") or 0.5)
+                        ratio = max(0.1, min(0.9, ratio))
+                        close_remaining_share = ratio
+                        remain_after = remaining * (1.0 - ratio)
+                    else:
+                        close_remaining_share = remaining
+                        remain_after = 0.0
                     if strategy_name == "ema7_center_down_short":
                         exit_type = "\u6b62\u635f" if is_sl else exit_info.get("exit_type", "\u6b62\u76c8\uff08j\u5c0f\u4e8e36.5\u4e14d\u5c0f\u4e8e62\u4e14cci\u5c0f\u4e8e\u8d1f89\uff09")
                     else:
@@ -2603,8 +2735,12 @@ def run_backtest(
                         friction.get("funding_rate_per_8h") or 0.0)*int(leverage)
                     transaction_cost_ratio = round_trip_cost_ratio+funding_cost_ratio
                     net_lev_pnl = gross_lev_pnl - transaction_cost_ratio
-                    margin_cap *= max(0.0, 1 + net_lev_pnl)
-                    size_frac = float(entry_size_frac if dynamic_risk_sizing else account_position_ratio)
+                    base_size = float(entry_size_frac if dynamic_risk_sizing else account_position_ratio)
+                    size_frac = base_size * remaining * close_remaining_share if is_partial else base_size * remaining
+                    # For non-partial legacy path size_frac == base_size when remaining==1
+                    if not is_partial and remaining >= 0.999999:
+                        size_frac = float(entry_size_frac if dynamic_risk_sizing else account_position_ratio)
+                    margin_cap *= max(0.0, 1 + net_lev_pnl * (close_remaining_share if (is_partial or remaining < 0.999999) else 1.0))
                     account_cap *= max(0.0, 1 + net_lev_pnl * size_frac)
                     if account_cap > peak_equity:
                         peak_equity = account_cap
@@ -2622,14 +2758,17 @@ def run_backtest(
                         "gross_pnl_ratio": float(gross_lev_pnl),
                         "transaction_cost_ratio": float(transaction_cost_ratio),
                         "friction_scenario": friction_scenario,
-                        "pnl_ratio": float(net_lev_pnl * size_frac) if dynamic_risk_sizing else float(net_lev_pnl),
+                        "pnl_ratio": float(net_lev_pnl * size_frac) if (dynamic_risk_sizing or is_partial or remaining < 0.999999) else float(net_lev_pnl),
                         "pnl_ratio_full_size": float(net_lev_pnl),
-                        "profit": bool((net_lev_pnl * size_frac) > 0) if dynamic_risk_sizing else bool(net_lev_pnl > 0),
+                        "profit": bool((net_lev_pnl * size_frac) > 0) if (dynamic_risk_sizing or is_partial or remaining < 0.999999) else bool(net_lev_pnl > 0),
                         "stop_loss": bool(is_sl),
                         "exit_type": exit_type,
                         "tp_class": tp_class,
                         "market_regime": market_regimes[entry_idx],
                     }
+                    if is_partial:
+                        _trade["partial_exit"] = True
+                        _trade["partial_tp_ratio"] = float(exit_info.get("partial_tp_ratio") or 0.5)
                     if isinstance(entry_data, dict) and entry_data.get("mae_price_pct") is not None:
                         _trade["mae_price_pct"] = float(entry_data.get("mae_price_pct") or 0.0)
                     if isinstance(exit_info, dict) and exit_info.get("mae_price_pct") is not None:
@@ -2652,8 +2791,15 @@ def run_backtest(
                     if entry_sizing is not None:
                         _trade['sizing'] = entry_sizing
                     trades.append(_trade)
-                    pos = None
-                    telemetry["actual_closes"] += 1
+                    if is_partial:
+                        entry_data["partial_taken"] = True
+                        entry_data["remaining_frac"] = remain_after
+                        # keep position open for remainder trail / SL / time
+                    else:
+                        pos = None
+                        telemetry["actual_closes"] += 1
+                    if is_partial:
+                        telemetry["actual_closes"] += 1
 
         return _native({
             "instrument": normalized_inst,

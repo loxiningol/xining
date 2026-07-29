@@ -137,8 +137,21 @@ def path_is_blocked(path_key, family=None):
     kb = load_failure_kb()
     if path_key and path_key in (kb.get("blocked_paths") or []):
         return True, "blocked_path"
-    if family and family in (kb.get("blocked_families") or []):
+    fam = (family or "").strip()
+    if fam and fam in (kb.get("blocked_families") or []):
         return True, "blocked_family"
+    # limit_reached lineages: block base name and all *_adN descendants so
+    # auto_driver family bumps cannot resume micro-perturbation.
+    if fam:
+        import re
+        fam_base = re.sub(r"_ad\d+$", "", fam)
+        for lf in (kb.get("limit_reached_families") or []):
+            lf = str(lf or "").strip()
+            if not lf:
+                continue
+            lf_base = re.sub(r"_ad\d+$", "", lf)
+            if fam == lf or fam_base == lf_base:
+                return True, "limit_reached_family"
     return False, None
 
 

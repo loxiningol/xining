@@ -20,6 +20,11 @@ FEATURES = {
     "ema75", "ema95", "ema200", "k", "d", "j", "cci", "macd_stick",
     "atr14", "rsi14", "z20", "vol_z20", "prev_high20", "prev_low20",
     "h1_ema19", "h1_ema53", "h1_atr14", "h1_slope4",
+    # Macro SFP anchors (research, no lookahead): prior-day + 4h swing24
+    "pdh", "pdl", "pdc", "h4_high24", "h4_low24",
+    # Session Vol Squeeze anchors (UTC, no lookahead): Asia [00:00,08:00)
+    "hour_utc", "asia_high", "asia_low", "asia_mid", "asia_range",
+    "asia_range_atr_ratio",
 }
 # Research / DSL allowlist — liquid OKX USDT-SWAP universe (expanded 2026-07-25).
 INSTRUMENTS = {
@@ -47,10 +52,15 @@ MAX_LOOKBACK = 240
 
 # ---- Phase-2 structured exits (opt-in; fail-closed on misuse) ----
 # Protective production SL (0.9%) is NOT an exit_op and is never banned here.
-EXIT_OPS = {"atr_trailing", "swing_extreme", "fixed_pct_tp"}
+EXIT_OPS = {"atr_trailing", "swing_extreme", "fixed_pct_tp", "partial_tp_atr"}
 ATR_TRAIL_N_MIN = 2.5
-ATR_TRAIL_N_MAX = 4.0
+ATR_TRAIL_N_MAX = 5.0  # allow Macro SFP 3.5–5.0× ATR_14 harvest window
 ATR_TRAIL_PERIOD_DEFAULT = 14
+# Scale-out lock (N×ATR from entry, NOT fixed % TP). Separate bounds from trail.
+PARTIAL_TP_ATR_N_MIN = 1.5
+PARTIAL_TP_ATR_N_MAX = 4.0
+PARTIAL_TP_RATIO_MIN = 0.1
+PARTIAL_TP_RATIO_MAX = 0.9
 SWING_LOOKBACK_MIN = 5
 SWING_LOOKBACK_MAX = 60
 
@@ -343,7 +353,7 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
             raise DSLValidationError("exit_op is only valid on exit conditions")
         allowed_exit = {
             "id", "exit_op", "role", "n_atr", "atr_period", "lookback",
-            "pct", "price_pct", "params",
+            "pct", "price_pct", "partial_tp_ratio", "params",
         }
         if set(node) - allowed_exit:
             raise DSLValidationError("exit_op node contains unknown fields")
@@ -369,6 +379,27 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
             atr_period = int(node.get("atr_period") or ATR_TRAIL_PERIOD_DEFAULT)
             if atr_period < 2 or atr_period > MAX_LOOKBACK:
                 raise DSLValidationError("atr_period outside 2..%d" % MAX_LOOKBACK)
+        elif exit_op == "partial_tp_atr":
+            # Scale-out lock at N×ATR from entry (NOT fixed %). Fail-closed.
+            if role is not None and role != "take_profit":
+                raise DSLValidationError(
+                    "partial_tp_atr role must be take_profit (got %s)" % role
+                )
+            n_atr = _number(node.get("n_atr", 2.0))
+            if n_atr < PARTIAL_TP_ATR_N_MIN or n_atr > PARTIAL_TP_ATR_N_MAX:
+                raise DSLValidationError(
+                    "partial_tp_atr n_atr must be in [%.1f, %.1f] (got %s)"
+                    % (PARTIAL_TP_ATR_N_MIN, PARTIAL_TP_ATR_N_MAX, n_atr)
+                )
+            atr_period = int(node.get("atr_period") or ATR_TRAIL_PERIOD_DEFAULT)
+            if atr_period < 2 or atr_period > MAX_LOOKBACK:
+                raise DSLValidationError("atr_period outside 2..%d" % MAX_LOOKBACK)
+            ratio = _number(node.get("partial_tp_ratio", 0.5))
+            if ratio < PARTIAL_TP_RATIO_MIN or ratio > PARTIAL_TP_RATIO_MAX:
+                raise DSLValidationError(
+                    "partial_tp_ratio must be in [%.1f, %.1f] (got %s)"
+                    % (PARTIAL_TP_RATIO_MIN, PARTIAL_TP_RATIO_MAX, ratio)
+                )
         elif exit_op == "swing_extreme":
             lookback = int(node.get("lookback") or 20)
             if lookback < SWING_LOOKBACK_MIN or lookback > SWING_LOOKBACK_MAX:
@@ -631,6 +662,29 @@ def evaluate_exit_op(frame, index, node, position, direction, explain=False):
                 "atr": atr, "n_atr": n_atr, "trail": trail,
                 "peak_high": peak_high, "peak_low": peak_low,
             })
+        elif exit_op == "partial_tp_atr":
+            # Lock partial_tp_ratio at N×ATR from entry (scale-out). Not fixed %.
+            if position.get("partial_taken"):
+                passed = False
+                exit_price = close
+                detail.update({"skipped": "already_partial_taken"})
+            else:
+                n_atr = float(node.get("n_atr") or 2.0)
+                atr_period = int(node.get("atr_period") or ATR_TRAIL_PERIOD_DEFAULT)
+                ratio = float(node.get("partial_tp_ratio") or 0.5)
+                atr = _atr_at(frame, index, atr_period)
+                if direction == "long":
+                    target = entry_price + n_atr * atr
+                    passed = high >= target
+                    exit_price = target if passed else close
+                else:
+                    target = entry_price - n_atr * atr
+                    passed = low <= target
+                    exit_price = target if passed else close
+                detail.update({
+                    "atr": atr, "n_atr": n_atr, "target": target,
+                    "partial_tp_ratio": ratio, "partial_exit": True,
+                })
         elif exit_op == "swing_extreme":
             lookback = int(node.get("lookback") or 20)
             swing_high, swing_low = _swing_high_low(frame, index, lookback)
@@ -678,6 +732,24 @@ def evaluate_exit_op(frame, index, node, position, direction, explain=False):
     detail["passed"] = bool(passed)
     detail["exit_price"] = float(exit_price)
     return bool(passed), [detail] if explain else [], float(exit_price)
+
+
+def classify_exit_details(exit_details, position=None):
+    """Split passed exit leaves into partial vs full. Fail-closed on unknown."""
+    partial_rows = []
+    full_rows = []
+    for row in (exit_details or []):
+        if not row.get("passed"):
+            continue
+        op = row.get("exit_op")
+        if op == "partial_tp_atr":
+            if position is not None and position.get("partial_taken"):
+                continue
+            partial_rows.append(row)
+        else:
+            # atr_trailing / swing / fixed / legacy condition leaves → full exit
+            full_rows.append(row)
+    return partial_rows, full_rows
 
 
 def evaluate_expression(frame, index, node, explain=False,
@@ -1040,27 +1112,47 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
             position=position, direction=direction,
         )
         timed = index-position["index"] >= int(strategy["max_hold_bars"])
-        if stopped or exited or timed:
-            # Prefer structured exit_price when present on a passed exit_op leaf
-            structured_px = None
+        partial_rows, full_rows = classify_exit_details(exit_details, position)
+        do_full = bool(stopped or timed or full_rows)
+        do_partial = bool(
+            (not do_full) and partial_rows and not position.get("partial_taken")
+        )
+        if not do_full and not do_partial:
+            continue
+        # Prefer full-exit leaf price; for partial use partial leaf price
+        structured_px = None
+        prefer_rows = full_rows if do_full else partial_rows
+        for row in prefer_rows:
+            if row.get("exit_price") is not None and row.get("exit_op"):
+                structured_px = float(row["exit_price"])
+                break
+        if do_full and not prefer_rows:
             for row in (exit_details or []):
                 if row.get("passed") and row.get("exit_price") is not None and row.get("exit_op"):
+                    if row.get("exit_op") == "partial_tp_atr":
+                        continue
                     structured_px = float(row["exit_price"])
                     break
-            exit_price = stop if stopped else (
-                structured_px if structured_px is not None
-                else float(frame["close"].iloc[index])
-            )
-            raw = ((exit_price-entry_price)/entry_price if direction == "long"
-                   else (entry_price-exit_price)/entry_price)
-            holding_hours = max(0, index-position["index"])*hours_per_bar
-            funding_cost = (holding_hours/8.0)*funding_rate_per_8h*leverage
-            net_full = raw*leverage-round_cost-funding_cost
-            size_meta = position.get("size_meta") or {"account_fraction": 1.0}
-            frac = float(size_meta.get("account_fraction") or 1.0)
-            if not dynamic_risk_sizing:
-                frac = 1.0
-            net = net_full * frac
+        exit_price = stop if stopped else (
+            structured_px if structured_px is not None
+            else float(frame["close"].iloc[index])
+        )
+        raw = ((exit_price-entry_price)/entry_price if direction == "long"
+               else (entry_price-exit_price)/entry_price)
+        holding_hours = max(0, index-position["index"])*hours_per_bar
+        funding_cost = (holding_hours/8.0)*funding_rate_per_8h*leverage
+        net_full = raw*leverage-round_cost-funding_cost
+        size_meta = position.get("size_meta") or {"account_fraction": 1.0}
+        base_frac = float(size_meta.get("account_fraction") or 1.0)
+        if not dynamic_risk_sizing:
+            base_frac = 1.0
+        remaining = float(position.get("remaining_frac", 1.0))
+        if do_partial:
+            ratio = float(partial_rows[0].get("partial_tp_ratio") or 0.5)
+            ratio = max(PARTIAL_TP_RATIO_MIN, min(PARTIAL_TP_RATIO_MAX, ratio))
+            close_frac = base_frac * remaining * ratio
+            remain_after = remaining * (1.0 - ratio)
+            net = net_full * close_frac
             capital *= max(0.0, 1.0+net)
             if capital > peak_equity:
                 peak_equity = capital
@@ -1068,45 +1160,76 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
                 dd = (peak_equity - capital) / peak_equity
                 if dd > max_dd_so_far:
                     max_dd_so_far = dd
-            passed_roles = set(
-                row.get("role") for row in (exit_details or [])
-                if row.get("passed") and row.get("role")
-            )
-            passed_ops = set(
-                row.get("exit_op") for row in (exit_details or [])
-                if row.get("passed") and row.get("exit_op")
-            )
-            if stopped:
-                exit_type = "止损"
-            elif timed:
-                exit_type = "定时强制平仓"
-            elif "atr_trailing" in passed_ops:
-                exit_type = "ATR动态追踪退出"
-            elif "swing_extreme" in passed_ops:
-                exit_type = "Swing极值退出"
-            elif "invalidation" in passed_roles:
-                exit_type = "策略失效退出"
-            elif "take_profit" in passed_roles:
-                exit_type = "策略止盈"
-            else:
-                # Legacy/experimental DSLs without an explicit semantic role
-                # are deliberately not reported as take-profit events.
-                exit_type = "策略规则退出"
-            trades.append({"entry_index": position["index"], "exit_index": index,
-                           "entry_time": str(frame.index[position["index"]]),
-                           "exit_time": str(frame.index[index]), "pnl_ratio": net,
-                           "pnl_ratio_full_size": net_full,
-                           "transaction_cost_ratio": (round_cost+funding_cost) * frac,
-                           "friction_scenario": friction_scenario,
-                           "profit": net > 0, "stop_loss": stopped,
-                           "exit_type": exit_type,
-                           "leverage": int(leverage),
-                           "mae_price_pct": float(position.get("mae_price_pct") or 0.0),
-                           "account_fraction": frac,
-                           "sizing": size_meta,
-                           "entry_conditions": position["conditions"],
-                           "exit_conditions": exit_details})
-            position = None
+            trades.append({
+                "entry_index": position["index"], "exit_index": index,
+                "entry_time": str(frame.index[position["index"]]),
+                "exit_time": str(frame.index[index]), "pnl_ratio": net,
+                "pnl_ratio_full_size": net_full,
+                "transaction_cost_ratio": (round_cost+funding_cost) * close_frac,
+                "friction_scenario": friction_scenario,
+                "profit": net > 0, "stop_loss": False,
+                "exit_type": "ATR分批止盈",
+                "leverage": int(leverage),
+                "mae_price_pct": float(position.get("mae_price_pct") or 0.0),
+                "account_fraction": close_frac,
+                "partial_tp_ratio": ratio,
+                "partial_exit": True,
+                "sizing": size_meta,
+                "entry_conditions": position["conditions"],
+                "exit_conditions": exit_details,
+            })
+            position["partial_taken"] = True
+            position["remaining_frac"] = remain_after
+            continue
+        # Full exit (remaining fraction only if scale-out already hit)
+        frac = base_frac * remaining
+        net = net_full * frac
+        capital *= max(0.0, 1.0+net)
+        if capital > peak_equity:
+            peak_equity = capital
+        if peak_equity > 0:
+            dd = (peak_equity - capital) / peak_equity
+            if dd > max_dd_so_far:
+                max_dd_so_far = dd
+        passed_roles = set(
+            row.get("role") for row in (exit_details or [])
+            if row.get("passed") and row.get("role")
+        )
+        passed_ops = set(
+            row.get("exit_op") for row in (exit_details or [])
+            if row.get("passed") and row.get("exit_op")
+        )
+        if stopped:
+            exit_type = "止损"
+        elif timed:
+            exit_type = "定时强制平仓"
+        elif "atr_trailing" in passed_ops:
+            exit_type = "ATR动态追踪退出"
+        elif "swing_extreme" in passed_ops:
+            exit_type = "Swing极值退出"
+        elif "invalidation" in passed_roles:
+            exit_type = "策略失效退出"
+        elif "take_profit" in passed_roles:
+            exit_type = "策略止盈"
+        else:
+            # Legacy/experimental DSLs without an explicit semantic role
+            # are deliberately not reported as take-profit events.
+            exit_type = "策略规则退出"
+        trades.append({"entry_index": position["index"], "exit_index": index,
+                       "entry_time": str(frame.index[position["index"]]),
+                       "exit_time": str(frame.index[index]), "pnl_ratio": net,
+                       "pnl_ratio_full_size": net_full,
+                       "transaction_cost_ratio": (round_cost+funding_cost) * frac,
+                       "friction_scenario": friction_scenario,
+                       "profit": net > 0, "stop_loss": stopped,
+                       "exit_type": exit_type,
+                       "leverage": int(leverage),
+                       "mae_price_pct": float(position.get("mae_price_pct") or 0.0),
+                       "account_fraction": frac,
+                       "sizing": size_meta,
+                       "entry_conditions": position["conditions"],
+                       "exit_conditions": exit_details})
+        position = None
     wins = sum(1 for row in trades if row["profit"])
     return {"strategy_key": strategy["key"], "total_trades": len(trades),
             "win_rate_percent": wins/float(len(trades))*100.0 if trades else 0.0,
