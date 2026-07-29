@@ -1,9 +1,9 @@
 {
-  "pack_path": "/root/strategy_session_liq_engulf_matrix_ad3_seed.json",
+  "pack_path": "/root/strategy_session_liq_engulf_matrix_ad10_seed.json",
   "symbol": "ETH-USDT-SWAP",
   "timeframe": "15m",
   "direction": "long",
-  "tag": "auto_driver_sess_liq_c2_ad3",
+  "tag": "auto_driver_sess_liq_c2b_ad10",
   "max_iterations": 8,
   "l1_seed_retries": 10,
   "ai_providers": ["deepseek", "qwen", "glm"],
@@ -12,24 +12,20 @@
   "convergence_eps": 0.015,
   "convergence_patience": 3,
   "stagnant_reason_patience": 4,
-  "max_kb_family_bumps": 5,
+  "max_kb_family_bumps": 6,
   "auto_bump_family_after_gate2": true,
   "report_name": "delivery_report.md",
   "report_copy_to": "/root/delivery_report.md",
-  "workdir": "/root/auto_trade/dual_engine/workflow_v2/auto_driver_runs/sess_liq_c2_ad3_20260730",
+  "workdir": "/root/auto_trade/dual_engine/workflow_v2/auto_driver_runs/sess_liq_c2b_ad10_20260730",
   "vector_root": "/root",
   "dry_run": false,
   "optimize_goals": [
-    "gate2_after_l1: prior fingerprint pay≈2.482 w5≈0.893 lottery — do NOT touch entry filters",
-    "scale_out_partial_tp_atr: partial_tp_ratio≈0.5 at n_atr≈2.0–2.5 (NOT fixed % TP)",
-    "remainder_trail: atr_trailing n_atr∈[3.5,5.0] on remaining size",
-    "clear_w5: more near-equal small losses; clear_lottery: multiple same-magnitude wins",
-    "dsl_bounds: atr_trailing n_atr∈[2.5,5.0]; swing lookback∈[5,60]; never vol_z20 threshold <1.8",
-    "family_adN: after Gate2 fail bump family; never lower Gate2 floors; never mount/confirm"
+    "gate2_after_l1: fingerprint pay≈2.482 w5≈0.893 lottery — NEVER mutate entry",
+    "seed already has partial_tp_atr 0.5@2.5ATR + trail 5.0; tune exit only within DSL bounds",
+    "clear_w5 + clear_lottery without raising vol_z above 1.8 or cutting fills",
+    "family_adN bump after Gate2; never mount/confirm; never lower Gate2 floors"
   ],
   "notes": [
-    "Campaign2 after c1 AI_LIMIT_REACHED: sanitize n_atr + preserve L1-passing entry.",
-    "Seed = session_liq ad3 (ad1/ad2 already KB-blocked from c1).",
-    "Do NOT --confirm, do NOT auto-mount, do NOT lower Gate2 floors."
+    "c2b: path shadow fix + Gate2 entry-filter + ad10 scaleout seed"
   ]
 }

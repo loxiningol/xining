@@ -9,4 +9,6 @@ Package layout:
 """
 from __future__ import print_function
 
+from .driver import run_driver
+
 __all__ = ["run_driver"]
