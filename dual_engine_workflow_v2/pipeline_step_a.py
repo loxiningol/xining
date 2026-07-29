@@ -2,6 +2,16 @@
 """STEP A creation pipeline — Gates 0–7, mechanism_spec, 20 tests, failure KB."""
 from __future__ import print_function
 
+# Allow `python3 dual_engine_workflow_v2/pipeline_step_a.py --strategy_json ...`
+# without requiring `python3 -m` (sets package context before relative imports).
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    import sys as _sys
+    from pathlib import Path as _Path
+    _repo_root = _Path(__file__).resolve().parents[1]
+    if str(_repo_root) not in _sys.path:
+        _sys.path.insert(0, str(_repo_root))
+    __package__ = "dual_engine_workflow_v2"
+
 import copy
 import json
 import threading
@@ -29,6 +39,7 @@ from .step_a_config import (
     STEP_A_CODE_VERSION,
     STEP_A_SCHEMA,
     STEP_A_MODES,
+    MECHANISM_SPEC_FIELDS,
     EXHAUSTION_FADE_FAMILY,
     REPAIR_ROUND_TYPES,
     PRODUCTION_CONSTRAINTS,
@@ -1544,3 +1555,207 @@ def start_creation_task_step_a(async_mode=True, symbol=None, timeframe=None,
 def job_snapshot_step_a():
     with _JOB_LOCK:
         return dict(_JOB)
+
+
+def _load_strategy_json_pack(path):
+    """Load a handcraft / Windtalker strategy JSON into prebuilt_spec_pack shape."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    p = _Path(path)
+    if not p.is_file():
+        raise FileNotFoundError("strategy_json not found: %s" % path)
+    pack = _json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(pack, dict):
+        raise ValueError("strategy_json must be a JSON object")
+    if not isinstance(pack.get("mechanism_spec"), dict):
+        raise ValueError("strategy_json missing mechanism_spec object")
+    pack = dict(pack)
+    pack.setdefault("ok", True)
+    pack.setdefault("errors", [])
+    meta = dict(pack.get("meta") or {})
+    pack["meta"] = meta
+    return pack
+
+
+def dry_run_gate0_from_pack(pack):
+    """Cheap local Gate0 + optional DSL validate. Does not touch production / AI."""
+    from .mechanism_spec import normalize_mechanism_spec
+
+    meta = pack.get("meta") or {}
+    focus = {
+        "symbol": meta.get("symbol"),
+        "timeframe": meta.get("timeframe"),
+    }
+    ok, errors, cleaned = normalize_mechanism_spec(pack.get("mechanism_spec"), focus=focus)
+    g0 = evaluate_gate0(cleaned, ok)
+    dsl_report = None
+    direction = str(meta.get("direction") or "long").lower()
+    dsl = pack.get("dsl")
+    if not isinstance(dsl, dict):
+        dsl = pack.get("dsl_long" if direction == "long" else "dsl_short")
+    if isinstance(dsl, dict):
+        try:
+            import auto_trade_strategy_dsl as dsl_mod
+            dsl_mod.validate_strategy(dsl)
+            dsl_report = {"ok": True, "key": dsl.get("key"), "direction": dsl.get("direction")}
+        except Exception as exc:
+            dsl_report = {"ok": False, "error": str(exc)}
+    fam = cleaned.get("mechanism_family")
+    kb_note = None
+    try:
+        blocked, why = path_is_blocked("family|%s" % fam, family=fam)
+        kb_note = {"family": fam, "blocked": bool(blocked), "why": why, "source": "failure_kb"}
+    except Exception as exc:
+        # Local macOS / sandbox often cannot read /root WF_DIR — fall back to
+        # the known prod blocked set from the forced KB read (2026-07-29).
+        known_blocked = {
+            "breakout_trap_reversal",
+            "liquidity_failed_breakout_high",
+            "mean_reversion_vwap_deviation",
+            "time_structure_session_breakout",
+            "trend_continuation_thrust_retest",
+            "vol_regime_compression_release",
+            "liquidity_failed_breakout_low",
+            "mean_reversion_rsi_extreme",
+            "mean_reversion_zscore_dislocation",
+            "absorption_climax_reclaim",
+            "selective_session_thrust",
+            "confirmed_vol_release",
+            "cascade_trap_proxy",
+            "vacuum_fill_impulse",
+            "compression_release_structural_breakout",
+        }
+        blocked = str(fam or "").strip() in known_blocked
+        kb_note = {
+            "family": fam,
+            "blocked": blocked,
+            "why": "static_prod_blocked_families_fallback",
+            "kb_live_error": str(exc),
+            "source": "static_fallback",
+        }
+    return {
+        "ok": bool(
+            ok and g0.get("pass")
+            and (dsl_report is None or dsl_report.get("ok"))
+            and not (kb_note or {}).get("blocked")
+        ),
+        "normalize_ok": ok,
+        "normalize_errors": errors,
+        "mechanism_spec_fields_filled": sum(
+            1 for f in MECHANISM_SPEC_FIELDS
+            if cleaned.get(f) not in (None, "", [])
+        ),
+        "mechanism_spec_fields_required": len(MECHANISM_SPEC_FIELDS),
+        "gate0": g0,
+        "dsl_validate": dsl_report,
+        "kb_family_check": kb_note,
+        "production_mounted": False,
+        "note": "dry_run_gate0 only — no L1–L3, incubator, Gate6 AI, or mount",
+    }
+
+
+if __name__ == "__main__":
+    import argparse
+    import json as _json
+    import sys as _sys
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "STEP A creation pipeline CLI. Prefer --strategy_json for prebuilt "
+            "mechanism_spec (+ optional dsl). Never auto-mounts production."
+        )
+    )
+    parser.add_argument(
+        "--strategy_json",
+        default=None,
+        help="Path to strategy candidate JSON (mechanism_spec + optional dsl/meta)",
+    )
+    parser.add_argument("--symbol", default=None, help="Override focus symbol")
+    parser.add_argument("--timeframe", default=None, help="Override focus timeframe")
+    parser.add_argument(
+        "--direction",
+        default=None,
+        help="long|short — selects dsl_long/dsl_short when present",
+    )
+    parser.add_argument(
+        "--exploration_mode",
+        default="A",
+        help="A/B/C/D or 1–4 (default A=new_mechanism)",
+    )
+    parser.add_argument(
+        "--windtalker_tag",
+        default=None,
+        help="Optional tag recorded on the task",
+    )
+    parser.add_argument(
+        "--dry_run_gate0",
+        action="store_true",
+        help="Validate mechanism_spec Gate0 (+ DSL if present); do not run full STEP A",
+    )
+    parser.add_argument(
+        "--async",
+        dest="async_mode",
+        action="store_true",
+        help="Start STEP A in background thread (full run only)",
+    )
+    args = parser.parse_args()
+
+    prebuilt = None
+    if args.strategy_json:
+        try:
+            prebuilt = _load_strategy_json_pack(args.strategy_json)
+        except Exception as exc:
+            print(_json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+            _sys.exit(2)
+        meta = prebuilt.setdefault("meta", {})
+        if args.direction:
+            meta["direction"] = str(args.direction).lower()
+            direction = meta["direction"]
+            side_dsl = prebuilt.get("dsl_long" if direction == "long" else "dsl_short")
+            if isinstance(side_dsl, dict):
+                prebuilt["dsl"] = side_dsl
+        if args.symbol:
+            meta["symbol"] = args.symbol
+        if args.timeframe:
+            meta["timeframe"] = args.timeframe
+        # Prefer meta focus when CLI overrides absent
+        symbol = args.symbol or meta.get("symbol")
+        timeframe = args.timeframe or meta.get("timeframe")
+    else:
+        symbol = args.symbol
+        timeframe = args.timeframe
+
+    if args.dry_run_gate0:
+        if not prebuilt:
+            print(_json.dumps({
+                "ok": False,
+                "error": "--dry_run_gate0 requires --strategy_json",
+            }, ensure_ascii=False))
+            _sys.exit(2)
+        report = dry_run_gate0_from_pack(prebuilt)
+        print(_json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        _sys.exit(0 if report.get("ok") else 1)
+
+    tag = args.windtalker_tag
+    if tag is None and prebuilt:
+        tag = "strategy_json_cli"
+    if args.async_mode:
+        out = start_creation_task_step_a(
+            async_mode=True,
+            symbol=symbol,
+            timeframe=timeframe,
+            exploration_mode=args.exploration_mode,
+            prebuilt_spec_pack=prebuilt,
+            windtalker_tag=tag,
+        )
+    else:
+        out = run_creation_pipeline_step_a(
+            symbol=symbol,
+            timeframe=timeframe,
+            exploration_mode=args.exploration_mode,
+            prebuilt_spec_pack=prebuilt,
+            windtalker_tag=tag,
+        )
+    print(_json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    _sys.exit(0 if (out or {}).get("ok") else 1)
