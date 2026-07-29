@@ -1,0 +1,791 @@
+{
+  "schema": "WINDTALKER_PHASE3_PROBES_SUMMARY",
+  "generated_at": "2026-07-28 18:04:27",
+  "n_probes": 4,
+  "probes": [
+    {
+      "probe_id": "probe_oi_price_crowding_fade_btc_5m",
+      "class": "OI",
+      "title": "OI+price crowding fade",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "5m",
+      "direction": "short",
+      "topology_fingerprint": "c11807493ada246f256ad2e35e8419ddca4b2342abfb230b0bfc6962450b1f32",
+      "structural": {
+        "validated": true,
+        "uses_new_data": true,
+        "research_features": [
+          "oi_z20"
+        ],
+        "proxy_declarations_present": true,
+        "live_enabled": false,
+        "auto_trade_eligible": false,
+        "ohlc_template_collapse": false,
+        "data_coverage": {
+          "oi": 0.1464,
+          "funding_rate": 1.0,
+          "basis_bps": 0.2136,
+          "taker_imbalance": 0.4107,
+          "cross_sync_score": 0.9857
+        },
+        "sources": {
+          "funding": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_funding_rate_history"
+          },
+          "oi": {
+            "ok": true,
+            "n": 200,
+            "source": "okx_rubik_oi_history+cache"
+          },
+          "basis": {
+            "ok": true,
+            "n": 300,
+            "source": "okx_mark_vs_index"
+          },
+          "taker": {
+            "ok": true,
+            "n": 576,
+            "source": "okx_rubik_taker_volume"
+          },
+          "microstructure_flow": {
+            "ok": true,
+            "n": 8477,
+            "source": "microstructure_telemetry.db"
+          },
+          "cross_asset": {
+            "ok": true,
+            "lead_symbol": "ETH-USDT-SWAP",
+            "lead_bars": 1440,
+            "source": "okx_market_candles"
+          }
+        },
+        "structural_pass": true,
+        "real_new_data_present": true
+      },
+      "causal": {
+        "base_entries": 82,
+        "base_pnl": {
+          "n": 82,
+          "mean": -0.0016237920314492336,
+          "sum": -0.13315094657883716
+        },
+        "ablation": {
+          "entries": 0,
+          "pass": true,
+          "note": "entries must drop when research features removed; requires >=5 base entries"
+        },
+        "random_proxy": {
+          "entries": 40,
+          "pnl": {
+            "n": 40,
+            "mean": -0.0012803147683871777,
+            "sum": -0.05121259073548711
+          },
+          "overlap_with_base": 0.0517,
+          "pass": true
+        },
+        "event_order_destroy": {
+          "entries": 53,
+          "overlap_with_base": 0.0465,
+          "pass": true
+        },
+        "regime_veto": {
+          "entries": 0,
+          "pass": true
+        },
+        "causal_pass_count_partial": 4,
+        "causal_partial_pass": true,
+        "behavioral_independence": {
+          "pass": true,
+          "pair_detail": {
+            "probe_oi_price_crowding_fade_btc_5m||probe_funding_basis_unwind_btc_5m": {
+              "high_dim_count": 1,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            },
+            "probe_oi_price_crowding_fade_btc_5m||probe_btc_lead_lag_eth_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            },
+            "probe_oi_price_crowding_fade_btc_5m||probe_taker_absorption_btc_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0458
+            }
+          }
+        },
+        "causal_pass_count": 5,
+        "min_signal_activity_pass": true,
+        "causal_fidelity_pass": true
+      },
+      "formal_candidate": false,
+      "positive_E_credit": false,
+      "gate3_required": false,
+      "gate3_ran": false,
+      "frame_meta": {
+        "n_bars": 1400,
+        "coverage": {
+          "funding_rate": 1.0,
+          "oi": 0.1464,
+          "basis_bps": 0.2136,
+          "taker_imbalance": 0.4107,
+          "cross_sync_score": 0.9857,
+          "flow_imbalance": 1.0
+        },
+        "sources": {
+          "funding": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_funding_rate_history"
+          },
+          "oi": {
+            "ok": true,
+            "n": 200,
+            "source": "okx_rubik_oi_history+cache"
+          },
+          "basis": {
+            "ok": true,
+            "n": 300,
+            "source": "okx_mark_vs_index"
+          },
+          "taker": {
+            "ok": true,
+            "n": 576,
+            "source": "okx_rubik_taker_volume"
+          },
+          "microstructure_flow": {
+            "ok": true,
+            "n": 8477,
+            "source": "microstructure_telemetry.db"
+          },
+          "cross_asset": {
+            "ok": true,
+            "lead_symbol": "ETH-USDT-SWAP",
+            "lead_bars": 1440,
+            "source": "okx_market_candles"
+          }
+        },
+        "schema_version": "windtalker_phase3_data_v1",
+        "cache_path": "/root/auto_trade/windtalker_phase3/data_cache/BTC_USDT_SWAP_5m_research_frame.json"
+      },
+      "overall_probe_pass": true
+    },
+    {
+      "probe_id": "probe_funding_basis_unwind_btc_5m",
+      "class": "Funding_Basis",
+      "title": "funding/basis unwind",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "5m",
+      "direction": "short",
+      "topology_fingerprint": "f87656077ad65245969bf8bc8cd50784f2b9598d43b79f42f56732445376b744",
+      "structural": {
+        "validated": true,
+        "uses_new_data": true,
+        "research_features": [
+          "basis_bps",
+          "basis_z20",
+          "funding_z20"
+        ],
+        "proxy_declarations_present": true,
+        "live_enabled": false,
+        "auto_trade_eligible": false,
+        "ohlc_template_collapse": false,
+        "data_coverage": {
+          "oi": 0.1464,
+          "funding_rate": 1.0,
+          "basis_bps": 0.2136,
+          "taker_imbalance": 0.4107,
+          "cross_sync_score": 0.9857
+        },
+        "sources": {
+          "funding": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_funding_rate_history"
+          },
+          "oi": {
+            "ok": true,
+            "n": 200,
+            "source": "okx_rubik_oi_history+cache"
+          },
+          "basis": {
+            "ok": true,
+            "n": 300,
+            "source": "okx_mark_vs_index"
+          },
+          "taker": {
+            "ok": true,
+            "n": 576,
+            "source": "okx_rubik_taker_volume"
+          },
+          "microstructure_flow": {
+            "ok": true,
+            "n": 8477,
+            "source": "microstructure_telemetry.db"
+          },
+          "cross_asset": {
+            "ok": true,
+            "lead_symbol": "ETH-USDT-SWAP",
+            "lead_bars": 1440,
+            "source": "okx_market_candles"
+          }
+        },
+        "structural_pass": true,
+        "real_new_data_present": true
+      },
+      "causal": {
+        "base_entries": 0,
+        "base_pnl": {
+          "n": 0,
+          "mean": 0.0,
+          "sum": 0.0
+        },
+        "ablation": {
+          "entries": 0,
+          "pass": false,
+          "note": "entries must drop when research features removed; requires >=5 base entries"
+        },
+        "random_proxy": {
+          "entries": 0,
+          "pnl": {
+            "n": 0,
+            "mean": 0.0,
+            "sum": 0.0
+          },
+          "overlap_with_base": 0.0,
+          "pass": false
+        },
+        "event_order_destroy": {
+          "entries": 37,
+          "overlap_with_base": 0.0,
+          "pass": false
+        },
+        "regime_veto": {
+          "entries": 0,
+          "pass": true
+        },
+        "causal_pass_count_partial": 1,
+        "causal_partial_pass": false,
+        "behavioral_independence": {
+          "pass": true,
+          "pair_detail": {
+            "probe_oi_price_crowding_fade_btc_5m||probe_funding_basis_unwind_btc_5m": {
+              "high_dim_count": 1,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            },
+            "probe_funding_basis_unwind_btc_5m||probe_btc_lead_lag_eth_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            },
+            "probe_funding_basis_unwind_btc_5m||probe_taker_absorption_btc_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            }
+          }
+        },
+        "causal_pass_count": 2,
+        "min_signal_activity_pass": false,
+        "causal_fidelity_pass": false
+      },
+      "formal_candidate": false,
+      "positive_E_credit": false,
+      "gate3_required": false,
+      "gate3_ran": false,
+      "frame_meta": {
+        "n_bars": 1400,
+        "coverage": {
+          "funding_rate": 1.0,
+          "oi": 0.1464,
+          "basis_bps": 0.2136,
+          "taker_imbalance": 0.4107,
+          "cross_sync_score": 0.9857,
+          "flow_imbalance": 1.0
+        },
+        "sources": {
+          "funding": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_funding_rate_history"
+          },
+          "oi": {
+            "ok": true,
+            "n": 200,
+            "source": "okx_rubik_oi_history+cache"
+          },
+          "basis": {
+            "ok": true,
+            "n": 300,
+            "source": "okx_mark_vs_index"
+          },
+          "taker": {
+            "ok": true,
+            "n": 576,
+            "source": "okx_rubik_taker_volume"
+          },
+          "microstructure_flow": {
+            "ok": true,
+            "n": 8477,
+            "source": "microstructure_telemetry.db"
+          },
+          "cross_asset": {
+            "ok": true,
+            "lead_symbol": "ETH-USDT-SWAP",
+            "lead_bars": 1440,
+            "source": "okx_market_candles"
+          }
+        },
+        "schema_version": "windtalker_phase3_data_v1",
+        "cache_path": "/root/auto_trade/windtalker_phase3/data_cache/BTC_USDT_SWAP_5m_research_frame.json"
+      },
+      "overall_probe_pass": false
+    },
+    {
+      "probe_id": "probe_btc_lead_lag_eth_5m",
+      "class": "Cross_asset_sync",
+      "title": "BTC lead-lag",
+      "symbol": "ETH-USDT-SWAP",
+      "timeframe": "5m",
+      "direction": "long",
+      "topology_fingerprint": "bad870c5e3afb0211db29f6d5736a601b2e538451f7dd73339438a259cc325aa",
+      "structural": {
+        "validated": true,
+        "uses_new_data": true,
+        "research_features": [
+          "cross_sync_score",
+          "lag_ret1",
+          "lead_lag_corr20",
+          "lead_ret1",
+          "lead_ret3"
+        ],
+        "proxy_declarations_present": true,
+        "live_enabled": false,
+        "auto_trade_eligible": false,
+        "ohlc_template_collapse": false,
+        "data_coverage": {
+          "oi": 0.0694,
+          "funding_rate": 1.0,
+          "basis_bps": 0.2083,
+          "taker_imbalance": 0.4,
+          "cross_sync_score": 0.966
+        },
+        "sources": {
+          "funding": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_funding_rate_history"
+          },
+          "oi": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_rubik_oi_history+cache"
+          },
+          "basis": {
+            "ok": true,
+            "n": 300,
+            "source": "okx_mark_vs_index"
+          },
+          "taker": {
+            "ok": true,
+            "n": 576,
+            "source": "okx_rubik_taker_volume"
+          },
+          "microstructure_flow": {
+            "ok": true,
+            "n": 3715,
+            "source": "microstructure_telemetry.db"
+          },
+          "cross_asset": {
+            "ok": true,
+            "lead_symbol": "BTC-USDT-SWAP",
+            "lead_bars": 1400,
+            "source": "formal_cache"
+          }
+        },
+        "structural_pass": true,
+        "real_new_data_present": true
+      },
+      "causal": {
+        "base_entries": 440,
+        "base_pnl": {
+          "n": 440,
+          "mean": -0.0014778560385309391,
+          "sum": -0.6502566569536132
+        },
+        "ablation": {
+          "entries": 0,
+          "pass": true,
+          "note": "entries must drop when research features removed; requires >=5 base entries"
+        },
+        "random_proxy": {
+          "entries": 413,
+          "pnl": {
+            "n": 413,
+            "mean": -0.0010752203153346143,
+            "sum": -0.4440659902331957
+          },
+          "overlap_with_base": 0.2014,
+          "pass": true
+        },
+        "event_order_destroy": {
+          "entries": 477,
+          "overlap_with_base": 0.213,
+          "pass": true
+        },
+        "regime_veto": {
+          "entries": 0,
+          "pass": true
+        },
+        "causal_pass_count_partial": 4,
+        "causal_partial_pass": true,
+        "behavioral_independence": {
+          "pass": true,
+          "pair_detail": {
+            "probe_oi_price_crowding_fade_btc_5m||probe_btc_lead_lag_eth_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            },
+            "probe_funding_basis_unwind_btc_5m||probe_btc_lead_lag_eth_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            },
+            "probe_btc_lead_lag_eth_5m||probe_taker_absorption_btc_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            }
+          }
+        },
+        "causal_pass_count": 5,
+        "min_signal_activity_pass": true,
+        "causal_fidelity_pass": true
+      },
+      "formal_candidate": false,
+      "positive_E_credit": false,
+      "gate3_required": false,
+      "gate3_ran": false,
+      "frame_meta": {
+        "n_bars": 1440,
+        "coverage": {
+          "funding_rate": 1.0,
+          "oi": 0.0694,
+          "basis_bps": 0.2083,
+          "taker_imbalance": 0.4,
+          "cross_sync_score": 0.966,
+          "flow_imbalance": 1.0
+        },
+        "sources": {
+          "funding": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_funding_rate_history"
+          },
+          "oi": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_rubik_oi_history+cache"
+          },
+          "basis": {
+            "ok": true,
+            "n": 300,
+            "source": "okx_mark_vs_index"
+          },
+          "taker": {
+            "ok": true,
+            "n": 576,
+            "source": "okx_rubik_taker_volume"
+          },
+          "microstructure_flow": {
+            "ok": true,
+            "n": 3715,
+            "source": "microstructure_telemetry.db"
+          },
+          "cross_asset": {
+            "ok": true,
+            "lead_symbol": "BTC-USDT-SWAP",
+            "lead_bars": 1400,
+            "source": "formal_cache"
+          }
+        },
+        "schema_version": "windtalker_phase3_data_v1",
+        "cache_path": "/root/auto_trade/windtalker_phase3/data_cache/ETH_USDT_SWAP_5m_research_frame.json"
+      },
+      "overall_probe_pass": true
+    },
+    {
+      "probe_id": "probe_taker_absorption_btc_5m",
+      "class": "Taker_flow",
+      "title": "taker absorption",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "5m",
+      "direction": "long",
+      "topology_fingerprint": "fa1c4b7c364679df5689d34c700d436b9b0bec264aac2531ef12b7f9f6dd0cb3",
+      "structural": {
+        "validated": true,
+        "uses_new_data": true,
+        "research_features": [
+          "taker_imbalance",
+          "taker_imbalance_z20"
+        ],
+        "proxy_declarations_present": true,
+        "live_enabled": false,
+        "auto_trade_eligible": false,
+        "ohlc_template_collapse": false,
+        "data_coverage": {
+          "oi": 0.1464,
+          "funding_rate": 1.0,
+          "basis_bps": 0.2136,
+          "taker_imbalance": 0.4107,
+          "cross_sync_score": 0.9857
+        },
+        "sources": {
+          "funding": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_funding_rate_history"
+          },
+          "oi": {
+            "ok": true,
+            "n": 200,
+            "source": "okx_rubik_oi_history+cache"
+          },
+          "basis": {
+            "ok": true,
+            "n": 300,
+            "source": "okx_mark_vs_index"
+          },
+          "taker": {
+            "ok": true,
+            "n": 576,
+            "source": "okx_rubik_taker_volume"
+          },
+          "microstructure_flow": {
+            "ok": true,
+            "n": 8477,
+            "source": "microstructure_telemetry.db"
+          },
+          "cross_asset": {
+            "ok": true,
+            "lead_symbol": "ETH-USDT-SWAP",
+            "lead_bars": 1440,
+            "source": "okx_market_candles"
+          }
+        },
+        "structural_pass": true,
+        "real_new_data_present": true
+      },
+      "causal": {
+        "base_entries": 78,
+        "base_pnl": {
+          "n": 78,
+          "mean": -0.001903206634408523,
+          "sum": -0.1484501174838648
+        },
+        "ablation": {
+          "entries": 0,
+          "pass": true,
+          "note": "entries must drop when research features removed; requires >=5 base entries"
+        },
+        "random_proxy": {
+          "entries": 13,
+          "pnl": {
+            "n": 13,
+            "mean": -0.002245285757388246,
+            "sum": -0.029188714846047195
+          },
+          "overlap_with_base": 0.0341,
+          "pass": true
+        },
+        "event_order_destroy": {
+          "entries": 88,
+          "overlap_with_base": 0.0,
+          "pass": true
+        },
+        "regime_veto": {
+          "entries": 0,
+          "pass": true
+        },
+        "causal_pass_count_partial": 4,
+        "causal_partial_pass": true,
+        "behavioral_independence": {
+          "pass": true,
+          "pair_detail": {
+            "probe_oi_price_crowding_fade_btc_5m||probe_taker_absorption_btc_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0458
+            },
+            "probe_funding_basis_unwind_btc_5m||probe_taker_absorption_btc_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            },
+            "probe_btc_lead_lag_eth_5m||probe_taker_absorption_btc_5m": {
+              "high_dim_count": 0,
+              "independent": true,
+              "feat_sim": 0.0,
+              "topo_same": false,
+              "class_same": false,
+              "sig_overlap": 0.0
+            }
+          }
+        },
+        "causal_pass_count": 5,
+        "min_signal_activity_pass": true,
+        "causal_fidelity_pass": true
+      },
+      "formal_candidate": false,
+      "positive_E_credit": false,
+      "gate3_required": false,
+      "gate3_ran": false,
+      "frame_meta": {
+        "n_bars": 1400,
+        "coverage": {
+          "funding_rate": 1.0,
+          "oi": 0.1464,
+          "basis_bps": 0.2136,
+          "taker_imbalance": 0.4107,
+          "cross_sync_score": 0.9857,
+          "flow_imbalance": 1.0
+        },
+        "sources": {
+          "funding": {
+            "ok": true,
+            "n": 100,
+            "source": "okx_funding_rate_history"
+          },
+          "oi": {
+            "ok": true,
+            "n": 200,
+            "source": "okx_rubik_oi_history+cache"
+          },
+          "basis": {
+            "ok": true,
+            "n": 300,
+            "source": "okx_mark_vs_index"
+          },
+          "taker": {
+            "ok": true,
+            "n": 576,
+            "source": "okx_rubik_taker_volume"
+          },
+          "microstructure_flow": {
+            "ok": true,
+            "n": 8477,
+            "source": "microstructure_telemetry.db"
+          },
+          "cross_asset": {
+            "ok": true,
+            "lead_symbol": "ETH-USDT-SWAP",
+            "lead_bars": 1440,
+            "source": "okx_market_candles"
+          }
+        },
+        "schema_version": "windtalker_phase3_data_v1",
+        "cache_path": "/root/auto_trade/windtalker_phase3/data_cache/BTC_USDT_SWAP_5m_research_frame.json"
+      },
+      "overall_probe_pass": true
+    }
+  ],
+  "independence_pairs": {
+    "probe_oi_price_crowding_fade_btc_5m||probe_funding_basis_unwind_btc_5m": {
+      "high_dim_count": 1,
+      "independent": true,
+      "feat_sim": 0.0,
+      "topo_same": false,
+      "class_same": false,
+      "sig_overlap": 0.0
+    },
+    "probe_oi_price_crowding_fade_btc_5m||probe_btc_lead_lag_eth_5m": {
+      "high_dim_count": 0,
+      "independent": true,
+      "feat_sim": 0.0,
+      "topo_same": false,
+      "class_same": false,
+      "sig_overlap": 0.0
+    },
+    "probe_oi_price_crowding_fade_btc_5m||probe_taker_absorption_btc_5m": {
+      "high_dim_count": 0,
+      "independent": true,
+      "feat_sim": 0.0,
+      "topo_same": false,
+      "class_same": false,
+      "sig_overlap": 0.0458
+    },
+    "probe_funding_basis_unwind_btc_5m||probe_btc_lead_lag_eth_5m": {
+      "high_dim_count": 0,
+      "independent": true,
+      "feat_sim": 0.0,
+      "topo_same": false,
+      "class_same": false,
+      "sig_overlap": 0.0
+    },
+    "probe_funding_basis_unwind_btc_5m||probe_taker_absorption_btc_5m": {
+      "high_dim_count": 0,
+      "independent": true,
+      "feat_sim": 0.0,
+      "topo_same": false,
+      "class_same": false,
+      "sig_overlap": 0.0
+    },
+    "probe_btc_lead_lag_eth_5m||probe_taker_absorption_btc_5m": {
+      "high_dim_count": 0,
+      "independent": true,
+      "feat_sim": 0.0,
+      "topo_same": false,
+      "class_same": false,
+      "sig_overlap": 0.0
+    }
+  },
+  "counts": {
+    "real_new_data": 4,
+    "causal_fidelity_pass": 3,
+    "behaviorally_independent": 4,
+    "overall_pass": 3
+  },
+  "core_unlock_rule": "PASS if >=3 probes use real new data + pass causal fidelity + behaviorally independent",
+  "core_capability_unlock": "PASS",
+  "not_formal_candidates": true,
+  "no_positive_E_credit": true,
+  "gate3_not_required": true
+}

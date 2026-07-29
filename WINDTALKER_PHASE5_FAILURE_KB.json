@@ -1,0 +1,188 @@
+{
+  "schema": "WINDTALKER_PHASE5_FAILURE_KB",
+  "generated_at": "2026-07-28 14:56:03",
+  "n_entries": 6,
+  "failure_distribution": {
+    "economic_edge_insufficient": 2,
+    "Gate3_window_instability": 1,
+    "zero_trade": 2,
+    "data_alignment_failure": 1
+  },
+  "entries": [
+    {
+      "candidate_id": "p5_ll_btc_eth_breadth_confirm_5m",
+      "exact_gate": "Gate3",
+      "root_cause": "economic_edge_insufficient",
+      "evidence": {
+        "pass_count": 1,
+        "total": 10,
+        "data_insufficient_windows": 0,
+        "fail_reasons": [
+          "non_positive_or_thin"
+        ]
+      },
+      "repairability": "strategy_quality_not_infra",
+      "repair_count": 0,
+      "archive_fingerprint": "6b6fb6e5bf3642c6f707b93bf2e120646218ec0a8b7ed79314cee7889dd3a3c4",
+      "future_reuse_condition": "improve_edge_stability_across_wf_windows"
+    },
+    {
+      "candidate_id": "p5_ll_btc_xrp_catchup_5m",
+      "exact_gate": "Gate3",
+      "root_cause": "Gate3_window_instability",
+      "evidence": {
+        "pass_count": 0,
+        "total": 10,
+        "data_insufficient_windows": 0,
+        "fail_reasons": [
+          "non_positive_or_thin"
+        ]
+      },
+      "repairability": "strategy_quality_not_infra",
+      "repair_count": 0,
+      "archive_fingerprint": "dfe568c85cbeeb38e1eb28b9e3399c7f828f435f0c150162c153afe0fbea9e07",
+      "future_reuse_condition": "improve_edge_stability_across_wf_windows"
+    },
+    {
+      "candidate_id": "p5_res_eth_btc_zfade_5m",
+      "exact_gate": "PreGate",
+      "root_cause": "zero_trade",
+      "evidence": {
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.002,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 3.3333
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": false,
+            "entries": 426,
+            "trades": 426
+          }
+        },
+        "reasons": [
+          "D_behavior"
+        ]
+      },
+      "repairability": "limited_param_tune",
+      "repair_count": 0,
+      "archive_fingerprint": "62e08931904e70b5a1c02dfc276c78a52bf9a821219a1ae6fd87aa740adc3a6b",
+      "future_reuse_condition": "fix_zero_trade"
+    },
+    {
+      "candidate_id": "p5_corr_btc_eth_recover_5m",
+      "exact_gate": "Gate3",
+      "root_cause": "economic_edge_insufficient",
+      "evidence": {
+        "pass_count": 4,
+        "total": 10,
+        "data_insufficient_windows": 0,
+        "fail_reasons": [
+          "no_entries_in_window",
+          "non_positive_or_thin"
+        ]
+      },
+      "repairability": "strategy_quality_not_infra",
+      "repair_count": 0,
+      "archive_fingerprint": "08e1bf6889312853fb2b7582168f491aaa1f9b4dc43bc37efdf57117b48db1e2",
+      "future_reuse_condition": "improve_edge_stability_across_wf_windows"
+    },
+    {
+      "candidate_id": "p5_rg_eth_vol_div_converge_5m",
+      "exact_gate": "PreGate",
+      "root_cause": "zero_trade",
+      "evidence": {
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.002,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 3.3333
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": false,
+            "entries": 392,
+            "trades": 392
+          }
+        },
+        "reasons": [
+          "D_behavior"
+        ]
+      },
+      "repairability": "limited_param_tune",
+      "repair_count": 0,
+      "archive_fingerprint": "49fc6b6e460b9e10227aa5fa4b5e766031502bb62047556f93f2a9e72fce2509",
+      "future_reuse_condition": "fix_zero_trade"
+    },
+    {
+      "candidate_id": "p5_br_btc_ltc_diffusion_15m",
+      "exact_gate": "PreGate",
+      "root_cause": "data_alignment_failure",
+      "evidence": {
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.0045,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 7.5
+          },
+          "C_data": {
+            "pass": false,
+            "windows_ok": 9,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": true,
+            "entries": 158,
+            "trades": 158
+          }
+        },
+        "reasons": [
+          "C_data"
+        ]
+      },
+      "repairability": "mechanism_redesign",
+      "repair_count": 0,
+      "archive_fingerprint": "1eb35afb185354befb6a5745ef27797dc69e9e5c45b9e5b48bc1e035cd60c116",
+      "future_reuse_condition": "fix_data_alignment_failure"
+    }
+  ],
+  "limited_engineering_repairs": [],
+  "note": "Mechanism changes require new candidate_id; only non-mechanism engineering notes recorded.",
+  "prior_kb_refs": {
+    "phase3_collapse_matrix": "/root/auto_trade/windtalker_phase3/WINDTALKER_PHASE3_BEHAVIORAL_COLLAPSE_MATRIX.json",
+    "phase4_isolation": "/root/auto_trade/windtalker_phase4/WINDTALKER_PHASE4_PRODUCTION_ISOLATION.json"
+  }
+}

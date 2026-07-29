@@ -1,0 +1,95 @@
+{
+  "schema": "windtalker_phase2_mechanism_taxonomy_v1",
+  "generated_at": "2026-07-28 15:30:11",
+  "rule": "Stop counting mirrors/symbol/tf/indicator renames as families",
+  "phase1_claimed_independent_families": 8,
+  "phase2_true_L1_count": 4,
+  "true_L1_list": [
+    "L1_failed_break_reclaim",
+    "L1_mean_reversion_stretch",
+    "L1_range_break_continuation",
+    "L1_vol_expansion_direction"
+  ],
+  "rows": [
+    {
+      "mechanism_id": "mech_liquidity_failed_breakout_high_xrp15m",
+      "L1_true_template_after_codex": "L1_failed_break_reclaim",
+      "L2_claimed_family": "liquidity_failed_breakout_high",
+      "L3_symbol_tf_instance": "mech_liquidity_failed_breakout_high_xrp15m",
+      "counts_as_independent_family_phase1_claim": true,
+      "counts_as_independent_family_phase2_rule": false,
+      "reason": "L3 rename / symbol-tf variant of shared Codex OHLC template"
+    },
+    {
+      "mechanism_id": "mech_mr_vwap_dev_btc15m",
+      "L1_true_template_after_codex": "L1_mean_reversion_stretch",
+      "L2_claimed_family": "mean_reversion_vwap_deviation",
+      "L3_symbol_tf_instance": "mech_mr_vwap_dev_btc15m",
+      "counts_as_independent_family_phase1_claim": true,
+      "counts_as_independent_family_phase2_rule": false,
+      "reason": "L3 rename / symbol-tf variant of shared Codex OHLC template"
+    },
+    {
+      "mechanism_id": "mech_ts_session_break_long_btc5m",
+      "L1_true_template_after_codex": "L1_range_break_continuation",
+      "L2_claimed_family": "time_structure_session_breakout",
+      "L3_symbol_tf_instance": "mech_ts_session_break_long_btc5m",
+      "counts_as_independent_family_phase1_claim": true,
+      "counts_as_independent_family_phase2_rule": false,
+      "reason": "L3 rename / symbol-tf variant of shared Codex OHLC template"
+    },
+    {
+      "mechanism_id": "mech_tc_thrust_retest_sol5m",
+      "L1_true_template_after_codex": "L1_range_break_continuation",
+      "L2_claimed_family": "trend_continuation_thrust_retest",
+      "L3_symbol_tf_instance": "mech_tc_thrust_retest_sol5m",
+      "counts_as_independent_family_phase1_claim": true,
+      "counts_as_independent_family_phase2_rule": false,
+      "reason": "L3 rename / symbol-tf variant of shared Codex OHLC template"
+    },
+    {
+      "mechanism_id": "mech_vr03_eth15m",
+      "L1_true_template_after_codex": "L1_vol_expansion_direction",
+      "L2_claimed_family": "vol_regime_compression_release",
+      "L3_symbol_tf_instance": "mech_vr03_eth15m",
+      "counts_as_independent_family_phase1_claim": true,
+      "counts_as_independent_family_phase2_rule": true,
+      "reason": "distinct L1"
+    },
+    {
+      "mechanism_id": "mech_low_break_fail_reclaim_long_ada5m",
+      "L1_true_template_after_codex": "L1_failed_break_reclaim",
+      "L2_claimed_family": "liquidity_failed_breakout_low",
+      "L3_symbol_tf_instance": "mech_low_break_fail_reclaim_long_ada5m",
+      "counts_as_independent_family_phase1_claim": true,
+      "counts_as_independent_family_phase2_rule": false,
+      "reason": "L3 rename / symbol-tf variant of shared Codex OHLC template"
+    },
+    {
+      "mechanism_id": "mech_mr_rsi_extreme_sol1h",
+      "L1_true_template_after_codex": "L1_mean_reversion_stretch",
+      "L2_claimed_family": "mean_reversion_rsi_extreme",
+      "L3_symbol_tf_instance": "mech_mr_rsi_extreme_sol1h",
+      "counts_as_independent_family_phase1_claim": true,
+      "counts_as_independent_family_phase2_rule": false,
+      "reason": "L3 rename / symbol-tf variant of shared Codex OHLC template"
+    },
+    {
+      "mechanism_id": "mech_mr_zscore_dislocation_sol15m",
+      "L1_true_template_after_codex": "L1_mean_reversion_stretch",
+      "L2_claimed_family": "mean_reversion_zscore_dislocation",
+      "L3_symbol_tf_instance": "mech_mr_zscore_dislocation_sol15m",
+      "counts_as_independent_family_phase1_claim": true,
+      "counts_as_independent_family_phase2_rule": false,
+      "reason": "L3 rename / symbol-tf variant of shared Codex OHLC template"
+    }
+  ],
+  "phase2_family_acceptance_rule": {
+    "must_differ_at_L1_or_material_L2": true,
+    "material_L2_requires": [
+      "different implemented entry leaf structure",
+      "different counterparty / forced-flow story",
+      "not only threshold/symbol/tf change"
+    ]
+  }
+}

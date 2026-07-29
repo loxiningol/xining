@@ -1,0 +1,355 @@
+{
+  "schema": "WINDTALKER_PHASE5_FORMAL_FIDELITY",
+  "generated_at": "2026-07-28 14:56:03",
+  "n_structural_pass": 6,
+  "n_causal_pass": 6,
+  "n_legacy_indep_pass": 6,
+  "n_same_batch_pass": 6,
+  "n_final_pass": 6,
+  "template_collapse": false,
+  "same_batch_collapse": false,
+  "candidates": [
+    {
+      "candidate_id": "p5_ll_btc_eth_breadth_confirm_5m",
+      "structural_fidelity": true,
+      "causal_fidelity": true,
+      "legacy_template_independence": true,
+      "same_batch_independence": true,
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 148,
+          "ablated": 0
+        },
+        "reference_removal": {
+          "pass": true,
+          "entries": 0
+        },
+        "random_proxy": {
+          "pass": true,
+          "jaccard": 0.0842,
+          "entries": 367
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "jaccard": 0.2847
+        },
+        "core_vars": [
+          "lead_ret1",
+          "lag_ret1",
+          "breadth_score",
+          "lead_lag_corr20"
+        ]
+      },
+      "base_entries": 148,
+      "base_trades": 148,
+      "same_batch_overlaps": [
+        {
+          "other": "p5_ll_btc_xrp_catchup_5m",
+          "entry_jaccard": 0.1053
+        },
+        {
+          "other": "p5_res_eth_btc_zfade_5m",
+          "entry_jaccard": 0.081
+        },
+        {
+          "other": "p5_corr_btc_eth_recover_5m",
+          "entry_jaccard": 0.0127
+        },
+        {
+          "other": "p5_rg_eth_vol_div_converge_5m",
+          "entry_jaccard": 0.0865
+        },
+        {
+          "other": "p5_br_btc_ltc_diffusion_15m",
+          "entry_jaccard": 0.0408
+        }
+      ],
+      "final_fidelity_verdict": "PASS"
+    },
+    {
+      "candidate_id": "p5_ll_btc_xrp_catchup_5m",
+      "structural_fidelity": true,
+      "causal_fidelity": true,
+      "legacy_template_independence": true,
+      "same_batch_independence": true,
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 188,
+          "ablated": 0
+        },
+        "reference_removal": {
+          "pass": true,
+          "entries": 0
+        },
+        "random_proxy": {
+          "pass": true,
+          "jaccard": 0.1038,
+          "entries": 333
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "jaccard": 0.1316
+        },
+        "core_vars": [
+          "lead_ret3",
+          "lag_ret1",
+          "lead_lag_corr20"
+        ]
+      },
+      "base_entries": 188,
+      "base_trades": 188,
+      "same_batch_overlaps": [
+        {
+          "other": "p5_ll_btc_eth_breadth_confirm_5m",
+          "entry_jaccard": 0.1053
+        },
+        {
+          "other": "p5_res_eth_btc_zfade_5m",
+          "entry_jaccard": 0.0925
+        },
+        {
+          "other": "p5_corr_btc_eth_recover_5m",
+          "entry_jaccard": 0.005
+        },
+        {
+          "other": "p5_rg_eth_vol_div_converge_5m",
+          "entry_jaccard": 0.1132
+        },
+        {
+          "other": "p5_br_btc_ltc_diffusion_15m",
+          "entry_jaccard": 0.0298
+        }
+      ],
+      "final_fidelity_verdict": "PASS"
+    },
+    {
+      "candidate_id": "p5_res_eth_btc_zfade_5m",
+      "structural_fidelity": true,
+      "causal_fidelity": true,
+      "legacy_template_independence": true,
+      "same_batch_independence": true,
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 426,
+          "ablated": 0
+        },
+        "reference_removal": {
+          "pass": true,
+          "entries": 0
+        },
+        "random_proxy": {
+          "pass": true,
+          "jaccard": 0.1571,
+          "entries": 296
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "jaccard": 0.1613
+        },
+        "core_vars": [
+          "residual_z20",
+          "beta20",
+          "corr_high_flag"
+        ]
+      },
+      "base_entries": 426,
+      "base_trades": 426,
+      "same_batch_overlaps": [
+        {
+          "other": "p5_ll_btc_eth_breadth_confirm_5m",
+          "entry_jaccard": 0.081
+        },
+        {
+          "other": "p5_ll_btc_xrp_catchup_5m",
+          "entry_jaccard": 0.0925
+        },
+        {
+          "other": "p5_corr_btc_eth_recover_5m",
+          "entry_jaccard": 0.0046
+        },
+        {
+          "other": "p5_rg_eth_vol_div_converge_5m",
+          "entry_jaccard": 0.2012
+        },
+        {
+          "other": "p5_br_btc_ltc_diffusion_15m",
+          "entry_jaccard": 0.0957
+        }
+      ],
+      "final_fidelity_verdict": "PASS"
+    },
+    {
+      "candidate_id": "p5_corr_btc_eth_recover_5m",
+      "structural_fidelity": true,
+      "causal_fidelity": true,
+      "legacy_template_independence": true,
+      "same_batch_independence": true,
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 12,
+          "ablated": 0
+        },
+        "reference_removal": {
+          "pass": true,
+          "entries": 0
+        },
+        "random_proxy": {
+          "pass": true,
+          "jaccard": 0.0086,
+          "entries": 455
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "jaccard": 0.022
+        },
+        "core_vars": [
+          "corr_high_flag",
+          "corr_delta5",
+          "lead_lag_corr20"
+        ]
+      },
+      "base_entries": 12,
+      "base_trades": 12,
+      "same_batch_overlaps": [
+        {
+          "other": "p5_ll_btc_eth_breadth_confirm_5m",
+          "entry_jaccard": 0.0127
+        },
+        {
+          "other": "p5_ll_btc_xrp_catchup_5m",
+          "entry_jaccard": 0.005
+        },
+        {
+          "other": "p5_res_eth_btc_zfade_5m",
+          "entry_jaccard": 0.0046
+        },
+        {
+          "other": "p5_rg_eth_vol_div_converge_5m",
+          "entry_jaccard": 0.005
+        },
+        {
+          "other": "p5_br_btc_ltc_diffusion_15m",
+          "entry_jaccard": 0.0119
+        }
+      ],
+      "final_fidelity_verdict": "PASS"
+    },
+    {
+      "candidate_id": "p5_rg_eth_vol_div_converge_5m",
+      "structural_fidelity": true,
+      "causal_fidelity": true,
+      "legacy_template_independence": true,
+      "same_batch_independence": true,
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 392,
+          "ablated": 0
+        },
+        "reference_removal": {
+          "pass": true,
+          "entries": 0
+        },
+        "random_proxy": {
+          "pass": true,
+          "jaccard": 0.1622,
+          "entries": 475
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "jaccard": 0.1839
+        },
+        "core_vars": [
+          "vol_div",
+          "lead_lag_corr20"
+        ]
+      },
+      "base_entries": 392,
+      "base_trades": 392,
+      "same_batch_overlaps": [
+        {
+          "other": "p5_ll_btc_eth_breadth_confirm_5m",
+          "entry_jaccard": 0.0865
+        },
+        {
+          "other": "p5_ll_btc_xrp_catchup_5m",
+          "entry_jaccard": 0.1132
+        },
+        {
+          "other": "p5_res_eth_btc_zfade_5m",
+          "entry_jaccard": 0.2012
+        },
+        {
+          "other": "p5_corr_btc_eth_recover_5m",
+          "entry_jaccard": 0.005
+        },
+        {
+          "other": "p5_br_btc_ltc_diffusion_15m",
+          "entry_jaccard": 0.0913
+        }
+      ],
+      "final_fidelity_verdict": "PASS"
+    },
+    {
+      "candidate_id": "p5_br_btc_ltc_diffusion_15m",
+      "structural_fidelity": true,
+      "causal_fidelity": true,
+      "legacy_template_independence": true,
+      "same_batch_independence": true,
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 158,
+          "ablated": 0
+        },
+        "reference_removal": {
+          "pass": true,
+          "entries": 0
+        },
+        "random_proxy": {
+          "pass": true,
+          "jaccard": 0.1079,
+          "entries": 489
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "jaccard": 0.0839
+        },
+        "core_vars": [
+          "breadth_score",
+          "lead_ret3",
+          "lag_ret1"
+        ]
+      },
+      "base_entries": 158,
+      "base_trades": 158,
+      "same_batch_overlaps": [
+        {
+          "other": "p5_ll_btc_eth_breadth_confirm_5m",
+          "entry_jaccard": 0.0408
+        },
+        {
+          "other": "p5_ll_btc_xrp_catchup_5m",
+          "entry_jaccard": 0.0298
+        },
+        {
+          "other": "p5_res_eth_btc_zfade_5m",
+          "entry_jaccard": 0.0957
+        },
+        {
+          "other": "p5_corr_btc_eth_recover_5m",
+          "entry_jaccard": 0.0119
+        },
+        {
+          "other": "p5_rg_eth_vol_div_converge_5m",
+          "entry_jaccard": 0.0913
+        }
+      ],
+      "final_fidelity_verdict": "PASS"
+    }
+  ]
+}

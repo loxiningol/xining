@@ -1,0 +1,54 @@
+{
+  "schema": "WINDTALKER_PHASE3_CAUSAL_FIDELITY_FRAMEWORK",
+  "generated_at": "2026-07-28 18:02:07",
+  "rule": "Structural-only fidelity ≠ PASS for Phase3 unlock",
+  "layers": {
+    "structural": {
+      "checks": [
+        "feature_set_overlap_with_spec",
+        "entry_exit_leaf_presence",
+        "forbidden_core_absent",
+        "proxy_declarations_present_when_proxy_used"
+      ],
+      "inherited_from": "step_a mechanism_fidelity_diff",
+      "alone_sufficient_for_phase3_pass": false
+    },
+    "causal": {
+      "ablation": {
+        "method": "Remove research-data leaves; signal overlap with baseline must drop >=40%",
+        "pass_if": "behavior_changes_materially"
+      },
+      "random_proxy": {
+        "method": "Shuffle research series in time (break alignment); expectancy/signal must degrade",
+        "pass_if": "edge_or_signal_collapses"
+      },
+      "event_order_destroy": {
+        "method": "Permute event_sequence step order / destroy lead→lag order",
+        "pass_if": "entries_drop_or_flip"
+      },
+      "regime_veto": {
+        "method": "Force regime_ok=0; entries must go to zero (fail-closed)",
+        "pass_if": "zero_entries_under_veto"
+      },
+      "behavioral_independence": {
+        "method": "Pairwise fingerprint/data/AST similarity; <3 high dims vs other probes",
+        "pass_if": "mutually_independent"
+      }
+    }
+  },
+  "pass_criteria_for_probe": {
+    "structural_pass": "required_but_not_sufficient",
+    "causal_tests_required": [
+      "ablation",
+      "random_proxy",
+      "event_order_destroy",
+      "regime_veto",
+      "behavioral_independence"
+    ],
+    "must_use_real_new_data": true,
+    "must_not_collapse_to_ohlc_template": true
+  },
+  "scoring": {
+    "causal_pass_needs": ">=4 of 5 causal tests pass AND uses_new_data AND not_ohlc_template"
+  }
+}

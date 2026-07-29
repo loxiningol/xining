@@ -1,0 +1,89 @@
+{
+  "schema": "WINDTALKER_PHASE5_FORMAL_CREATION_SUMMARY",
+  "generated_at": "2026-07-28 14:56:03",
+  "n_ideas": 14,
+  "n_formal_specs": 6,
+  "L1_families": [
+    "Breadth",
+    "Corr_breakdown",
+    "Lead_lag",
+    "Regime_divergence",
+    "Residual"
+  ],
+  "candidates": [
+    {
+      "candidate_id": "p5_ll_btc_eth_breadth_confirm_5m",
+      "counterparty": "lagged_ETH_takers_after_BTC_impulse",
+      "profit_source": "delayed_transmission",
+      "edge_decay": "corr_collapse_or_leader_reversal",
+      "expected_gross": 0.0025,
+      "friction": 0.0006,
+      "cost_coverage_ratio": 4.166666666666667,
+      "L1": "Lead_lag",
+      "L2": "delayed_transmission_with_breadth",
+      "idea_id": "idea_ll_btc_eth_impulse_5m"
+    },
+    {
+      "candidate_id": "p5_ll_btc_xrp_catchup_5m",
+      "counterparty": "XRP_momentum_chasers",
+      "profit_source": "delayed_transmission",
+      "edge_decay": "beta_regime_shift",
+      "expected_gross": 0.0035,
+      "friction": 0.0006,
+      "cost_coverage_ratio": 5.833333333333334,
+      "L1": "Lead_lag",
+      "L2": "high_beta_catchup",
+      "idea_id": "idea_ll_btc_xrp_impulse_5m"
+    },
+    {
+      "candidate_id": "p5_res_eth_btc_zfade_5m",
+      "counterparty": "relative_value_arb_flow",
+      "profit_source": "residual_repair",
+      "edge_decay": "beta_unstable_or_corr_break",
+      "expected_gross": 0.002,
+      "friction": 0.0006,
+      "cost_coverage_ratio": 3.3333333333333335,
+      "L1": "Residual",
+      "L2": "beta_adjusted_residual_MR",
+      "idea_id": "idea_res_eth_btc_beta_fade_5m"
+    },
+    {
+      "candidate_id": "p5_corr_btc_eth_recover_5m",
+      "counterparty": "pairs_desk_rehedge",
+      "profit_source": "structure_recovery",
+      "edge_decay": "structural_decorrelation",
+      "expected_gross": 0.0028,
+      "friction": 0.0006,
+      "cost_coverage_ratio": 4.666666666666667,
+      "L1": "Corr_breakdown",
+      "L2": "breakdown_then_recovery",
+      "idea_id": "idea_corr_btc_eth_breakdown_recover_5m"
+    },
+    {
+      "candidate_id": "p5_rg_eth_vol_div_converge_5m",
+      "counterparty": "vol_targeters",
+      "profit_source": "state_switch_convergence",
+      "edge_decay": "vol_div_persists",
+      "expected_gross": 0.002,
+      "friction": 0.0006,
+      "cost_coverage_ratio": 3.3333333333333335,
+      "L1": "Regime_divergence",
+      "L2": "vol_divergence_convergence",
+      "idea_id": "idea_rg_eth_vol_div_converge_5m"
+    },
+    {
+      "candidate_id": "p5_br_btc_ltc_diffusion_15m",
+      "counterparty": "LTC_late_cycle",
+      "profit_source": "breadth_diffusion",
+      "edge_decay": "breadth_collapse",
+      "expected_gross": 0.0045,
+      "friction": 0.0006,
+      "cost_coverage_ratio": 7.5,
+      "L1": "Breadth",
+      "L2": "breadth_diffusion_laggard",
+      "idea_id": "idea_br_btc_ltc_diffusion_15m"
+    }
+  ],
+  "compiler_audit_ref": "WINDTALKER_PHASE5_COMPILER_AUDIT.json",
+  "legacy_fallback_count": 0
+}

@@ -1,0 +1,53 @@
+# Secrets & credentials
+*.env
+.env*
+!*.env.example
+ai_ecosystem.env
+**/secrets*
+*credentials*
+*secret*
+*.pem
+*.key
+ssh/
+**/vultr*
+id_rsa*
+*_ed25519*
+token*
+api_key*
+auto_trade/ai_*.env
+*consent*
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Large data & logs
+market_data/
+*.parquet
+*.log
+logs/
+**/logs/
+
+# Backup dumps / local agent junk
+*.bak
+*.dump
+*_backup/
+.cursor/
+agent-transcripts/

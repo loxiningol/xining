@@ -1,0 +1,559 @@
+{
+  "schema": "WINDTALKER_PHASE3_SPEC_TO_CODE_SEMANTIC_MAP",
+  "generated_at": "2026-07-28 18:02:01",
+  "n_mechanisms": 16,
+  "phase1_n": 8,
+  "phase2_n": 8,
+  "grade_counts": {
+    "HIGH": 4,
+    "MED": 12,
+    "LOW": 0,
+    "NONE": 0
+  },
+  "rows": [
+    {
+      "phase": 1,
+      "mechanism_id": "mech_liquidity_failed_breakout_high_xrp15m",
+      "mechanism_family": "liquidity_failed_breakout_high",
+      "claimed_inefficiency": "false breakout above 20-bar range high traps momentum longs who must exit on close back below range high",
+      "entry_logic_claim": "bar wick exceeds high20 by at least 0.15*ATR but close falls back below high20; enter short on close of that bar",
+      "code_feature_set": [
+        "high",
+        "close",
+        "vol_z20",
+        "atr14",
+        "vol_z20",
+        "atr14"
+      ],
+      "fidelity_score_structural": 0.4184,
+      "fidelity_pass_structural": true,
+      "fidelity_notes": [
+        "pass_via_structural_fidelity_proxies"
+      ],
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec→OHLC+vol_z/atr/prev_high_low family branches",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.175353,
+        "leveraged_position_return_pct": -3.507068,
+        "after_cost_position_return_pct": -3.507068,
+        "account_return_at_30pct_equity_pct": -1.05212,
+        "trades_n": 217,
+        "win_rate_pct": 24.42396313364055,
+        "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+        "assumptions": {
+          "leverage": 20.0,
+          "equity_fraction": 0.3
+        }
+      },
+      "fingerprint_hash": "a21209572d1e934e2c698e4345d90e74"
+    },
+    {
+      "phase": 1,
+      "mechanism_id": "mech_low_break_fail_reclaim_long_ada5m",
+      "mechanism_family": "liquidity_failed_breakout_low",
+      "claimed_inefficiency": "wick_below_range_then_close_back_in",
+      "entry_logic_claim": "enter long when bar low breaks prev 20 low but close reclaims prev 20 low",
+      "code_feature_set": [
+        "low",
+        "close",
+        "vol_z20",
+        "atr14",
+        "vol_z20",
+        "atr14"
+      ],
+      "fidelity_score_structural": 0.4241,
+      "fidelity_pass_structural": true,
+      "fidelity_notes": [
+        "pass_via_structural_fidelity_proxies"
+      ],
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec→OHLC+vol_z/atr/prev_high_low family branches",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.234818,
+        "leveraged_position_return_pct": -4.696364,
+        "after_cost_position_return_pct": -4.696364,
+        "account_return_at_30pct_equity_pct": -1.408909,
+        "trades_n": 163,
+        "win_rate_pct": 9.815950920245399,
+        "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+        "assumptions": {
+          "leverage": 20.0,
+          "equity_fraction": 0.3
+        }
+      },
+      "fingerprint_hash": "98d33db0d4e96847b11256bb391369fa"
+    },
+    {
+      "phase": 1,
+      "mechanism_id": "mech_mr_rsi_extreme_sol1h",
+      "mechanism_family": "mean_reversion_rsi_extreme",
+      "claimed_inefficiency": "overbought momentum stretch reverts",
+      "entry_logic_claim": "RSI>80 followed by bearish engulfing candle close",
+      "code_feature_set": [
+        "atr14",
+        "close",
+        "close",
+        "atr14",
+        "vol_z20",
+        "atr14"
+      ],
+      "fidelity_score_structural": 0.4135,
+      "fidelity_pass_structural": true,
+      "fidelity_notes": [
+        "pass_via_structural_fidelity_proxies"
+      ],
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "mr_label_without_stretch_feature"
+      ],
+      "collapse_layer": "codex_implement_from_spec→OHLC+vol_z/atr/prev_high_low family branches",
+      "net_pnl_quality": {
+        "price_change_pct_approx": 0.0,
+        "leveraged_position_return_pct": 0.0,
+        "after_cost_position_return_pct": 0.0,
+        "account_return_at_30pct_equity_pct": 0.0,
+        "trades_n": 10,
+        "win_rate_pct": 0.0,
+        "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+        "assumptions": {
+          "leverage": 20.0,
+          "equity_fraction": 0.3
+        }
+      },
+      "fingerprint_hash": "3392370b4e0cd9a6cd3f3c24c2fb82fd"
+    },
+    {
+      "phase": 1,
+      "mechanism_id": "mech_mr_vwap_dev_btc15m",
+      "mechanism_family": "mean_reversion_vwap_deviation",
+      "claimed_inefficiency": "price stretched below VWAP by 2 std then reverts",
+      "entry_logic_claim": "close_lt_vwap_2std_then_reclaim_inside_lower_band",
+      "code_feature_set": [
+        "atr14",
+        "close",
+        "close",
+        "atr14",
+        "vol_z20",
+        "atr14"
+      ],
+      "fidelity_score_structural": 0.4,
+      "fidelity_pass_structural": true,
+      "fidelity_notes": [
+        "pass_via_structural_fidelity_proxies"
+      ],
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "mr_label_without_stretch_feature"
+      ],
+      "collapse_layer": "codex_implement_from_spec→OHLC+vol_z/atr/prev_high_low family branches",
+      "net_pnl_quality": {
+        "price_change_pct_approx": 0.0,
+        "leveraged_position_return_pct": 0.0,
+        "after_cost_position_return_pct": 0.0,
+        "account_return_at_30pct_equity_pct": 0.0,
+        "trades_n": 10,
+        "win_rate_pct": 0.0,
+        "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+        "assumptions": {
+          "leverage": 20.0,
+          "equity_fraction": 0.3
+        }
+      },
+      "fingerprint_hash": "6649c12779acedc47ed27cdeeb5e0737"
+    },
+    {
+      "phase": 1,
+      "mechanism_id": "mech_mr_zscore_dislocation_sol15m",
+      "mechanism_family": "mean_reversion_zscore_dislocation",
+      "claimed_inefficiency": "extreme_statistical_dislocation_from_mean",
+      "entry_logic_claim": "zscore_lt_neg2_then_close_above_sma20",
+      "code_feature_set": [
+        "atr14",
+        "close",
+        "close",
+        "atr14",
+        "vol_z20",
+        "atr14"
+      ],
+      "fidelity_score_structural": 0.4114,
+      "fidelity_pass_structural": true,
+      "fidelity_notes": [
+        "pass_via_structural_fidelity_proxies"
+      ],
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "mr_label_without_stretch_feature"
+      ],
+      "collapse_layer": "codex_implement_from_spec→OHLC+vol_z/atr/prev_high_low family branches",
+      "net_pnl_quality": {
+        "price_change_pct_approx": 0.0,
+        "leveraged_position_return_pct": 0.0,
+        "after_cost_position_return_pct": 0.0,
+        "account_return_at_30pct_equity_pct": 0.0,
+        "trades_n": 10,
+        "win_rate_pct": 0.0,
+        "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+        "assumptions": {
+          "leverage": 20.0,
+          "equity_fraction": 0.3
+        }
+      },
+      "fingerprint_hash": "5246c1d7743cf0ef65c2728f8aa829c7"
+    },
+    {
+      "phase": 1,
+      "mechanism_id": "mech_tc_thrust_retest_sol5m",
+      "mechanism_family": "trend_continuation_thrust_retest",
+      "claimed_inefficiency": "thrust_then_retest_level_holds",
+      "entry_logic_claim": "thrust bar closes above high20; price retraces to high20 zone; retest holds with close above high20",
+      "code_feature_set": [
+        "close",
+        "low",
+        "vol_z20",
+        "atr14",
+        "vol_z20",
+        "atr14"
+      ],
+      "fidelity_score_structural": 0.4109,
+      "fidelity_pass_structural": true,
+      "fidelity_notes": [
+        "pass_via_structural_fidelity_proxies"
+      ],
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec→OHLC+vol_z/atr/prev_high_low family branches",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.165401,
+        "leveraged_position_return_pct": -3.308021,
+        "after_cost_position_return_pct": -3.308021,
+        "account_return_at_30pct_equity_pct": -0.992406,
+        "trades_n": 324,
+        "win_rate_pct": 16.97530864197531,
+        "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+        "assumptions": {
+          "leverage": 20.0,
+          "equity_fraction": 0.3
+        }
+      },
+      "fingerprint_hash": "bb69558d828cba3d86528e4d7e7000ad"
+    },
+    {
+      "phase": 1,
+      "mechanism_id": "mech_ts_session_break_long_btc5m",
+      "mechanism_family": "time_structure_session_breakout",
+      "claimed_inefficiency": "overnight inventory liquidation at session open causes directional continuation",
+      "entry_logic_claim": "enter long when 5m close > prev 20-bar high during active session open with moderate volume confirmation",
+      "code_feature_set": [
+        "close",
+        "vol_z20",
+        "atr14",
+        "vol_z20",
+        "atr14"
+      ],
+      "fidelity_score_structural": 0.4106,
+      "fidelity_pass_structural": true,
+      "fidelity_notes": [
+        "pass_via_structural_fidelity_proxies"
+      ],
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec→OHLC+vol_z/atr/prev_high_low family branches",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.164593,
+        "leveraged_position_return_pct": -3.291865,
+        "after_cost_position_return_pct": -3.291865,
+        "account_return_at_30pct_equity_pct": -0.98756,
+        "trades_n": 319,
+        "win_rate_pct": 11.285266457680251,
+        "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+        "assumptions": {
+          "leverage": 20.0,
+          "equity_fraction": 0.3
+        }
+      },
+      "fingerprint_hash": "cce9876ef036c3cc4e7375356419f515"
+    },
+    {
+      "phase": 1,
+      "mechanism_id": "mech_vr03_eth15m",
+      "mechanism_family": "vol_regime_compression_release",
+      "claimed_inefficiency": "compression_breakout_has_inertia",
+      "entry_logic_claim": "vol_z low then atr_expand with up_close; enter long on expansion bar close",
+      "code_feature_set": [
+        "atr14",
+        "vol_z20",
+        "close",
+        "atr14",
+        "vol_z20",
+        "atr14"
+      ],
+      "fidelity_score_structural": 0.4113,
+      "fidelity_pass_structural": true,
+      "fidelity_notes": [
+        "pass_via_structural_fidelity_proxies"
+      ],
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec→OHLC+vol_z/atr/prev_high_low family branches",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.164533,
+        "leveraged_position_return_pct": -3.290655,
+        "after_cost_position_return_pct": -3.290655,
+        "account_return_at_30pct_equity_pct": -0.987197,
+        "trades_n": 506,
+        "win_rate_pct": 24.308300395256918,
+        "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+        "assumptions": {
+          "leverage": 20.0,
+          "equity_fraction": 0.3
+        }
+      },
+      "fingerprint_hash": "5a9fa0b279d463ec668ccc6ca03dee19"
+    },
+    {
+      "phase": 2,
+      "mechanism_id": "mech_p2_a_cascade_trap_proxy_xrp_15m",
+      "mechanism_family": "cascade_trap_proxy",
+      "claimed_inefficiency": "forced long liquidations then failed upside reclaim",
+      "entry_logic_claim": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+      "code_feature_set": [
+        "vol_z20",
+        "atr14",
+        "ohlc_proxy_assumed"
+      ],
+      "fidelity_score_structural": null,
+      "fidelity_pass_structural": null,
+      "fidelity_notes": null,
+      "semantic_loss_grade": "HIGH",
+      "semantic_loss_issues": [
+        "forced_flow_story_reduced_to_vol_z_ohlc"
+      ],
+      "collapse_layer": "codex_implement_from_spec Phase2 family branch still OHLC+vol_z proxy",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.254993,
+        "leveraged_position_return_pct": -5.099863,
+        "after_cost_position_return_pct": -5.099863,
+        "account_return_at_30pct_equity_pct": -1.529959,
+        "trades_n": 44,
+        "win_rate_pct": 18.181818181818183
+      },
+      "direction_class": "A"
+    },
+    {
+      "phase": 2,
+      "mechanism_id": "mech_p2_d_selective_session_thrust_btc_5m",
+      "mechanism_family": "selective_session_thrust",
+      "claimed_inefficiency": "overnight inventory forced to chase session auction",
+      "entry_logic_claim": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+      "code_feature_set": [
+        "vol_z20",
+        "atr14",
+        "ohlc_proxy_assumed"
+      ],
+      "fidelity_score_structural": null,
+      "fidelity_pass_structural": null,
+      "fidelity_notes": null,
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec Phase2 family branch still OHLC+vol_z proxy",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.165158,
+        "leveraged_position_return_pct": -3.303166,
+        "after_cost_position_return_pct": -3.303166,
+        "account_return_at_30pct_equity_pct": -0.99095,
+        "trades_n": 186,
+        "win_rate_pct": 12.365591397849462
+      },
+      "direction_class": "D"
+    },
+    {
+      "phase": 2,
+      "mechanism_id": "mech_p2_d_selective_session_thrust_xau_5m",
+      "mechanism_family": "selective_session_thrust",
+      "claimed_inefficiency": "session auction sellers dominating thin book",
+      "entry_logic_claim": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+      "code_feature_set": [
+        "vol_z20",
+        "atr14",
+        "ohlc_proxy_assumed"
+      ],
+      "fidelity_score_structural": null,
+      "fidelity_pass_structural": null,
+      "fidelity_notes": null,
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec Phase2 family branch still OHLC+vol_z proxy",
+      "net_pnl_quality": {
+        "price_change_pct_approx": 0.0,
+        "leveraged_position_return_pct": 0.0,
+        "after_cost_position_return_pct": 0.0,
+        "account_return_at_30pct_equity_pct": 0.0,
+        "trades_n": 0,
+        "win_rate_pct": null
+      },
+      "direction_class": "D"
+    },
+    {
+      "phase": 2,
+      "mechanism_id": "mech_p2_e_absorption_climax_reclaim_btc_15m",
+      "mechanism_family": "absorption_climax_reclaim",
+      "claimed_inefficiency": "FOMO buyers trapped after climax wick above range",
+      "entry_logic_claim": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+      "code_feature_set": [
+        "vol_z20",
+        "atr14",
+        "ohlc_proxy_assumed"
+      ],
+      "fidelity_score_structural": null,
+      "fidelity_pass_structural": null,
+      "fidelity_notes": null,
+      "semantic_loss_grade": "HIGH",
+      "semantic_loss_issues": [
+        "forced_flow_story_reduced_to_vol_z_ohlc"
+      ],
+      "collapse_layer": "codex_implement_from_spec Phase2 family branch still OHLC+vol_z proxy",
+      "net_pnl_quality": {
+        "price_change_pct_approx": 0.0,
+        "leveraged_position_return_pct": 0.0,
+        "after_cost_position_return_pct": 0.0,
+        "account_return_at_30pct_equity_pct": 0.0,
+        "trades_n": 0,
+        "win_rate_pct": null
+      },
+      "direction_class": "E"
+    },
+    {
+      "phase": 2,
+      "mechanism_id": "mech_p2_e_absorption_climax_reclaim_btc_5m",
+      "mechanism_family": "absorption_climax_reclaim",
+      "claimed_inefficiency": "panic sellers trapped after climax wick below range",
+      "entry_logic_claim": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+      "code_feature_set": [
+        "vol_z20",
+        "atr14",
+        "ohlc_proxy_assumed"
+      ],
+      "fidelity_score_structural": null,
+      "fidelity_pass_structural": null,
+      "fidelity_notes": null,
+      "semantic_loss_grade": "HIGH",
+      "semantic_loss_issues": [
+        "forced_flow_story_reduced_to_vol_z_ohlc"
+      ],
+      "collapse_layer": "codex_implement_from_spec Phase2 family branch still OHLC+vol_z proxy",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.129405,
+        "leveraged_position_return_pct": -2.588108,
+        "after_cost_position_return_pct": -2.588108,
+        "account_return_at_30pct_equity_pct": -0.776432,
+        "trades_n": 29,
+        "win_rate_pct": 24.137931034482758
+      },
+      "direction_class": "E"
+    },
+    {
+      "phase": 2,
+      "mechanism_id": "mech_p2_e_vacuum_fill_impulse_ng_5m",
+      "mechanism_family": "vacuum_fill_impulse",
+      "claimed_inefficiency": "thin-book shorts run by impulse vacuum",
+      "entry_logic_claim": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+      "code_feature_set": [
+        "vol_z20",
+        "atr14",
+        "ohlc_proxy_assumed"
+      ],
+      "fidelity_score_structural": null,
+      "fidelity_pass_structural": null,
+      "fidelity_notes": null,
+      "semantic_loss_grade": "HIGH",
+      "semantic_loss_issues": [
+        "forced_flow_story_reduced_to_vol_z_ohlc"
+      ],
+      "collapse_layer": "codex_implement_from_spec Phase2 family branch still OHLC+vol_z proxy",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.197702,
+        "leveraged_position_return_pct": -3.954045,
+        "after_cost_position_return_pct": -3.954045,
+        "account_return_at_30pct_equity_pct": -1.186214,
+        "trades_n": 88,
+        "win_rate_pct": 15.909090909090908
+      },
+      "direction_class": "E"
+    },
+    {
+      "phase": 2,
+      "mechanism_id": "mech_p2_f_confirmed_vol_release_btc_15m",
+      "mechanism_family": "confirmed_vol_release",
+      "claimed_inefficiency": "range longs trapped on downside expansion",
+      "entry_logic_claim": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+      "code_feature_set": [
+        "vol_z20",
+        "atr14",
+        "ohlc_proxy_assumed"
+      ],
+      "fidelity_score_structural": null,
+      "fidelity_pass_structural": null,
+      "fidelity_notes": null,
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec Phase2 family branch still OHLC+vol_z proxy",
+      "net_pnl_quality": {
+        "price_change_pct_approx": 0.0,
+        "leveraged_position_return_pct": 0.0,
+        "after_cost_position_return_pct": 0.0,
+        "account_return_at_30pct_equity_pct": 0.0,
+        "trades_n": 0,
+        "win_rate_pct": null
+      },
+      "direction_class": "F"
+    },
+    {
+      "phase": 2,
+      "mechanism_id": "mech_p2_f_confirmed_vol_release_eth_15m",
+      "mechanism_family": "confirmed_vol_release",
+      "claimed_inefficiency": "range shorts covering into expansion",
+      "entry_logic_claim": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+      "code_feature_set": [
+        "vol_z20",
+        "atr14",
+        "ohlc_proxy_assumed"
+      ],
+      "fidelity_score_structural": null,
+      "fidelity_pass_structural": null,
+      "fidelity_notes": null,
+      "semantic_loss_grade": "MED",
+      "semantic_loss_issues": [
+        "ohlc_vol_atr_template"
+      ],
+      "collapse_layer": "codex_implement_from_spec Phase2 family branch still OHLC+vol_z proxy",
+      "net_pnl_quality": {
+        "price_change_pct_approx": -0.171736,
+        "leveraged_position_return_pct": -3.434716,
+        "after_cost_position_return_pct": -3.434716,
+        "account_return_at_30pct_equity_pct": -1.030415,
+        "trades_n": 170,
+        "win_rate_pct": 21.764705882352942
+      },
+      "direction_class": "F"
+    }
+  ],
+  "method": "claimed entry/inefficiency vs fidelity feature_set + codex family branch localization"
+}

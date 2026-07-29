@@ -1,0 +1,86 @@
+{
+  "schema": "WINDTALKER_PHASE5_PRODUCTION_ISOLATION",
+  "generated_at": "2026-07-28 14:56:03",
+  "checks": [
+    {
+      "file": "/root/auto_trade/auto_trade_config.json",
+      "pre": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+      "now": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/portfolio_risk_policy.json",
+      "pre": "b6706810a56727e0c5e887245ca7efd35337a6c77f03ed5fb11c4d5be9a30156",
+      "now": "b6706810a56727e0c5e887245ca7efd35337a6c77f03ed5fb11c4d5be9a30156",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/STEP_B_calibration_status.json",
+      "pre": "d5e8a114f6b5120ba0a1f35c07ac4987407469580b060d706c970caebdc5f8d2",
+      "now": "d5e8a114f6b5120ba0a1f35c07ac4987407469580b060d706c970caebdc5f8d2",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config.json",
+      "pre": "f0d0356bdd4754087e5a7c3e3c3be0ea428ae7da019a92bc15530aaefada2415",
+      "now": "f0d0356bdd4754087e5a7c3e3c3be0ea428ae7da019a92bc15530aaefada2415",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config_ada_5m.json",
+      "pre": "f47942ab4992ad36fd2d2277ba635028be07628f3f90c462025b25ffe8e30eb3",
+      "now": "f47942ab4992ad36fd2d2277ba635028be07628f3f90c462025b25ffe8e30eb3",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config_btc_15m.json",
+      "pre": "be7108b72f66f741e7542f8a7f18a4bd92dfa071ca28a035d52a44c861cf260d",
+      "now": "be7108b72f66f741e7542f8a7f18a4bd92dfa071ca28a035d52a44c861cf260d",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config_btc_5m.json",
+      "pre": "53deec7d7c80ba0d2c56773f7c94989a193447a584ec7a2854f3522ff82401eb",
+      "now": "53deec7d7c80ba0d2c56773f7c94989a193447a584ec7a2854f3522ff82401eb",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config_cl.json",
+      "pre": "70f38b5b15ecbaf256320369f554a4f2669183a42b851ca9abc2cb7fd9e80caf",
+      "now": "70f38b5b15ecbaf256320369f554a4f2669183a42b851ca9abc2cb7fd9e80caf",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config_cl_15m.json",
+      "pre": "21ae95a90b70ad00b48a7ef255ded1c4620cbf6c8a7f565324ec74c5381340f2",
+      "now": "21ae95a90b70ad00b48a7ef255ded1c4620cbf6c8a7f565324ec74c5381340f2",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config_cl_5m.json",
+      "pre": "07f7381112e92eea09235c503c4ee0f768a211f3fc56c682ffb1b9ec5291d920",
+      "now": "07f7381112e92eea09235c503c4ee0f768a211f3fc56c682ffb1b9ec5291d920",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config_ltc_5m.json",
+      "pre": "195d724feacb3b0927288930307eca9bf36f53ebd9219a7555897a2d58518acb",
+      "now": "195d724feacb3b0927288930307eca9bf36f53ebd9219a7555897a2d58518acb",
+      "unchanged": true
+    }
+  ],
+  "production_dsl_research_features_absent": true,
+  "prod_feature_count": 33,
+  "regression_pass": true,
+  "safety": {
+    "auto_mount": false,
+    "live_enabled": false,
+    "real_orders": false,
+    "daemon_mutated": false,
+    "ada_sl_migrated": false,
+    "step_b_changed": false,
+    "risk_20x_30pct_0_9pct_changed": false,
+    "open_sl_tp_close_weakened": false
+  },
+  "rollback_needed": false
+}

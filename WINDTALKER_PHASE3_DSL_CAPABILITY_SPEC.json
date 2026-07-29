@@ -1,0 +1,119 @@
+{
+  "schema": "WINDTALKER_PHASE3_DSL_CAPABILITY_SPEC",
+  "generated_at": "2026-07-28 18:02:07",
+  "production_dsl": {
+    "module": "auto_trade_strategy_dsl.py",
+    "schema": "qiyu_strategy_dsl_v1",
+    "features_n": 33,
+    "features": [
+      "atr14",
+      "cci",
+      "close",
+      "d",
+      "ema16",
+      "ema17",
+      "ema19",
+      "ema200",
+      "ema21",
+      "ema23",
+      "ema32",
+      "ema38",
+      "ema53",
+      "ema6",
+      "ema7",
+      "ema75",
+      "ema8",
+      "ema95",
+      "h1_atr14",
+      "h1_ema19",
+      "h1_ema53",
+      "h1_slope4",
+      "high",
+      "j",
+      "k",
+      "low",
+      "macd_stick",
+      "open",
+      "prev_high20",
+      "prev_low20",
+      "rsi14",
+      "vol_z20",
+      "z20"
+    ],
+    "has_oi": false,
+    "has_funding_entry": false,
+    "has_taker": false,
+    "has_cross_asset": false,
+    "has_state_machine": false,
+    "has_event_sequence": false,
+    "untouched_by_phase3": true
+  },
+  "research_dsl": {
+    "module": "windtalker_phase3_research_dsl.py",
+    "schema": "qiyu_strategy_dsl_research_v1",
+    "features_n": 55,
+    "research_features": [
+      "basis_bps",
+      "basis_z20",
+      "cross_sync_score",
+      "event_code",
+      "flow_imbalance",
+      "funding_rate",
+      "funding_z20",
+      "lag_ret1",
+      "lead_lag_corr20",
+      "lead_ret1",
+      "lead_ret3",
+      "oi",
+      "oi_crowding",
+      "oi_delta_pct",
+      "oi_z20",
+      "regime_ok",
+      "seq_age",
+      "state_id",
+      "taker_buy",
+      "taker_imbalance",
+      "taker_imbalance_z20",
+      "taker_sell"
+    ],
+    "ops_added": [
+      "falling_for",
+      "rising_for"
+    ],
+    "capabilities": {
+      "multi_source_features": true,
+      "state_machines": true,
+      "event_sequences": true,
+      "multi_asset_relations": true,
+      "dynamic_exits": true,
+      "explicit_proxy_declarations": true,
+      "fail_closed_missing_features": true
+    },
+    "live_enabled_forbidden": true,
+    "auto_trade_eligible_forbidden": true
+  },
+  "extension_policy": {
+    "per_strategy_hardcoded_families": false,
+    "generic_expressiveness": true,
+    "does_not_rebuild_step_a_b": true,
+    "production_isolation": "research module separate; production FEATURES unchanged"
+  },
+  "proxy_declaration_contract": {
+    "required_fields": [
+      "feature",
+      "true_target",
+      "proxy_of",
+      "limitation"
+    ],
+    "example": {
+      "feature": "oi_crowding",
+      "true_target": "open_interest_crowding_with_price",
+      "proxy_of": "okx_rubik_oi_history asof-aligned",
+      "limitation": "5m rubik resolution; stale>30m → NaN fail-closed"
+    }
+  },
+  "sample_validation": {
+    "ok": true,
+    "topology": "623f27560ee1cbc1ffd2ab7e4a1482ac3240a0e9cf84e947b7e6a1d9cf0740f8"
+  }
+}

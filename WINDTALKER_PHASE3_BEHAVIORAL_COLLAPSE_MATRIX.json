@@ -1,0 +1,2234 @@
+{
+  "schema": "WINDTALKER_PHASE3_BEHAVIORAL_COLLAPSE_MATRIX",
+  "generated_at": "2026-07-28 18:02:01",
+  "n_items": 16,
+  "ids": [
+    "mech_liquidity_failed_breakout_high_xrp15m",
+    "mech_low_break_fail_reclaim_long_ada5m",
+    "mech_mr_rsi_extreme_sol1h",
+    "mech_mr_vwap_dev_btc15m",
+    "mech_mr_zscore_dislocation_sol15m",
+    "mech_tc_thrust_retest_sol5m",
+    "mech_ts_session_break_long_btc5m",
+    "mech_vr03_eth15m",
+    "mech_p2_a_cascade_trap_proxy_xrp_15m",
+    "mech_p2_d_selective_session_thrust_btc_5m",
+    "mech_p2_d_selective_session_thrust_xau_5m",
+    "mech_p2_e_absorption_climax_reclaim_btc_15m",
+    "mech_p2_e_absorption_climax_reclaim_btc_5m",
+    "mech_p2_e_vacuum_fill_impulse_ng_5m",
+    "mech_p2_f_confirmed_vol_release_btc_15m",
+    "mech_p2_f_confirmed_vol_release_eth_15m"
+  ],
+  "high_similarity_threshold": 0.55,
+  "rule": "If >=3 similarity dimensions high → not independent",
+  "matrices": {
+    "ast_feature_jaccard": {
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_low_break_fail_reclaim_long_ada5m": 0.6,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_rsi_extreme_sol1h": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_vwap_dev_btc15m": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_zscore_dislocation_sol15m": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_tc_thrust_retest_sol5m": 0.6,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_ts_session_break_long_btc5m": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_vr03_eth15m": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_rsi_extreme_sol1h": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_vwap_dev_btc15m": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_zscore_dislocation_sol15m": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_tc_thrust_retest_sol5m": 1.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_ts_session_break_long_btc5m": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_vr03_eth15m": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_vwap_dev_btc15m": 1.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_zscore_dislocation_sol15m": 1.0,
+      "mech_mr_rsi_extreme_sol1h||mech_tc_thrust_retest_sol5m": 0.75,
+      "mech_mr_rsi_extreme_sol1h||mech_ts_session_break_long_btc5m": 1.0,
+      "mech_mr_rsi_extreme_sol1h||mech_vr03_eth15m": 1.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_mr_zscore_dislocation_sol15m": 1.0,
+      "mech_mr_vwap_dev_btc15m||mech_tc_thrust_retest_sol5m": 0.75,
+      "mech_mr_vwap_dev_btc15m||mech_ts_session_break_long_btc5m": 1.0,
+      "mech_mr_vwap_dev_btc15m||mech_vr03_eth15m": 1.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_tc_thrust_retest_sol5m": 0.75,
+      "mech_mr_zscore_dislocation_sol15m||mech_ts_session_break_long_btc5m": 1.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_vr03_eth15m": 1.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_ts_session_break_long_btc5m": 0.75,
+      "mech_tc_thrust_retest_sol5m||mech_vr03_eth15m": 0.75,
+      "mech_tc_thrust_retest_sol5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_vr03_eth15m": 1.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_btc_5m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_xau_5m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_d_selective_session_thrust_xau_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_f_confirmed_vol_release_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85
+    },
+    "entry_fingerprint": {
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_low_break_fail_reclaim_long_ada5m": 0.1538,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_rsi_extreme_sol1h": 0.0833,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_tc_thrust_retest_sol5m": 0.1379,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_ts_session_break_long_btc5m": 0.0588,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_vr03_eth15m": 0.1481,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_rsi_extreme_sol1h": 0.0588,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_tc_thrust_retest_sol5m": 0.087,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_ts_session_break_long_btc5m": 0.2174,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_vr03_eth15m": 0.2778,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_tc_thrust_retest_sol5m": 0.05,
+      "mech_mr_rsi_extreme_sol1h||mech_ts_session_break_long_btc5m": 0.0435,
+      "mech_mr_rsi_extreme_sol1h||mech_vr03_eth15m": 0.0556,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_tc_thrust_retest_sol5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_vr03_eth15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_tc_thrust_retest_sol5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_vr03_eth15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_ts_session_break_long_btc5m": 0.069,
+      "mech_tc_thrust_retest_sol5m||mech_vr03_eth15m": 0.1304,
+      "mech_tc_thrust_retest_sol5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_vr03_eth15m": 0.16,
+      "mech_ts_session_break_long_btc5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_btc_5m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_xau_5m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_d_selective_session_thrust_xau_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_f_confirmed_vol_release_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0
+    },
+    "exit_fingerprint": {
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_low_break_fail_reclaim_long_ada5m": 0.1538,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_rsi_extreme_sol1h": 0.087,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_zscore_dislocation_sol15m": 0.087,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_tc_thrust_retest_sol5m": 0.2609,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_ts_session_break_long_btc5m": 0.125,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_vr03_eth15m": 0.1304,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_rsi_extreme_sol1h": 0.0556,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_zscore_dislocation_sol15m": 0.1875,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_tc_thrust_retest_sol5m": 0.2105,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_ts_session_break_long_btc5m": 0.2353,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_vr03_eth15m": 0.3333,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_zscore_dislocation_sol15m": 0.0769,
+      "mech_mr_rsi_extreme_sol1h||mech_tc_thrust_retest_sol5m": 0.125,
+      "mech_mr_rsi_extreme_sol1h||mech_ts_session_break_long_btc5m": 0.0667,
+      "mech_mr_rsi_extreme_sol1h||mech_vr03_eth15m": 0.0714,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_tc_thrust_retest_sol5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_vr03_eth15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_tc_thrust_retest_sol5m": 0.0588,
+      "mech_mr_zscore_dislocation_sol15m||mech_ts_session_break_long_btc5m": 0.0667,
+      "mech_mr_zscore_dislocation_sol15m||mech_vr03_eth15m": 0.0714,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_ts_session_break_long_btc5m": 0.3333,
+      "mech_tc_thrust_retest_sol5m||mech_vr03_eth15m": 0.2667,
+      "mech_tc_thrust_retest_sol5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_vr03_eth15m": 0.3077,
+      "mech_ts_session_break_long_btc5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_btc_5m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_xau_5m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_d_selective_session_thrust_xau_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_btc_15m": 1.0,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0,
+      "mech_p2_f_confirmed_vol_release_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 1.0
+    },
+    "data_feature_overlap": {
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_low_break_fail_reclaim_long_ada5m": 0.6,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_rsi_extreme_sol1h": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_vwap_dev_btc15m": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_zscore_dislocation_sol15m": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_tc_thrust_retest_sol5m": 0.6,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_ts_session_break_long_btc5m": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_vr03_eth15m": 0.75,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_rsi_extreme_sol1h": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_vwap_dev_btc15m": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_zscore_dislocation_sol15m": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_tc_thrust_retest_sol5m": 1.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_ts_session_break_long_btc5m": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_vr03_eth15m": 0.75,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_vwap_dev_btc15m": 1.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_zscore_dislocation_sol15m": 1.0,
+      "mech_mr_rsi_extreme_sol1h||mech_tc_thrust_retest_sol5m": 0.75,
+      "mech_mr_rsi_extreme_sol1h||mech_ts_session_break_long_btc5m": 1.0,
+      "mech_mr_rsi_extreme_sol1h||mech_vr03_eth15m": 1.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_mr_zscore_dislocation_sol15m": 1.0,
+      "mech_mr_vwap_dev_btc15m||mech_tc_thrust_retest_sol5m": 0.75,
+      "mech_mr_vwap_dev_btc15m||mech_ts_session_break_long_btc5m": 1.0,
+      "mech_mr_vwap_dev_btc15m||mech_vr03_eth15m": 1.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_tc_thrust_retest_sol5m": 0.75,
+      "mech_mr_zscore_dislocation_sol15m||mech_ts_session_break_long_btc5m": 1.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_vr03_eth15m": 1.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_ts_session_break_long_btc5m": 0.75,
+      "mech_tc_thrust_retest_sol5m||mech_vr03_eth15m": 0.75,
+      "mech_tc_thrust_retest_sol5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_vr03_eth15m": 1.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_btc_5m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_xau_5m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_d_selective_session_thrust_xau_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.85,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85,
+      "mech_p2_f_confirmed_vol_release_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.85
+    },
+    "pnl_quality_proximity": {
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_low_break_fail_reclaim_long_ada5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_rsi_extreme_sol1h": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_tc_thrust_retest_sol5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_vr03_eth15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_rsi_extreme_sol1h": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_tc_thrust_retest_sol5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_vr03_eth15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_vwap_dev_btc15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_tc_thrust_retest_sol5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_vr03_eth15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_mr_zscore_dislocation_sol15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_tc_thrust_retest_sol5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_vr03_eth15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_tc_thrust_retest_sol5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_vr03_eth15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_ts_session_break_long_btc5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_vr03_eth15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_vr03_eth15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_btc_5m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_d_selective_session_thrust_xau_5m": 0.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_btc_15m": 0.0,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0,
+      "mech_p2_f_confirmed_vol_release_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 0.0
+    },
+    "composite_high_dim_count": {
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_low_break_fail_reclaim_long_ada5m": 2,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_rsi_extreme_sol1h": 2,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_vwap_dev_btc15m": 2,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_zscore_dislocation_sol15m": 2,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_tc_thrust_retest_sol5m": 2,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_ts_session_break_long_btc5m": 2,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_vr03_eth15m": 2,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_btc_5m": 0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_xau_5m": 0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_btc_15m": 0,
+      "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_eth_15m": 0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_rsi_extreme_sol1h": 2,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_vwap_dev_btc15m": 2,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_mr_zscore_dislocation_sol15m": 2,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_tc_thrust_retest_sol5m": 2,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_ts_session_break_long_btc5m": 2,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_vr03_eth15m": 2,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_btc_5m": 0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_xau_5m": 0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_btc_15m": 0,
+      "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_eth_15m": 0,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_vwap_dev_btc15m": 2,
+      "mech_mr_rsi_extreme_sol1h||mech_mr_zscore_dislocation_sol15m": 2,
+      "mech_mr_rsi_extreme_sol1h||mech_tc_thrust_retest_sol5m": 2,
+      "mech_mr_rsi_extreme_sol1h||mech_ts_session_break_long_btc5m": 2,
+      "mech_mr_rsi_extreme_sol1h||mech_vr03_eth15m": 2,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_a_cascade_trap_proxy_xrp_15m": 0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_btc_5m": 0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_xau_5m": 0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_15m": 0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_5m": 0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_e_vacuum_fill_impulse_ng_5m": 0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_btc_15m": 0,
+      "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_eth_15m": 0,
+      "mech_mr_vwap_dev_btc15m||mech_mr_zscore_dislocation_sol15m": 2,
+      "mech_mr_vwap_dev_btc15m||mech_tc_thrust_retest_sol5m": 2,
+      "mech_mr_vwap_dev_btc15m||mech_ts_session_break_long_btc5m": 2,
+      "mech_mr_vwap_dev_btc15m||mech_vr03_eth15m": 2,
+      "mech_mr_vwap_dev_btc15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_btc_5m": 0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_xau_5m": 0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_btc_15m": 0,
+      "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_eth_15m": 0,
+      "mech_mr_zscore_dislocation_sol15m||mech_tc_thrust_retest_sol5m": 2,
+      "mech_mr_zscore_dislocation_sol15m||mech_ts_session_break_long_btc5m": 2,
+      "mech_mr_zscore_dislocation_sol15m||mech_vr03_eth15m": 2,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_btc_5m": 0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_xau_5m": 0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_btc_15m": 0,
+      "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_eth_15m": 0,
+      "mech_tc_thrust_retest_sol5m||mech_ts_session_break_long_btc5m": 2,
+      "mech_tc_thrust_retest_sol5m||mech_vr03_eth15m": 2,
+      "mech_tc_thrust_retest_sol5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_btc_5m": 0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_xau_5m": 0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_btc_15m": 0,
+      "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_eth_15m": 0,
+      "mech_ts_session_break_long_btc5m||mech_vr03_eth15m": 2,
+      "mech_ts_session_break_long_btc5m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_btc_5m": 0,
+      "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_xau_5m": 0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0,
+      "mech_ts_session_break_long_btc5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_btc_15m": 0,
+      "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_eth_15m": 0,
+      "mech_vr03_eth15m||mech_p2_a_cascade_trap_proxy_xrp_15m": 0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_btc_5m": 0,
+      "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_xau_5m": 0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 0,
+      "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 0,
+      "mech_vr03_eth15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_btc_15m": 0,
+      "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_eth_15m": 0,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_btc_5m": 5,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_xau_5m": 5,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_15m": 5,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 5,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 5,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_btc_15m": 5,
+      "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_eth_15m": 5,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_d_selective_session_thrust_xau_5m": 5,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 5,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 5,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 5,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 5,
+      "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 5,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": 5,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": 5,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 5,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_btc_15m": 5,
+      "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_eth_15m": 5,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": 5,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": 5,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_btc_15m": 5,
+      "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 5,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": 5,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": 5,
+      "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": 5,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_btc_15m": 5,
+      "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_eth_15m": 5,
+      "mech_p2_f_confirmed_vol_release_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": 5
+    }
+  },
+  "pair_flags": {
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_low_break_fail_reclaim_long_ada5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.6,
+        "entry": 0.15384615384615385,
+        "exit": 0.15384615384615385,
+        "data": 0.6,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_rsi_extreme_sol1h": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.08333333333333333,
+        "exit": 0.08695652173913043,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.05263157894736842
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_vwap_dev_btc15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.041666666666666664
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_mr_zscore_dislocation_sol15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.0,
+        "exit": 0.08695652173913043,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_tc_thrust_retest_sol5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.6,
+        "entry": 0.13793103448275862,
+        "exit": 0.2608695652173913,
+        "data": 0.6,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_ts_session_break_long_btc5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.058823529411764705,
+        "exit": 0.125,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_vr03_eth15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.14814814814814814,
+        "exit": 0.13043478260869565,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_a_cascade_trap_proxy_xrp_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_liquidity_failed_breakout_high_xrp15m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_mr_rsi_extreme_sol1h": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.058823529411764705,
+        "exit": 0.05555555555555555,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_mr_vwap_dev_btc15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_mr_zscore_dislocation_sol15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.0,
+        "exit": 0.1875,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_tc_thrust_retest_sol5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.08695652173913043,
+        "exit": 0.21052631578947367,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_ts_session_break_long_btc5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.21739130434782608,
+        "exit": 0.23529411764705882,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_vr03_eth15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.2777777777777778,
+        "exit": 0.3333333333333333,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_p2_a_cascade_trap_proxy_xrp_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_low_break_fail_reclaim_long_ada5m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_mr_vwap_dev_btc15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.08333333333333333
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_mr_zscore_dislocation_sol15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.0,
+        "exit": 0.07692307692307693,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_tc_thrust_retest_sol5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.05,
+        "exit": 0.125,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_ts_session_break_long_btc5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.043478260869565216,
+        "exit": 0.06666666666666667,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_vr03_eth15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.05555555555555555,
+        "exit": 0.07142857142857142,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_p2_a_cascade_trap_proxy_xrp_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_rsi_extreme_sol1h||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_mr_zscore_dislocation_sol15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_tc_thrust_retest_sol5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_ts_session_break_long_btc5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_vr03_eth15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_p2_a_cascade_trap_proxy_xrp_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_vwap_dev_btc15m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_tc_thrust_retest_sol5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.0,
+        "exit": 0.058823529411764705,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_ts_session_break_long_btc5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.0,
+        "exit": 0.06666666666666667,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_vr03_eth15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.0,
+        "exit": 0.07142857142857142,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_p2_a_cascade_trap_proxy_xrp_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_mr_zscore_dislocation_sol15m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_ts_session_break_long_btc5m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.06896551724137931,
+        "exit": 0.3333333333333333,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_vr03_eth15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 0.75,
+        "entry": 0.13043478260869565,
+        "exit": 0.26666666666666666,
+        "data": 0.75,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_p2_a_cascade_trap_proxy_xrp_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_tc_thrust_retest_sol5m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_vr03_eth15m": {
+      "high_dim_count": 2,
+      "not_independent": false,
+      "dims": {
+        "features": 1.0,
+        "entry": 0.16,
+        "exit": 0.3076923076923077,
+        "data": 1.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_p2_a_cascade_trap_proxy_xrp_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_ts_session_break_long_btc5m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_vr03_eth15m||mech_p2_a_cascade_trap_proxy_xrp_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_vr03_eth15m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_vr03_eth15m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_vr03_eth15m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_vr03_eth15m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 0,
+      "not_independent": false,
+      "dims": {
+        "features": 0.0,
+        "entry": 0.0,
+        "exit": 0.0,
+        "data": 0.0,
+        "pnl": 0.0,
+        "signal_origin": 0.0
+      }
+    },
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_btc_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_d_selective_session_thrust_xau_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_absorption_climax_reclaim_btc_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_btc_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    },
+    "mech_p2_f_confirmed_vol_release_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m": {
+      "high_dim_count": 5,
+      "not_independent": true,
+      "dims": {
+        "features": 0.85,
+        "entry": 1.0,
+        "exit": 1.0,
+        "data": 0.85,
+        "pnl": 0.0,
+        "signal_origin": 1.0
+      }
+    }
+  },
+  "not_independent_pair_count": 28,
+  "not_independent_pairs_sample": [
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_btc_5m",
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_d_selective_session_thrust_xau_5m",
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_15m",
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_absorption_climax_reclaim_btc_5m",
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_e_vacuum_fill_impulse_ng_5m",
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_btc_15m",
+    "mech_p2_a_cascade_trap_proxy_xrp_15m||mech_p2_f_confirmed_vol_release_eth_15m",
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_d_selective_session_thrust_xau_5m",
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_15m",
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_absorption_climax_reclaim_btc_5m",
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m",
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m",
+    "mech_p2_d_selective_session_thrust_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m",
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_15m",
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_absorption_climax_reclaim_btc_5m",
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_e_vacuum_fill_impulse_ng_5m",
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_btc_15m",
+    "mech_p2_d_selective_session_thrust_xau_5m||mech_p2_f_confirmed_vol_release_eth_15m",
+    "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_absorption_climax_reclaim_btc_5m",
+    "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_e_vacuum_fill_impulse_ng_5m",
+    "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_btc_15m",
+    "mech_p2_e_absorption_climax_reclaim_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m",
+    "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_e_vacuum_fill_impulse_ng_5m",
+    "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_btc_15m",
+    "mech_p2_e_absorption_climax_reclaim_btc_5m||mech_p2_f_confirmed_vol_release_eth_15m",
+    "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_btc_15m",
+    "mech_p2_e_vacuum_fill_impulse_ng_5m||mech_p2_f_confirmed_vol_release_eth_15m",
+    "mech_p2_f_confirmed_vol_release_btc_15m||mech_p2_f_confirmed_vol_release_eth_15m"
+  ],
+  "verdict": "BEHAVIORAL_COLLAPSE_CONFIRMED",
+  "note": "Phase1+2 formal candidates largely share OHLC template behavioral fingerprints"
+}

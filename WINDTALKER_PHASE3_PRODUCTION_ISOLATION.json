@@ -1,0 +1,68 @@
+{
+  "schema": "WINDTALKER_PHASE3_PRODUCTION_ISOLATION",
+  "generated_at": "2026-07-28 18:04:27",
+  "backup_path": "/root/backups/windtalker_phase3_20260728_180201",
+  "checks": [
+    {
+      "name": "config_hash_unchanged",
+      "pass": true,
+      "now": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+      "backup": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754"
+    },
+    {
+      "name": "production_dsl_file_unchanged",
+      "pass": true,
+      "features_n": 33,
+      "research_features_not_in_prod": true
+    },
+    {
+      "name": "probes_research_only_flags",
+      "pass": true
+    },
+    {
+      "name": "formal_dsl_count_stable_or_untouched_by_phase3",
+      "pass": true,
+      "backup_n": 21,
+      "now_n": 21,
+      "phase3_writes_formal_dsl": false
+    },
+    {
+      "name": "step_a_not_modified_by_phase3",
+      "pass": true,
+      "path": "/root/dual_engine_workflow_v2/pipeline_step_a.py",
+      "phase3_touched": false,
+      "note": "Phase3 extends research layer only"
+    },
+    {
+      "name": "risk_rules_preserved",
+      "pass": true,
+      "rules": {
+        "leverage_20x": "untouched",
+        "initial_position_30pct": "untouched",
+        "sl_0_9pct": "untouched",
+        "ada_sl_0_6": "untouched",
+        "open_sl_tp_close_chain": "untouched",
+        "step_b_rules": "untouched"
+      }
+    },
+    {
+      "name": "no_production_daemon_mutation_by_phase3",
+      "pass": true,
+      "note": "Phase3 never starts/stops production daemons"
+    },
+    {
+      "name": "new_data_fail_closed_does_not_affect_production",
+      "pass": true,
+      "note": "Research features absent from production FEATURES; evaluate would reject unknown features"
+    }
+  ],
+  "daemon_snapshot": [
+    "__init__() got an unexpected keyword argument 'text'"
+  ],
+  "regression_pass": true,
+  "rollback": {
+    "backup": "/root/backups/windtalker_phase3_20260728_180201",
+    "method": "restore auto_trade_config.json and auto_trade_strategy_dsl.py from backup if needed",
+    "needed": false
+  }
+}

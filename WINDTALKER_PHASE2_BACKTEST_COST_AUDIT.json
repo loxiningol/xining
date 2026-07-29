@@ -1,0 +1,92 @@
+{
+  "schema": "windtalker_phase2_backtest_cost_audit_v1",
+  "generated_at": "2026-07-28 15:30:11",
+  "cost_model_updated_at": "2026-07-28 15:29:17",
+  "scenarios": {
+    "observed_base": {
+      "fee_rate_per_side": 0.0005,
+      "funding_rate_per_8h": 0.0001,
+      "half_spread_rate_per_side": 5e-05,
+      "impact_rate_per_side": 5e-05,
+      "latency_rate_per_side": 5e-05,
+      "slippage_rate_per_side": 0.0002
+    },
+    "severe": {
+      "fee_rate_per_side": 0.0005,
+      "funding_rate_per_8h": 0.0005,
+      "half_spread_rate_per_side": 0.0002,
+      "impact_rate_per_side": 0.0003,
+      "latency_rate_per_side": 0.0002,
+      "slippage_rate_per_side": 0.001
+    },
+    "stressed": {
+      "fee_rate_per_side": 0.0005,
+      "funding_rate_per_8h": 0.0003,
+      "half_spread_rate_per_side": 0.0001,
+      "impact_rate_per_side": 0.00015,
+      "latency_rate_per_side": 0.0001,
+      "slippage_rate_per_side": 0.0005
+    }
+  },
+  "findings": [
+    {
+      "id": "cost_application_in__backtest",
+      "severity": true,
+      "blocking_bug": false,
+      "detail": "Fees/slip/half-spread/impact/latency/funding passed into dsl.backtest_dsl"
+    },
+    {
+      "id": "gross_equals_cost_after_reporting",
+      "severity": true,
+      "blocking_bug": false,
+      "detail": "gates.evaluate_gate2 sets gross_expectancy = mean_gross OR mean_net; mean_gross is never populated → gross_expectancy == cost_after_expectancy. Misleading display, not a cost-skipping bug.",
+      "fix_recommended": "optional_instrument_mean_gross_deferred",
+      "would_change_gate_outcomes": false
+    },
+    {
+      "id": "quality_trades_n_placeholder_anomaly",
+      "severity": true,
+      "blocking_bug": false,
+      "affected": [
+        "mech_mr_vwap_dev_btc15m",
+        "mech_mr_rsi_extreme_sol1h",
+        "mech_mr_zscore_dislocation_sol15m"
+      ],
+      "detail": "net_pnl_quality_review reports trades_n from base_metrics after repair path; Gate2 sample_size correctly 0. Display-only anomaly.",
+      "would_change_gate_outcomes": false
+    },
+    {
+      "id": "wf_requirement_unchanged",
+      "severity": true,
+      "blocking_bug": false,
+      "WF_WINDOW_PASS_REQUIREMENT": [
+        7,
+        10
+      ],
+      "detail": "Gate3 still requires 7/10 windows with per-window detail"
+    },
+    {
+      "id": "walk_forward_chunking_present",
+      "severity": true,
+      "blocking_bug": false,
+      "detail": "WF uses trade chunks; pass iff mean_net>0 and trades>=1 per window"
+    },
+    {
+      "id": "near_identical_not_shared_pnl_array",
+      "severity": true,
+      "blocking_bug": false,
+      "detail": "Returns are not bit-identical; spread <0.03pp across BTC5m/SOL5m/ETH15m despite different labels/symbols/tfs — consistent with shared cost-floor attractor after Codex template collapse, not a copy-paste PnL bug."
+    },
+    {
+      "id": "recompute_decision",
+      "severity": true,
+      "blocking_bug": false,
+      "detail": "No blocking backtest/cost bug → do NOT recompute Phase1 eight (avoid churn); Phase2 uses live pipeline as-is"
+    }
+  ],
+  "blocking_bugs": [],
+  "recompute_all_8": false,
+  "fix_applied": null,
+  "rollback_note": "pipeline_step_a backup at /root/backups/pipeline_step_a.py.bak_phase2_*",
+  "verdict": "NO_BLOCKING_BUG_NO_RECOMPUTE"
+}

@@ -1,0 +1,1283 @@
+{
+  "schema": "WINDTALKER_PHASE5_GATE_SUMMARY",
+  "generated_at": "2026-07-28 14:56:03",
+  "core_metric": {
+    "gate3_pass_count": 0,
+    "gate4_complete_count": 0,
+    "breakthrough": false
+  },
+  "counts": {
+    "pregate_passed": 3,
+    "gate0_entered": 3,
+    "gate3_entered": 3,
+    "gate3_passed": 0,
+    "gate3_to_gate4": 0,
+    "gate4_done": 0,
+    "gate4_passed": 0,
+    "gate5_done": 0,
+    "gate5_passed": 0,
+    "gate6_done": 0,
+    "gate6_passed": 0,
+    "human_review_pending": 0
+  },
+  "detail": {
+    "generated_at": "2026-07-28 14:56:00",
+    "pregate_passed": [
+      "p5_ll_btc_eth_breadth_confirm_5m",
+      "p5_ll_btc_xrp_catchup_5m",
+      "p5_corr_btc_eth_recover_5m"
+    ],
+    "pregate_failed": [
+      {
+        "candidate_id": "p5_res_eth_btc_zfade_5m",
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.002,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 3.3333
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": false,
+            "entries": 426,
+            "trades": 426
+          }
+        },
+        "reason": [
+          "D_behavior"
+        ]
+      },
+      {
+        "candidate_id": "p5_rg_eth_vol_div_converge_5m",
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.002,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 3.3333
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": false,
+            "entries": 392,
+            "trades": 392
+          }
+        },
+        "reason": [
+          "D_behavior"
+        ]
+      },
+      {
+        "candidate_id": "p5_br_btc_ltc_diffusion_15m",
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.0045,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 7.5
+          },
+          "C_data": {
+            "pass": false,
+            "windows_ok": 9,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": true,
+            "entries": 158,
+            "trades": 158
+          }
+        },
+        "reason": [
+          "C_data"
+        ]
+      }
+    ],
+    "gate0_entered": [
+      "p5_ll_btc_eth_breadth_confirm_5m",
+      "p5_ll_btc_xrp_catchup_5m",
+      "p5_corr_btc_eth_recover_5m"
+    ],
+    "gate3_entered": [
+      "p5_ll_btc_eth_breadth_confirm_5m",
+      "p5_ll_btc_xrp_catchup_5m",
+      "p5_corr_btc_eth_recover_5m"
+    ],
+    "gate3_passed": [],
+    "gate3_to_gate4": [],
+    "gate4_done": [],
+    "gate4_passed": [],
+    "gate5_done": [],
+    "gate5_passed": [],
+    "gate6_done": [],
+    "gate6_passed": [],
+    "human_review_pending": [],
+    "candidates": [
+      {
+        "candidate_id": "p5_ll_btc_eth_breadth_confirm_5m",
+        "pregate_pass": true,
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.0025,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 4.1667
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": true,
+            "entries": 148,
+            "trades": 148
+          }
+        },
+        "gates": {
+          "gate0": {
+            "pass": true,
+            "notes": []
+          },
+          "gate1": {
+            "pass": true,
+            "notes": []
+          },
+          "gate2": {
+            "pass": true,
+            "notes": [
+              "gate2_records_metrics; quality judged with later gates"
+            ]
+          },
+          "gate3": {
+            "pass": false,
+            "notes": []
+          }
+        },
+        "gate3_detail": {
+          "windows": [
+            {
+              "id": "window_0",
+              "pass": true,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  0,
+                  144
+                ],
+                "target_reference_coverage": 0.7222,
+                "setup_count": 10,
+                "entry_count": 10,
+                "gross_return": 0.0006285789498732458,
+                "net_return": 2.8578949873245794e-05,
+                "expectancy": 2.8578949873245794e-05,
+                "win_rate": 50.0,
+                "payoff_ratio": 1.0405377243860658,
+                "Sharpe": 0.013935320896148956,
+                "max_drawdown": -0.002876777402452309,
+                "MAE": -0.002876777402452309,
+                "MFE": 0.005011654317826594,
+                "cost_ratio": 20.993738710566138,
+                "holding_time": 2.6,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 30
+              },
+              "fail_reason": null
+            },
+            {
+              "id": "window_1",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  144,
+                  288
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 27,
+                "entry_count": 27,
+                "gross_return": 0.00039191617991130023,
+                "net_return": -0.00020808382008869971,
+                "expectancy": -0.00020808382008869971,
+                "win_rate": 29.62962962962963,
+                "payoff_ratio": 1.8895140169753881,
+                "Sharpe": -0.08274456868618836,
+                "max_drawdown": -0.0058424569541378245,
+                "MAE": -0.0058424569541378245,
+                "MFE": 0.007698711209089411,
+                "cost_ratio": 2.883439550007731,
+                "holding_time": 1.5555555555555556,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 81
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_2",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  288,
+                  432
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 14,
+                "entry_count": 14,
+                "gross_return": 0.00027468338939188084,
+                "net_return": -0.0003253166106081191,
+                "expectancy": -0.0003253166106081191,
+                "win_rate": 28.571428571428573,
+                "payoff_ratio": 1.5543106738118468,
+                "Sharpe": -0.18384079169390097,
+                "max_drawdown": -0.001831182795698905,
+                "MAE": -0.001831182795698905,
+                "MFE": 0.005101924736751217,
+                "cost_ratio": 1.8443514289878578,
+                "holding_time": 1.7142857142857142,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 42
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_3",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  432,
+                  576
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 1,
+                "entry_count": 1,
+                "gross_return": -0.00033218319367358086,
+                "net_return": -0.0009321831936735808,
+                "expectancy": -0.0009321831936735808,
+                "win_rate": 0.0,
+                "payoff_ratio": 0.0,
+                "Sharpe": -932183.1936735808,
+                "max_drawdown": -0.0009321831936735808,
+                "MAE": -0.0009321831936735808,
+                "MFE": -0.0009321831936735808,
+                "cost_ratio": 0.6436496178244571,
+                "holding_time": 4.0,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 3
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_4",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  576,
+                  720
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 5,
+                "entry_count": 5,
+                "gross_return": 0.00025506068196984,
+                "net_return": -0.00034493931803015993,
+                "expectancy": -0.00034493931803015993,
+                "win_rate": 20.0,
+                "payoff_ratio": 0.0011909357597150805,
+                "Sharpe": -1.2143081510465823,
+                "max_drawdown": -0.000841067123801385,
+                "MAE": -0.000841067123801385,
+                "MFE": 5.136536430902288e-07,
+                "cost_ratio": 1.7394313411270723,
+                "holding_time": 2.0,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 15
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_5",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  720,
+                  864
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 5,
+                "entry_count": 5,
+                "gross_return": -6.049945822971068e-05,
+                "net_return": -0.0006604994582297106,
+                "expectancy": -0.0006604994582297106,
+                "win_rate": 20.0,
+                "payoff_ratio": 0.21970722023002046,
+                "Sharpe": -1.2674907839075744,
+                "max_drawdown": -0.00142355798164941,
+                "MAE": -0.00142355798164941,
+                "MFE": 0.0001919381756720893,
+                "cost_ratio": 0.9084020949934456,
+                "holding_time": 2.4,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 15
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_6",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  864,
+                  1008
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 13,
+                "entry_count": 13,
+                "gross_return": 0.0003274826528652248,
+                "net_return": -0.00027251734713477514,
+                "expectancy": -0.00027251734713477514,
+                "win_rate": 15.384615384615385,
+                "payoff_ratio": 4.227086220111469,
+                "Sharpe": -0.10010443378243816,
+                "max_drawdown": -0.0029230348864578135,
+                "MAE": -0.0029230348864578135,
+                "MFE": 0.006565255485010767,
+                "cost_ratio": 2.201686625169744,
+                "holding_time": 2.3846153846153846,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 39
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_7",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1008,
+                  1152
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 16,
+                "entry_count": 16,
+                "gross_return": -0.00024273689038962337,
+                "net_return": -0.0008427368903896233,
+                "expectancy": -0.0008427368903896233,
+                "win_rate": 31.25,
+                "payoff_ratio": 0.741835131953005,
+                "Sharpe": -0.42648333475012884,
+                "max_drawdown": -0.004752029739168734,
+                "MAE": -0.004752029739168734,
+                "MFE": 0.004020977182641556,
+                "cost_ratio": 0.7119651398640706,
+                "holding_time": 1.4375,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 48
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_8",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1152,
+                  1296
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 33,
+                "entry_count": 33,
+                "gross_return": -0.00048762690859452276,
+                "net_return": -0.0010876269085945227,
+                "expectancy": -0.0010876269085945227,
+                "win_rate": 24.242424242424242,
+                "payoff_ratio": 0.5241123440435225,
+                "Sharpe": -0.7401408595977524,
+                "max_drawdown": -0.004095312048242642,
+                "MAE": -0.004095312048242642,
+                "MFE": 0.0019605547338455266,
+                "cost_ratio": 0.551659253370341,
+                "holding_time": 1.6363636363636365,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 99
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_9",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1296,
+                  1440
+                ],
+                "target_reference_coverage": 0.9931,
+                "setup_count": 24,
+                "entry_count": 24,
+                "gross_return": -0.0006158745415782541,
+                "net_return": -0.001215874541578254,
+                "expectancy": -0.001215874541578254,
+                "win_rate": 25.0,
+                "payoff_ratio": 0.24773793515163664,
+                "Sharpe": -0.6648974120541128,
+                "max_drawdown": -0.007782208582419462,
+                "MAE": -0.007782208582419462,
+                "MFE": 0.0007900206106503804,
+                "cost_ratio": 0.49347155977919954,
+                "holding_time": 1.5416666666666667,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 72
+              },
+              "fail_reason": "non_positive_or_thin"
+            }
+          ],
+          "pass_count": 1,
+          "total": 10,
+          "data_insufficient_windows": 0,
+          "deleted_windows": 0,
+          "standards_lowered": false,
+          "data_regression_after_pregate_c": false,
+          "executable_windows": 10
+        },
+        "gate3_pass": false,
+        "continued_gate4": false,
+        "gate4_pass": false,
+        "all_gate0_6_pass": false,
+        "status": "gate3_fail",
+        "no_live_mount": true,
+        "no_positive_E_credit": true,
+        "data_regression_after_pregate_c": false
+      },
+      {
+        "candidate_id": "p5_ll_btc_xrp_catchup_5m",
+        "pregate_pass": true,
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.0035,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 5.8333
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": true,
+            "entries": 188,
+            "trades": 188
+          }
+        },
+        "gates": {
+          "gate0": {
+            "pass": true,
+            "notes": []
+          },
+          "gate1": {
+            "pass": true,
+            "notes": []
+          },
+          "gate2": {
+            "pass": true,
+            "notes": [
+              "gate2_records_metrics; quality judged with later gates"
+            ]
+          },
+          "gate3": {
+            "pass": false,
+            "notes": []
+          }
+        },
+        "gate3_detail": {
+          "windows": [
+            {
+              "id": "window_0",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  0,
+                  144
+                ],
+                "target_reference_coverage": 0.7083,
+                "setup_count": 17,
+                "entry_count": 17,
+                "gross_return": 0.0005226092010394729,
+                "net_return": -7.739079896052705e-05,
+                "expectancy": -7.739079896052705e-05,
+                "win_rate": 17.647058823529413,
+                "payoff_ratio": 4.0482668156848565,
+                "Sharpe": -0.04327846989578223,
+                "max_drawdown": -0.001229949604031608,
+                "MAE": -0.001229949604031608,
+                "MFE": 0.006564233245669736,
+                "cost_ratio": 7.752759440390114,
+                "holding_time": 2.7058823529411766,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 51
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_1",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  144,
+                  288
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 26,
+                "entry_count": 26,
+                "gross_return": -7.979746888392403e-05,
+                "net_return": -0.000679797468883924,
+                "expectancy": -0.000679797468883924,
+                "win_rate": 19.23076923076923,
+                "payoff_ratio": 1.328918884282351,
+                "Sharpe": -0.47771902047342496,
+                "max_drawdown": -0.0027648926574056986,
+                "MAE": -0.0027648926574056986,
+                "MFE": 0.0032651685393258164,
+                "cost_ratio": 0.8826145210139482,
+                "holding_time": 2.4615384615384617,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 78
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_2",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  288,
+                  432
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 14,
+                "entry_count": 14,
+                "gross_return": 6.682763169291921e-05,
+                "net_return": -0.0005331723683070807,
+                "expectancy": -0.0005331723683070807,
+                "win_rate": 28.571428571428573,
+                "payoff_ratio": 1.0196351330151987,
+                "Sharpe": -0.40693235267787353,
+                "max_drawdown": -0.0020691029290240068,
+                "MAE": -0.0020691029290240068,
+                "MFE": 0.002163194252555855,
+                "cost_ratio": 1.1253375274633568,
+                "holding_time": 2.7857142857142856,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 42
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_3",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  432,
+                  576
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 6,
+                "entry_count": 6,
+                "gross_return": -0.0005185193231333833,
+                "net_return": -0.0011185193231333832,
+                "expectancy": -0.0011185193231333832,
+                "win_rate": 0.0,
+                "payoff_ratio": 0.0,
+                "Sharpe": -2.4026192373855912,
+                "max_drawdown": -0.0016071415491669115,
+                "MAE": -0.0016071415491669115,
+                "MFE": -0.0005082989454378826,
+                "cost_ratio": 0.5364229755961709,
+                "holding_time": 1.8333333333333333,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 18
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_4",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  576,
+                  720
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 10,
+                "entry_count": 10,
+                "gross_return": 0.00034065072201205525,
+                "net_return": -0.0002593492779879447,
+                "expectancy": -0.0002593492779879447,
+                "win_rate": 20.0,
+                "payoff_ratio": 2.3867051393474576,
+                "Sharpe": -0.1733868720903735,
+                "max_drawdown": -0.0023235123367198953,
+                "MAE": -0.0023235123367198953,
+                "MFE": 0.003799633363886469,
+                "cost_ratio": 2.3134735179573993,
+                "holding_time": 3.5,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 30
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_5",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  720,
+                  864
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 15,
+                "entry_count": 15,
+                "gross_return": -0.0002182890153051175,
+                "net_return": -0.0008182890153051175,
+                "expectancy": -0.0008182890153051175,
+                "win_rate": 6.666666666666667,
+                "payoff_ratio": 0.5398595886414632,
+                "Sharpe": -1.6037301626764462,
+                "max_drawdown": -0.0017822480902144932,
+                "MAE": -0.0017822480902144932,
+                "MFE": 0.0004922992900055434,
+                "cost_ratio": 0.7332363694750409,
+                "holding_time": 2.2666666666666666,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 45
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_6",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  864,
+                  1008
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 20,
+                "entry_count": 20,
+                "gross_return": 0.00033613257485220116,
+                "net_return": -0.0002638674251477988,
+                "expectancy": -0.0002638674251477988,
+                "win_rate": 20.0,
+                "payoff_ratio": 2.5332651333533276,
+                "Sharpe": -0.14868366884571105,
+                "max_drawdown": -0.0021397156054705504,
+                "MAE": -0.0021397156054705504,
+                "MFE": 0.006463937692447046,
+                "cost_ratio": 2.2738605411538955,
+                "holding_time": 2.45,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 60
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_7",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1008,
+                  1152
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 28,
+                "entry_count": 28,
+                "gross_return": -7.394829406778673e-05,
+                "net_return": -0.0006739482940677867,
+                "expectancy": -0.0006739482940677867,
+                "win_rate": 21.428571428571427,
+                "payoff_ratio": 1.205646924425654,
+                "Sharpe": -0.42077519867166063,
+                "max_drawdown": -0.0043926675094816525,
+                "MAE": -0.0043926675094816525,
+                "MFE": 0.003473872895165624,
+                "cost_ratio": 0.8902746917035144,
+                "holding_time": 2.357142857142857,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 84
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_8",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1152,
+                  1296
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 27,
+                "entry_count": 27,
+                "gross_return": -0.0006079616456162016,
+                "net_return": -0.0012079616456162016,
+                "expectancy": -0.0012079616456162016,
+                "win_rate": 14.814814814814815,
+                "payoff_ratio": 0.3096487225380195,
+                "Sharpe": -1.1131571177646227,
+                "max_drawdown": -0.003539015429831091,
+                "MAE": -0.003539015429831091,
+                "MFE": 0.0008643968515468112,
+                "cost_ratio": 0.49670410105598106,
+                "holding_time": 1.7037037037037037,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 81
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_9",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1296,
+                  1440
+                ],
+                "target_reference_coverage": 0.9931,
+                "setup_count": 25,
+                "entry_count": 25,
+                "gross_return": -0.00013232904886348697,
+                "net_return": -0.0007323290488634869,
+                "expectancy": -0.0007323290488634869,
+                "win_rate": 28.0,
+                "payoff_ratio": 0.5765583435862119,
+                "Sharpe": -0.6292280951819587,
+                "max_drawdown": -0.002783820736802097,
+                "MAE": -0.002783820736802097,
+                "MFE": 0.0026203068763021855,
+                "cost_ratio": 0.8193027186732924,
+                "holding_time": 2.48,
+                "exit_reasons": "{'mechanism_exit'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 75
+              },
+              "fail_reason": "non_positive_or_thin"
+            }
+          ],
+          "pass_count": 0,
+          "total": 10,
+          "data_insufficient_windows": 0,
+          "deleted_windows": 0,
+          "standards_lowered": false,
+          "data_regression_after_pregate_c": false,
+          "executable_windows": 10
+        },
+        "gate3_pass": false,
+        "continued_gate4": false,
+        "gate4_pass": false,
+        "all_gate0_6_pass": false,
+        "status": "gate3_fail",
+        "no_live_mount": true,
+        "no_positive_E_credit": true,
+        "data_regression_after_pregate_c": false
+      },
+      {
+        "candidate_id": "p5_res_eth_btc_zfade_5m",
+        "pregate_pass": false,
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.002,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 3.3333
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": false,
+            "entries": 426,
+            "trades": 426
+          }
+        },
+        "status": "pregate_fail"
+      },
+      {
+        "candidate_id": "p5_corr_btc_eth_recover_5m",
+        "pregate_pass": true,
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.0028,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 4.6667
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": true,
+            "entries": 12,
+            "trades": 12
+          }
+        },
+        "gates": {
+          "gate0": {
+            "pass": true,
+            "notes": []
+          },
+          "gate1": {
+            "pass": true,
+            "notes": []
+          },
+          "gate2": {
+            "pass": true,
+            "notes": [
+              "gate2_records_metrics; quality judged with later gates"
+            ]
+          },
+          "gate3": {
+            "pass": false,
+            "notes": []
+          }
+        },
+        "gate3_detail": {
+          "windows": [
+            {
+              "id": "window_0",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  0,
+                  144
+                ],
+                "entry_count": 0,
+                "expectancy": 0,
+                "target_reference_coverage": 0.6597
+              },
+              "fail_reason": "no_entries_in_window"
+            },
+            {
+              "id": "window_1",
+              "pass": true,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  144,
+                  288
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 1,
+                "entry_count": 1,
+                "gross_return": 0.0032659400747868895,
+                "net_return": 0.0026659400747868897,
+                "expectancy": 0.0026659400747868897,
+                "win_rate": 100.0,
+                "payoff_ratio": 2665940.0747868894,
+                "Sharpe": 2665940.0747868894,
+                "max_drawdown": 0.0026659400747868897,
+                "MAE": 0.0026659400747868897,
+                "MFE": 0.0026659400747868897,
+                "cost_ratio": 0.22506123847765946,
+                "holding_time": 16.0,
+                "exit_reasons": "{'time_stop'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 3
+              },
+              "fail_reason": null
+            },
+            {
+              "id": "window_2",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  288,
+                  432
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 2,
+                "entry_count": 2,
+                "gross_return": -0.00045141765178943435,
+                "net_return": -0.0010514176517894343,
+                "expectancy": -0.0010514176517894343,
+                "win_rate": 0.0,
+                "payoff_ratio": 0.0,
+                "Sharpe": -5.747632548370554,
+                "max_drawdown": -0.0012343472137105352,
+                "MAE": -0.0012343472137105352,
+                "MFE": -0.0008684880898683334,
+                "cost_ratio": 0.5706575577471883,
+                "holding_time": 16.0,
+                "exit_reasons": "{'time_stop'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 6
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_3",
+              "pass": true,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  432,
+                  576
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 2,
+                "entry_count": 2,
+                "gross_return": 0.002089448287398791,
+                "net_return": 0.0014894482873987907,
+                "expectancy": 0.0014894482873987907,
+                "win_rate": 50.0,
+                "payoff_ratio": 3.183896526120382,
+                "Sharpe": 0.5219765228753964,
+                "max_drawdown": -0.001364028258284512,
+                "MAE": -0.001364028258284512,
+                "MFE": 0.0043429248330820935,
+                "cost_ratio": 0.40283345332814524,
+                "holding_time": 16.0,
+                "exit_reasons": "{'time_stop'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 6
+              },
+              "fail_reason": null
+            },
+            {
+              "id": "window_4",
+              "pass": true,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  576,
+                  720
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 2,
+                "entry_count": 2,
+                "gross_return": 0.001366241555228822,
+                "net_return": 0.0007662415552288221,
+                "expectancy": 0.0007662415552288221,
+                "win_rate": 50.0,
+                "payoff_ratio": 3.0305911401456793,
+                "Sharpe": 0.5037945389279089,
+                "max_drawdown": -0.000754698018798457,
+                "MAE": -0.000754698018798457,
+                "MFE": 0.002287181129256101,
+                "cost_ratio": 0.7830418656672268,
+                "holding_time": 16.0,
+                "exit_reasons": "{'time_stop'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 6
+              },
+              "fail_reason": null
+            },
+            {
+              "id": "window_5",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  720,
+                  864
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 1,
+                "entry_count": 1,
+                "gross_return": -0.00021215882209426793,
+                "net_return": -0.0008121588220942679,
+                "expectancy": -0.0008121588220942679,
+                "win_rate": 0.0,
+                "payoff_ratio": 0.0,
+                "Sharpe": -812158.8220942678,
+                "max_drawdown": -0.0008121588220942679,
+                "MAE": -0.0008121588220942679,
+                "MFE": -0.0008121588220942679,
+                "cost_ratio": 0.738770847408846,
+                "holding_time": 16.0,
+                "exit_reasons": "{'time_stop'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 3
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_6",
+              "pass": true,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  864,
+                  1008
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 2,
+                "entry_count": 2,
+                "gross_return": 0.007430641794460496,
+                "net_return": 0.006830641794460496,
+                "expectancy": 0.006830641794460496,
+                "win_rate": 50.0,
+                "payoff_ratio": 76.15002409053761,
+                "Sharpe": 0.9740763435881563,
+                "max_drawdown": -0.00018178681582939278,
+                "MAE": -0.00018178681582939278,
+                "MFE": 0.013843070404750385,
+                "cost_ratio": 0.08783946373049796,
+                "holding_time": 16.0,
+                "exit_reasons": "{'time_stop'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 6
+              },
+              "fail_reason": null
+            },
+            {
+              "id": "window_7",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1008,
+                  1152
+                ],
+                "entry_count": 0,
+                "expectancy": 0,
+                "target_reference_coverage": 1.0
+              },
+              "fail_reason": "no_entries_in_window"
+            },
+            {
+              "id": "window_8",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1152,
+                  1296
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 1,
+                "entry_count": 1,
+                "gross_return": -0.002758679455293982,
+                "net_return": -0.003358679455293982,
+                "expectancy": -0.003358679455293982,
+                "win_rate": 0.0,
+                "payoff_ratio": 0.0,
+                "Sharpe": -3358679.455293982,
+                "max_drawdown": -0.003358679455293982,
+                "MAE": -0.003358679455293982,
+                "MFE": -0.003358679455293982,
+                "cost_ratio": 0.17864158498742405,
+                "holding_time": 16.0,
+                "exit_reasons": "{'time_stop'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 3
+              },
+              "fail_reason": "non_positive_or_thin"
+            },
+            {
+              "id": "window_9",
+              "pass": false,
+              "data_insufficient": false,
+              "metrics": {
+                "date_range": [
+                  1296,
+                  1440
+                ],
+                "target_reference_coverage": 1.0,
+                "setup_count": 1,
+                "entry_count": 1,
+                "gross_return": -0.0021844996430207416,
+                "net_return": -0.0027844996430207414,
+                "expectancy": -0.0027844996430207414,
+                "win_rate": 0.0,
+                "payoff_ratio": 0.0,
+                "Sharpe": -2784499.643020741,
+                "max_drawdown": -0.0027844996430207414,
+                "MAE": -0.0027844996430207414,
+                "MFE": -0.0027844996430207414,
+                "cost_ratio": 0.21547849216838216,
+                "holding_time": 10.0,
+                "exit_reasons": "{'time_stop'}",
+                "missing_data_veto": 0,
+                "state_transition_count": 3
+              },
+              "fail_reason": "non_positive_or_thin"
+            }
+          ],
+          "pass_count": 4,
+          "total": 10,
+          "data_insufficient_windows": 0,
+          "deleted_windows": 0,
+          "standards_lowered": false,
+          "data_regression_after_pregate_c": false,
+          "executable_windows": 10
+        },
+        "gate3_pass": false,
+        "continued_gate4": false,
+        "gate4_pass": false,
+        "all_gate0_6_pass": false,
+        "status": "gate3_fail",
+        "no_live_mount": true,
+        "no_positive_E_credit": true,
+        "data_regression_after_pregate_c": false
+      },
+      {
+        "candidate_id": "p5_rg_eth_vol_div_converge_5m",
+        "pregate_pass": false,
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.002,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 3.3333
+          },
+          "C_data": {
+            "pass": true,
+            "windows_ok": 10,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": false,
+            "entries": 392,
+            "trades": 392
+          }
+        },
+        "status": "pregate_fail"
+      },
+      {
+        "candidate_id": "p5_br_btc_ltc_diffusion_15m",
+        "pregate_pass": false,
+        "pregate": {
+          "A_mechanism": {
+            "pass": true
+          },
+          "B_cost": {
+            "pass": true,
+            "gross": 0.0045,
+            "friction": 0.0006,
+            "fee": 0.0003,
+            "slippage": 0.0003,
+            "funding_friction": 0.0,
+            "total_friction": 0.0006,
+            "coverage_ratio": 7.5
+          },
+          "C_data": {
+            "pass": false,
+            "windows_ok": 9,
+            "required": 10
+          },
+          "D_behavior": {
+            "pass": true,
+            "entries": 158,
+            "trades": 158
+          }
+        },
+        "status": "pregate_fail"
+      }
+    ]
+  }
+}

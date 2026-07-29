@@ -1,0 +1,801 @@
+{
+  "schema": "WINDTALKER_PHASE5_BASELINE_AND_READINESS",
+  "generated_at": "2026-07-28 14:42:02",
+  "phase4_status": {
+    "phase": "WINDTALKER_PHASE4",
+    "checkpoint": "4I",
+    "status": "DONE",
+    "updated_at": "2026-07-28 13:51:04",
+    "engineering_execution": "PASS",
+    "research_to_formal_bridge": "PASS",
+    "strategy_quality_breakthrough": "NOT YET",
+    "auto_trade_progress_pct": 0,
+    "ALLOW_FORMAL_BATCH_CREATION": "YES",
+    "overall": "桥接阶段PASS",
+    "full_bridge_candidates": [
+      "bridge_oi_price_crowding_fade_btc_5m",
+      "bridge_btc_lead_lag_eth_5m",
+      "bridge_taker_absorption_btc_5m"
+    ],
+    "gate3_entered": [
+      "bridge_oi_price_crowding_fade_btc_5m",
+      "bridge_btc_lead_lag_eth_5m",
+      "bridge_taker_absorption_btc_5m"
+    ],
+    "gate3_passed": [],
+    "auto_mount": false
+  },
+  "evidence_reaudit": {
+    "windtalker_phase4/WINDTALKER_PHASE4_CANDIDATE_IR_SCHEMA.json": {
+      "exists": true,
+      "sha256": "2b3702788fcf5bef343c8d2615b93ae4bc4866cd70817e8fa8b767507d57114c"
+    },
+    "windtalker_phase4/WINDTALKER_PHASE4_FORMAL_COMPILER_AUDIT.json": {
+      "exists": true,
+      "sha256": "c7a76715de85c05fa555fe8cf85e456ad2a631793826ea84028e08df27e8d39c"
+    },
+    "windtalker_phase4/WINDTALKER_PHASE4_FORMAL_CAUSAL_FIDELITY.json": {
+      "exists": true,
+      "sha256": "8934750a7b21a2d88c31bc6278e3eb8010170c40458598bc40b5370879af2030"
+    },
+    "windtalker_phase4/WINDTALKER_PHASE4_RESEARCH_FORMAL_EQUIVALENCE.json": {
+      "exists": true,
+      "sha256": "980ab03bf81d993b80978ed93d4ffba1d6a14d1c8be7d7c7e5884e4707b1d816"
+    },
+    "windtalker_phase4/WINDTALKER_PHASE4_PRODUCTION_ISOLATION.json": {
+      "exists": true,
+      "sha256": "ad12747ad485b6b190f71011423fa8f1427f98afc02dad6ad00be57eb2a9df4a"
+    },
+    "windtalker_phase4/WINDTALKER_PHASE4_DATA_PROMOTION_READINESS.json": {
+      "exists": true,
+      "sha256": "05916de453d5b68c79a24b2f49243807dab9d086f406acd8a74d8af1421bcb81"
+    },
+    "windtalker_phase4/STATUS.json": {
+      "exists": true,
+      "sha256": "5efeee7b772c57f24e4ef4616ac8ceeaf098b722a81beed177762e6855f29ca0"
+    },
+    "windtalker_phase3/WINDTALKER_PHASE3_BEHAVIORAL_COLLAPSE_MATRIX.json": {
+      "exists": true,
+      "sha256": "ead66a9a4b3093ec57acd2319b1761d6ee0aea44df18e75a03831b64e97ba3a8"
+    },
+    "windtalker_phase3/WINDTALKER_PHASE3_PROBES_SUMMARY.json": {
+      "exists": true,
+      "sha256": "7eee5b644c98b5922ad746d6d20cdd58f180f4fc2efb53c6d77476b6a5f9149a"
+    },
+    "windtalker_phase3/STATUS.json": {
+      "exists": true,
+      "sha256": "af49e05176176d935180950075143f11bff12f3647302fe2d27f779b064c8a6b"
+    },
+    "windtalker_phase2/STATUS.json": {
+      "exists": true,
+      "sha256": "81f16975c121658a7a0fd067e813b8ef2930a26a604fffd20b660e5c0dc98bee"
+    },
+    "windtalker_phase2/WINDTALKER_PHASE2_final_report.md": {
+      "exists": true,
+      "sha256": "a37f73f2fb939b7e134f3fa17005f1bb765b0692491414f61c9ee97d3621f7b2"
+    },
+    "windtalker_phase1/STATUS.json": {
+      "exists": true,
+      "sha256": "97ec7cbc9ba127a462d903584732868484161fe3e0ab253e3c445989f152eaf3"
+    }
+  },
+  "production_baseline": {
+    "mounted_count": 5,
+    "mounted": [
+      {
+        "daemon": "formal_daemon_config.json",
+        "strategy_key": "frost3_btc1h_xrpport_exhaustion_fade_slope"
+      },
+      {
+        "daemon": "formal_daemon_config_ada_5m.json",
+        "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14"
+      },
+      {
+        "daemon": "formal_daemon_config_ltc_5m.json",
+        "strategy_key": "ltc5_exhaustion_fade_short_ai"
+      },
+      {
+        "daemon": "formal_daemon_config_ng_5m.json",
+        "strategy_key": "ng5_exhaustion_fade_short_ai"
+      },
+      {
+        "daemon": "formal_daemon_config_xrp_15m.json",
+        "strategy_key": "frost_xrp_rescue_h20_t45"
+      }
+    ],
+    "can_open_count": 5,
+    "can_open": [
+      {
+        "daemon": "formal_daemon_config.json",
+        "strategy_key": "frost3_btc1h_xrpport_exhaustion_fade_slope"
+      },
+      {
+        "daemon": "formal_daemon_config_ada_5m.json",
+        "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14"
+      },
+      {
+        "daemon": "formal_daemon_config_ltc_5m.json",
+        "strategy_key": "ltc5_exhaustion_fade_short_ai"
+      },
+      {
+        "daemon": "formal_daemon_config_ng_5m.json",
+        "strategy_key": "ng5_exhaustion_fade_short_ai"
+      },
+      {
+        "daemon": "formal_daemon_config_xrp_15m.json",
+        "strategy_key": "frost_xrp_rescue_h20_t45"
+      }
+    ],
+    "independent_families": 2,
+    "fillable_frequency_weekly": 2.3472,
+    "fillable_frequency_daily": 0.3353,
+    "calibrated_positive_E_weekly": 0.0,
+    "calibrated_positive_E_daily": 0.0,
+    "positive_E_frequency_gap_weekly": 3.5,
+    "note_not_frequency": "mounted/can_open/strategy_count MUST NOT be reported as positive-E frequency",
+    "production_config_hash": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+    "risk_config_hash": "b6706810a56727e0c5e887245ca7efd35337a6c77f03ed5fb11c4d5be9a30156",
+    "risk_rules": {
+      "leverage_20x_all_profiles": true,
+      "stop_loss_0_9pct_all_profiles": true,
+      "full_position_ratio_1h": 0.28,
+      "profiles": {
+        "1h": {
+          "leverage": 20,
+          "stop_loss_pct": 0.009,
+          "full_position_ratio": 0.28
+        },
+        "15m": {
+          "leverage": 20,
+          "stop_loss_pct": 0.009,
+          "full_position_ratio": 0.2
+        },
+        "5m": {
+          "leverage": 20,
+          "stop_loss_pct": 0.009,
+          "full_position_ratio": 0.15
+        }
+      }
+    },
+    "step_b": {
+      "path": "/root/auto_trade/STEP_B_calibration_status.json",
+      "complete_periods": 0,
+      "scientifically_validated": false
+    }
+  },
+  "confirmations": {
+    "candidate_ir_compiler_available": true,
+    "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+    "legacy_fallback_used_required_false": true,
+    "production_legacy_path_preserved": true,
+    "cross_asset_ge_10_wf_windows": true,
+    "reference_target_align_ok": true,
+    "production_config_hash_unchanged_vs_phase4": true,
+    "risk_20x_30pct_0_9pct": {
+      "leverage_20x_all_profiles": true,
+      "stop_loss_0_9pct_all_profiles": true,
+      "full_position_ratio_1h": 0.28,
+      "profiles": {
+        "1h": {
+          "leverage": 20,
+          "stop_loss_pct": 0.009,
+          "full_position_ratio": 0.28
+        },
+        "15m": {
+          "leverage": 20,
+          "stop_loss_pct": 0.009,
+          "full_position_ratio": 0.2
+        },
+        "5m": {
+          "leverage": 20,
+          "stop_loss_pct": 0.009,
+          "full_position_ratio": 0.15
+        }
+      }
+    },
+    "fail_closed_on_missing_data": true,
+    "positive_E_frequency_口径_correct": true,
+    "auto_trade_progress_based_on_real_mount": true
+  },
+  "cross_asset_readiness": {
+    "ETH_5m": {
+      "symbol": "ETH-USDT-SWAP",
+      "timeframe": "5m",
+      "n_bars": 1440,
+      "wf_windows_data_sufficient": 10,
+      "wf_windows_required": 10,
+      "per_fold": [
+        {
+          "fold": 0,
+          "n": 144,
+          "cross_sync_cov": 0.6597,
+          "lead_lag_cov": 0.6597,
+          "data_sufficient": true
+        },
+        {
+          "fold": 1,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 2,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 3,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 4,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 0.9931,
+          "data_sufficient": true
+        }
+      ],
+      "promotion_ready": true,
+      "meta_sources": {
+        "ok": true,
+        "lead_symbol": "BTC-USDT-SWAP",
+        "lead_bars": 1400,
+        "source": "formal_cache"
+      },
+      "enrichment_cov": {
+        "beta20": 0.966,
+        "residual_z20": 0.959,
+        "corr_delta5": 0.9625,
+        "breadth_score": 0.966,
+        "vol_div": 0.9653
+      }
+    },
+    "XRP_5m": {
+      "symbol": "XRP-USDT-SWAP",
+      "timeframe": "5m",
+      "n_bars": 1440,
+      "wf_windows_data_sufficient": 10,
+      "wf_windows_required": 10,
+      "per_fold": [
+        {
+          "fold": 0,
+          "n": 144,
+          "cross_sync_cov": 0.6597,
+          "lead_lag_cov": 0.6597,
+          "data_sufficient": true
+        },
+        {
+          "fold": 1,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 2,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 3,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 4,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 0.9931,
+          "data_sufficient": true
+        }
+      ],
+      "promotion_ready": true,
+      "meta_sources": {
+        "ok": true,
+        "lead_symbol": "BTC-USDT-SWAP",
+        "lead_bars": 1400,
+        "source": "formal_cache"
+      },
+      "enrichment_cov": {
+        "beta20": 0.966,
+        "residual_z20": 0.959,
+        "corr_delta5": 0.9625,
+        "breadth_score": 0.966,
+        "vol_div": 0.9653
+      }
+    },
+    "LTC_5m": {
+      "symbol": "LTC-USDT-SWAP",
+      "timeframe": "5m",
+      "n_bars": 1400,
+      "wf_windows_data_sufficient": 10,
+      "wf_windows_required": 10,
+      "per_fold": [
+        {
+          "fold": 0,
+          "n": 140,
+          "cross_sync_cov": 0.8571,
+          "lead_lag_cov": 0.8571,
+          "data_sufficient": true
+        },
+        {
+          "fold": 1,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 2,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 3,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 4,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "n": 140,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        }
+      ],
+      "promotion_ready": true,
+      "meta_sources": {
+        "ok": true,
+        "lead_symbol": "BTC-USDT-SWAP",
+        "lead_bars": 1400,
+        "source": "formal_cache"
+      },
+      "enrichment_cov": {
+        "beta20": 0.9857,
+        "residual_z20": 0.9793,
+        "corr_delta5": 0.9821,
+        "breadth_score": 0.9857,
+        "vol_div": 0.9857
+      }
+    },
+    "ETH_15m": {
+      "symbol": "ETH-USDT-SWAP",
+      "timeframe": "15m",
+      "n_bars": 1440,
+      "wf_windows_data_sufficient": 9,
+      "wf_windows_required": 10,
+      "per_fold": [
+        {
+          "fold": 0,
+          "n": 144,
+          "cross_sync_cov": 0.0,
+          "lead_lag_cov": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 1,
+          "n": 144,
+          "cross_sync_cov": 0.2708,
+          "lead_lag_cov": 0.2708,
+          "data_sufficient": true
+        },
+        {
+          "fold": 2,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 3,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 4,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 0.9931,
+          "data_sufficient": true
+        }
+      ],
+      "promotion_ready": false,
+      "meta_sources": {
+        "ok": true,
+        "lead_symbol": "BTC-USDT-SWAP",
+        "lead_bars": 1200,
+        "source": "formal_cache"
+      },
+      "enrichment_cov": {
+        "beta20": 0.8271,
+        "residual_z20": 0.8201,
+        "corr_delta5": 0.8236,
+        "breadth_score": 0.8271,
+        "vol_div": 0.8264
+      }
+    },
+    "primary_gate": {
+      "symbol": "ETH-USDT-SWAP",
+      "timeframe": "5m",
+      "n_bars": 1440,
+      "wf_windows_data_sufficient": 10,
+      "wf_windows_required": 10,
+      "per_fold": [
+        {
+          "fold": 0,
+          "n": 144,
+          "cross_sync_cov": 0.6597,
+          "lead_lag_cov": 0.6597,
+          "data_sufficient": true
+        },
+        {
+          "fold": 1,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 2,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 3,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 4,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "n": 144,
+          "cross_sync_cov": 1.0,
+          "lead_lag_cov": 0.9931,
+          "data_sufficient": true
+        }
+      ],
+      "promotion_ready": true,
+      "meta_sources": {
+        "ok": true,
+        "lead_symbol": "BTC-USDT-SWAP",
+        "lead_bars": 1400,
+        "source": "formal_cache"
+      },
+      "enrichment_cov": {
+        "beta20": 0.966,
+        "residual_z20": 0.959,
+        "corr_delta5": 0.9625,
+        "breadth_score": 0.966,
+        "vol_div": 0.9653
+      }
+    }
+  },
+  "oi_taker_funding_record": {
+    "OI": {
+      "previous_phase4_wf": 3,
+      "current_wf_windows_data_sufficient": 3,
+      "wf_windows_required": 10,
+      "promotion_ready": false,
+      "promotion_readiness_reached": false,
+      "delta_windows": 0,
+      "per_fold": [
+        {
+          "fold": 0,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 1,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 2,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 3,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 4,
+          "non_missing_rate": 0.3714,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "non_missing_rate": 0.3857,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 7,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 8,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 9,
+          "non_missing_rate": 0.7071,
+          "data_sufficient": true
+        }
+      ],
+      "formal_candidates_this_phase": 0,
+      "note": "coverage growth record only — NO formal candidates in Phase5"
+    },
+    "Taker_flow": {
+      "previous_phase4_wf": 4,
+      "current_wf_windows_data_sufficient": 4,
+      "wf_windows_required": 10,
+      "promotion_ready": false,
+      "promotion_readiness_reached": false,
+      "delta_windows": 0,
+      "per_fold": [
+        {
+          "fold": 0,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 1,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 2,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 3,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 4,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 5,
+          "non_missing_rate": 0.1071,
+          "data_sufficient": false
+        },
+        {
+          "fold": 6,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        }
+      ],
+      "formal_candidates_this_phase": 0,
+      "note": "coverage growth record only — NO formal candidates in Phase5"
+    },
+    "Funding_Basis": {
+      "status": "BLOCKED",
+      "reason": "Phase3 causal fidelity FAIL — must not enter formal batch",
+      "formal_candidates_this_phase": 0
+    }
+  },
+  "DATA_READINESS_FAIL": false,
+  "abort_reason": null,
+  "ALLOW_FORMAL_BATCH": true
+}

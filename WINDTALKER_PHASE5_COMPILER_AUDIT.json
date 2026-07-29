@@ -1,0 +1,490 @@
+{
+  "schema": "WINDTALKER_PHASE5_COMPILER_AUDIT",
+  "generated_at": "2026-07-28 14:55:51",
+  "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+  "legacy_fallback_count": 0,
+  "unsupported_silent_delete": false,
+  "candidates": [
+    {
+      "candidate_id": "p5_ll_btc_eth_breadth_confirm_5m",
+      "compile_ok": true,
+      "legacy_fallback_used": false,
+      "ir_hash": "187cd12d23cf7705d33c6351604c760580c81090eb92ce7095792a98c3abf1f2",
+      "code_hash": "c15d11240e892716805c2ab19809567a385adf48f5cba03f9faaeaef7ef0c170",
+      "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+      "unsupported_clauses": [],
+      "feature_mapping": null,
+      "state_mapping": null,
+      "event_mapping": null,
+      "exit_mapping": null,
+      "compilation_trace": {
+        "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+        "started_at": "2026-07-28 14:55:51",
+        "steps": [
+          "validate_ir_ok",
+          "feature_mapping_ok",
+          "state_mapping_ok",
+          "event_order_mapping_ok",
+          "exit_mapping_ok",
+          "emit_formal_ok"
+        ],
+        "legacy_fallback_used": false,
+        "rejected_clauses": [],
+        "unsupported_feature_list": [],
+        "feature_mapping": {
+          "breadth_score": {
+            "from": "breadth_score",
+            "to": "breadth_score",
+            "kind": "research"
+          },
+          "cross_sync_score": {
+            "from": "cross_sync_score",
+            "to": "cross_sync_score",
+            "kind": "research"
+          },
+          "lag_ret1": {
+            "from": "lag_ret1",
+            "to": "lag_ret1",
+            "kind": "research"
+          },
+          "lead_lag_corr20": {
+            "from": "lead_lag_corr20",
+            "to": "lead_lag_corr20",
+            "kind": "research"
+          },
+          "lead_ret1": {
+            "from": "lead_ret1",
+            "to": "lead_ret1",
+            "kind": "research"
+          },
+          "regime_ok": {
+            "from": "regime_ok",
+            "to": "regime_ok",
+            "kind": "base"
+          }
+        },
+        "state_mapping": {
+          "idle": "idle",
+          "setup": "setup",
+          "armed": "armed",
+          "triggered": "triggered",
+          "in_trade": "in_trade",
+          "invalidated": "invalidated",
+          "cooldown": "cooldown"
+        },
+        "event_order_mapping": {
+          "preserved_as": "event_sequence",
+          "flattened_to_unordered_AND": false,
+          "max_bars": 10,
+          "n_steps": 3
+        },
+        "exit_mapping": {
+          "research_exit_preserved": true,
+          "production_sl_0_9pct": 0.009,
+          "time_stop": {
+            "max_hold_bars": 12
+          },
+          "modified": false
+        },
+        "generated_code_hash": "c15d11240e892716805c2ab19809567a385adf48f5cba03f9faaeaef7ef0c170",
+        "finished_at": "2026-07-28 14:55:51",
+        "verdict": "PASS"
+      }
+    },
+    {
+      "candidate_id": "p5_ll_btc_xrp_catchup_5m",
+      "compile_ok": true,
+      "legacy_fallback_used": false,
+      "ir_hash": "b75aca0d6791322ff78cce19ec2b86fd783fafa074d026c10b630b5786ed7ffa",
+      "code_hash": "04a4b21b2747dc3df0731096783aea3c41f7743b2274853ab0889ed5080be461",
+      "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+      "unsupported_clauses": [],
+      "feature_mapping": null,
+      "state_mapping": null,
+      "event_mapping": null,
+      "exit_mapping": null,
+      "compilation_trace": {
+        "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+        "started_at": "2026-07-28 14:55:51",
+        "steps": [
+          "validate_ir_ok",
+          "feature_mapping_ok",
+          "state_mapping_ok",
+          "event_order_mapping_ok",
+          "exit_mapping_ok",
+          "emit_formal_ok"
+        ],
+        "legacy_fallback_used": false,
+        "rejected_clauses": [],
+        "unsupported_feature_list": [],
+        "feature_mapping": {
+          "cross_sync_score": {
+            "from": "cross_sync_score",
+            "to": "cross_sync_score",
+            "kind": "research"
+          },
+          "lag_ret1": {
+            "from": "lag_ret1",
+            "to": "lag_ret1",
+            "kind": "research"
+          },
+          "lead_lag_corr20": {
+            "from": "lead_lag_corr20",
+            "to": "lead_lag_corr20",
+            "kind": "research"
+          },
+          "lead_ret3": {
+            "from": "lead_ret3",
+            "to": "lead_ret3",
+            "kind": "research"
+          },
+          "regime_ok": {
+            "from": "regime_ok",
+            "to": "regime_ok",
+            "kind": "base"
+          }
+        },
+        "state_mapping": {
+          "idle": "idle",
+          "setup": "setup",
+          "armed": "armed",
+          "triggered": "triggered",
+          "in_trade": "in_trade",
+          "invalidated": "invalidated",
+          "cooldown": "cooldown"
+        },
+        "event_order_mapping": {
+          "preserved_as": "event_sequence",
+          "flattened_to_unordered_AND": false,
+          "max_bars": 10,
+          "n_steps": 3
+        },
+        "exit_mapping": {
+          "research_exit_preserved": true,
+          "production_sl_0_9pct": 0.009,
+          "time_stop": {
+            "max_hold_bars": 14
+          },
+          "modified": false
+        },
+        "generated_code_hash": "04a4b21b2747dc3df0731096783aea3c41f7743b2274853ab0889ed5080be461",
+        "finished_at": "2026-07-28 14:55:51",
+        "verdict": "PASS"
+      }
+    },
+    {
+      "candidate_id": "p5_res_eth_btc_zfade_5m",
+      "compile_ok": true,
+      "legacy_fallback_used": false,
+      "ir_hash": "ac9c394e28e9267307e1c40a5332f2fdfb046cd45cd5f0f44d8e3aefe9657380",
+      "code_hash": "f83c8d6f1324a4a70ab5e87fdc61ea4c113ba58ccafd798b33d7cee27ff91370",
+      "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+      "unsupported_clauses": [],
+      "feature_mapping": null,
+      "state_mapping": null,
+      "event_mapping": null,
+      "exit_mapping": null,
+      "compilation_trace": {
+        "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+        "started_at": "2026-07-28 14:55:51",
+        "steps": [
+          "validate_ir_ok",
+          "feature_mapping_ok",
+          "state_mapping_ok",
+          "event_order_mapping_ok",
+          "exit_mapping_ok",
+          "emit_formal_ok"
+        ],
+        "legacy_fallback_used": false,
+        "rejected_clauses": [],
+        "unsupported_feature_list": [],
+        "feature_mapping": {
+          "beta20": {
+            "from": "beta20",
+            "to": "beta20",
+            "kind": "research"
+          },
+          "corr_high_flag": {
+            "from": "corr_high_flag",
+            "to": "corr_high_flag",
+            "kind": "research"
+          },
+          "regime_ok": {
+            "from": "regime_ok",
+            "to": "regime_ok",
+            "kind": "base"
+          },
+          "residual_z20": {
+            "from": "residual_z20",
+            "to": "residual_z20",
+            "kind": "research"
+          }
+        },
+        "state_mapping": {
+          "idle": "idle",
+          "setup": "setup",
+          "armed": "armed",
+          "triggered": "triggered",
+          "in_trade": "in_trade",
+          "invalidated": "invalidated",
+          "cooldown": "cooldown"
+        },
+        "event_order_mapping": {
+          "preserved_as": "event_sequence",
+          "flattened_to_unordered_AND": false,
+          "max_bars": 12,
+          "n_steps": 3
+        },
+        "exit_mapping": {
+          "research_exit_preserved": true,
+          "production_sl_0_9pct": 0.009,
+          "time_stop": {
+            "max_hold_bars": 14
+          },
+          "modified": false
+        },
+        "generated_code_hash": "f83c8d6f1324a4a70ab5e87fdc61ea4c113ba58ccafd798b33d7cee27ff91370",
+        "finished_at": "2026-07-28 14:55:51",
+        "verdict": "PASS"
+      }
+    },
+    {
+      "candidate_id": "p5_corr_btc_eth_recover_5m",
+      "compile_ok": true,
+      "legacy_fallback_used": false,
+      "ir_hash": "807471b620522eb2168f647a23d1612155609650849cd83cc3604c17616f40ca",
+      "code_hash": "6b0cf8480a24fa3ee263aad15830d034277be1836ea00cafbfe0e05cef9e5296",
+      "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+      "unsupported_clauses": [],
+      "feature_mapping": null,
+      "state_mapping": null,
+      "event_mapping": null,
+      "exit_mapping": null,
+      "compilation_trace": {
+        "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+        "started_at": "2026-07-28 14:55:51",
+        "steps": [
+          "validate_ir_ok",
+          "feature_mapping_ok",
+          "state_mapping_ok",
+          "event_order_mapping_ok",
+          "exit_mapping_ok",
+          "emit_formal_ok"
+        ],
+        "legacy_fallback_used": false,
+        "rejected_clauses": [],
+        "unsupported_feature_list": [],
+        "feature_mapping": {
+          "corr_delta5": {
+            "from": "corr_delta5",
+            "to": "corr_delta5",
+            "kind": "research"
+          },
+          "corr_high_flag": {
+            "from": "corr_high_flag",
+            "to": "corr_high_flag",
+            "kind": "research"
+          },
+          "cross_sync_score": {
+            "from": "cross_sync_score",
+            "to": "cross_sync_score",
+            "kind": "research"
+          },
+          "lead_lag_corr20": {
+            "from": "lead_lag_corr20",
+            "to": "lead_lag_corr20",
+            "kind": "research"
+          },
+          "lead_ret1": {
+            "from": "lead_ret1",
+            "to": "lead_ret1",
+            "kind": "research"
+          },
+          "regime_ok": {
+            "from": "regime_ok",
+            "to": "regime_ok",
+            "kind": "base"
+          }
+        },
+        "state_mapping": {
+          "idle": "idle",
+          "setup": "setup",
+          "armed": "armed",
+          "triggered": "triggered",
+          "in_trade": "in_trade",
+          "invalidated": "invalidated",
+          "cooldown": "cooldown"
+        },
+        "event_order_mapping": {
+          "preserved_as": "event_sequence",
+          "flattened_to_unordered_AND": false,
+          "max_bars": 12,
+          "n_steps": 3
+        },
+        "exit_mapping": {
+          "research_exit_preserved": true,
+          "production_sl_0_9pct": 0.009,
+          "time_stop": {
+            "max_hold_bars": 16
+          },
+          "modified": false
+        },
+        "generated_code_hash": "6b0cf8480a24fa3ee263aad15830d034277be1836ea00cafbfe0e05cef9e5296",
+        "finished_at": "2026-07-28 14:55:51",
+        "verdict": "PASS"
+      }
+    },
+    {
+      "candidate_id": "p5_rg_eth_vol_div_converge_5m",
+      "compile_ok": true,
+      "legacy_fallback_used": false,
+      "ir_hash": "59b95ca7217b66342493e9d46580e5bf0683ca5f1346df7a781566f68e5f8168",
+      "code_hash": "900910e077f5417dc674b462bb36205c7896b003f3566392591c2b2c0ebb4db1",
+      "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+      "unsupported_clauses": [],
+      "feature_mapping": null,
+      "state_mapping": null,
+      "event_mapping": null,
+      "exit_mapping": null,
+      "compilation_trace": {
+        "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+        "started_at": "2026-07-28 14:55:51",
+        "steps": [
+          "validate_ir_ok",
+          "feature_mapping_ok",
+          "state_mapping_ok",
+          "event_order_mapping_ok",
+          "exit_mapping_ok",
+          "emit_formal_ok"
+        ],
+        "legacy_fallback_used": false,
+        "rejected_clauses": [],
+        "unsupported_feature_list": [],
+        "feature_mapping": {
+          "lead_lag_corr20": {
+            "from": "lead_lag_corr20",
+            "to": "lead_lag_corr20",
+            "kind": "research"
+          },
+          "regime_ok": {
+            "from": "regime_ok",
+            "to": "regime_ok",
+            "kind": "base"
+          },
+          "vol_div": {
+            "from": "vol_div",
+            "to": "vol_div",
+            "kind": "research"
+          }
+        },
+        "state_mapping": {
+          "idle": "idle",
+          "setup": "setup",
+          "armed": "armed",
+          "triggered": "triggered",
+          "in_trade": "in_trade",
+          "invalidated": "invalidated",
+          "cooldown": "cooldown"
+        },
+        "event_order_mapping": {
+          "preserved_as": "event_sequence",
+          "flattened_to_unordered_AND": false,
+          "max_bars": 10,
+          "n_steps": 3
+        },
+        "exit_mapping": {
+          "research_exit_preserved": true,
+          "production_sl_0_9pct": 0.009,
+          "time_stop": {
+            "max_hold_bars": 14
+          },
+          "modified": false
+        },
+        "generated_code_hash": "900910e077f5417dc674b462bb36205c7896b003f3566392591c2b2c0ebb4db1",
+        "finished_at": "2026-07-28 14:55:51",
+        "verdict": "PASS"
+      }
+    },
+    {
+      "candidate_id": "p5_br_btc_ltc_diffusion_15m",
+      "compile_ok": true,
+      "legacy_fallback_used": false,
+      "ir_hash": "03b30436c78f9b7075edca948d290577ed9709a3453ce0c8757ad8352a849ec0",
+      "code_hash": "0ed909fd79d5d9910acfb26929c9b0ed8b464a05d9684c0fc3232979227dc122",
+      "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+      "unsupported_clauses": [],
+      "feature_mapping": null,
+      "state_mapping": null,
+      "event_mapping": null,
+      "exit_mapping": null,
+      "compilation_trace": {
+        "compiler_version": "windtalker_phase5_candidate_ir_compiler_v1",
+        "started_at": "2026-07-28 14:55:51",
+        "steps": [
+          "validate_ir_ok",
+          "feature_mapping_ok",
+          "state_mapping_ok",
+          "event_order_mapping_ok",
+          "exit_mapping_ok",
+          "emit_formal_ok"
+        ],
+        "legacy_fallback_used": false,
+        "rejected_clauses": [],
+        "unsupported_feature_list": [],
+        "feature_mapping": {
+          "breadth_score": {
+            "from": "breadth_score",
+            "to": "breadth_score",
+            "kind": "research"
+          },
+          "lag_ret1": {
+            "from": "lag_ret1",
+            "to": "lag_ret1",
+            "kind": "research"
+          },
+          "lead_lag_corr20": {
+            "from": "lead_lag_corr20",
+            "to": "lead_lag_corr20",
+            "kind": "research"
+          },
+          "lead_ret3": {
+            "from": "lead_ret3",
+            "to": "lead_ret3",
+            "kind": "research"
+          },
+          "regime_ok": {
+            "from": "regime_ok",
+            "to": "regime_ok",
+            "kind": "base"
+          }
+        },
+        "state_mapping": {
+          "idle": "idle",
+          "setup": "setup",
+          "armed": "armed",
+          "triggered": "triggered",
+          "in_trade": "in_trade",
+          "invalidated": "invalidated",
+          "cooldown": "cooldown"
+        },
+        "event_order_mapping": {
+          "preserved_as": "event_sequence",
+          "flattened_to_unordered_AND": false,
+          "max_bars": 10,
+          "n_steps": 3
+        },
+        "exit_mapping": {
+          "research_exit_preserved": true,
+          "production_sl_0_9pct": 0.009,
+          "time_stop": {
+            "max_hold_bars": 10
+          },
+          "modified": false
+        },
+        "generated_code_hash": "0ed909fd79d5d9910acfb26929c9b0ed8b464a05d9684c0fc3232979227dc122",
+        "finished_at": "2026-07-28 14:55:51",
+        "verdict": "PASS"
+      }
+    }
+  ]
+}

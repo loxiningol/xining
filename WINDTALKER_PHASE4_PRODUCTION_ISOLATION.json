@@ -1,0 +1,78 @@
+{
+  "schema": "WINDTALKER_PHASE4_PRODUCTION_ISOLATION",
+  "generated_at": "2026-07-28 13:51:04",
+  "backup_path": "/root/backups/windtalker_phase4_20260728_213538",
+  "checks": [
+    {
+      "file": "/root/auto_trade/auto_trade_config.json",
+      "pre": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+      "now": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/portfolio_risk_policy.json",
+      "pre": "b6706810a56727e0c5e887245ca7efd35337a6c77f03ed5fb11c4d5be9a30156",
+      "now": "b6706810a56727e0c5e887245ca7efd35337a6c77f03ed5fb11c4d5be9a30156",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/formal_daemon_config.json",
+      "pre": "f0d0356bdd4754087e5a7c3e3c3be0ea428ae7da019a92bc15530aaefada2415",
+      "now": "f0d0356bdd4754087e5a7c3e3c3be0ea428ae7da019a92bc15530aaefada2415",
+      "unchanged": true
+    },
+    {
+      "file": "/root/auto_trade/auto_trade_strategy_dsl.py",
+      "pre": "fbe7a78e268d82b44fec1d7d9a4d6c24e0fea80f8c912f8f12801477b00ab16d",
+      "now": "fbe7a78e268d82b44fec1d7d9a4d6c24e0fea80f8c912f8f12801477b00ab16d",
+      "unchanged": true
+    },
+    {
+      "name": "production_dsl_features_untouched_by_research",
+      "pass": true,
+      "prod_n": 33
+    },
+    {
+      "name": "legacy_path_preserved",
+      "pass": true
+    },
+    {
+      "name": "no_auto_mount",
+      "pass": true
+    },
+    {
+      "name": "risk_rules_preserved",
+      "pass": true,
+      "rules": {
+        "leverage_20x": "untouched",
+        "initial_position_30pct": "untouched",
+        "sl_0_9pct": "untouched",
+        "ada_sl_0_6": "untouched",
+        "open_sl_tp_close_chain": "untouched",
+        "step_b": "untouched"
+      }
+    },
+    {
+      "name": "new_data_fail_closed_isolation",
+      "pass": true,
+      "note": "research features absent from production FEATURES"
+    }
+  ],
+  "regression_pass": true,
+  "config_hash": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+  "risk_hash": "b6706810a56727e0c5e887245ca7efd35337a6c77f03ed5fb11c4d5be9a30156",
+  "step_a_hash": "95b185a0d2d7627f782dc8352f5c9ed98fb995a07087e1907875178879764062",
+  "rollback": {
+    "config": "restore from backup",
+    "pipeline_step_a": "restore from windtalker_phase4_step_a_* backup",
+    "needed": false,
+    "auto_mount_detected": false
+  },
+  "safety": {
+    "live_enabled": false,
+    "real_orders": false,
+    "daemon_mutated": false,
+    "ada_sl_migrated": false,
+    "step_b_changed": false
+  }
+}

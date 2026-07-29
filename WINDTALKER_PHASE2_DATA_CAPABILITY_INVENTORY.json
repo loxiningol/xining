@@ -1,0 +1,125 @@
+{
+  "schema": "windtalker_phase2_data_capability_inventory_v1",
+  "generated_at": "2026-07-28 15:30:12",
+  "dsl_features": [
+    "atr14",
+    "cci",
+    "close",
+    "d",
+    "ema16",
+    "ema17",
+    "ema19",
+    "ema200",
+    "ema21",
+    "ema23",
+    "ema32",
+    "ema38",
+    "ema53",
+    "ema6",
+    "ema7",
+    "ema75",
+    "ema8",
+    "ema95",
+    "h1_atr14",
+    "h1_ema19",
+    "h1_ema53",
+    "h1_slope4",
+    "high",
+    "j",
+    "k",
+    "low",
+    "macd_stick",
+    "open",
+    "prev_high20",
+    "prev_low20",
+    "rsi14",
+    "vol_z20",
+    "z20"
+  ],
+  "dsl_has": {
+    "funding_as_entry_feature": true,
+    "oi": false,
+    "taker": false,
+    "liquidation": false,
+    "cross_asset": false,
+    "ohlc_vol_atr_z": true
+  },
+  "microstructure_telemetry": {
+    "available": true,
+    "counts": {
+      "microstructure_samples": 78442,
+      "microstructure_windows": 17818
+    },
+    "boundary": "forward-only sampled trade subwindows; not continuous 5s replay, 200ms OFI, queue position, cancel flow, or historical L2 replay",
+    "research_only": true,
+    "in_dsl_backtest_path": false,
+    "note": "May inform research-layer ideas; cannot drive Gate backtests without DSL feature wiring"
+  },
+  "execution_cost_model": true,
+  "candle_caches_present": [
+    "formal_btc_5m_candles_cache.json",
+    "formal_cl_1h_candles_cache.json",
+    "formal_ng_1h_candles_cache.json",
+    "formal_xau_15m_candles_cache.json",
+    "formal_xau_5m_candles_cache.json",
+    "formal_xau_1h_candles_cache.json",
+    "formal_xrp_15m_candles_cache.json",
+    "formal_cl_15m_candles_cache.json",
+    "formal_ada_5m_candles_cache.json",
+    "formal_cl_5m_candles_cache.json",
+    "formal_xag_5m_candles_cache.json",
+    "formal_ng_5m_candles_cache.json",
+    "formal_btc_1h_candles_cache.json",
+    "formal_btc_15m_candles_cache.json",
+    "formal_ltc_5m_candles_cache.json"
+  ],
+  "direction_classes_A_F": {
+    "A": "forced_flow_liquidation_cascade_proxy",
+    "B": "funding_pressure_unwind",
+    "C": "cross_asset_lead_lag",
+    "D": "selective_session_auction",
+    "E": "volume_aggression_absorption",
+    "F": "confirmed_vol_regime_release"
+  },
+  "implementability": {
+    "A": {
+      "dsl_proxy": true,
+      "true_liq_feed": false,
+      "phase2_use": "OHLC+vol cascade proxy"
+    },
+    "B": {
+      "dsl_proxy": false,
+      "funding_in_friction_only": true,
+      "phase2_use": "research_layer_or_eliminate"
+    },
+    "C": {
+      "dsl_proxy": "weak_same_symbol_shock",
+      "true_lead_lag": false,
+      "phase2_use": "data_eliminate_or_research_only"
+    },
+    "D": {
+      "dsl_proxy": true,
+      "phase2_use": "selective session via range+vol filters"
+    },
+    "E": {
+      "dsl_proxy": true,
+      "true_taker": false,
+      "phase2_use": "vol_z climax + wick reclaim proxy"
+    },
+    "F": {
+      "dsl_proxy": true,
+      "phase2_use": "atr/vol expansion with directional confirmation"
+    }
+  },
+  "prefer_cover_at_least_4_of_6": true,
+  "target_cover": [
+    "A",
+    "D",
+    "E",
+    "F"
+  ],
+  "research_only_candidates": [
+    "B",
+    "C"
+  ]
+}

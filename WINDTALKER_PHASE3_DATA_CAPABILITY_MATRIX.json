@@ -1,0 +1,176 @@
+{
+  "schema": "WINDTALKER_PHASE3_DATA_CAPABILITY_MATRIX",
+  "generated_at": "2026-07-28 18:02:03",
+  "schema_versioning": "windtalker_phase3_data_v1",
+  "replay_policy": "asof_align_past_only_no_lookahead",
+  "missing_stale_policy": "NaN → research DSL fail-closed (no signal)",
+  "classes": {
+    "OI": {
+      "endpoints": [
+        "/api/v5/rubik/stat/contracts/open-interest-history",
+        "/api/v5/public/open-interest"
+      ],
+      "local_cache": [
+        "dual_engine/frost3_btc5m_microedge_okx_funding_oi.json"
+      ],
+      "dsl_features": [
+        "oi",
+        "oi_z20",
+        "oi_delta_pct",
+        "oi_crowding"
+      ],
+      "in_production_dsl": false,
+      "fabricated": false
+    },
+    "Funding_Basis": {
+      "endpoints": [
+        "/api/v5/public/funding-rate-history",
+        "/api/v5/market/mark-price-candles",
+        "/api/v5/market/index-candles"
+      ],
+      "dsl_features": [
+        "funding_rate",
+        "funding_z20",
+        "basis_bps",
+        "basis_z20"
+      ],
+      "in_production_dsl": false,
+      "funding_in_production_friction_only": true,
+      "fabricated": false
+    },
+    "Taker_flow": {
+      "endpoints": [
+        "/api/v5/rubik/stat/taker-volume"
+      ],
+      "local": [
+        "microstructure_telemetry.db buy/sell notional + imbalance"
+      ],
+      "dsl_features": [
+        "taker_buy",
+        "taker_sell",
+        "taker_imbalance",
+        "taker_imbalance_z20",
+        "flow_imbalance"
+      ],
+      "in_production_dsl": false,
+      "fabricated": false
+    },
+    "Cross_asset_sync": {
+      "endpoints": [
+        "/api/v5/market/candles multi-symbol"
+      ],
+      "local_caches": "formal_*_candles_cache.json",
+      "dsl_features": [
+        "lead_ret1",
+        "lead_ret3",
+        "lag_ret1",
+        "lead_lag_corr20",
+        "cross_sync_score"
+      ],
+      "in_production_dsl": false,
+      "fabricated": false
+    }
+  },
+  "live_connectivity_evidence": {
+    "Funding_Basis": {
+      "ok": true,
+      "n": 100
+    },
+    "OI": {
+      "ok": true,
+      "n": 200
+    },
+    "Taker_flow": {
+      "ok": true,
+      "n": 576
+    },
+    "Cross_asset_sync": {
+      "ok": true,
+      "btc_bars": 1400,
+      "eth_bars": 1440
+    }
+  },
+  "connected_classes": [
+    "Funding_Basis",
+    "OI",
+    "Taker_flow",
+    "Cross_asset_sync"
+  ],
+  "connected_count": 4,
+  "meets_ge3_of_4": true,
+  "unavailable_do_not_fabricate": {
+    "liquidation_feed": {
+      "available": false,
+      "policy": "do_not_fabricate",
+      "note": "No continuous liquidation replay; cascade ideas must declare proxy or eliminate"
+    },
+    "historical_L2_orderbook": {
+      "available": false,
+      "policy": "do_not_fabricate",
+      "note": "microstructure is forward-sampled windows, not L2 replay"
+    }
+  },
+  "production_isolation": {
+    "writes_to_production_dsl_features": false,
+    "writes_to_formal_daemon": false,
+    "new_data_fail_closed_for_probes": true
+  },
+  "sample_frame_meta": {
+    "schema_version": "windtalker_phase3_data_v1",
+    "symbol": "BTC-USDT-SWAP",
+    "timeframe": "5m",
+    "built_at": "2026-07-28 18:02:03",
+    "sources": {
+      "funding": {
+        "ok": true,
+        "n": 100,
+        "source": "okx_funding_rate_history"
+      },
+      "oi": {
+        "ok": true,
+        "n": 200,
+        "source": "okx_rubik_oi_history+cache"
+      },
+      "basis": {
+        "ok": true,
+        "n": 300,
+        "source": "okx_mark_vs_index"
+      },
+      "taker": {
+        "ok": true,
+        "n": 576,
+        "source": "okx_rubik_taker_volume"
+      },
+      "microstructure_flow": {
+        "ok": true,
+        "n": 8475,
+        "source": "microstructure_telemetry.db"
+      },
+      "cross_asset": {
+        "ok": true,
+        "lead_symbol": "ETH-USDT-SWAP",
+        "lead_bars": 1440,
+        "source": "okx_market_candles"
+      }
+    },
+    "no_lookahead": true,
+    "fail_closed": true,
+    "stale_policy_ms": {
+      "funding": 29400000,
+      "oi": 1800000,
+      "taker": 1800000,
+      "basis": 1800000
+    },
+    "n_bars": 1400,
+    "candle_source": "formal_cache",
+    "coverage": {
+      "funding_rate": 1.0,
+      "oi": 0.1464,
+      "basis_bps": 0.2136,
+      "taker_imbalance": 0.4107,
+      "cross_sync_score": 0.9857,
+      "flow_imbalance": 1.0
+    },
+    "cache_path": "/root/auto_trade/windtalker_phase3/data_cache/BTC_USDT_SWAP_5m_research_frame.json"
+  }
+}

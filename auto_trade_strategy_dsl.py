@@ -1,0 +1,938 @@
+# -*- coding: utf-8 -*-
+"""Safe, auditable strategy DSL used by the Qiyu research ecosystem.
+
+The DSL is deliberately data-only.  It cannot import modules, call functions,
+access files/network, or change capital controls.  It supports boolean trees
+over a fixed indicator allow-list and produces leaf-level explanations.
+"""
+from __future__ import print_function
+
+import copy
+import hashlib
+import json
+import math
+
+
+SCHEMA = "qiyu_strategy_dsl_v1"
+FEATURES = {
+    "open", "high", "low", "close", "ema6", "ema7", "ema8", "ema16",
+    "ema17", "ema19", "ema21", "ema23", "ema32", "ema38", "ema53",
+    "ema75", "ema95", "ema200", "k", "d", "j", "cci", "macd_stick",
+    "atr14", "rsi14", "z20", "vol_z20", "prev_high20", "prev_low20",
+    "h1_ema19", "h1_ema53", "h1_atr14", "h1_slope4",
+}
+# Research / DSL allowlist — liquid OKX USDT-SWAP universe (expanded 2026-07-25).
+INSTRUMENTS = {
+    # majors
+    "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "BNB-USDT-SWAP",
+    "XRP-USDT-SWAP", "ADA-USDT-SWAP", "DOGE-USDT-SWAP", "LTC-USDT-SWAP",
+    # liquid alts
+    "LINK-USDT-SWAP", "AVAX-USDT-SWAP", "DOT-USDT-SWAP", "ATOM-USDT-SWAP",
+    "NEAR-USDT-SWAP", "APT-USDT-SWAP", "SUI-USDT-SWAP", "OP-USDT-SWAP",
+    "ARB-USDT-SWAP", "FIL-USDT-SWAP", "UNI-USDT-SWAP", "AAVE-USDT-SWAP",
+    "BCH-USDT-SWAP", "ETC-USDT-SWAP", "INJ-USDT-SWAP", "SEI-USDT-SWAP",
+    "TIA-USDT-SWAP", "TRX-USDT-SWAP", "ICP-USDT-SWAP", "RENDER-USDT-SWAP",
+    "ONDO-USDT-SWAP", "JUP-USDT-SWAP", "WLD-USDT-SWAP", "POL-USDT-SWAP",
+    # memes / high-beta
+    "PEPE-USDT-SWAP", "WIF-USDT-SWAP", "BONK-USDT-SWAP", "FLOKI-USDT-SWAP",
+    "SHIB-USDT-SWAP", "ORDI-USDT-SWAP",
+    # commodities
+    "XAU-USDT-SWAP", "XAG-USDT-SWAP", "NG-USDT-SWAP", "CL-USDT-SWAP",
+}
+OPS = {"lt", "lte", "gt", "gte", "eq", "between", "cross_above", "cross_below"}
+LOGICAL = {"all", "any", "not"}
+MAX_DEPTH = 6
+MAX_LEAVES = 32
+MAX_LOOKBACK = 240
+
+# ---- Phase-2 structured exits (opt-in; fail-closed on misuse) ----
+# Protective production SL (0.9%) is NOT an exit_op and is never banned here.
+EXIT_OPS = {"atr_trailing", "swing_extreme", "fixed_pct_tp"}
+ATR_TRAIL_N_MIN = 2.5
+ATR_TRAIL_N_MAX = 4.0
+ATR_TRAIL_PERIOD_DEFAULT = 14
+SWING_LOOKBACK_MIN = 5
+SWING_LOOKBACK_MAX = 60
+# Hard ban: fixed take-profit below 2.0% price move (e.g. 0.6%/0.9%/1.0%/1.3%).
+# Does NOT silently convert — validation / compile must refuse.
+FIXED_TP_MIN_PCT = 0.02
+FIXED_TINY_TP_ALIASES = (
+    "price_take_profit_pct", "take_profit_price_ratio", "take_profit_pct",
+    "fixed_tp_pct", "tp_pct", "price_tp_pct",
+)
+
+
+class DSLValidationError(ValueError):
+    pass
+
+
+def refuse_fixed_tiny_tp(pct, context="exit"):
+    """Raise if pct is a banned tiny fixed take-profit. Never converts."""
+    try:
+        value = float(pct)
+    except Exception:
+        raise DSLValidationError(
+            "REFUSED: %s fixed take-profit pct is not numeric" % context
+        )
+    if not math.isfinite(value):
+        raise DSLValidationError(
+            "REFUSED: %s fixed take-profit pct is not finite" % context
+        )
+    # Accept either fraction (0.01) or percent-points (1.0 → 1%)
+    frac = value / 100.0 if value >= 0.2 else value
+    if frac < FIXED_TP_MIN_PCT:
+        raise DSLValidationError(
+            "REFUSED: fixed tiny take-profit %.4f%% banned under 20x+friction "
+            "(need pct>=%.1f%% OR atr_trailing/swing_extreme). "
+            "Does not silently convert. context=%s"
+            % (frac * 100.0, FIXED_TP_MIN_PCT * 100.0, context)
+        )
+    return frac
+
+
+def scan_banned_fixed_tp_params(params, context="params"):
+    """Refuse known tiny fixed-TP param keys. Opt-in scan for compiler/gates."""
+    if not isinstance(params, dict):
+        return
+    for key in FIXED_TINY_TP_ALIASES:
+        if key in params and params.get(key) is not None:
+            refuse_fixed_tiny_tp(params.get(key), context="%s.%s" % (context, key))
+
+
+def canonical_json(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True,
+                      separators=(",", ":"))
+
+
+def dsl_hash(value):
+    return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def executable_hash(strategy):
+    """Identity of executable logic, excluding names/provenance/live flags."""
+    validated = validate_strategy(strategy)
+    value = {key: validated.get(key) for key in (
+        "schema", "direction", "timeframe", "supported_instruments",
+        "entry", "exit", "max_hold_bars",
+    )}
+    return dsl_hash(value)
+
+
+def _logic_skeleton(node, nums=None):
+    """Structural skeleton of a boolean tree; collect numeric thresholds."""
+    nums = nums if nums is not None else []
+    if not isinstance(node, dict):
+        return None
+    logical = [k for k in LOGICAL if k in node]
+    if logical:
+        op = logical[0]
+        children = node[op]
+        if op == "not":
+            return {"op": "not", "child": _logic_skeleton(children, nums)}
+        kids = []
+        for child in (children or []):
+            kids.append(_logic_skeleton(child, nums))
+        return {"op": op, "children": kids}
+    if "exit_op" in node:
+        leaf = {
+            "exit_op": node.get("exit_op"),
+            "role": node.get("role"),
+            "n_atr": node.get("n_atr"),
+            "lookback": node.get("lookback"),
+            "has_pct": ("pct" in node) or ("price_pct" in node),
+        }
+        for key in ("n_atr", "lookback", "pct", "price_pct"):
+            if key in node:
+                try:
+                    nums.append(float(node.get(key)))
+                except Exception:
+                    pass
+        return leaf
+    left = node.get("left") or {}
+    right = node.get("right") or {}
+    role = node.get("role")
+    leaf = {
+        "left": left.get("feature"),
+        "left_offset": int(left.get("offset") or 0),
+        "op": node.get("op"),
+        "right_feature": right.get("feature"),
+        "right_offset": int(right.get("offset") or 0) if "feature" in right else None,
+        "role": role,
+        "has_value": "value" in right,
+    }
+    if "value" in right:
+        try:
+            nums.append(float(right.get("value")))
+        except Exception:
+            pass
+    return leaf
+
+
+def logic_topology_hash(strategy):
+    """Hash of logic shape (features/ops/roles), ignoring numeric thresholds.
+
+    Two strategies with the same topology but only threshold tweaks (e.g.
+    z20<2.2 vs z20<2.3) share this hash and are treated as near-duplicates.
+    """
+    validated = validate_strategy(strategy)
+    nums = []
+    skeleton = {
+        "direction": validated.get("direction"),
+        "timeframe": validated.get("timeframe"),
+        "supported_instruments": list(validated.get("supported_instruments") or []),
+        "entry": _logic_skeleton(validated.get("entry") or {}, nums),
+        "exit": _logic_skeleton(validated.get("exit") or {}, nums),
+    }
+    # Drop collected nums — topology only.
+    return dsl_hash(skeleton), nums
+
+
+def _nums_near(a, b, abs_tol=0.35, rel_tol=0.15):
+    if len(a) != len(b):
+        return False
+    for x, y in zip(a, b):
+        diff = abs(float(x) - float(y))
+        scale = max(abs(float(x)), abs(float(y)), 1e-9)
+        if diff > abs_tol and diff / scale > rel_tol:
+            return False
+    return True
+
+
+def is_near_duplicate_logic(a, b, abs_tol=0.35, rel_tol=0.15, hold_slack=2):
+    """True when two DSLs are the same family with only small param tweaks."""
+    try:
+        va = validate_strategy(a)
+        vb = validate_strategy(b)
+    except Exception:
+        return False
+    if va.get("direction") != vb.get("direction"):
+        return False
+    if va.get("timeframe") != vb.get("timeframe"):
+        return False
+    if list(va.get("supported_instruments") or []) != list(
+            vb.get("supported_instruments") or []):
+        return False
+    ha, na = logic_topology_hash(va)
+    hb, nb = logic_topology_hash(vb)
+    if ha != hb:
+        return False
+    hold_a = int(va.get("max_hold_bars") or 0)
+    hold_b = int(vb.get("max_hold_bars") or 0)
+    if abs(hold_a - hold_b) > int(hold_slack):
+        return False
+    # Exact executable match OR thresholds within tolerance.
+    if executable_hash(va) == executable_hash(vb):
+        return True
+    return _nums_near(na, nb, abs_tol=abs_tol, rel_tol=rel_tol)
+
+
+def find_near_duplicate(candidate, catalog, abs_tol=0.35, rel_tol=0.15):
+    """Return first catalog strategy that is a near-duplicate of candidate."""
+    for row in catalog or []:
+        if not isinstance(row, dict):
+            continue
+        other = row.get("dsl") or row
+        if not isinstance(other, dict):
+            continue
+        key = other.get("key") or row.get("key")
+        if key and candidate.get("key") and key == candidate.get("key"):
+            continue
+        try:
+            if is_near_duplicate_logic(candidate, other,
+                                       abs_tol=abs_tol, rel_tol=rel_tol):
+                return {
+                    "key": key,
+                    "name": other.get("name") or row.get("name"),
+                    "match": "near_duplicate_logic",
+                }
+        except Exception:
+            continue
+    return None
+
+
+def _number(value):
+    if isinstance(value, bool):
+        raise DSLValidationError("boolean is not a numeric threshold")
+    try:
+        value = float(value)
+    except Exception:
+        raise DSLValidationError("threshold must be numeric")
+    if not math.isfinite(value) or abs(value) > 1000000000:
+        raise DSLValidationError("threshold is not finite or exceeds safety bound")
+    return value
+
+
+def _offset(value):
+    try:
+        value = int(value or 0)
+    except Exception:
+        raise DSLValidationError("offset must be integer")
+    if value < 0 or value > MAX_LOOKBACK:
+        raise DSLValidationError("offset outside 0..%d" % MAX_LOOKBACK)
+    return value
+
+
+def _validate_operand(operand):
+    if not isinstance(operand, dict):
+        raise DSLValidationError("operand must be object")
+    keys = set(operand)
+    if "feature" in operand:
+        if keys - {"feature", "offset"}:
+            raise DSLValidationError("feature operand contains unknown fields")
+        feature = str(operand.get("feature") or "")
+        if feature not in FEATURES:
+            raise DSLValidationError("unsupported feature: %s" % feature)
+        _offset(operand.get("offset", 0))
+        return
+    if "value" in operand:
+        if keys != {"value"}:
+            raise DSLValidationError("constant operand contains unknown fields")
+        _number(operand.get("value"))
+        return
+    raise DSLValidationError("operand requires feature or value")
+
+
+def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
+    counter = counter if counter is not None else [0]
+    seen_ids = seen_ids if seen_ids is not None else set()
+    if depth > MAX_DEPTH or not isinstance(node, dict):
+        raise DSLValidationError("expression depth/type invalid")
+    logical = [key for key in LOGICAL if key in node]
+    if logical:
+        if len(logical) != 1 or len(node) != 1:
+            raise DSLValidationError("logical node must contain exactly one operator")
+        op = logical[0]
+        children = node[op]
+        if op == "not":
+            _walk(children, depth + 1, counter, seen_ids, phase=phase)
+        else:
+            if not isinstance(children, list) or not children:
+                raise DSLValidationError("all/any requires non-empty list")
+            for child in children:
+                _walk(child, depth + 1, counter, seen_ids, phase=phase)
+        return
+    # Phase-2 structured exit operators (opt-in leaves)
+    if "exit_op" in node:
+        if phase != "exit":
+            raise DSLValidationError("exit_op is only valid on exit conditions")
+        allowed_exit = {
+            "id", "exit_op", "role", "n_atr", "atr_period", "lookback",
+            "pct", "price_pct", "params",
+        }
+        if set(node) - allowed_exit:
+            raise DSLValidationError("exit_op node contains unknown fields")
+        condition_id = str(node.get("id") or "")
+        if not condition_id or len(condition_id) > 80:
+            raise DSLValidationError("condition id required and <=80 chars")
+        if condition_id in seen_ids:
+            raise DSLValidationError("condition ids must be unique")
+        seen_ids.add(condition_id)
+        exit_op = str(node.get("exit_op") or "")
+        if exit_op not in EXIT_OPS:
+            raise DSLValidationError("unsupported exit_op: %s" % exit_op)
+        role = node.get("role")
+        if role is not None and role not in ("take_profit", "invalidation"):
+            raise DSLValidationError("exit role must be take_profit or invalidation")
+        if exit_op == "atr_trailing":
+            n_atr = _number(node.get("n_atr", 3.0))
+            if n_atr < ATR_TRAIL_N_MIN or n_atr > ATR_TRAIL_N_MAX:
+                raise DSLValidationError(
+                    "atr_trailing n_atr must be in [%.1f, %.1f] (got %s)"
+                    % (ATR_TRAIL_N_MIN, ATR_TRAIL_N_MAX, n_atr)
+                )
+            atr_period = int(node.get("atr_period") or ATR_TRAIL_PERIOD_DEFAULT)
+            if atr_period < 2 or atr_period > MAX_LOOKBACK:
+                raise DSLValidationError("atr_period outside 2..%d" % MAX_LOOKBACK)
+        elif exit_op == "swing_extreme":
+            lookback = int(node.get("lookback") or 20)
+            if lookback < SWING_LOOKBACK_MIN or lookback > SWING_LOOKBACK_MAX:
+                raise DSLValidationError(
+                    "swing_extreme lookback must be in [%d, %d]"
+                    % (SWING_LOOKBACK_MIN, SWING_LOOKBACK_MAX)
+                )
+        elif exit_op == "fixed_pct_tp":
+            # Hard ban tiny fixed TP — refuse-compile / refuse-validate, no convert
+            pct = node.get("pct", node.get("price_pct"))
+            if pct is None and isinstance(node.get("params"), dict):
+                pct = (node["params"].get("pct")
+                       or node["params"].get("price_pct"))
+            refuse_fixed_tiny_tp(pct, context="exit_op.fixed_pct_tp")
+        counter[0] += 1
+        if counter[0] > MAX_LEAVES:
+            raise DSLValidationError("too many conditions")
+        return
+    allowed = {"id", "left", "op", "right", "lower", "upper", "role"}
+    if set(node) - allowed:
+        raise DSLValidationError("condition contains unknown fields")
+    condition_id = str(node.get("id") or "")
+    if not condition_id or len(condition_id) > 80:
+        raise DSLValidationError("condition id required and <=80 chars")
+    if condition_id in seen_ids:
+        raise DSLValidationError("condition ids must be unique")
+    seen_ids.add(condition_id)
+    op = str(node.get("op") or "")
+    if op not in OPS:
+        raise DSLValidationError("unsupported operator: %s" % op)
+    _validate_operand(node.get("left"))
+    if op == "between":
+        _number(node.get("lower")); _number(node.get("upper"))
+        if float(node["lower"]) > float(node["upper"]):
+            raise DSLValidationError("between lower exceeds upper")
+    else:
+        _validate_operand(node.get("right"))
+    role = node.get("role")
+    if role is not None:
+        if phase != "exit":
+            raise DSLValidationError("role is only valid on exit conditions")
+        if role not in ("take_profit", "invalidation"):
+            raise DSLValidationError("exit role must be take_profit or invalidation")
+    counter[0] += 1
+    if counter[0] > MAX_LEAVES:
+        raise DSLValidationError("too many conditions")
+
+
+def validate_strategy(strategy):
+    if not isinstance(strategy, dict):
+        raise DSLValidationError("strategy must be object")
+    allowed = {"schema", "key", "name", "direction", "timeframe",
+               "supported_instruments", "entry", "exit", "max_hold_bars",
+               "description", "origin", "version", "live_enabled",
+               "approved_version_hash", "auto_trade_eligible"}
+    if set(strategy) - allowed:
+        raise DSLValidationError("strategy contains unknown top-level fields")
+    if strategy.get("schema") != SCHEMA:
+        raise DSLValidationError("unsupported DSL schema")
+    key = str(strategy.get("key") or "")
+    if not key or len(key) > 100 or not all(ch.isalnum() or ch == "_" for ch in key):
+        raise DSLValidationError("invalid strategy key")
+    if strategy.get("direction") not in ("long", "short"):
+        raise DSLValidationError("direction must be long or short")
+    if len(str(strategy.get("name") or "")) > 120:
+        raise DSLValidationError("strategy name too long")
+    if len(str(strategy.get("description") or "")) > 2000:
+        raise DSLValidationError("strategy description too long")
+    if strategy.get("timeframe") not in ("1h", "4h", "15m", "5m"):
+        raise DSLValidationError("unsupported timeframe")
+    instruments = strategy.get("supported_instruments") or []
+    if not isinstance(instruments, list) or not instruments or len(instruments) > 12:
+        raise DSLValidationError("supported_instruments must be non-empty list")
+    if any(str(instrument) not in INSTRUMENTS for instrument in instruments):
+        raise DSLValidationError("unsupported instrument")
+    hold = int(strategy.get("max_hold_bars") or 0)
+    if hold < 1 or hold > 240:
+        raise DSLValidationError("max_hold_bars outside 1..240")
+    entry_count = [0]; exit_count = [0]
+    _walk(strategy.get("entry"), counter=entry_count, seen_ids=set(), phase="entry")
+    _walk(strategy.get("exit"), counter=exit_count, seen_ids=set(), phase="exit")
+    if entry_count[0] < 2:
+        raise DSLValidationError("entry requires at least two independent conditions")
+    return copy.deepcopy(strategy)
+
+
+def _series(frame, feature):
+    if feature not in frame.columns:
+        raise DSLValidationError("feature absent from frame: %s" % feature)
+    return frame[feature]
+
+
+def _operand(frame, index, operand, extra_offset=0):
+    if "value" in operand:
+        return float(operand["value"])
+    offset = _offset(operand.get("offset", 0)) + int(extra_offset)
+    position = index - offset
+    if position < 0:
+        raise IndexError("insufficient lookback")
+    value = float(_series(frame, operand["feature"]).iloc[position])
+    if not math.isfinite(value):
+        raise ValueError("indicator is not finite")
+    return value
+
+
+def _atr_at(frame, index, period=14):
+    """ATR_period from OHLC frame (Wilder-ish simple mean of TR)."""
+    if index < period:
+        raise IndexError("insufficient bars for ATR")
+    trs = []
+    for i in range(index - period + 1, index + 1):
+        high = float(frame["high"].iloc[i])
+        low = float(frame["low"].iloc[i])
+        prev_close = float(frame["close"].iloc[i - 1]) if i > 0 else high
+        tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+        trs.append(tr)
+    return sum(trs) / float(len(trs))
+
+
+def _swing_high_low(frame, index, lookback):
+    """Local extremes over last `lookback` bars excluding current bar."""
+    if index < lookback:
+        raise IndexError("insufficient bars for swing")
+    lo = index - lookback
+    hi = index  # exclusive current
+    highs = frame["high"].iloc[lo:hi]
+    lows = frame["low"].iloc[lo:hi]
+    try:
+        swing_high = float(highs.max())
+        swing_low = float(lows.min())
+    except Exception:
+        swing_high = float(max(highs))
+        swing_low = float(min(lows))
+    return swing_high, swing_low
+
+
+def evaluate_exit_op(frame, index, node, position, direction, explain=False):
+    """Evaluate structured exit leaf. position must include price + peaks."""
+    exit_op = str(node.get("exit_op") or "")
+    role = node.get("role") or "take_profit"
+    entry_price = float(position["price"])
+    high = float(frame["high"].iloc[index])
+    low = float(frame["low"].iloc[index])
+    close = float(frame["close"].iloc[index])
+    passed = False
+    exit_price = close
+    detail = {
+        "condition_id": node.get("id"),
+        "exit_op": exit_op,
+        "role": role,
+        "passed": False,
+    }
+    try:
+        if exit_op == "atr_trailing":
+            n_atr = float(node.get("n_atr") or 3.0)
+            atr_period = int(node.get("atr_period") or ATR_TRAIL_PERIOD_DEFAULT)
+            atr = _atr_at(frame, index, atr_period)
+            peak_high = float(position.get("peak_high") or max(entry_price, high))
+            peak_low = float(position.get("peak_low") or min(entry_price, low))
+            if direction == "long":
+                trail = peak_high - n_atr * atr
+                passed = low <= trail
+                exit_price = trail if passed else close
+            else:
+                trail = peak_low + n_atr * atr
+                passed = high >= trail
+                exit_price = trail if passed else close
+            detail.update({
+                "atr": atr, "n_atr": n_atr, "trail": trail,
+                "peak_high": peak_high, "peak_low": peak_low,
+            })
+        elif exit_op == "swing_extreme":
+            lookback = int(node.get("lookback") or 20)
+            swing_high, swing_low = _swing_high_low(frame, index, lookback)
+            if role == "invalidation":
+                if direction == "long":
+                    passed = low <= swing_low
+                    exit_price = swing_low if passed else close
+                else:
+                    passed = high >= swing_high
+                    exit_price = swing_high if passed else close
+            else:
+                # take_profit / dynamic exit line at opposing extreme
+                if direction == "long":
+                    passed = high >= swing_high
+                    exit_price = swing_high if passed else close
+                else:
+                    passed = low <= swing_low
+                    exit_price = swing_low if passed else close
+            detail.update({
+                "lookback": lookback,
+                "swing_high": swing_high,
+                "swing_low": swing_low,
+            })
+        elif exit_op == "fixed_pct_tp":
+            pct = refuse_fixed_tiny_tp(
+                node.get("pct", node.get("price_pct")),
+                context="runtime.fixed_pct_tp",
+            )
+            if direction == "long":
+                target = entry_price * (1.0 + pct)
+                passed = high >= target
+                exit_price = target if passed else close
+            else:
+                target = entry_price * (1.0 - pct)
+                passed = low <= target
+                exit_price = target if passed else close
+            detail.update({"pct": pct, "target": target})
+        else:
+            raise DSLValidationError("unsupported exit_op at runtime: %s" % exit_op)
+    except DSLValidationError:
+        raise
+    except Exception as exc:
+        passed = False
+        detail["error"] = str(exc)
+    detail["passed"] = bool(passed)
+    detail["exit_price"] = float(exit_price)
+    return bool(passed), [detail] if explain else [], float(exit_price)
+
+
+def evaluate_expression(frame, index, node, explain=False,
+                        position=None, direction=None):
+    if "all" in node:
+        children = [evaluate_expression(frame, index, child, explain=explain,
+                                        position=position, direction=direction)
+                    for child in node["all"]]
+        passed = all(item[0] for item in children)
+        details = sum((item[1] for item in children), [])
+        return passed, details
+    if "any" in node:
+        children = [evaluate_expression(frame, index, child, explain=explain,
+                                        position=position, direction=direction)
+                    for child in node["any"]]
+        passed = any(item[0] for item in children)
+        details = sum((item[1] for item in children), [])
+        return passed, details
+    if "not" in node:
+        passed, details = evaluate_expression(
+            frame, index, node["not"], explain=explain,
+            position=position, direction=direction,
+        )
+        if explain:
+            details = [dict(item, passed=not bool(item.get("passed")), negated=True)
+                       for item in details]
+        return not passed, details
+    if "exit_op" in node:
+        if position is None or direction is None:
+            # Fail-closed: structured exits require position context
+            detail = {"condition_id": node.get("id"), "exit_op": node.get("exit_op"),
+                      "passed": False, "error": "exit_op_requires_position_context"}
+            return False, [detail] if explain else []
+        passed, details, _price = evaluate_exit_op(
+            frame, index, node, position, direction, explain=explain,
+        )
+        return passed, details
+    op = node["op"]
+    try:
+        left = _operand(frame, index, node["left"])
+        if op == "between":
+            right = [float(node["lower"]), float(node["upper"])]
+            passed = right[0] <= left <= right[1]
+        else:
+            right = _operand(frame, index, node["right"])
+            if op == "lt": passed = left < right
+            elif op == "lte": passed = left <= right
+            elif op == "gt": passed = left > right
+            elif op == "gte": passed = left >= right
+            elif op == "eq": passed = abs(left-right) <= 1e-12
+            elif op == "cross_above":
+                previous_left = _operand(frame, index, node["left"], 1)
+                previous_right = _operand(frame, index, node["right"], 1)
+                passed = previous_left <= previous_right and left > right
+            elif op == "cross_below":
+                previous_left = _operand(frame, index, node["left"], 1)
+                previous_right = _operand(frame, index, node["right"], 1)
+                passed = previous_left >= previous_right and left < right
+            else:
+                passed = False
+        detail = {"condition_id": node["id"], "passed": bool(passed),
+                  "left": left, "operator": op, "right": right}
+        if node.get("role"):
+            detail["role"] = node.get("role")
+    except Exception as exc:
+        passed = False
+        detail = {"condition_id": node.get("id"), "passed": False,
+                  "operator": op, "error": str(exc)}
+    return bool(passed), [detail] if explain else []
+
+
+def evaluate_strategy(frame, index, strategy, phase="entry", explain=False,
+                      position=None):
+    validate_strategy(strategy)
+    if phase not in ("entry", "exit"):
+        raise DSLValidationError("phase must be entry or exit")
+    return evaluate_expression(
+        frame, index, strategy[phase], explain=explain,
+        position=position,
+        direction=strategy.get("direction") if phase == "exit" else None,
+    )
+
+
+def _leaf_paths(node, path=()):
+    if "all" in node or "any" in node:
+        key = "all" if "all" in node else "any"
+        out = []
+        for index, child in enumerate(node[key]):
+            out.extend(_leaf_paths(child, path + (key, index)))
+        return out
+    if "not" in node:
+        return _leaf_paths(node["not"], path + ("not",))
+    return [(path, node)]
+
+
+def _at(root, path):
+    current = root
+    for part in path:
+        current = current[part]
+    return current
+
+
+def mutate_strategy(strategy, threshold_step=1.0, additions=None, limit=24):
+    """Return bounded, validated add/remove/threshold mutations."""
+    base = validate_strategy(strategy)
+    variants = []
+    entry_leaves = _leaf_paths(base["entry"])
+    for path, leaf in entry_leaves:
+        if len(variants) >= limit: break
+        for field in ("right",):
+            operand = leaf.get(field)
+            if not isinstance(operand, dict) or "value" not in operand:
+                continue
+            feature = str((leaf.get("left") or {}).get("feature") or "")
+            # Numeric features do not share a scale.  In particular,
+            # h1_slope4 is a decimal return where 0.001 means 0.1%; applying
+            # the legacy +/-1 step makes the condition unreachable.  Keep
+            # mutations local to the observed indicator's natural scale.
+            feature_steps = {
+                "h1_slope4": 0.0005,
+                "z20": 0.1,
+                "vol_z20": 0.1,
+                "cci": 5.0,
+                "macd_stick": 5.0,
+                "atr14": 1.0,
+                "rsi14": 1.0,
+                "k": 1.0,
+                "d": 1.0,
+                "j": 1.0,
+            }
+            step = float(feature_steps.get(feature, threshold_step))
+            for direction in (-1, 1):
+                changed = copy.deepcopy(base)
+                target = _at(changed["entry"], path)
+                target[field]["value"] = round(float(operand["value"]) + direction*step, 10)
+                changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+                changed["origin"] = {"mutation": "threshold", "condition_id": leaf["id"]}
+                try:
+                    variants.append(validate_strategy(changed))
+                except DSLValidationError:
+                    pass
+        if leaf.get("op") == "between":
+            for field in ("lower", "upper"):
+                for direction in (-1, 1):
+                    changed = copy.deepcopy(base)
+                    target = _at(changed["entry"], path)
+                    target[field] = round(float(leaf[field]) + direction*threshold_step, 10)
+                    changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+                    changed["origin"] = {"mutation": "threshold",
+                                         "condition_id": leaf["id"], "field": field}
+                    try:
+                        variants.append(validate_strategy(changed))
+                    except DSLValidationError:
+                        pass
+    if isinstance(base.get("entry"), dict) and "all" in base["entry"] and len(base["entry"]["all"]) > 2:
+        for index, child in enumerate(list(base["entry"]["all"])):
+            if len(variants) >= limit: break
+            changed = copy.deepcopy(base)
+            removed = changed["entry"]["all"].pop(index)
+            changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+            changed["origin"] = {"mutation": "remove_condition",
+                                 "condition_id": removed.get("id") if isinstance(removed, dict) else None}
+            try:
+                variants.append(validate_strategy(changed))
+            except DSLValidationError:
+                pass
+    # Exit logic is part of strategy quality, not a fixed capital-risk
+    # parameter.  Explore bounded threshold changes and removals so an exit
+    # that is already true at entry cannot silently dominate every trade.
+    exit_leaves = _leaf_paths(base["exit"])
+    for path, leaf in exit_leaves:
+        if len(variants) >= limit: break
+        operand = leaf.get("right")
+        if not isinstance(operand, dict) or "value" not in operand:
+            continue
+        feature = str((leaf.get("left") or {}).get("feature") or "")
+        step = float({
+            "h1_slope4": 0.0005, "z20": 0.1, "vol_z20": 0.1, "cci": 5.0,
+            "macd_stick": 5.0, "atr14": 1.0, "rsi14": 1.0,
+            "k": 1.0, "d": 1.0, "j": 1.0,
+        }.get(feature, threshold_step))
+        for direction in (-1, 1):
+            changed = copy.deepcopy(base)
+            target = _at(changed["exit"], path)
+            target["right"]["value"] = round(
+                float(operand["value"]) + direction * step, 10)
+            changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+            changed["origin"] = {"mutation": "exit_threshold",
+                                 "condition_id": leaf["id"]}
+            try:
+                variants.append(validate_strategy(changed))
+            except DSLValidationError:
+                pass
+    exit_root = base.get("exit") or {}
+    exit_key = "all" if "all" in exit_root else ("any" if "any" in exit_root else None)
+    if exit_key and len(exit_root[exit_key]) > 1:
+        for index, child in enumerate(list(exit_root[exit_key])):
+            if len(variants) >= limit: break
+            changed = copy.deepcopy(base)
+            removed = changed["exit"][exit_key].pop(index)
+            changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+            changed["origin"] = {"mutation": "remove_exit_condition",
+                                 "condition_id": removed.get("id") if isinstance(removed, dict) else None}
+            try:
+                variants.append(validate_strategy(changed))
+            except DSLValidationError:
+                pass
+        # Also test each exit independently.  This is bounded and auditable,
+        # and is essential when one sibling exit conflicts with the entry.
+        for child in list(exit_root[exit_key]):
+            if len(variants) >= limit: break
+            changed = copy.deepcopy(base)
+            changed["exit"] = copy.deepcopy(child)
+            changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+            changed["origin"] = {"mutation": "isolate_exit_condition",
+                                 "condition_id": child.get("id") if isinstance(child, dict) else None}
+            try:
+                variants.append(validate_strategy(changed))
+            except DSLValidationError:
+                pass
+    for hold_delta in (-4, 4):
+        if len(variants) >= limit: break
+        changed = copy.deepcopy(base)
+        changed["max_hold_bars"] = max(1, int(base["max_hold_bars"]) + hold_delta)
+        changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+        changed["origin"] = {"mutation": "max_hold_bars",
+                             "delta": hold_delta}
+        try:
+            variants.append(validate_strategy(changed))
+        except DSLValidationError:
+            pass
+    for addition in additions or []:
+        if len(variants) >= limit: break
+        if "all" not in base["entry"]:
+            break
+        changed = copy.deepcopy(base)
+        changed["entry"]["all"].append(copy.deepcopy(addition))
+        changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+        changed["origin"] = {"mutation": "add_condition",
+                             "condition_id": addition.get("id") if isinstance(addition, dict) else None}
+        try:
+            variants.append(validate_strategy(changed))
+        except DSLValidationError:
+            pass
+    if len(variants) < limit and ("all" in base["entry"] or "any" in base["entry"]):
+        changed = copy.deepcopy(base)
+        old = "all" if "all" in changed["entry"] else "any"
+        new = "any" if old == "all" else "all"
+        changed["entry"] = {new: changed["entry"][old]}
+        changed["key"] = base["key"] + "_m" + dsl_hash(changed)[:10]
+        changed["origin"] = {"mutation": "condition_combination",
+                             "from": old, "to": new}
+        try:
+            variants.append(validate_strategy(changed))
+        except DSLValidationError:
+            pass
+    seen = set(); out = []
+    for variant in variants:
+        digest = dsl_hash(variant)
+        if digest not in seen:
+            seen.add(digest); out.append(variant)
+    return out[:limit]
+
+
+def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
+                 fee_rate_per_side=0.0005, slippage_rate_per_side=0.0002,
+                 half_spread_rate_per_side=0.0, impact_rate_per_side=0.0,
+                 latency_rate_per_side=0.0, funding_rate_per_8h=0.0,
+                 friction_scenario="legacy"):
+    strategy = validate_strategy(strategy)
+    direction = strategy["direction"]
+    execution_rate_per_side = (fee_rate_per_side + slippage_rate_per_side +
+                               half_spread_rate_per_side +
+                               impact_rate_per_side + latency_rate_per_side)
+    round_cost = 2.0 * execution_rate_per_side * leverage
+    hours_per_bar = {"5m": 1.0/12.0, "15m": 0.25, "1h": 1.0}.get(
+        strategy.get("timeframe"), 1.0)
+    trades = []; position = None; capital = 1.0
+    start = max(250, MAX_LOOKBACK + 2)
+    for index in range(start, len(frame)):
+        if position is None:
+            # The complete definition was validated once above. Revalidating
+            # the same boolean tree on every bar dominates 5m research CPU.
+            entered, details = evaluate_expression(
+                frame, index, strategy["entry"], explain=True
+            )
+            if entered:
+                px = float(frame["close"].iloc[index])
+                position = {
+                    "index": index,
+                    "price": px,
+                    "conditions": details,
+                    "peak_high": float(frame["high"].iloc[index]),
+                    "peak_low": float(frame["low"].iloc[index]),
+                    "mae_price_pct": 0.0,
+                }
+            continue
+        entry_price = position["price"]
+        low = float(frame["low"].iloc[index]); high = float(frame["high"].iloc[index])
+        # Track MFE/MAE peaks for trailing exits + fitness MAE demotion
+        position["peak_high"] = max(float(position.get("peak_high") or entry_price), high)
+        position["peak_low"] = min(float(position.get("peak_low") or entry_price), low)
+        if direction == "long":
+            adverse = max(0.0, (entry_price - low) / entry_price)
+        else:
+            adverse = max(0.0, (high - entry_price) / entry_price)
+        position["mae_price_pct"] = max(float(position.get("mae_price_pct") or 0.0), adverse)
+        # Protective SL chain — production 0.9% default; NEVER abolished by Phase-2
+        stop = entry_price * (1-stop_loss_pct if direction == "long" else 1+stop_loss_pct)
+        stopped = low <= stop if direction == "long" else high >= stop
+        exited, exit_details = evaluate_expression(
+            frame, index, strategy["exit"], explain=True,
+            position=position, direction=direction,
+        )
+        timed = index-position["index"] >= int(strategy["max_hold_bars"])
+        if stopped or exited or timed:
+            # Prefer structured exit_price when present on a passed exit_op leaf
+            structured_px = None
+            for row in (exit_details or []):
+                if row.get("passed") and row.get("exit_price") is not None and row.get("exit_op"):
+                    structured_px = float(row["exit_price"])
+                    break
+            exit_price = stop if stopped else (
+                structured_px if structured_px is not None
+                else float(frame["close"].iloc[index])
+            )
+            raw = ((exit_price-entry_price)/entry_price if direction == "long"
+                   else (entry_price-exit_price)/entry_price)
+            holding_hours = max(0, index-position["index"])*hours_per_bar
+            funding_cost = (holding_hours/8.0)*funding_rate_per_8h*leverage
+            net = raw*leverage-round_cost-funding_cost
+            capital *= max(0.0, 1.0+net)
+            passed_roles = set(
+                row.get("role") for row in (exit_details or [])
+                if row.get("passed") and row.get("role")
+            )
+            passed_ops = set(
+                row.get("exit_op") for row in (exit_details or [])
+                if row.get("passed") and row.get("exit_op")
+            )
+            if stopped:
+                exit_type = "止损"
+            elif timed:
+                exit_type = "定时强制平仓"
+            elif "atr_trailing" in passed_ops:
+                exit_type = "ATR动态追踪退出"
+            elif "swing_extreme" in passed_ops:
+                exit_type = "Swing极值退出"
+            elif "invalidation" in passed_roles:
+                exit_type = "策略失效退出"
+            elif "take_profit" in passed_roles:
+                exit_type = "策略止盈"
+            else:
+                # Legacy/experimental DSLs without an explicit semantic role
+                # are deliberately not reported as take-profit events.
+                exit_type = "策略规则退出"
+            trades.append({"entry_index": position["index"], "exit_index": index,
+                           "entry_time": str(frame.index[position["index"]]),
+                           "exit_time": str(frame.index[index]), "pnl_ratio": net,
+                           "transaction_cost_ratio": round_cost+funding_cost,
+                           "friction_scenario": friction_scenario,
+                           "profit": net > 0, "stop_loss": stopped,
+                           "exit_type": exit_type,
+                           "leverage": int(leverage),
+                           "mae_price_pct": float(position.get("mae_price_pct") or 0.0),
+                           "entry_conditions": position["conditions"],
+                           "exit_conditions": exit_details})
+            position = None
+    wins = sum(1 for row in trades if row["profit"])
+    return {"strategy_key": strategy["key"], "total_trades": len(trades),
+            "win_rate_percent": wins/float(len(trades))*100.0 if trades else 0.0,
+            "total_return_percent": (capital-1.0)*100.0, "trades": trades,
+            "dsl_hash": dsl_hash(strategy), "dsl_schema": SCHEMA,
+            "stop_loss_pct": float(stop_loss_pct),
+            "structured_exits_enabled": True}

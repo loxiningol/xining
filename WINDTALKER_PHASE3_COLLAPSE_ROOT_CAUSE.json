@@ -1,0 +1,37 @@
+{
+  "schema": "WINDTALKER_PHASE3_COLLAPSE_ROOT_CAUSE",
+  "generated_at": "2026-07-28 18:02:01",
+  "primary_collapse_layer": "codex_implement_from_spec",
+  "path": "/root/dual_engine_workflow_v2/pipeline_step_a.py::codex_implement_from_spec",
+  "mechanism": "Distinct mechanism_family labels are mapped onto a small set of OHLC+vol_z20/atr14/prev_high20/prev_low20 entry leaf templates. Advanced stories (absorption, cascade, cross-asset, funding) become keyword branches that still only emit OHLC microstructure proxies.",
+  "secondary_layers": [
+    {
+      "layer": "production_DSL_FEATURES_allowlist",
+      "path": "/root/auto_trade/auto_trade_strategy_dsl.py::FEATURES",
+      "effect": "OI/funding/taker/cross-asset cannot appear as entry features; funding only in friction"
+    },
+    {
+      "layer": "structural_fidelity_only",
+      "path": "dual_engine/workflow_v2/fidelity_diffs",
+      "effect": "fidelity_pass via structural proxies; does not detect causal/data collapse"
+    },
+    {
+      "layer": "shared_cost_floor_attractor",
+      "evidence": "Phase2 NEAR_IDENTICAL_COST_FLOOR cluster; Gate3=0",
+      "effect": "template-similar strategies converge to similar negative quality"
+    }
+  ],
+  "not_primary": [
+    "copy-paste identical PnL bug (Phase2: returns not bit-identical)",
+    "Gate3 standard too high as sole cause (templates fail earlier differentiation)"
+  ],
+  "phase1_true_L1_after_collapse": 4,
+  "phase1_claimed_families": 8,
+  "high_semantic_loss_ids": [
+    "mech_p2_a_cascade_trap_proxy_xrp_15m",
+    "mech_p2_e_absorption_climax_reclaim_btc_15m",
+    "mech_p2_e_absorption_climax_reclaim_btc_5m",
+    "mech_p2_e_vacuum_fill_impulse_ng_5m"
+  ],
+  "localization_summary": "Collapse is localized at Codex implementer + DSL allowlist, not at Gate math. Unlock requires research data wiring + expressiveness + causal fidelity — not more formal OHLC candidates."
+}

@@ -1,0 +1,138 @@
+{
+  "schema": "WINDTALKER_PHASE5_DATA_COVERAGE_GROWTH",
+  "generated_at": "2026-07-28 14:56:03",
+  "record": {
+    "OI": {
+      "previous_phase4_wf": 3,
+      "current_wf_windows_data_sufficient": 3,
+      "wf_windows_required": 10,
+      "promotion_ready": false,
+      "promotion_readiness_reached": false,
+      "delta_windows": 0,
+      "per_fold": [
+        {
+          "fold": 0,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 1,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 2,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 3,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 4,
+          "non_missing_rate": 0.3714,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "non_missing_rate": 0.3857,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 7,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 8,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 9,
+          "non_missing_rate": 0.7071,
+          "data_sufficient": true
+        }
+      ],
+      "formal_candidates_this_phase": 0,
+      "note": "coverage growth record only — NO formal candidates in Phase5"
+    },
+    "Taker_flow": {
+      "previous_phase4_wf": 4,
+      "current_wf_windows_data_sufficient": 4,
+      "wf_windows_required": 10,
+      "promotion_ready": false,
+      "promotion_readiness_reached": false,
+      "delta_windows": 0,
+      "per_fold": [
+        {
+          "fold": 0,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 1,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 2,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 3,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 4,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 5,
+          "non_missing_rate": 0.1071,
+          "data_sufficient": false
+        },
+        {
+          "fold": 6,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        }
+      ],
+      "formal_candidates_this_phase": 0,
+      "note": "coverage growth record only — NO formal candidates in Phase5"
+    },
+    "Funding_Basis": {
+      "status": "BLOCKED",
+      "reason": "Phase3 causal fidelity FAIL — must not enter formal batch",
+      "formal_candidates_this_phase": 0
+    }
+  },
+  "formal_candidates_from_OI": 0,
+  "formal_candidates_from_Taker": 0,
+  "formal_candidates_from_Funding_Basis": 0
+}
