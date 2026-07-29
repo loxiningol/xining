@@ -1,0 +1,29 @@
+{
+  "pack_path": "strategy_session_liq_engulf_matrix_v1b.json",
+  "symbol": "ETH-USDT-SWAP",
+  "timeframe": "15m",
+  "direction": "long",
+  "tag": "auto_driver_session_liq",
+  "max_iterations": 10,
+  "l1_seed_retries": 6,
+  "ai_providers": ["deepseek", "qwen", "glm"],
+  "prefer_provider": "glm",
+  "ai_max_tokens": 2800,
+  "convergence_eps": 0.02,
+  "convergence_patience": 3,
+  "stagnant_reason_patience": 4,
+  "max_kb_family_bumps": 3,
+  "auto_bump_family_after_gate2": true,
+  "report_name": "delivery_report.md",
+  "report_copy_to": "delivery_report.md",
+  "workdir": null,
+  "vector_root": null,
+  "dry_run": false,
+  "dry_run_skip_ai": false,
+  "skip_pipeline": false,
+  "notes": [
+    "Copy this file to auto_driver_config.json and edit pack_path/symbol.",
+    "Requires /root/auto_trade/ai_ecosystem.env keys + ai_research_consent.json.",
+    "Driver is a wrapper only — it never mounts or human-confirms."
+  ]
+}
