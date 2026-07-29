@@ -73,6 +73,31 @@ def set_by_path(obj, path, value):
     return obj
 
 
+def filter_patches_for_reason(patches, pipeline_reason):
+    """Drop entry mutations after L1-pass Gate2 fails (preserve sparse edge sample)."""
+    reason = str(pipeline_reason or "")
+    gate2ish = reason in (
+        "repair_exhausted_or_drift",
+        "gate2_3_fail",
+        "gate2_fail",
+        "gate2_base_backtest_fail",
+    )
+    if not gate2ish:
+        return list(patches or [])
+    out = []
+    dropped = []
+    for p in patches or []:
+        if not isinstance(p, dict):
+            continue
+        op = str(p.get("op") or "").lower()
+        path = str(p.get("path") or "").lower()
+        if op == "replace_entry" or ".entry." in path or path.startswith("dsl.entry"):
+            dropped.append(p)
+            continue
+        out.append(p)
+    return out
+
+
 def sanitize_patches(patches):
     """Clamp known DSL hard bounds so AI patches do not bounce on validate.
 
@@ -156,6 +181,8 @@ def apply_patches(pack, patches, direction="long"):
     applied = []
     errors = []
     patches = sanitize_patches(patches)
+    # Snapshot scale-out exits before mutation so AI cannot strip them.
+    scaleout_locked = _pack_requires_scaleout(pack)
     for i, patch in enumerate(patches or []):
         if not isinstance(patch, dict):
             errors.append({"i": i, "error": "patch_not_object"})
@@ -201,6 +228,10 @@ def apply_patches(pack, patches, direction="long"):
                 exit_ = patch.get("exit")
                 if not isinstance(exit_, dict):
                     raise ValueError("replace_exit requires exit object")
+                if scaleout_locked and not _exit_has_partial_tp_atr(exit_):
+                    raise ValueError(
+                        "replace_exit rejected: must_keep_partial_tp_atr_scaleout"
+                    )
                 cur = _read_active_dsl(out, direction) or {}
                 cur = deep_copy_pack(cur)
                 cur["exit"] = exit_
@@ -248,7 +279,52 @@ def apply_patches(pack, patches, direction="long"):
             out["dsl_short"] = deep_copy_pack(active)
         else:
             out["dsl_long"] = deep_copy_pack(active)
+    # Final guard: restore partial_tp_atr if scale-out was stripped by set_path etc.
+    if scaleout_locked:
+        out = _ensure_scaleout_exit(out, direction, pack)
     return out, applied, errors
+
+
+def _exit_has_partial_tp_atr(exit_):
+    if not isinstance(exit_, dict):
+        return False
+    for item in (exit_.get("any") or []):
+        if isinstance(item, dict) and str(item.get("exit_op") or "") == "partial_tp_atr":
+            return True
+    return False
+
+
+def _pack_requires_scaleout(pack):
+    spec = (pack or {}).get("mechanism_spec") or {}
+    nn = [str(x) for x in (spec.get("non_negotiable_rules") or [])]
+    forbid = [str(x) for x in (spec.get("forbidden_transformations") or [])]
+    if any("partial_tp_atr" in x or "scaleout" in x.lower() for x in nn + forbid):
+        return True
+    # Also lock if seed DSL already has partial_tp_atr (scale-out baseline packs).
+    for key in ("dsl", "dsl_long", "dsl_short"):
+        dsl = (pack or {}).get(key) or {}
+        if _exit_has_partial_tp_atr(dsl.get("exit")):
+            return True
+    return False
+
+
+def _ensure_scaleout_exit(out, direction, seed_pack):
+    """If active exit lost partial_tp_atr, restore from seed pack."""
+    cur = _read_active_dsl(out, direction) or {}
+    if _exit_has_partial_tp_atr(cur.get("exit")):
+        return out
+    seed_dsl = None
+    if str(direction).lower() == "short":
+        seed_dsl = (seed_pack or {}).get("dsl_short") or (seed_pack or {}).get("dsl")
+    else:
+        seed_dsl = (seed_pack or {}).get("dsl_long") or (seed_pack or {}).get("dsl")
+    seed_exit = (seed_dsl or {}).get("exit") if isinstance(seed_dsl, dict) else None
+    if not _exit_has_partial_tp_atr(seed_exit):
+        return out
+    cur = deep_copy_pack(cur)
+    cur["exit"] = deep_copy_pack(seed_exit)
+    _write_active_dsl(out, direction, cur)
+    return out
 
 
 def _read_active_dsl(pack, direction):

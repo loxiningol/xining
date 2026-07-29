@@ -25,6 +25,10 @@ SYSTEM_PROMPT = """你是量化策略无人值守优化器（只输出 JSON，�
    禁止改 entry 过滤导致 filled_entries 下降；只改 exit / max_hold / family rename / suitable_symbols。
    典型 Gate2 指纹 pay≈2.48、w5≈0.89、lottery → 优先 partial_tp_atr 减仓 + 剩余 atr_trailing≤5.0，
    以及多个近似等额小亏（清 w5）+ 多个同量级赢单（清 lottery），不要为了 w5 去砍掉稀疏 edge 样本。
+10. 若 seed/optimize_goals 含 scale-out：禁止移除 partial_tp_atr；必须保留
+    partial_tp_atr（约 0.5@2.0ATR）+ atr_trailing 剩余仓；禁止把 exit 改回纯单笔 trail。
+11. 评测已启用 multi_symbol_matrix：L1 filled_entries 按 suitable_symbols 矩阵汇总；
+    勿以「单标的 ETH 样本不足」作为 LIMIT_REACHED 理由。
 
 优先结构补丁（若 optimize_goals 提到）：
 - scale-out：exit 使用 partial_tp_atr（n_atr≈2.0–2.5, partial_tp_ratio≈0.5, atr_period=14）

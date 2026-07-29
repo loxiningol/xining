@@ -34,9 +34,12 @@ def main(argv=None):
     default_root = "/root" if Path("/root/dual_engine_workflow_v2").exists() else str(workspace)
     vector_root = Path(os.environ.get("VECTOR_ROOT") or default_root)
 
-    sys.path.insert(0, str(scripts_dir))
-    sys.path.insert(0, str(workspace))
+    # Prefer the auto_driver package shipped next to this script. VECTOR_ROOT
+    # (/root) often also has a stale /root/auto_driver/ copy that would otherwise
+    # shadow scripts/auto_driver after insert(0, vector_root).
     sys.path.insert(0, str(vector_root))
+    sys.path.insert(0, str(workspace))
+    sys.path.insert(0, str(scripts_dir))
 
     from auto_driver.driver import run_driver
 

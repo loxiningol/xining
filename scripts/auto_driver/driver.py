@@ -44,7 +44,8 @@ def _select_dsl(pack, direction):
     return pack.get("dsl_long") or pack.get("dsl")
 
 
-def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1):
+def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1,
+                    enable_multi_symbol_matrix=True):
     """Call existing STEP A pipeline with prebuilt pack. Never mounts / confirms."""
     import auto_trade_strategy_dsl as dsl_mod
     import auto_trade_human_confirm_pipeline as pipe
@@ -56,6 +57,13 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1):
     dsl["supported_instruments"] = [symbol]
     dsl["timeframe"] = timeframe
     dsl_mod.validate_strategy(dsl)
+
+    matrix_n = len((spec or {}).get("suitable_symbols") or [])
+    print(
+        "[auto_driver] pipeline enable_multi_symbol_matrix=%s suitable_symbols=%d primary=%s"
+        % (bool(enable_multi_symbol_matrix), matrix_n, symbol),
+        flush=True,
+    )
 
     t0 = time.time()
     result = run_creation_pipeline_step_a(
@@ -75,12 +83,18 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1):
                 "direction": direction,
                 "title": spec.get("mechanism_name"),
                 "source": "auto_driver_wrapper",
+                "matrix_generalization": list(
+                    (pack.get("meta") or {}).get("matrix_generalization")
+                    or (spec or {}).get("suitable_symbols")
+                    or []
+                ),
             },
             "errors": [],
             "call_id": "auto_driver_%s_%s_%d" % (direction, int(time.time()), try_idx),
             "attempts": 0,
         },
         windtalker_tag="%s_ad_try%d" % (tag, try_idx),
+        enable_multi_symbol_matrix=bool(enable_multi_symbol_matrix),
     )
     elapsed = round(time.time() - t0, 2)
     return result, elapsed
@@ -93,11 +107,18 @@ def _l1_seed_retries(pack, cfg, workdir, iteration):
     timeframe = cfg["timeframe"]
     direction = cfg["direction"]
     tag = cfg.get("tag") or "auto_driver"
+    # Always enable matrix for auto-driver eval (config may only turn it off explicitly).
+    enable_matrix = cfg.get("enable_multi_symbol_matrix", True)
+    if enable_matrix is None:
+        enable_matrix = True
     last = None
     for seed in range(1, max_seeds + 1):
         print("[auto_driver] iter=%d L1-seed %d/%d" % (iteration, seed, max_seeds), flush=True)
         try:
-            result, elapsed = run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=seed)
+            result, elapsed = run_once_step_a(
+                pack, symbol, timeframe, direction, tag, try_idx=seed,
+                enable_multi_symbol_matrix=bool(enable_matrix),
+            )
         except Exception as exc:
             result = {
                 "ok": False,
@@ -108,6 +129,7 @@ def _l1_seed_retries(pack, cfg, workdir, iteration):
             elapsed = 0.0
         _dump_json(workdir / ("iter_%02d_seed_%02d_result.json" % (iteration, seed)), {
             "elapsed": elapsed,
+            "enable_multi_symbol_matrix": bool(enable_matrix),
             "result": result,
         })
         last = result
@@ -307,30 +329,42 @@ def run_driver(cfg):
 
         # PATCH
         if ai_decision == "PATCH":
-            # sanitize DSL hard bounds then apply; rollback on total failure
-            patches = patch_apply.sanitize_patches(merged.get("patches") or [])
-            new_pack, applied, apply_errors = patch_apply.apply_patches(
-                pack, patches, direction=cfg["direction"],
+            # Gate2-after-L1: drop entry mutations; then clamp DSL hard bounds.
+            patches = patch_apply.filter_patches_for_reason(
+                merged.get("patches") or [], reason,
             )
-            _dump_json(iter_dir / "patches.applied.json", {"applied": applied, "errors": apply_errors})
-            if apply_errors and not applied:
-                print("[auto_driver] all patches failed; rollback", flush=True)
-                pack = patch_apply.restore_pack(snap)
+            patches = patch_apply.sanitize_patches(patches)
+            applied = []
+            apply_errors = []
+            if not patches:
+                print("[auto_driver] no usable patches after Gate2 entry-filter/sanitize; skip apply", flush=True)
+                apply_errors = [{"error": "no_usable_patches_after_filter"}]
+                _dump_json(iter_dir / "patches.applied.json", {
+                    "applied": [], "errors": apply_errors, "filtered": True,
+                })
             else:
-                # DSL validate; rollback if invalid
-                try:
-                    import auto_trade_strategy_dsl as dsl_mod
-                    dsl = _select_dsl(new_pack, cfg["direction"])
-                    dsl = dict(dsl or {})
-                    dsl["supported_instruments"] = [cfg["symbol"]]
-                    dsl["timeframe"] = cfg["timeframe"]
-                    dsl_mod.validate_strategy(dsl)
-                    pack = new_pack
-                except Exception as exc:
-                    print("[auto_driver] DSL validate failed after patch: %s; rollback" % exc, flush=True)
+                new_pack, applied, apply_errors = patch_apply.apply_patches(
+                    pack, patches, direction=cfg["direction"],
+                )
+                _dump_json(iter_dir / "patches.applied.json", {"applied": applied, "errors": apply_errors})
+                if apply_errors and not applied:
+                    print("[auto_driver] all patches failed; rollback", flush=True)
                     pack = patch_apply.restore_pack(snap)
-                    apply_errors.append({"error": "dsl_validate_failed", "detail": str(exc)})
-                    applied = []
+                else:
+                    # DSL validate; rollback if invalid
+                    try:
+                        import auto_trade_strategy_dsl as dsl_mod
+                        dsl = _select_dsl(new_pack, cfg["direction"])
+                        dsl = dict(dsl or {})
+                        dsl["supported_instruments"] = [cfg["symbol"]]
+                        dsl["timeframe"] = cfg["timeframe"]
+                        dsl_mod.validate_strategy(dsl)
+                        pack = new_pack
+                    except Exception as exc:
+                        print("[auto_driver] DSL validate failed after patch: %s; rollback" % exc, flush=True)
+                        pack = patch_apply.restore_pack(snap)
+                        apply_errors.append({"error": "dsl_validate_failed", "detail": str(exc)})
+                        applied = []
         else:
             print("[auto_driver] unexpected ai_decision=%s" % ai_decision, flush=True)
 

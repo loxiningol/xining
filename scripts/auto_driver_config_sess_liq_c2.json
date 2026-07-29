@@ -1,9 +1,9 @@
 {
-  "pack_path": "/root/strategy_session_liq_engulf_matrix_ad1_seed.json",
+  "pack_path": "/root/strategy_session_liq_engulf_matrix_ad3_seed.json",
   "symbol": "ETH-USDT-SWAP",
   "timeframe": "15m",
   "direction": "long",
-  "tag": "auto_driver_sess_liq_c2",
+  "tag": "auto_driver_sess_liq_c2_ad3",
   "max_iterations": 8,
   "l1_seed_retries": 10,
   "ai_providers": ["deepseek", "qwen", "glm"],
@@ -16,7 +16,7 @@
   "auto_bump_family_after_gate2": true,
   "report_name": "delivery_report.md",
   "report_copy_to": "/root/delivery_report.md",
-  "workdir": "/root/auto_trade/dual_engine/workflow_v2/auto_driver_runs/sess_liq_c2_20260730",
+  "workdir": "/root/auto_trade/dual_engine/workflow_v2/auto_driver_runs/sess_liq_c2_ad3_20260730",
   "vector_root": "/root",
   "dry_run": false,
   "optimize_goals": [
@@ -29,7 +29,7 @@
   ],
   "notes": [
     "Campaign2 after c1 AI_LIMIT_REACHED: sanitize n_atr + preserve L1-passing entry.",
-    "Seed = session_liq ad1 (same as wsa_20260730_042507_1cd7 Gate2 fail fingerprint).",
+    "Seed = session_liq ad3 (ad1/ad2 already KB-blocked from c1).",
     "Do NOT --confirm, do NOT auto-mount, do NOT lower Gate2 floors."
   ]
 }
