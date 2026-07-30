@@ -1,0 +1,12 @@
+[Unit]
+Description=Collect Qiyu market, signal, trade and lifecycle experience every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=20s
+Persistent=true
+Unit=qiyu-strategy-experience.service
+
+[Install]
+WantedBy=timers.target
