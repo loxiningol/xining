@@ -31,7 +31,7 @@ _TAG_ZH = {
 }
 
 
-def _fmt(x, digits=2, na="N/A"):
+def _fmt(x, digits=2, na="暂无"):
     try:
         if x is None:
             return na
@@ -40,7 +40,7 @@ def _fmt(x, digits=2, na="N/A"):
         return na
 
 
-def _pct(x, digits=2, na="N/A"):
+def _pct(x, digits=2, na="暂无"):
     try:
         if x is None:
             return na
@@ -330,8 +330,8 @@ def build_diagnostic(ctx=None, result=None, pack=None, title_zh=None,
                 fatal["n"] if fatal["n"] is not None else "—",
                 _fmt(fatal["payoff"]),
                 _fmt(fatal["expectancy"]),
-                _fmt(fatal["calmar"]) if stage == "gate2" else "N/A",
-                _fmt(fatal["w5"]) if stage == "gate2" else "N/A",
+                _fmt(fatal["calmar"]) if stage == "gate2" else "暂无",
+                _fmt(fatal["w5"]) if stage == "gate2" else "暂无",
             )
         )
         reject_lines = []

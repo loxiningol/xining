@@ -24,8 +24,8 @@ SYSTEM_PROMPT = _charter.prompt_prefix() + """
 6. 若判定在当前数据与规则下已无优化空间，decision 必须为 LIMIT_REACHED。
 7. DSL 硬边界（越界会被校验拒绝）：atr_trailing.n_atr ∈ [2.5, 5.0]；
    partial_tp_atr.n_atr ∈ [2.0, 5.0]；swing lookback ∈ [5, 60]；stop_pct ≤ 0.009。
-8. vol_z20 下限以机制包为准：asia_sweep_fade* 允许 ≥1.5；session_liq_engulf* 保持 ≥1.8。
-   不得把阈值降到该机制包声明下限以下。
+8. vol_z20 阈值以机制包为准：macro_sfp_unblocked* 允许 >=0.8；asia_sweep_fade* 允许 >=1.5；
+   session_liq_engulf* 保持 >=1.8。不得把阈值降到该机制包声明下限以下。
 9. 若本轮已 L1 PASS 且失败在 Gate2（repair_exhausted_or_drift / gate2_*）：
    禁止改 entry 过滤导致 filled_entries 下降；只改 exit / max_hold / family rename / suitable_symbols。
    典型 Gate2 指纹 pay≈2.48、w5≈0.89、lottery → 优先 partial_tp_atr 减仓 + 剩余 atr_trailing≤5.0，

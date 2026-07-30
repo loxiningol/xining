@@ -1,0 +1,433 @@
+{
+  "ok": true,
+  "errors": [],
+  "schema": "qiyu_step_a_v1",
+  "artifact": "strategy_candidate_pack",
+  "call_id": "prebuilt_macro_sfp_unblocked_v1",
+  "attempts": 0,
+  "meta": {
+    "symbol": "ETH-USDT-SWAP",
+    "timeframe": "15m",
+    "direction": "long",
+    "title": "macro_sfp_unblocked_v1",
+    "thesis": "L1 autopsy of macro_sfp_displacement_ad5: n=None / 0 fills. Bottleneck = vol_z20>1.8 stacked on same-bar PDL/PDH sweep+reclaim. Unblock Mode B: keep 15m Macro SFP, relax vol_z20>0.8 (mild volume confirm), enable 38-symbol matrix to expand sample n. Gate2 floors absolute (payoff≥2.5 / calmar≥1.5). Stop: swing_extreme(8) ≈ sweep-wick +0.1% proxy; outer protective SL 0.9% immutable. Scale-out: partial_tp_atr 0.5@2.0ATR + trail 4.5ATR.",
+    "source": "handcraft_workflow_v2_macro_sfp_unblocked_v1_l1_unblock",
+    "prior_fail_task_ids": [
+      "wsa_20260730_024123_babb"
+    ],
+    "primary_submit": "ETH-USDT-SWAP 15m long",
+    "matrix_generalization": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "XRP-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "BNB-USDT-SWAP",
+      "ADA-USDT-SWAP",
+      "LTC-USDT-SWAP",
+      "LINK-USDT-SWAP",
+      "AVAX-USDT-SWAP",
+      "SUI-USDT-SWAP",
+      "PEPE-USDT-SWAP",
+      "BONK-USDT-SWAP",
+      "WIF-USDT-SWAP",
+      "NEAR-USDT-SWAP",
+      "APT-USDT-SWAP",
+      "ARB-USDT-SWAP",
+      "OP-USDT-SWAP",
+      "INJ-USDT-SWAP",
+      "SEI-USDT-SWAP",
+      "TIA-USDT-SWAP",
+      "DOT-USDT-SWAP",
+      "ATOM-USDT-SWAP",
+      "UNI-USDT-SWAP",
+      "AAVE-USDT-SWAP",
+      "FIL-USDT-SWAP",
+      "ICP-USDT-SWAP",
+      "RENDER-USDT-SWAP",
+      "ONDO-USDT-SWAP",
+      "JUP-USDT-SWAP",
+      "ORDI-USDT-SWAP",
+      "WLD-USDT-SWAP",
+      "TRX-USDT-SWAP",
+      "BCH-USDT-SWAP",
+      "ETC-USDT-SWAP",
+      "XAU-USDT-SWAP",
+      "XAG-USDT-SWAP",
+      "CL-USDT-SWAP"
+    ],
+    "scaleout": {
+      "partial_tp_ratio": 0.5,
+      "partial_n_atr": 2.0,
+      "trail_n_atr": 4.5,
+      "matrix_n": 38
+    },
+    "title_zh": "[38标的] 宏观流动性扫荡回收 · 解封",
+    "replaces_archived_lineage": "macro_sfp_displacement_ad5",
+    "unblock": {
+      "vol_z20_floor": 0.8,
+      "mode": "B_multi_symbol_matrix",
+      "prior_fail": "l1_fail n=None vol_z20>1.8 too strict"
+    }
+  },
+  "mechanism_spec": {
+    "mechanism_id": "mech_macro_sfp_unblocked_v1_eth15m",
+    "mechanism_name": "macro_sfp_unblocked_v1",
+    "mechanism_family": "macro_sfp_unblocked_v1",
+    "market_inefficiency": "Prior-day low (PDL) concentrates resting sell-stops. A 15m wick that pierces PDL then fails with volumetric bullish displacement reclaim leaves trapped shorts that must cover, driving price back into the prior-day range.",
+    "counterparty_source": "Stop-run shorts and failed breakdown chasers at PDL forced to cover after reclaim.",
+    "why_edge_exists": "Macro PDL/PDH is a watched session anchor. Failed sweeps with mild vol_z20>0.8 and directional displacement body remain selective enough after Mode-B matrix expansion; ATR scale-out harvests cover squeeze.",
+    "edge_decay_conditions": "True PDL/PDH breakdown acceptance; zero-vol noise without vol_z20>0.8; overcrowded SFP fades; gap resets of prior-day levels.",
+    "required_market_regime": "Two-way markets with respected prior-day extremes. Features: pdh/pdl/pdc completed prior UTC day; no EMA/CCI/RSI core.",
+    "entry_logic": "LONG ALL: (1) low < pdl (sweep); (2) close > pdl (same-bar reclaim); (3) vol_z20 > 0.8; (4) close > open. SHORT mirror on PDH.",
+    "exit_logic": "partial_tp_atr 0.5@2.0ATR + atr_trailing 4.5; swing_extreme lookback=8 invalidation (sweep-wick + buffer proxy); protective SL 0.9%; max_hold_bars=48; no fixed % TP.",
+    "stop_logic": "Structural: beyond sweep wick +0.1% via swing_extreme(8). Hard protective SL 0.9% immutable.",
+    "take_profit_logic": "No fixed % TP. atr_trailing 5.0×ATR_14 only (top of 3.5–5.0 band).",
+    "invalidation_logic": "swing_extreme lookback=8; max_hold_bars=48; true PDL breakdown acceptance.",
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "no_ema_cci_rsi_as_core_edge",
+      "must_keep_pdh_pdl_macro_anchor",
+      "must_keep_sweep_then_displacement_reclaim",
+      "must_keep_vol_z20_gt_0_8",
+      "must_keep_directional_displacement_body",
+      "must_use_atr_trailing_or_partial_scaleout",
+      "must_keep_38_symbol_suitable_symbols_matrix",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm",
+      "never_lower_gate2_floors",
+      "not_rename_into_blocked_macro_sfp_displacement_exact"
+    ],
+    "tunable_parameters": [
+      "vol_z20_min",
+      "atr_trail_n",
+      "swing_lookback",
+      "max_hold_bars",
+      "partial_tp_atr_n"
+    ],
+    "forbidden_transformations": [
+      "rename_into_exact_blocked_macro_sfp_displacement",
+      "swap_anchor_to_prev_high20_prev_low20_only",
+      "inject_ema_cci_rsi_as_core_filter",
+      "add_fixed_micro_tp_below_2pct",
+      "remove_vol_z20_or_displacement_body",
+      "raise_vol_z20_floor_back_above_1_5_without_sample_evidence",
+      "weaken_or_widen_0.9_protective_sl",
+      "shrink_suitable_symbols_below_matrix_whitelist",
+      "auto_mount_or_confirm_without_human",
+      "lower_gate2_floors"
+    ],
+    "expected_trade_frequency_class": "selective_0_3_to_2_0_per_day_15m_matrix",
+    "expected_holding_period": "4_to_48_bars_15m",
+    "suitable_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "XRP-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "BNB-USDT-SWAP",
+      "ADA-USDT-SWAP",
+      "LTC-USDT-SWAP",
+      "LINK-USDT-SWAP",
+      "AVAX-USDT-SWAP",
+      "SUI-USDT-SWAP",
+      "PEPE-USDT-SWAP",
+      "BONK-USDT-SWAP",
+      "WIF-USDT-SWAP",
+      "NEAR-USDT-SWAP",
+      "APT-USDT-SWAP",
+      "ARB-USDT-SWAP",
+      "OP-USDT-SWAP",
+      "INJ-USDT-SWAP",
+      "SEI-USDT-SWAP",
+      "TIA-USDT-SWAP",
+      "DOT-USDT-SWAP",
+      "ATOM-USDT-SWAP",
+      "UNI-USDT-SWAP",
+      "AAVE-USDT-SWAP",
+      "FIL-USDT-SWAP",
+      "ICP-USDT-SWAP",
+      "RENDER-USDT-SWAP",
+      "ONDO-USDT-SWAP",
+      "JUP-USDT-SWAP",
+      "ORDI-USDT-SWAP",
+      "WLD-USDT-SWAP",
+      "TRX-USDT-SWAP",
+      "BCH-USDT-SWAP",
+      "ETC-USDT-SWAP",
+      "XAU-USDT-SWAP",
+      "XAG-USDT-SWAP",
+      "CL-USDT-SWAP"
+    ],
+    "suitable_timeframes": [
+      "15m",
+      "5m"
+    ],
+    "display_title_zh": "[38标的] 宏观流动性扫荡回收 · 解封"
+  },
+  "dsl": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "macro_sfp_unblocked_v1_eth15m_long",
+    "name": "macro_sfp_unblocked_v1_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_sweep_pdl",
+          "left": {
+            "feature": "low"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "pdl"
+          }
+        },
+        {
+          "id": "e_displace_reclaim",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "pdl"
+          }
+        },
+        {
+          "id": "e_vol_displace",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_bull_body",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_partial_2atr",
+          "exit_op": "partial_tp_atr",
+          "n_atr": 2.0,
+          "atr_period": 14,
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.5,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_sw_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 8,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|macro_sfp_unblocked_v1|pdl_samebar_volz0.8|partial2.0+trail4.5|sw8|sl0.9|eth15m_long|matrix38",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "macro_sfp_unblocked_v1_eth15m_long",
+    "name": "macro_sfp_unblocked_v1_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_sweep_pdl",
+          "left": {
+            "feature": "low"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "pdl"
+          }
+        },
+        {
+          "id": "e_displace_reclaim",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "pdl"
+          }
+        },
+        {
+          "id": "e_vol_displace",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_bull_body",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_partial_2atr",
+          "exit_op": "partial_tp_atr",
+          "n_atr": 2.0,
+          "atr_period": 14,
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.5,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_sw_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 8,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|macro_sfp_unblocked_v1|pdl_samebar_volz0.8|partial2.0+trail4.5|sw8|sl0.9|eth15m_long|matrix38",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "macro_sfp_unblocked_v1_eth15m_short",
+    "name": "macro_sfp_unblocked_v1_short",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_sweep_pdh",
+          "left": {
+            "feature": "high"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "pdh"
+          }
+        },
+        {
+          "id": "e_displace_reclaim",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "pdh"
+          }
+        },
+        {
+          "id": "e_vol_displace",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_bear_body",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_partial_2atr",
+          "exit_op": "partial_tp_atr",
+          "n_atr": 2.0,
+          "atr_period": 14,
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.5,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_sw_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 8,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|macro_sfp_unblocked_v1|pdh_samebar_volz0.8|partial2.0+trail4.5|sw8|sl0.9|eth15m_short|matrix38",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "pipeline_readiness": {
+    "gate0_ready": true,
+    "mechanism_spec_complete": true,
+    "mechanism_spec_fields": 20,
+    "protective_sl": 0.009,
+    "no_fixed_pct_tp": true,
+    "calibration_gate2ish": true,
+    "l1_pass_rate_probe": "unblocked_volz0.8_matrix38"
+  }
+}

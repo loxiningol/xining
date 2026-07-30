@@ -946,6 +946,8 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     Object.keys(map).forEach(function(k){
       if(s.indexOf(k)>=0) s=s.split(k).join(map[k]);
     });
+    // Protect N/A before slash→semicolon (otherwise N/A becomes N；A).
+    s=s.replace(/\bN\/A\b/gi,'暂无');
     s=s.replace(/\s*\/\s*/g,'；');
     return s;
   }

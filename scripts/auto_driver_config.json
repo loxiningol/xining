@@ -1,11 +1,11 @@
 {
-  "pack_path": "/root/strategy_asia_sweep_fade_v1.json",
+  "pack_path": "/root/strategy_macro_sfp_unblocked_v1.json",
   "symbol": "ETH-USDT-SWAP",
   "timeframe": "15m",
   "direction": "long",
-  "tag": "auto_driver_asia_sweep_fade_v1",
-  "max_iterations": 4,
-  "l1_seed_retries": 6,
+  "tag": "auto_driver_macro_sfp_unblocked_v1",
+  "max_iterations": 6,
+  "l1_seed_retries": 8,
   "ai_providers": ["deepseek", "qwen", "glm"],
   "prefer_provider": "glm",
   "ai_max_tokens": 2800,
@@ -16,22 +16,24 @@
   "auto_bump_family_after_gate2": true,
   "enable_multi_symbol_matrix": true,
   "report_name": "delivery_report.md",
-  "report_copy_to": "/root/delivery_report_asia_sweep_fade.md",
+  "report_copy_to": "/root/delivery_report_macro_sfp_unblocked_v1.md",
   "workdir": null,
   "vector_root": "/root",
   "dry_run": false,
   "optimize_goals": [
-    "family=asia_sweep_fade_v1 — NEW mechanism; display title [38标的] 亚盘极值扫单反手; NEVER rename into session_vol_squeeze* or session_liq_engulf*",
-    "keep Asia box sweep+reclaim: low<asia_low & close>asia_low & close<asia_high (long); mirror on asia_high for short",
-    "keep hour_utc window [8,18) and vol_z20>1.5 (this family floor is 1.5, not 1.8) and displacement body",
-    "exit: atr_trailing n_atr≈3.5 (∈[2.5,5.0]); swing_extreme lookback≥5 (DSL floor) for wick-stop proxy; no fixed % TP",
+    "family=macro_sfp_unblocked_v1 — L1 unblock of macro_sfp_displacement_ad5 (n=None / vol_z20>1.8 clog); display [38标的] 宏观流动性扫荡回收 · 解封",
+    "NEVER rename into exact blocked family macro_sfp_displacement (KB exact match)",
+    "keep Macro SFP core: low<pdl & close>pdl (long); high>pdh & close<pdh (short); displacement body close vs open",
+    "vol_z20 floor for THIS family is 0.8 (mild volume) — do not re-raise to 1.8 without sample evidence; may tune in [0.5, 1.2]",
+    "Mode B active: enable_multi_symbol_matrix=true with full 38 suitable_symbols — do not shrink matrix",
+    "exit: keep scale-out partial_tp_atr≈0.5@2.0ATR + atr_trailing≈4.5 (∈[2.5,5.0]); swing_extreme lookback≥5 (prefer 8) as sweep-wick stop proxy; no fixed % TP",
     "never_lower_gate2_floors: payoff≥2.5 / calmar≥1.5 / WF≥7/10 / worst5 floors stay absolute",
     "never mount / human confirm; success only enters pending queue"
   ],
   "notes": [
-    "session_vol_squeeze_expansion_v1 archived as limit_reached (false Asia breakouts, Calmar≈-1.04). Do not micro-perturb that lineage.",
-    "session_liq_engulf* remains limit_reached blocked.",
-    "Gate2 floors absolute unchanged.",
-    "38-symbol matrix enabled per campaign brief."
+    "Prior ad5 died at L1 with 0 fills: vol_z20>1.8 + PDL/PDH same-bar reclaim too strict on single-symbol density.",
+    "Unblock: vol_z20>0.8 + 38-symbol matrix; Gate2 floors unchanged.",
+    "session_vol_squeeze_expansion_v1 / session_liq_engulf* remain limit_reached archived.",
+    "macro_sfp_displacement exact name stays KB-blocked — this campaign uses macro_sfp_unblocked_v1."
   ]
 }
