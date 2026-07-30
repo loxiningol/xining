@@ -365,6 +365,27 @@ def run_driver(cfg):
             reason, ctx.get("composite_score") or 0, metrics.total_gap(ctx.get("metric_gaps")),
         ), flush=True)
 
+        # Clean pack but L0 too rare: do NOT loosen entry to decorate density.
+        if reason == "funnel_l0_fail":
+            pq = (result or {}).get("pretest_quality") or ctx.get("pretest_quality") or {}
+            if str(pq.get("quality") or "") == "ok" or pq.get("pass"):
+                state["ai_limit_reached"] = True
+                state["stop_code"] = "L0_SPARSE_CLEAN_PACK"
+                state["ai_limit_reason"] = (
+                    "L0 density sparse on pretest-clean pack; refuse entry loosening / shit-decorate"
+                )
+                state["iterations"].append(_iter_record(
+                    iteration, result, ctx, elapsed,
+                    ai_decision="LIMIT_REACHED", applied=[],
+                    ai_rationale=state["ai_limit_reason"],
+                    limit_reason=state["ai_limit_reason"],
+                ))
+                _dump_json(iter_dir / "pack.after.json", pack)
+                _pub(cfg, state, pack, phase="l0_sparse_limit", result=result,
+                     message=state["ai_limit_reason"])
+                print("[auto_driver] L0 sparse on CLEAN pack → LIMIT (no decorate)", flush=True)
+                break
+
         # pretest fail = SHIT_TRANSLATION → RESET only, never call additive AI
         if reason == "pretest_quality_fail":
             pq = (result or {}).get("pretest_quality") or ctx.get("pretest_quality") or {}
