@@ -397,6 +397,20 @@ def _is_completed_100(payload):
     status = str(payload.get("status_label") or diag.get("terminal_zh") or "")
     if "已归档" in status:
         return True
+    reason = str(
+        (payload.get("metrics") or {}).get("pipeline_reason")
+        or payload.get("phase")
+        or diag.get("pipeline_reason")
+        or ""
+    )
+    if reason in (
+        "funnel_l0_fail", "funnel_l0_cull", "funnel_l1_fail", "funnel_l1_cull",
+        "repair_exhausted_or_drift", "gate2_3_fail", "kb_blocked", "immutable_spec_error",
+    ):
+        return True
+    for row in payload.get("pipeline") or []:
+        if (row or {}).get("id") in ("l0", "l1", "gate2") and (row or {}).get("status") == "fail":
+            return True
     prog = payload.get("progress") or {}
     try:
         pct = float(prog.get("percent") or 0)
