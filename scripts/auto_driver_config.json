@@ -1,16 +1,12 @@
 {
-  "pack_path": "/root/strategy_rolling_4h_sweep_5m_v1.json",
+  "pack_path": "/root/strategy_ny_open_liq_fade_clean_v1.json",
   "symbol": "ETH-USDT-SWAP",
   "timeframe": "5m",
   "direction": "long",
-  "tag": "auto_driver_rolling_4h_sweep_fade_clean_v1",
+  "tag": "auto_driver_ny_open_liq_fade_clean_v1",
   "max_iterations": 6,
   "l1_seed_retries": 4,
-  "ai_providers": [
-    "deepseek",
-    "qwen",
-    "glm"
-  ],
+  "ai_providers": ["deepseek", "qwen", "glm"],
   "prefer_provider": "glm",
   "ai_max_tokens": 2800,
   "convergence_eps": 0.02,
@@ -20,23 +16,23 @@
   "auto_bump_family_after_gate2": false,
   "enable_multi_symbol_matrix": true,
   "report_name": "delivery_report.md",
-  "report_copy_to": "/root/delivery_report_rolling_4h_sweep_fade_clean_v1.md",
+  "report_copy_to": "/root/delivery_report_ny_open_liq_fade_clean_v1.md",
   "workdir": null,
   "vector_root": "/root",
   "dry_run": false,
   "optimize_goals": [
-    "PRETEST FIRST: contract + sanity asserts must pass; SHIT_TRANSLATION → RESET only, never additive decorate",
-    "family=rolling_4h_sweep_fade_clean_v1 — clean pretest reset of Rolling 4H Sweep Fade 5m",
-    "NEVER rename into asia_sweep_fade* / macro_sfp_displacement / session_liq_engulf*",
-    "keep prev_low48/prev_high48 sweep+reclaim + vol_ma20_ratio>1.15",
-    "MUST keep entry_wick_buffer buffer_pct=0.0008 (ban swing_extreme as wick proxy)",
-    "MUST keep prev_mid48 initial TP + atr_trailing≈3.2",
+    "PRETEST FIRST: contract ny_open_liq_fade_v1 + sanity asserts; SHIT_TRANSLATION → RESET only",
+    "family=ny_open_liq_fade_clean_v1 — NY Open Liquidity Hole Fade 5m",
+    "keep London box london_high/low sweep+reclaim; NY window 12.5<=hour_utc<15.5",
+    "vol_ma20_ratio>1.2 mild only; NEVER vol_z>1.8",
+    "MUST keep entry_wick_buffer 0.0008 (ban swing_extreme wick proxy)",
+    "MUST keep partial_tp_feature vwap@0.5 + atr_trailing≈3.2",
     "timeframe MUST stay 5m; Gate2 floors absolute; never mount/confirm",
-    "AI mode=prune_auditor: PRUNE or RESET only — no shit-decorate"
+    "AI mode=prune_auditor: PRUNE or RESET only"
   ],
   "notes": [
-    "Pack reset under pretest_quality blueprint (contract→asserts→skeleton).",
-    "Prior swing_extreme(5) translation was SHIT_TRANSLATION — discarded.",
+    "Built under pretest_quality blueprint from contract first.",
+    "Features london_high/low + vwap + partial_tp_feature are real primitives — no proxies.",
     "Formal Gate2 floors unchanged."
   ]
 }

@@ -1,0 +1,442 @@
+{
+  "ok": true,
+  "errors": [],
+  "schema": "qiyu_step_a_v1",
+  "artifact": "strategy_candidate_pack",
+  "call_id": "prebuilt_ny_open_liq_fade_clean_v1",
+  "attempts": 0,
+  "meta": {
+    "symbol": "ETH-USDT-SWAP",
+    "timeframe": "5m",
+    "direction": "long",
+    "title": "[BTC/ETH/SOL 5m] 纽约开盘流动性空洞扫荡",
+    "title_zh": "[BTC/ETH/SOL 5m] 纽约开盘流动性空洞扫荡 (NY Open Liquidity Hole Fade)",
+    "thesis": "NY open 12:30–15:30 UTC fades London-box (08:00–12:30 UTC) liquidity sweeps on 5m with vol_ma20_ratio>1.2. True wick stop entry_wick_buffer 0.0008. TP1 50% at session VWAP via partial_tp_feature; TP2 remaining atr_trailing 3.2×ATR_14. Outer SL 0.9% immutable.",
+    "source": "handcraft_pretest_quality_ny_open_v1",
+    "primary_submit": "ETH-USDT-SWAP 5m long",
+    "anchor_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP"
+    ],
+    "contract_id": "ny_open_liq_fade_v1",
+    "pretest_quality_required": true
+  },
+  "mechanism_spec": {
+    "mechanism_id": "mech_ny_open_liq_fade_clean_v1",
+    "mechanism_name": "ny_open_liq_fade_clean_v1",
+    "mechanism_family": "ny_open_liq_fade_clean_v1",
+    "display_title_zh": "[BTC/ETH/SOL 5m] 纽约开盘流动性空洞扫荡",
+    "market_inefficiency": "纽约开盘流动性交接期，伦敦盘高低点外的止损单被扫后收回，形成可重复的空洞回补。",
+    "counterparty_source": "在伦敦极值外追突破/被扫止损的订单；收回盒内后向 VWAP 均值回归时被迫平仓。",
+    "why_edge_exists": "伦敦盒在 12:30 后固定可见（无前瞻）；NY 开盘窗口流动性脉冲提供扫荡；温和放量确认参与。",
+    "edge_decay_conditions": "Trend days accepting beyond London box; holiday thin NY open; overcrowded fade bots.",
+    "required_market_regime": "5m crypto majors. Features: hour_utc, london_high/low, vwap, vol_ma20_ratio, OHLC. No EMA/CCI/RSI core.",
+    "entry_logic": "LONG ALL: (1) 12.5<=hour_utc<15.5; (2) low < london_low; (3) close > london_low; (4) close < london_high; (5) vol_ma20_ratio > 1.2. SHORT mirror.",
+    "exit_logic": "TP1 partial_tp_feature vwap@0.5; TP2 atr_trailing 3.2×ATR_14; invalidation entry_wick_buffer 0.0008; outer SL 0.9%; max_hold_bars=72.",
+    "stop_logic": "entry_wick_buffer 0.0008 on signal-bar extreme. Outer protective SL 0.9% immutable.",
+    "take_profit_logic": "50% at session VWAP (partial_tp_feature); remainder atr_trailing 3.2×ATR_14.",
+    "invalidation_logic": "entry_wick_buffer; max_hold_bars=72; acceptance beyond London box.",
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "must_use_5m_timeframe",
+      "must_keep_ny_open_window_12_30_15_30_utc",
+      "must_keep_london_box_sweep_and_reclaim",
+      "must_keep_mild_vol_ma20_ratio_gt_1_2",
+      "must_use_entry_wick_buffer_0_0008",
+      "must_use_partial_tp_vwap_0_5",
+      "must_use_atr_trailing_3_2",
+      "no_extreme_vol_z_gt_1_8_as_core_filter",
+      "no_swing_extreme_as_wick_proxy",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm",
+      "never_lower_gate2_floors"
+    ],
+    "tunable_parameters": [
+      "vol_ma20_ratio_min",
+      "atr_trail_n",
+      "max_hold_bars"
+    ],
+    "forbidden_transformations": [
+      "replace_entry_wick_buffer_with_swing_extreme_proxy",
+      "remove_vwap_partial_tp",
+      "swap_london_box_to_asia_or_rolling48",
+      "inject_ema_cci_rsi_as_core_filter",
+      "raise_vol_filter_to_vol_z20_gt_1_8",
+      "add_fixed_micro_tp_below_2pct",
+      "weaken_or_widen_0.9_protective_sl",
+      "auto_mount_or_confirm_without_human",
+      "lower_gate2_floors",
+      "additive_optimize_before_pretest_pass"
+    ],
+    "expected_trade_frequency_class": "session_ny_open_1_to_6_per_day_5m",
+    "expected_holding_period": "3_to_72_bars_5m",
+    "suitable_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "XRP-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "BNB-USDT-SWAP",
+      "ADA-USDT-SWAP",
+      "LTC-USDT-SWAP",
+      "LINK-USDT-SWAP",
+      "AVAX-USDT-SWAP",
+      "SUI-USDT-SWAP",
+      "PEPE-USDT-SWAP",
+      "BONK-USDT-SWAP",
+      "WIF-USDT-SWAP",
+      "NEAR-USDT-SWAP",
+      "APT-USDT-SWAP",
+      "ARB-USDT-SWAP",
+      "OP-USDT-SWAP",
+      "INJ-USDT-SWAP",
+      "SEI-USDT-SWAP",
+      "TIA-USDT-SWAP",
+      "DOT-USDT-SWAP",
+      "ATOM-USDT-SWAP",
+      "UNI-USDT-SWAP",
+      "AAVE-USDT-SWAP",
+      "FIL-USDT-SWAP",
+      "ICP-USDT-SWAP",
+      "RENDER-USDT-SWAP",
+      "ONDO-USDT-SWAP",
+      "JUP-USDT-SWAP",
+      "ORDI-USDT-SWAP",
+      "WLD-USDT-SWAP",
+      "TRX-USDT-SWAP",
+      "BCH-USDT-SWAP",
+      "ETC-USDT-SWAP",
+      "XAU-USDT-SWAP",
+      "XAG-USDT-SWAP",
+      "CL-USDT-SWAP"
+    ],
+    "suitable_timeframes": [
+      "5m"
+    ]
+  },
+  "dsl": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "ny_open_liq_fade_clean_v1_eth_long",
+    "name": "[BTC/ETH/SOL 5m] 纽约开盘流动性空洞扫荡",
+    "direction": "long",
+    "timeframe": "5m",
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_ny_ge",
+          "left": {
+            "feature": "hour_utc"
+          },
+          "op": "gte",
+          "right": {
+            "value": 12.5
+          }
+        },
+        {
+          "id": "e_ny_lt",
+          "left": {
+            "feature": "hour_utc"
+          },
+          "op": "lt",
+          "right": {
+            "value": 15.5
+          }
+        },
+        {
+          "id": "e_sweep_london_low",
+          "left": {
+            "feature": "low"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "london_low"
+          }
+        },
+        {
+          "id": "e_reclaim_london_low",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "london_low"
+          }
+        },
+        {
+          "id": "e_inside_box",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "london_high"
+          }
+        },
+        {
+          "id": "e_mild_vol",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.2
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_vwap_partial",
+          "exit_op": "partial_tp_feature",
+          "feature": "vwap",
+          "op": "gte",
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.2,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_wick_sl",
+          "exit_op": "entry_wick_buffer",
+          "buffer_pct": 0.0008,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 72,
+    "description": "step_a|ny_open_liq_fade_clean_v1|london_sweep|ny_window|vol1.2|vwap_partial0.5|trail3.2|wick0.08|sl0.9|long",
+    "origin": "pretest_quality_translate",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "ny_open_liq_fade_clean_v1_eth_long",
+    "name": "[BTC/ETH/SOL 5m] 纽约开盘流动性空洞扫荡",
+    "direction": "long",
+    "timeframe": "5m",
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_ny_ge",
+          "left": {
+            "feature": "hour_utc"
+          },
+          "op": "gte",
+          "right": {
+            "value": 12.5
+          }
+        },
+        {
+          "id": "e_ny_lt",
+          "left": {
+            "feature": "hour_utc"
+          },
+          "op": "lt",
+          "right": {
+            "value": 15.5
+          }
+        },
+        {
+          "id": "e_sweep_london_low",
+          "left": {
+            "feature": "low"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "london_low"
+          }
+        },
+        {
+          "id": "e_reclaim_london_low",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "london_low"
+          }
+        },
+        {
+          "id": "e_inside_box",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "london_high"
+          }
+        },
+        {
+          "id": "e_mild_vol",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.2
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_vwap_partial",
+          "exit_op": "partial_tp_feature",
+          "feature": "vwap",
+          "op": "gte",
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.2,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_wick_sl",
+          "exit_op": "entry_wick_buffer",
+          "buffer_pct": 0.0008,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 72,
+    "description": "step_a|ny_open_liq_fade_clean_v1|london_sweep|ny_window|vol1.2|vwap_partial0.5|trail3.2|wick0.08|sl0.9|long",
+    "origin": "pretest_quality_translate",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "ny_open_liq_fade_clean_v1_eth_short",
+    "name": "[BTC/ETH/SOL 5m] 纽约开盘流动性空洞扫荡",
+    "direction": "short",
+    "timeframe": "5m",
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_ny_ge",
+          "left": {
+            "feature": "hour_utc"
+          },
+          "op": "gte",
+          "right": {
+            "value": 12.5
+          }
+        },
+        {
+          "id": "e_ny_lt",
+          "left": {
+            "feature": "hour_utc"
+          },
+          "op": "lt",
+          "right": {
+            "value": 15.5
+          }
+        },
+        {
+          "id": "e_sweep_london_high",
+          "left": {
+            "feature": "high"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "london_high"
+          }
+        },
+        {
+          "id": "e_reclaim_london_high",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "london_high"
+          }
+        },
+        {
+          "id": "e_inside_box",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "london_low"
+          }
+        },
+        {
+          "id": "e_mild_vol",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.2
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_vwap_partial",
+          "exit_op": "partial_tp_feature",
+          "feature": "vwap",
+          "op": "lte",
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.2,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_wick_sl",
+          "exit_op": "entry_wick_buffer",
+          "buffer_pct": 0.0008,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 72,
+    "description": "step_a|ny_open_liq_fade_clean_v1|london_sweep|ny_window|vol1.2|vwap_partial0.5|trail3.2|wick0.08|sl0.9|short",
+    "origin": "pretest_quality_translate",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "pipeline_readiness": {
+    "gate0_ready": true,
+    "mechanism_spec_complete": true,
+    "protective_sl": 0.009,
+    "no_fixed_pct_tp": true,
+    "pretest_quality_required": true,
+    "contract_id": "ny_open_liq_fade_v1"
+  }
+}

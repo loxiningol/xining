@@ -1,0 +1,66 @@
+{
+  "schema": "qiyu_invariants_contract_v1",
+  "contract_id": "ny_open_liq_fade_v1",
+  "title_zh": "[BTC/ETH/SOL 5m] 纽约开盘流动性空洞扫荡",
+  "assert_suite": "ny_open_liq_fade_v1",
+  "require_sanity_asserts": true,
+  "must_timeframe": "5m",
+  "ban_swing_as_wick_proxy": true,
+  "mechanism_pseudocode": {
+    "time_window": "12.5 <= hour_utc < 15.5 (12:30–15:30 UTC NY open handoff)",
+    "box": "london_high/london_low = max/min of same-day [08:00,12:30) UTC bars; visible only after 12:30 (no lookahead)",
+    "long_entry": "hour in NY window AND low < london_low AND close > london_low AND close < london_high AND vol_ma20_ratio > 1.2",
+    "short_entry": "hour in NY window AND high > london_high AND close < london_high AND close > london_low AND vol_ma20_ratio > 1.2",
+    "stop": "entry_wick_buffer buffer_pct=0.0008 (NOT swing_extreme proxy)",
+    "tp1": "partial_tp_feature feature=vwap partial_tp_ratio=0.5 (mean-revert to session VWAP)",
+    "tp2": "atr_trailing n_atr=3.2 atr_period=14 on remaining size",
+    "outer_sl": "protective 0.9% immutable"
+  },
+  "required_entry_feature_cmps": [
+    {"left": "low", "op": "lt", "right": "london_low"},
+    {"left": "close", "op": "gt", "right": "london_low"},
+    {"left": "close", "op": "lt", "right": "london_high"}
+  ],
+  "required_entry_feature_cmps_short": [
+    {"left": "high", "op": "gt", "right": "london_high"},
+    {"left": "close", "op": "lt", "right": "london_high"},
+    {"left": "close", "op": "gt", "right": "london_low"}
+  ],
+  "required_entry_value_cmps": [
+    {"left": "hour_utc", "op": "gte", "value": 12.5},
+    {"left": "hour_utc", "op": "lt", "value": 15.5},
+    {"left": "vol_ma20_ratio", "op": "gt", "value": 1.2}
+  ],
+  "required_exit_ops": [
+    {"exit_op": "entry_wick_buffer", "buffer_pct": 0.0008, "role": "invalidation"},
+    {"exit_op": "partial_tp_feature", "feature": "vwap", "partial_tp_ratio": 0.5, "role": "take_profit"},
+    {"exit_op": "atr_trailing", "n_atr": 3.2, "atr_period": 14, "role": "take_profit"}
+  ],
+  "forbidden_features": [
+    "asia_high", "asia_low", "asia_mid", "asia_range", "asia_range_atr_ratio",
+    "prev_high48", "prev_low48", "prev_mid48",
+    "pdh", "pdl", "pdc", "h4_high24", "h4_low24",
+    "ema6", "ema21", "ema53", "cci", "rsi14"
+  ],
+  "forbidden_exit_ops": ["fixed_pct_tp", "swing_extreme"],
+  "non_negotiable_rules": [
+    "protective_sl_0.9_pct_immutable",
+    "no_fixed_pct_take_profit",
+    "must_use_5m_timeframe",
+    "must_keep_ny_open_window_12_30_15_30_utc",
+    "must_keep_london_box_sweep_and_reclaim",
+    "must_keep_mild_vol_ma20_ratio_gt_1_2",
+    "must_use_entry_wick_buffer_0_0008",
+    "must_use_partial_tp_vwap_0_5",
+    "must_use_atr_trailing_3_2",
+    "no_extreme_vol_z_gt_1_8_as_core_filter",
+    "no_swing_extreme_as_wick_proxy",
+    "never_lower_gate2_floors"
+  ],
+  "prune_audit_instructions_zh": [
+    "对比本契约与 DSL：只列多余假设、未授权硬编码、逻辑偏离。",
+    "只允许删除或清零重译；禁止加分支/加过滤/加 EMA。",
+    "严禁用 swing_extreme 冒充 entry_wick_buffer；严禁缺 VWAP 半仓初 TP。",
+    "若无法在不新增契约外逻辑的情况下修好 → decision=RESET。"
+  ]
+}

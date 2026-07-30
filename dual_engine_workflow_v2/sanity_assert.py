@@ -194,6 +194,127 @@ def assert_rolling_4h_sweep_short(dsl):
     return failures
 
 
+def _ny_base_frame(n=60, mid=100.0):
+    fr = _base_frame(n=n, mid=mid)
+    # Default outside NY window / flat london box
+    for i in range(n):
+        fr.set(
+            i,
+            hour_utc=10.0,
+            london_high=mid + 2.0,
+            london_low=mid - 2.0,
+            london_mid=mid,
+            vwap=mid,
+            vol_ma20_ratio=1.0,
+        )
+    return fr
+
+
+def assert_ny_open_liq_fade_long(dsl):
+    """Sweep/reclaim/wick/VWAP partial/ATR trail asserts for NY Open fade long."""
+    failures = []
+    direction = "long"
+    fr = _ny_base_frame()
+    i = 50
+    fr.set(
+        i,
+        hour_utc=13.0,          # inside 12:30–15:30
+        low=97.5,
+        close=98.2,
+        high=98.5,
+        london_low=98.0,
+        london_high=102.0,
+        vwap=100.0,
+        vol_ma20_ratio=1.25,
+    )
+    if not _eval_entry(dsl, fr, i):
+        failures.append("ASSERT_FAIL:ny_sweep_reclaim_vol_must_enter")
+
+    fr_time = fr.copy()
+    fr_time.set(i, hour_utc=11.0)  # before NY window
+    if _eval_entry(dsl, fr_time, i):
+        failures.append("ASSERT_FAIL:outside_ny_window_must_reject")
+
+    fr_b = fr.copy()
+    fr_b.set(i, close=97.8)
+    if _eval_entry(dsl, fr_b, i):
+        failures.append("ASSERT_FAIL:no_reclaim_must_reject")
+
+    fr_c = fr.copy()
+    fr_c.set(i, vol_ma20_ratio=1.10)
+    if _eval_entry(dsl, fr_c, i):
+        failures.append("ASSERT_FAIL:vol_below_1_2_must_reject")
+
+    pos = {
+        "price": 98.2,
+        "peak_high": 98.5,
+        "peak_low": 97.5,
+        "entry_bar_low": 97.5,
+        "entry_bar_high": 98.5,
+    }
+    j = i + 1
+    fr_e = fr.copy()
+    stop = 97.5 * (1.0 - 0.0008)
+    fr_e.set(j, low=stop - 0.01, high=98.0, close=97.9, vwap=100.0, atr14=1.0)
+    ok, fired = _eval_exit_op_only(dsl, fr_e, j, pos, direction)
+    if "entry_wick_buffer" not in fired:
+        failures.append(
+            "ASSERT_FAIL:entry_wick_buffer_must_fire got=%s" % ",".join(fired)
+        )
+
+    # VWAP partial TP: close reaches vwap from below
+    fr_v = fr.copy()
+    fr_v.set(j, low=99.0, high=100.5, close=100.2, vwap=100.0, atr14=1.0)
+    ok_v, fired_v = _eval_exit_op_only(dsl, fr_v, j, dict(pos), direction)
+    if "partial_tp_feature" not in fired_v:
+        failures.append(
+            "ASSERT_FAIL:vwap_partial_tp_must_fire got=%s" % ",".join(fired_v)
+        )
+
+    # ATR trail must be present as an exit_op leaf (fire when trail hit)
+    fr_t = fr.copy()
+    # After large adverse move from peak — set peak_high high then crush low
+    pos_t = dict(pos)
+    pos_t["peak_high"] = 110.0
+    pos_t["partial_taken"] = True  # remaining size trails
+    fr_t.set(j, low=90.0, high=91.0, close=90.5, vwap=100.0, atr14=1.0)
+    ok_t, fired_t = _eval_exit_op_only(dsl, fr_t, j, pos_t, direction)
+    if "atr_trailing" not in fired_t:
+        failures.append(
+            "ASSERT_FAIL:atr_trailing_must_fire got=%s" % ",".join(fired_t)
+        )
+
+    return failures
+
+
+def assert_ny_open_liq_fade_short(dsl):
+    failures = []
+    fr = _ny_base_frame()
+    i = 50
+    fr.set(
+        i,
+        hour_utc=14.0,
+        high=102.5,
+        close=101.8,
+        low=101.5,
+        london_high=102.0,
+        london_low=98.0,
+        vwap=100.0,
+        vol_ma20_ratio=1.25,
+    )
+    if not _eval_entry(dsl, fr, i):
+        failures.append("ASSERT_FAIL:short_ny_sweep_reclaim_vol_must_enter")
+    fr_b = fr.copy()
+    fr_b.set(i, close=102.2)
+    if _eval_entry(dsl, fr_b, i):
+        failures.append("ASSERT_FAIL:short_no_reclaim_must_reject")
+    fr_t = fr.copy()
+    fr_t.set(i, hour_utc=16.0)
+    if _eval_entry(dsl, fr_t, i):
+        failures.append("ASSERT_FAIL:short_outside_ny_window_must_reject")
+    return failures
+
+
 ASSERT_REGISTRY = {
     "rolling_4h_sweep_5m_v1": {
         "long": assert_rolling_4h_sweep_long,
@@ -202,6 +323,14 @@ ASSERT_REGISTRY = {
     "rolling_4h_sweep_5m": {
         "long": assert_rolling_4h_sweep_long,
         "short": assert_rolling_4h_sweep_short,
+    },
+    "ny_open_liq_fade_v1": {
+        "long": assert_ny_open_liq_fade_long,
+        "short": assert_ny_open_liq_fade_short,
+    },
+    "ny_open_liq_fade_clean_v1": {
+        "long": assert_ny_open_liq_fade_long,
+        "short": assert_ny_open_liq_fade_short,
     },
 }
 

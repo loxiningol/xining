@@ -122,6 +122,18 @@ def _has_exit_op(node, exit_op, **attrs):
                     return False
             except Exception:
                 return False
+        elif k == "partial_tp_ratio":
+            try:
+                if abs(float(node.get("partial_tp_ratio")) - float(v)) > 1e-9:
+                    return False
+            except Exception:
+                return False
+        elif k == "feature":
+            if str(node.get("feature") or "") != str(v):
+                return False
+        elif k == "op":
+            if str(node.get("op") or "") != str(v):
+                return False
         elif node.get(k) != v:
             return False
     return True
@@ -163,6 +175,8 @@ def resolve_contract_for_pack(pack, search_roots=None):
         candidates.append(family.rsplit("_ad", 1)[0])
     if "rolling_4h_sweep" in family and "rolling_4h_sweep_5m_v1" not in candidates:
         candidates.append("rolling_4h_sweep_5m_v1")
+    if "ny_open_liq_fade" in family and "ny_open_liq_fade_v1" not in candidates:
+        candidates.append("ny_open_liq_fade_v1")
     for root in roots:
         for cand_name in candidates:
             cand = Path(root) / "contracts" / ("%s.contract.json" % cand_name)

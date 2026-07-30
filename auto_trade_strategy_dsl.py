@@ -27,6 +27,8 @@ FEATURES = {
     # Session Vol Squeeze anchors (UTC, no lookahead): Asia [00:00,08:00)
     "hour_utc", "asia_high", "asia_low", "asia_mid", "asia_range",
     "asia_range_atr_ratio",
+    # NY Open Liquidity Hole Fade: London box [08:00,12:30) UTC + session VWAP
+    "london_high", "london_low", "london_mid", "vwap",
 }
 # Research / DSL allowlist — liquid OKX USDT-SWAP universe (expanded 2026-07-25).
 INSTRUMENTS = {
@@ -56,7 +58,7 @@ MAX_LOOKBACK = 240
 # Protective production SL (0.9%) is NOT an exit_op and is never banned here.
 EXIT_OPS = {
     "atr_trailing", "swing_extreme", "fixed_pct_tp", "partial_tp_atr",
-    "entry_wick_buffer",
+    "entry_wick_buffer", "partial_tp_feature",
 }
 ATR_TRAIL_N_MIN = 2.5
 ATR_TRAIL_N_MAX = 5.0  # allow Macro SFP 3.5–5.0× ATR_14 harvest window
@@ -361,7 +363,8 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
             raise DSLValidationError("exit_op is only valid on exit conditions")
         allowed_exit = {
             "id", "exit_op", "role", "n_atr", "atr_period", "lookback",
-            "pct", "price_pct", "partial_tp_ratio", "buffer_pct", "params",
+            "pct", "price_pct", "partial_tp_ratio", "buffer_pct",
+            "feature", "op", "params",
         }
         if set(node) - allowed_exit:
             raise DSLValidationError("exit_op node contains unknown fields")
@@ -426,6 +429,28 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
                 raise DSLValidationError(
                     "entry_wick_buffer buffer_pct must be in [%.4f, %.4f] (got %s)"
                     % (ENTRY_WICK_BUFFER_MIN, ENTRY_WICK_BUFFER_MAX, buf)
+                )
+        elif exit_op == "partial_tp_feature":
+            # Scale-out when price reaches a live feature (e.g. session VWAP).
+            if role is not None and role != "take_profit":
+                raise DSLValidationError(
+                    "partial_tp_feature role must be take_profit (got %s)" % role
+                )
+            feat = str(node.get("feature") or "")
+            if feat not in FEATURES:
+                raise DSLValidationError(
+                    "partial_tp_feature feature not allowed: %s" % feat
+                )
+            op = str(node.get("op") or "")
+            if op not in ("gte", "lte", "gt", "lt"):
+                raise DSLValidationError(
+                    "partial_tp_feature op must be gte|lte|gt|lt (got %s)" % op
+                )
+            ratio = _number(node.get("partial_tp_ratio", 0.5))
+            if ratio < PARTIAL_TP_RATIO_MIN or ratio > PARTIAL_TP_RATIO_MAX:
+                raise DSLValidationError(
+                    "partial_tp_ratio must be in [%.1f, %.1f] (got %s)"
+                    % (PARTIAL_TP_RATIO_MIN, PARTIAL_TP_RATIO_MAX, ratio)
                 )
         elif exit_op == "fixed_pct_tp":
             # Hard ban tiny fixed TP — refuse-compile / refuse-validate, no convert
@@ -750,6 +775,31 @@ def evaluate_exit_op(frame, index, node, position, direction, explain=False):
                 "entry_bar_high": entry_high,
                 "stop": stop_px,
             })
+        elif exit_op == "partial_tp_feature":
+            if position.get("partial_taken"):
+                passed = False
+                exit_price = close
+                detail.update({"skipped": "already_partial_taken"})
+            else:
+                feat = str(node.get("feature") or "")
+                op = str(node.get("op") or "gte")
+                ratio = float(node.get("partial_tp_ratio") or 0.5)
+                target = float(_series(frame, feat).iloc[index])
+                if op == "gte":
+                    passed = close >= target or high >= target
+                elif op == "gt":
+                    passed = close > target or high > target
+                elif op == "lte":
+                    passed = close <= target or low <= target
+                elif op == "lt":
+                    passed = close < target or low < target
+                else:
+                    passed = False
+                exit_price = target if passed else close
+                detail.update({
+                    "feature": feat, "op": op, "target": target,
+                    "partial_tp_ratio": ratio, "partial_exit": True,
+                })
         elif exit_op == "fixed_pct_tp":
             pct = refuse_fixed_tiny_tp(
                 node.get("pct", node.get("price_pct")),
@@ -784,12 +834,12 @@ def classify_exit_details(exit_details, position=None):
         if not row.get("passed"):
             continue
         op = row.get("exit_op")
-        if op == "partial_tp_atr":
+        if op in ("partial_tp_atr", "partial_tp_feature"):
             if position is not None and position.get("partial_taken"):
                 continue
             partial_rows.append(row)
         else:
-            # atr_trailing / swing / fixed / legacy condition leaves → full exit
+            # atr_trailing / swing / wick / fixed / legacy condition leaves → full exit
             full_rows.append(row)
     return partial_rows, full_rows
 

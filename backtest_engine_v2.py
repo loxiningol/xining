@@ -565,6 +565,49 @@ def precompute_indicators(df, timeframe="1h"):
         tf_norm = normalize_timeframe(timeframe)
         asia_bars = {"5m": 96.0, "15m": 32.0, "1h": 8.0}.get(tf_norm, 32.0)
         df["asia_range_atr_ratio"] = df["asia_range"] / (atr * (asia_bars ** 0.5))
+
+        # London box [08:00, 12:30) UTC — completed range visible only after 12:30.
+        london_mask = (hour_utc >= 8.0) & (hour_utc < 12.5)
+        london_high_map = {}
+        london_low_map = {}
+        if bool(london_mask.any()):
+            london_df = pd.DataFrame({
+                "high": h[london_mask].astype(float),
+                "low": l[london_mask].astype(float),
+                "day": day_keys[london_mask].values,
+            })
+            grouped_l = london_df.groupby("day")
+            london_high_map = grouped_l["high"].max().to_dict()
+            london_low_map = grouped_l["low"].min().to_dict()
+        sorted_l_days = sorted(london_high_map.keys())
+        prev_l_day = {}
+        for i, d in enumerate(sorted_l_days):
+            prev_l_day[d] = sorted_l_days[i - 1] if i else None
+        lh_vals = []
+        ll_vals = []
+        for hr, day in zip(hour_utc.tolist(), day_keys.tolist()):
+            # After London close (12:30+), today's London box is available.
+            # During/before London, expose previous completed London day only.
+            key = day if float(hr) >= 12.5 else prev_l_day.get(day)
+            if key is None or key not in london_high_map:
+                lh_vals.append(np.nan)
+                ll_vals.append(np.nan)
+            else:
+                lh_vals.append(float(london_high_map[key]))
+                ll_vals.append(float(london_low_map[key]))
+        df["london_high"] = lh_vals
+        df["london_low"] = ll_vals
+        df["london_mid"] = (df["london_high"] + df["london_low"]) * 0.5
+
+        # Session VWAP from UTC day open (typical price × volume cumulation).
+        tp = (h.astype(float) + l.astype(float) + c.astype(float)) / 3.0
+        vol = df["volume"].astype(float) if "volume" in df.columns else pd.Series(
+            [1.0] * len(df), index=df.index
+        )
+        day_group = day_keys
+        cum_pv = (tp * vol).groupby(day_group).cumsum()
+        cum_v = vol.groupby(day_group).cumsum().replace(0, np.nan)
+        df["vwap"] = (cum_pv / cum_v).astype(float)
     except Exception:
         # Fail-open: leave features absent; DSL validate will reject strategies
         # that require them rather than silently inventing levels.
@@ -642,6 +685,7 @@ def _build_kwargs(df):
         "vol_z20","vol_ma20_ratio","pdh","pdl","pdc","h4_high24","h4_low24",
         "hour_utc","asia_high","asia_low","asia_mid","asia_range",
         "asia_range_atr_ratio",
+        "london_high","london_low","london_mid","vwap",
     ]:
         if col in df.columns:
             try:

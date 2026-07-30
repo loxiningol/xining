@@ -151,7 +151,7 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1,
                 "title_zh": (pack.get("meta") or {}).get("title_zh"),
                 "source": "auto_driver_wrapper",
                 "contract_id": (pack.get("meta") or {}).get("contract_id")
-                    or "rolling_4h_sweep_5m_v1",
+                    or (spec or {}).get("mechanism_family"),
                 "pretest_quality_required": True,
                 "matrix_generalization": list(
                     (pack.get("meta") or {}).get("matrix_generalization")
