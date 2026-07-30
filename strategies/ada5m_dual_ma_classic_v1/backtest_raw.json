@@ -1,0 +1,225 @@
+{
+  "ok": true,
+  "present_to_human": true,
+  "strategy_id": "ada5m_dual_ma_classic_v1",
+  "symbol": "ADA-USDT-SWAP",
+  "logic": "classic_dual_ma_trend",
+  "n_bars": 1400,
+  "n_trades": 17,
+  "total_return": 0.010969397913411116,
+  "final_equity": 10109.693979134112,
+  "sharpe_ann_proxy": 10.626678912660426,
+  "sharpe_note_zh": "短窗夏普代理极易虚高，仅供参考，不得单独当作达标证据。",
+  "max_drawdown": -0.006952118893542969,
+  "win_rate": 0.7058823529411765,
+  "payoff": 0.9871250257135425,
+  "avg_trades_per_day": 2.8333333333333335,
+  "day_trade_counts": {
+    "2026-07-25": 1,
+    "2026-07-26": 6,
+    "2026-07-27": 1,
+    "2026-07-28": 3,
+    "2026-07-29": 5,
+    "2026-07-30": 1
+  },
+  "targets": {
+    "ann_sharpe_min": 1.5,
+    "max_drawdown_max": 0.15,
+    "trades_per_day_min": 2,
+    "trades_per_day_max": 8,
+    "min_win_rate": 0.5
+  },
+  "classic_variant": {
+    "id": "classic_dual_ma_trend",
+    "lens_zh": "经典双均线趋势变式",
+    "reason_zh": "上一方向 D1 动量×波动过滤初评胜率 44.4%<50% 被拒；切换经典变式。"
+  },
+  "rejected_prior": {
+    "id": "ada5m_mom_vol_filter_v1",
+    "win_rate": 0.444,
+    "reason_zh": "初评胜率<50%，禁止展示"
+  },
+  "costs": {
+    "slippage_pct": 0.0005,
+    "taker_fee_pct": 0.0005
+  },
+  "trades_tail": [
+    {
+      "side": "short",
+      "entry_ts": 1785031500000,
+      "exit_ts": 1785035100000,
+      "entry_px": 0.16441775000000003,
+      "exit_px": 0.1650825,
+      "ret": -0.004526774491541874,
+      "pnl": -17.614221638726608,
+      "reason": "time_stop",
+      "equity_after": 9986.17672467215
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785051600000,
+      "exit_ts": 1785055200000,
+      "entry_px": 0.16491750000000002,
+      "exit_px": 0.16478235,
+      "ret": 0.00032017279156421096,
+      "pnl": 1.243395252941268,
+      "reason": "time_stop",
+      "equity_after": 9985.478363339738
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785063300000,
+      "exit_ts": 1785066900000,
+      "entry_px": 0.16538265,
+      "exit_px": 0.16481755,
+      "ret": -0.003916924326705262,
+      "pnl": -15.210363433671182,
+      "reason": "time_stop",
+      "equity_after": 9968.326379113196
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785078900000,
+      "exit_ts": 1785082500000,
+      "entry_px": 0.16518254999999998,
+      "exit_px": 0.1653173,
+      "ret": 0.0003157641348920386,
+      "pnl": 1.2240822048863977,
+      "reason": "time_stop",
+      "equity_after": 9967.612175633254
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785101100000,
+      "exit_ts": 1785104700000,
+      "entry_px": 0.16468229999999998,
+      "exit_px": 0.1655172,
+      "ret": 0.004569761595508648,
+      "pnl": 17.713737735218487,
+      "reason": "time_stop",
+      "equity_after": 9983.387766556545
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785162000000,
+      "exit_ts": 1785162600000,
+      "entry_px": 0.16271860000000002,
+      "exit_px": 0.1598695600326,
+      "ret": 0.01732102838601074,
+      "pnl": 67.24765556953044,
+      "reason": "take_profit",
+      "equity_after": 10048.694207838134
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785239100000,
+      "exit_ts": 1785242700000,
+      "entry_px": 0.15672160000000002,
+      "exit_px": 0.1582111604472,
+      "ret": -0.00991501499002706,
+      "pnl": -38.74614866146625,
+      "reason": "hard_sl",
+      "equity_after": 10007.994146414032
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785245400000,
+      "exit_ts": 1785249000000,
+      "entry_px": 0.1563218,
+      "exit_px": 0.15617804999999998,
+      "ret": 0.0004204238367686024,
+      "pnl": 1.6362886156528729,
+      "reason": "time_stop",
+      "equity_after": 10007.684436167883
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785252000000,
+      "exit_ts": 1785255600000,
+      "entry_px": 0.158079,
+      "exit_px": 0.15842075,
+      "ret": 0.0016618937366760793,
+      "pnl": 6.467886476760367,
+      "reason": "time_stop",
+      "equity_after": 10012.206384004277
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785312900000,
+      "exit_ts": 1785316500000,
+      "entry_px": 0.16341825000000001,
+      "exit_px": 0.16458224999999999,
+      "ret": -0.00757245161613701,
+      "pnl": -29.484368827530744,
+      "reason": "time_stop",
+      "equity_after": 9980.775197268746
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785329400000,
+      "exit_ts": 1785333000000,
+      "entry_px": 0.16398195,
+      "exit_px": 0.16421785,
+      "ret": 0.0009385729648904721,
+      "pnl": 3.6429889100911503,
+      "reason": "time_stop",
+      "equity_after": 9982.477479890478
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785334800000,
+      "exit_ts": 1785338400000,
+      "entry_px": 0.1633183,
+      "exit_px": 0.1624812,
+      "ret": 0.004651980659916288,
+      "pnl": 18.059335845639048,
+      "reason": "time_stop",
+      "equity_after": 9998.59577844836
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785344400000,
+      "exit_ts": 1785348000000,
+      "entry_px": 0.16348169999999998,
+      "exit_px": 0.16634115841469999,
+      "ret": 0.016991000000000145,
+      "pnl": 66.0668325611846,
+      "reason": "take_profit",
+      "equity_after": 10062.71843960818
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785354000000,
+      "exit_ts": 1785357600000,
+      "entry_px": 0.16361815000000002,
+      "exit_px": 0.16258125,
+      "ret": 0.005877734209818131,
+      "pnl": 23.00121616187606,
+      "reason": "time_stop",
+      "equity_after": 10083.763016073464
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785373800000,
+      "exit_ts": 1785377400000,
+      "entry_px": 0.1624812,
+      "exit_px": 0.1637181,
+      "ret": 0.007112573023833002,
+      "pnl": 27.89169475821907,
+      "reason": "time_stop",
+      "equity_after": 10109.693979134112
+    }
+  ],
+  "data_window": {
+    "first_ts": 1784985900000,
+    "last_ts": 1785405600000,
+    "first_iso": "2026-07-25 13:25:00 UTC",
+    "last_iso": "2026-07-30 10:00:00 UTC",
+    "span_days": 4.857638888888889,
+    "n_bars": 1400,
+    "timeframe": "5m",
+    "label_zh": "回测窗口：2026-07-25 13:25:00 UTC → 2026-07-30 10:00:00 UTC（共 4.86 天，1400 根 5m）",
+    "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，不是自然周收益标签，也不是年化收益。"
+  },
+  "min_win_rate_gate": 0.5
+}

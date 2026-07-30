@@ -1,0 +1,108 @@
+{
+  "ok": true,
+  "present_to_human": true,
+  "schema": "qiyu_creation_delivery_v1",
+  "strategy_id": "ada5m_dual_ma_classic_v1",
+  "status": "PRELIM_PASS_WR50",
+  "replaced": "ada5m_mom_vol_filter_v1",
+  "classic_variant": {
+    "id": "classic_dual_ma_trend",
+    "lens_zh": "经典双均线趋势变式",
+    "reason_zh": "上一方向 D1 动量×波动过滤初评胜率 44.4%<50% 被拒；切换经典变式。"
+  },
+  "rejected_prior": {
+    "id": "ada5m_mom_vol_filter_v1",
+    "win_rate": 0.444,
+    "reason_zh": "初评胜率<50%，禁止展示"
+  },
+  "prelim": {
+    "ok": true,
+    "schema": "qiyu_creation_prelim_eval_v1",
+    "present_to_human": true,
+    "min_win_rate": 0.5,
+    "win_rate": 0.7058823529411765,
+    "n_trades": 17,
+    "total_return": 0.010969397913411116,
+    "max_drawdown": -0.006952118893542969,
+    "sharpe_ann_proxy": 10.626678912660426,
+    "window": {
+      "first_ts": 1784985900000,
+      "last_ts": 1785405600000,
+      "first_iso": "2026-07-25 13:25:00 UTC",
+      "last_iso": "2026-07-30 10:00:00 UTC",
+      "span_days": 4.857638888888889,
+      "n_bars": 1400,
+      "timeframe": "5m",
+      "label_zh": "回测窗口：2026-07-25 13:25:00 UTC → 2026-07-30 10:00:00 UTC（共 4.86 天，1400 根 5m）",
+      "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。"
+    },
+    "reject_reasons": [],
+    "human_banner_zh": null,
+    "metrics_note_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。 回测窗口：2026-07-25 13:25:00 UTC → 2026-07-30 10:00:00 UTC（共 4.86 天，1400 根 5m）"
+  },
+  "backtest": {
+    "ok": true,
+    "present_to_human": true,
+    "strategy_id": "ada5m_dual_ma_classic_v1",
+    "symbol": "ADA-USDT-SWAP",
+    "logic": "classic_dual_ma_trend",
+    "n_bars": 1400,
+    "n_trades": 17,
+    "total_return": 0.010969397913411116,
+    "final_equity": 10109.693979134112,
+    "sharpe_ann_proxy": 10.626678912660426,
+    "sharpe_note_zh": "短窗夏普代理极易虚高，仅供参考，不得单独当作达标证据。",
+    "max_drawdown": -0.006952118893542969,
+    "win_rate": 0.7058823529411765,
+    "payoff": 0.9871250257135425,
+    "avg_trades_per_day": 2.8333333333333335,
+    "day_trade_counts": {
+      "2026-07-25": 1,
+      "2026-07-26": 6,
+      "2026-07-27": 1,
+      "2026-07-28": 3,
+      "2026-07-29": 5,
+      "2026-07-30": 1
+    },
+    "targets": {
+      "ann_sharpe_min": 1.5,
+      "max_drawdown_max": 0.15,
+      "trades_per_day_min": 2,
+      "trades_per_day_max": 8,
+      "min_win_rate": 0.5
+    },
+    "classic_variant": {
+      "id": "classic_dual_ma_trend",
+      "lens_zh": "经典双均线趋势变式",
+      "reason_zh": "上一方向 D1 动量×波动过滤初评胜率 44.4%<50% 被拒；切换经典变式。"
+    },
+    "rejected_prior": {
+      "id": "ada5m_mom_vol_filter_v1",
+      "win_rate": 0.444,
+      "reason_zh": "初评胜率<50%，禁止展示"
+    },
+    "costs": {
+      "slippage_pct": 0.0005,
+      "taker_fee_pct": 0.0005
+    },
+    "data_window": {
+      "first_ts": 1784985900000,
+      "last_ts": 1785405600000,
+      "first_iso": "2026-07-25 13:25:00 UTC",
+      "last_iso": "2026-07-30 10:00:00 UTC",
+      "span_days": 4.857638888888889,
+      "n_bars": 1400,
+      "timeframe": "5m",
+      "label_zh": "回测窗口：2026-07-25 13:25:00 UTC → 2026-07-30 10:00:00 UTC（共 4.86 天，1400 根 5m）",
+      "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，不是自然周收益标签，也不是年化收益。"
+    },
+    "min_win_rate_gate": 0.5
+  },
+  "human_banner_zh": "初评胜率门禁通过（>=50%）。总收益 +1.10% 仅为 2026-07-25 13:25:00 UTC → 2026-07-30 10:00:00 UTC（共 4.86 天）累计，不是日/周/年化。",
+  "deliverables": {
+    "strategy_code": "strategy_code.py",
+    "params": "params.json",
+    "backtest_report": "backtest_report.md",
+    "risk_report": "risk_report.md"
+  }
+}

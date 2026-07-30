@@ -1,7 +1,11 @@
 {
-  "ok": true,
+  "ok": false,
+  "present_to_human": false,
   "schema": "qiyu_creation_delivery_v1",
   "strategy_id": "ada5m_mom_vol_filter_v1",
+  "status": "REJECTED",
+  "reject_reasons": ["win_rate_below_50pct", "near_zero_total_return"],
+  "human_banner_zh": "【初评未通过·禁止展示为交付】胜率 44.4% < 50%。总收益 +0.02% 仅为约 4.86 天短窗累计，不是日收益也不是年化。本包作废。",
   "replaced": "btc15m_mtf_momentum_v1",
   "divergence": {
     "instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，然后再选择其中一种深入推演。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。",
@@ -23,17 +27,19 @@
       }
     ],
     "selected_id": "D1_momentum_vol_dual_filter",
-    "selection_reason_zh": "同窗对比：D1在ADA5m上夏普>1.5且回撤<15%、日均约3.7笔；D2配对夏普显著为负。"
+    "selection_reason_zh": "同窗对比曾选 D1；现按人类强制门禁因胜率<50%整包 REJECTED。"
   },
-  "logic_selected": "D1_momentum_vol_dual_filter",
+  "logic_selected": "D1_momentum_vol_filter_REJECTED",
   "backtest": {
-    "ok": true,
+    "ok": false,
+    "present_to_human": false,
     "strategy_id": "ada5m_mom_vol_filter_v1",
     "symbol": "ADA-USDT-SWAP",
     "logic": "D1_momentum_vol_dual_filter",
     "n_bars": 1400,
     "n_trades": 18,
     "total_return": 0.00021431532006666032,
+    "total_return_pct": 0.0214,
     "final_equity": 10002.143153200666,
     "sharpe_ann_proxy": 1.8061918463502338,
     "max_drawdown": -0.014509092576220795,
@@ -48,20 +54,6 @@
       "2026-07-29": 5,
       "2026-07-30": 2
     },
-    "targets": {
-      "ann_sharpe_min": 1.5,
-      "max_drawdown_max": 0.15,
-      "trades_per_day_min": 2,
-      "trades_per_day_max": 8
-    },
-    "rejected_logic": {
-      "id": "D2_pairs_mean_reversion",
-      "pair_candidates": [
-        "BTC-ADA",
-        "BTC-LTC"
-      ],
-      "reason_zh": "短窗回测夏普显著为负，日均频率可达但风险收益失衡；本次择优放弃。"
-    },
     "costs": {
       "slippage_pct": 0.0005,
       "taker_fee_pct": 0.0005
@@ -69,53 +61,25 @@
     "data_window": {
       "first_ts": 1784985900000,
       "last_ts": 1785405600000,
+      "first_iso": "2026-07-25 13:25:00 UTC",
+      "last_iso": "2026-07-30 10:00:00 UTC",
+      "span_days": 4.857638888888889,
+      "label_zh": "回测窗口：2026-07-25 13:25:00 UTC → 2026-07-30 10:00:00 UTC（共 4.86 天，1400 根 5m）",
+      "return_scope_zh": "下列「总收益 +0.02%」仅为该约 4.86 天日历窗口的累计权益变化，不是 1 日收益，不是 1 周收益标签下的周收益，也不是年化收益。",
       "note_zh": "受 formal_* 缓存长度限制；非完整 2024YTD。"
     }
   },
   "target_hit_short_window": {
     "sharpe": true,
     "mdd": true,
-    "freq": true
-  },
-  "quantoracle": {
-    "ok": true,
-    "source": "local_fallback",
-    "certified": {
-      "sharpe_ratio": 0.20836753717317133,
-      "sortino": null,
-      "calmar": null,
-      "win_rate": 0.4444444444444444,
-      "profit_factor": null,
-      "ann_vol": null,
-      "kelly_quarter": null,
-      "kelly_recommended": null,
-      "max_drawdown": null,
-      "hurst": null
-    }
-  },
-  "stress": {
-    "passed": false,
-    "backtrader": {
-      "ok": false,
-      "source": "backtrader_lite",
-      "passed": false,
-      "windows": [],
-      "at": "2026-07-30 18:12:49",
-      "error": "insufficient_trades"
-    },
-    "red_team": {
-      "ok": false,
-      "source": "autogen_redteam_lite",
-      "passed": false,
-      "error": "insufficient",
-      "attacks": [],
-      "at": "2026-07-30 18:12:49"
-    }
+    "freq": true,
+    "win_rate_ge_50": false
   },
   "deliverables": {
     "strategy_code": "strategy_code.py",
     "params": "params.json",
     "backtest_report": "backtest_report.md",
-    "risk_report": "risk_report.md"
+    "risk_report": "risk_report.md",
+    "rejected": "REJECTED.md"
   }
 }

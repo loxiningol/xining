@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "schema": "qiyu_creation_prelim_eval_v1",
+  "present_to_human": true,
+  "min_win_rate": 0.5,
+  "win_rate": 0.7058823529411765,
+  "n_trades": 17,
+  "total_return": 0.010969397913411116,
+  "max_drawdown": -0.006952118893542969,
+  "sharpe_ann_proxy": 10.626678912660426,
+  "window": {
+    "first_ts": 1784985900000,
+    "last_ts": 1785405600000,
+    "first_iso": "2026-07-25 13:25:00 UTC",
+    "last_iso": "2026-07-30 10:00:00 UTC",
+    "span_days": 4.857638888888889,
+    "n_bars": 1400,
+    "timeframe": "5m",
+    "label_zh": "回测窗口：2026-07-25 13:25:00 UTC → 2026-07-30 10:00:00 UTC（共 4.86 天，1400 根 5m）",
+    "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。"
+  },
+  "reject_reasons": [],
+  "human_banner_zh": null,
+  "metrics_note_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。 回测窗口：2026-07-25 13:25:00 UTC → 2026-07-30 10:00:00 UTC（共 4.86 天，1400 根 5m）"
+}

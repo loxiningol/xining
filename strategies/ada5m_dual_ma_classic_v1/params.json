@@ -1,0 +1,59 @@
+{
+  "schema": "qiyu_strategy_params_v1",
+  "strategy_id": "ada5m_dual_ma_classic_v1",
+  "title_zh": "[ADA 5m] 经典双均线趋势变式（WR门禁通过）",
+  "symbol": "ADA-USDT-SWAP",
+  "timeframe_entry": "5m",
+  "logic": "classic_dual_ma_trend",
+  "classic_variant": {
+    "id": "classic_dual_ma_trend",
+    "lens_zh": "经典双均线趋势变式",
+    "reason_zh": "上一方向 D1 动量×波动过滤初评胜率 44.4%<50% 被拒；切换经典变式。"
+  },
+  "rejected_prior": {
+    "id": "ada5m_mom_vol_filter_v1",
+    "win_rate": 0.444,
+    "reason_zh": "初评胜率<50%，禁止展示"
+  },
+  "leverage": 20,
+  "protective_sl_pct": 0.009,
+  "max_equity_per_trade": 0.05,
+  "slippage_pct": 0.0005,
+  "taker_fee_pct": 0.0005,
+  "targets": {
+    "ann_sharpe_min": 1.5,
+    "max_drawdown_max": 0.15,
+    "trades_per_day_min": 2,
+    "trades_per_day_max": 8,
+    "min_win_rate": 0.50
+  },
+  "entry": {
+    "fast_ema": 8,
+    "slow_ema": 34,
+    "require_atr_expand": true,
+    "atr_lookback": 5,
+    "atr_expand_mult": 1.05
+  },
+  "exit": {
+    "take_profit_r": 2.0,
+    "time_stop_bars": 12,
+    "hard_sl_pct": 0.009
+  },
+  "position_sizing": {
+    "mode": "atr_risk",
+    "atr_period": 14,
+    "risk_fraction_of_equity": 0.0035,
+    "max_equity_fraction": 0.05,
+    "min_equity_fraction": 0.01
+  },
+  "frequency": {
+    "max_trades_per_day": 8,
+    "cooldown_bars_after_exit": 1,
+    "max_concurrent_positions": 1
+  },
+  "backtest": {
+    "initial_equity": 10000.0,
+    "candle_5m": "formal_ada_5m_candles_cache.json",
+    "note_zh": "仅使用实盘可获取 OKX K 线；无未来函数。窗口标签必须写清 span_days。"
+  }
+}
