@@ -289,7 +289,7 @@ def submit_codex_strategy(dsl, meta=None, dry_run=False):
             "【三AI理论复核未通过】\n"
             "策略: %s\n"
             "均值理论胜率: %s\n"
-            "均值理论单笔盈利率: %s\n"
+            "均值理论盈利单盈利率: %s\n"
             "原因: %s\n时间: %s"
             % (shown,
                review.get("ai_theoretical_wr_avg"),

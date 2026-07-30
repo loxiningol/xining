@@ -430,33 +430,40 @@ def phase5_unanimous_review(candidate, evidence):
 THEORETICAL_STRATEGY_REVIEW_PROMPT = """你是栖语策略的独立「理论复核官」。你不会看到其他AI的结论。
 任务：评估 Codex 提交的策略在真实成本下是否具备稳健正期望，重点看：
   A) 理论胜率 theoretical_win_rate_pct
-  B) 理论单笔盈利率 theoretical_mean_net_pct（单位：百分比点，例如 3.5 表示单笔净约 +3.5%）
+  B) 理论「盈利单」单笔盈利率 theoretical_mean_net_pct
+     （只统计盈利成交的平均净收益率；单位百分比点，例如 7.5 表示盈利单平均约 +7.5%）
   C) 止损簇风险
 规则：
 1) 不得修改策略；不得因「已经写好」而放宽标准。
-2) deterministic_evidence.safety_metrics 已按【该策略标的+周期】observed_base全摩擦回测；
-   empirical_win_rate / mean_net / max_loss_streak / fold 是该标的真实核算，不是泛化假设。
-   注意：证据里 mean_net 若是小数（如 0.038），换算成百分比点是 3.8；你输出的
-   theoretical_mean_net_pct 必须用百分比点（3.8），不要输出 0.038。
-3) theoretical_win_rate_pct 必须以该标的 empirical_win_rate 为锚做有限折价（通常0-8个百分点），
-   仅当逻辑自相矛盾、明显过拟合或命中已知死因时才可大幅下调；禁止无证据地把75%样本胜率压到50%以下。
-4) theoretical_mean_net_pct 必须以 empirical mean_net（换算成百分比点）为锚做有限折价
-   （通常折价约 5%-20% 相对幅度，或最多下调 0.5~1.5 个百分点），不得无证据地改成负数；
-   样本很小（trades<30）时应更保守，但仍须给出正期望的理论单笔盈利率（若你决定 REJECT 可给更低值）。
+2) deterministic_evidence.safety_metrics 已按【该策略标的+周期】observed_base全摩擦回测。
+   请优先使用：
+   - empirical_win_rate / win_rate
+   - mean_net_win_only_pct（盈利单平均净收益率，百分比点）
+   - mean_net_win_only（盈利单平均，小数口径，如 0.075 = 7.5%）
+   注意：mean_net（含亏损全体均值）仅作参考，禁止再当作 B 项锚点。
+   你输出的 theoretical_mean_net_pct 必须是「盈利单」百分比点，不要输出 0.075。
+3) theoretical_win_rate_pct 必须以 empirical_win_rate 为锚做有限折价（通常0-8个百分点），
+   仅当逻辑自相矛盾、明显过拟合或命中已知死因时才可大幅下调。
+4) theoretical_mean_net_pct 必须以 mean_net_win_only_pct 为锚做有限折价
+   （通常相对折价约 5%-20%，或最多下调 0.5~1.5 个百分点）；样本很小（trades<30）时更保守。
 5) stop_cluster_risk 优先参考 max_loss_streak 与 fold_meta；streak≤2且五折多数为正时，
    不应默认 high。给 stop_cluster_prob（0-1）。
-6) 只有理论胜率≥50且止损簇风险低（low，或概率≤0.30）才可 APPROVE，否则 REJECT。
+6) 硬门槛（必须同时满足才可 APPROVE）：
+   - 理论胜率 ≥ 65
+   - 理论盈利单盈利率 ≥ 5（百分比点）
+   - 止损簇风险低（low，或概率≤0.30）
 7) 证据不足、逻辑自相矛盾、明显依赖未来信息或命中已知死因 → REJECT。
 仅输出一个JSON对象：
 {"candidate_hash":"原样复述","decision":"APPROVE或REJECT",
  "theoretical_win_rate_pct":0到100,
- "theoretical_mean_net_pct":数字（单笔净盈利率，百分比点，可正可负）,
+ "theoretical_mean_net_pct":数字（盈利单平均净盈利率，百分比点）,
  "stop_cluster_risk":"low或medium或high",
  "stop_cluster_prob":0到1,"confidence":0到1,"reason":"中文简述",
  "failure_modes":["..."]}
 """
 
-MIN_THEORETICAL_WR = 50.0
+MIN_THEORETICAL_WR = 65.0
+MIN_THEORETICAL_WIN_MEAN_NET_PCT = 5.0
 MAX_STOP_CLUSTER_PROB = 0.30
 
 
@@ -470,34 +477,43 @@ def _sf_num(x, default=None):
 
 
 def _normalize_mean_net_pct(raw, empirical_mean_net=None):
-    """Normalize AI mean-net into percentage points.
+    """Normalize AI win-only mean-net into percentage points.
 
-    Accepts either percentage points (3.5) or decimal ratio (0.035).
-    If value looks like a ratio (|x|<0.5) while empirical suggests percent-scale,
-    convert *100.
+    Accepts either percentage points (7.5) or decimal ratio (0.075).
     """
     v = _sf_num(raw)
     if v is None:
         return None
     emp = _sf_num(empirical_mean_net)
-    # Heuristic: AI sometimes echoes decimal mean_net (0.03x)
+    # Heuristic: AI sometimes echoes decimal ratio (0.07x)
     if abs(v) < 0.5:
-        # If empirical is also decimal (<0.5), treat both as ratio → percent
         if emp is None or abs(emp) < 0.5:
             return round(v * 100.0, 6)
     return round(v, 6)
 
 
+def _empirical_win_mean_net_pct(evidence):
+    """Prefer win-only empirics from safety_metrics."""
+    sm = ((evidence or {}).get("safety_metrics") or {})
+    for key in ("mean_net_win_only_pct", "win_mean_net_pct",
+                "avg_win_pnl_pct"):
+        v = _sf_num(sm.get(key))
+        if v is not None:
+            return v
+    for key in ("mean_net_win_only", "win_mean_net", "avg_win_pnl_ratio"):
+        v = _sf_num(sm.get(key))
+        if v is not None:
+            return (v * 100.0) if abs(v) < 0.5 else v
+    # Do NOT fall back to all-trade mean_net — that mixes losses.
+    return None
+
+
 def theoretical_review_one(name, candidate, evidence, _retry=True):
-    """Per-provider theoretical WR + mean-net + stop-cluster review."""
+    """Per-provider theoretical WR + win-only mean-net + stop-cluster review."""
     name = _normalize_provider_name(name)
     cfg = _provider_config(name)
     digest = candidate_hash(candidate)
-    emp_mean = None
-    try:
-        emp_mean = ((evidence or {}).get("safety_metrics") or {}).get("mean_net")
-    except Exception:
-        emp_mean = None
+    emp_win_mean_pct = _empirical_win_mean_net_pct(evidence)
     consent = external_research_consent_status(name, "final_review")
     if not consent.get("allowed"):
         return {"provider": name, "ok": False, "decision": "REJECT",
@@ -522,15 +538,19 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
                 "candidate_hash": digest,
                 "candidate": candidate,
                 "deterministic_evidence": evidence,
+                "gates": {
+                    "min_theoretical_win_rate_pct": MIN_THEORETICAL_WR,
+                    "min_theoretical_win_mean_net_pct": MIN_THEORETICAL_WIN_MEAN_NET_PCT,
+                    "max_stop_cluster_prob": MAX_STOP_CLUSTER_PROB,
+                    "mean_net_scope": "winning_trades_only",
+                },
                 "unit_hint": {
                     "theoretical_win_rate_pct": "0-100 percentage points",
                     "theoretical_mean_net_pct": (
-                        "percentage points per trade; empirical mean_net=%.6f "
-                        "→ about %.4f pct points"
-                        % (
-                            float(emp_mean or 0.0),
-                            (float(emp_mean) * 100.0) if emp_mean is not None else 0.0,
-                        )
+                        "winning-trades-only percentage points; "
+                        "empirical mean_net_win_only_pct≈%s"
+                        % (("%.4f" % emp_win_mean_pct)
+                           if emp_win_mean_pct is not None else "unknown")
                     ),
                 },
             })},
@@ -561,9 +581,11 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
         wr = _sf_num(parsed.get("theoretical_win_rate_pct"), 0.0) or 0.0
         mean_net_pct = _normalize_mean_net_pct(
             parsed.get("theoretical_mean_net_pct",
-                       parsed.get("theoretical_per_trade_profit_pct",
-                                  parsed.get("theoretical_mean_net"))),
-            empirical_mean_net=emp_mean,
+                       parsed.get("theoretical_win_mean_net_pct",
+                                  parsed.get("theoretical_per_trade_profit_pct"))),
+            empirical_mean_net=(
+                (emp_win_mean_pct / 100.0) if emp_win_mean_pct is not None else None
+            ),
         )
         risk = str(parsed.get("stop_cluster_risk") or "high").lower()
         if risk not in ("low", "medium", "high"):
@@ -579,6 +601,7 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
             "decision": decision if hash_ok else "REJECT",
             "theoretical_win_rate_pct": wr,
             "theoretical_mean_net_pct": mean_net_pct,
+            "mean_net_scope": "winning_trades_only",
             "stop_cluster_risk": risk,
             "stop_cluster_prob": scp,
             "confidence": parsed.get("confidence"),
@@ -604,16 +627,15 @@ def _provider_theoretical_pass(row):
         return False
     if str(row.get("decision") or "").upper() != "APPROVE":
         return False
-    try:
-        wr = float(row.get("theoretical_win_rate_pct") or 0.0)
-    except Exception:
-        return False
+    wr = _sf_num(row.get("theoretical_win_rate_pct"), 0.0) or 0.0
     if wr < MIN_THEORETICAL_WR - 1e-9:
         return False
+    mean_net_pct = _sf_num(row.get("theoretical_mean_net_pct"))
+    if mean_net_pct is None or mean_net_pct < MIN_THEORETICAL_WIN_MEAN_NET_PCT - 1e-9:
+        return False
     risk = str(row.get("stop_cluster_risk") or "").lower()
-    try:
-        scp = float(row.get("stop_cluster_prob") or 1.0)
-    except Exception:
+    scp = _sf_num(row.get("stop_cluster_prob"), 1.0)
+    if scp is None:
         scp = 1.0
     if risk == "low" or scp <= MAX_STOP_CLUSTER_PROB + 1e-12:
         return True
@@ -710,25 +732,31 @@ def theoretical_review_all(candidate, evidence):
         fail_reasons.append("%s:SKIP_INFRA(%s)" % (
             p, str(row.get("reason") or "unavailable")[:80]))
     policy = (
-        "theoretical_wr_ge_50_stop_cluster_low_healthy_providers_min_%s"
-        % min_voters
+        "theoretical_wr_ge_%s_win_mean_net_ge_%s_stop_cluster_low_healthy_providers_min_%s"
+        % (int(MIN_THEORETICAL_WR), int(MIN_THEORETICAL_WIN_MEAN_NET_PCT), min_voters)
     )
     nl_extra = (
         ("；已忽略不可用: " + ",".join(skipped)) if skipped else ""
     )
     mean_txt = (
-        ("，均值单笔盈利率 %.3f%%" % mean_net_avg)
-        if mean_net_avg is not None else "，单笔盈利率未齐"
+        ("，均值盈利单盈利率 %.3f%%" % mean_net_avg)
+        if mean_net_avg is not None else "，盈利单盈利率未齐"
     )
     return {
         "ok": True,
         "candidate_hash": digest,
         "approved": approved,
         "policy": policy,
+        "gates": {
+            "min_theoretical_win_rate_pct": MIN_THEORETICAL_WR,
+            "min_theoretical_win_mean_net_pct": MIN_THEORETICAL_WIN_MEAN_NET_PCT,
+            "mean_net_scope": "winning_trades_only",
+        },
         "ai_theoretical_wr_by_provider": wr_map,
         "ai_theoretical_wr_avg": round(avg, 3),
         "ai_theoretical_mean_net_by_provider": mean_net_map,
         "ai_theoretical_mean_net_avg": mean_net_avg,
+        "mean_net_scope": "winning_trades_only",
         "ai_stop_cluster_risk_by_provider": risk_map,
         "reviews": reviews,
         "fail_reasons": fail_reasons,

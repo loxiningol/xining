@@ -45,7 +45,8 @@ _JOB = {"running": False, "kind": None, "started_at": None, "error": None}
 LEVERAGE = 20
 STOP_LOSS_PCT = 0.009
 SIM_WR_GATE = 55.0
-FORMAL_WR_GATE = 50.0
+FORMAL_WR_GATE = 65.0
+FORMAL_WIN_MEAN_NET_PCT_GATE = 5.0
 SHARPE_ANTIOF = 0.5
 SHARPE_FRICTION = 0.0
 # Frost gates (寒霜贰续 2026-07-25): WF ≥7/10 aligned with live ADA B.
@@ -1272,24 +1273,52 @@ def formal_ds_qwen_review(definition, packs, book):
             return 0.0
 
     wr_ds, wr_qw = _wr(ds), _wr(qw)
-    ds_ok = bool(ds.get("ok")) and str(ds.get("decision")).upper() == "APPROVE" and wr_ds >= FORMAL_WR_GATE
-    qw_ok = bool(qw.get("ok")) and str(qw.get("decision")).upper() == "APPROVE" and wr_qw >= FORMAL_WR_GATE
-    # Also allow pass on WR gate even if decision text flaky, if both WR≥50 and ok
-    if not (ds_ok and qw_ok):
-        if (bool(ds.get("ok")) and bool(qw.get("ok"))
-                and wr_ds >= FORMAL_WR_GATE and wr_qw >= FORMAL_WR_GATE
-                and str(ds.get("stop_cluster_risk") or "high") == "low"
-                and str(qw.get("stop_cluster_risk") or "high") == "low"):
-            ds_ok = qw_ok = True
+
+    def _mn(row):
+        try:
+            v = row.get("theoretical_mean_net_pct")
+            return float(v) if v is not None else None
+        except Exception:
+            return None
+
+    mn_ds, mn_qw = _mn(ds), _mn(qw)
+
+    def _ok(row, wr, mn):
+        if not (row.get("ok") and str(row.get("decision") or "").upper() == "APPROVE"):
+            return False
+        if wr < FORMAL_WR_GATE:
+            return False
+        if mn is None or mn < FORMAL_WIN_MEAN_NET_PCT_GATE:
+            return False
+        risk = str(row.get("stop_cluster_risk") or "high").lower()
+        try:
+            scp = float(row.get("stop_cluster_prob") or 1.0)
+        except Exception:
+            scp = 1.0
+        return risk == "low" or scp <= 0.30
+
+    ds_ok = _ok(ds, wr_ds, mn_ds)
+    qw_ok = _ok(qw, wr_qw, mn_qw)
     mean = round((wr_ds + wr_qw) / 2.0, 3) if (wr_ds or wr_qw) else None
+    mn_vals = [x for x in (mn_ds, mn_qw) if x is not None]
+    mean_net = round(sum(mn_vals) / float(len(mn_vals)), 6) if mn_vals else None
     approved = bool(ds_ok and qw_ok)
-    annotation = "DeepSeek %.1f%% | Qwen %.1f%% | mean %.1f%%" % (
-        wr_ds, wr_qw, mean or 0.0)
+    annotation = (
+        "DeepSeek WR %.1f%% / 盈利单 %.2f%% | Qwen WR %.1f%% / 盈利单 %.2f%% | "
+        "mean WR %.1f%% / 盈利单 %.2f%%"
+        % (wr_ds, mn_ds or 0.0, wr_qw, mn_qw or 0.0, mean or 0.0, mean_net or 0.0)
+    )
     ai_review = {
         "approved": approved,
-        "policy": "deepseek_and_qwen_formal_only_ge_50",
+        "policy": "deepseek_and_qwen_formal_wr_ge_%s_win_mean_ge_%s"
+        % (int(FORMAL_WR_GATE), int(FORMAL_WIN_MEAN_NET_PCT_GATE)),
         "ai_theoretical_wr_avg": mean,
         "ai_theoretical_wr_by_provider": {"deepseek": wr_ds, "qwen": wr_qw},
+        "ai_theoretical_mean_net_avg": mean_net,
+        "ai_theoretical_mean_net_by_provider": {
+            "deepseek": mn_ds, "qwen": mn_qw,
+        },
+        "mean_net_scope": "winning_trades_only",
         "ai_stop_cluster_risk_by_provider": {
             "deepseek": ds.get("stop_cluster_risk"),
             "qwen": qw.get("stop_cluster_risk"),
@@ -1297,6 +1326,7 @@ def formal_ds_qwen_review(definition, packs, book):
         "natural_language": annotation,
         "reviews": [ds, qw],
         "gate": FORMAL_WR_GATE,
+        "win_mean_net_gate": FORMAL_WIN_MEAN_NET_PCT_GATE,
     }
     return {
         "ok": True,

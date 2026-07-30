@@ -33,7 +33,7 @@ class CardTests(unittest.TestCase):
             ai_theoretical_mean_net_avg=3.2,
         )
         self.assertIn("三AI理论胜率 74.7%", card)
-        self.assertIn("三AI理论单笔盈利率 +3.200%", card)
+        self.assertIn("三AI理论盈利单盈利率 +3.200%", card)
 
 
 if __name__ == "__main__":

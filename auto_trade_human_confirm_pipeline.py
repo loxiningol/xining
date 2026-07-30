@@ -495,7 +495,10 @@ def safety_screen_candidate(cand):
         pnls = [float(t.get("pnl_ratio") or 0.0) for t in trades]
         n = len(pnls)
         mean = (sum(pnls) / float(n)) if n else None
-        wins = sum(1 for p in pnls if p > 0)
+        win_pnls = [p for p in pnls if p > 0]
+        mean_win = (sum(win_pnls) / float(len(win_pnls))) if win_pnls else None
+        mean_win_pct = (mean_win * 100.0) if mean_win is not None else None
+        wins = len(win_pnls)
         wr = (wins / float(n) * 100.0) if n else None
         max_dd = _max_drawdown(pnls) if pnls else None
         fold_ok, fold_means, fold_meta = _five_fold_pass(trades, min_positive=4)
@@ -509,6 +512,9 @@ def safety_screen_candidate(cand):
         metrics.update({
             "trades": n,
             "mean_net": mean,
+            "mean_net_win_only": mean_win,
+            "mean_net_win_only_pct": mean_win_pct,
+            "win_trades": wins,
             "win_rate": wr,
             "max_drawdown": max_dd,
             "fold_means": fold_means,
@@ -532,7 +538,10 @@ def safety_screen_candidate(cand):
                 "scenario": "observed_base",
             },
             "evidence_backtest": {
-                "trades": n, "mean_net": mean, "win_rate": wr,
+                "trades": n, "mean_net": mean,
+                "mean_net_win_only": mean_win,
+                "mean_net_win_only_pct": mean_win_pct,
+                "win_trades": wins, "win_rate": wr,
                 "max_drawdown": max_dd, "max_loss_streak": mx_streak,
                 "symbol": symbol, "timeframe": timeframe,
                 "advisory_only": True,
@@ -695,10 +704,10 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         "Calmar: {calmar} · Payoff: {payoff}\n"
         "Cross-asset score: {cross} · Mean MAE: {mae}\n"
         "三AI理论胜率均值: {avg}\n"
-        "三AI理论单笔盈利率均值: {mean_net}\n"
+        "三AI理论盈利单盈利率均值: {mean_net}\n"
         "分项胜率: DS {ds} / Qwen {qw} / GLM {gpt}\n"
-        "分项单笔盈利率: DS {ds_mn} / Qwen {qw_mn} / GLM {gpt_mn}\n"
-        "回测证据(仅参考): 净均值 {mean} · 样本 {n} · 机器胜率 {wr}\n"
+        "分项盈利单盈利率: DS {ds_mn} / Qwen {qw_mn} / GLM {gpt_mn}\n"
+        "回测证据(仅参考): 盈利单净均值 {mean_win} · 全体净均值 {mean} · 样本 {n} · 机器胜率 {wr}\n"
         "production_mounted=False（需人工 --confirm 才上 B级30%/20x/SL0.9%）\n"
         "确认指令: python3 auto_trade_human_confirm_pipeline.py --confirm {key}\n"
         "拒绝指令: python3 auto_trade_human_confirm_pipeline.py --reject {key}\n"
@@ -714,6 +723,11 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         ds_mn=mean_net_map.get("deepseek"), qw_mn=mean_net_map.get("qwen"),
         gpt_mn=mean_net_map.get("glm", mean_net_map.get("chatgpt")),
         mean=metrics.get("mean_net"),
+        mean_win=(
+            metrics.get("mean_net_win_only_pct")
+            if metrics.get("mean_net_win_only_pct") is not None
+            else metrics.get("mean_net_win_only")
+        ),
         n=int(metrics.get("trades") or 0),
         wr=metrics.get("win_rate"),
         t=_now(),

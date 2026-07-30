@@ -248,7 +248,7 @@ def format_live_strategy_card(strategy_key, strategy_name=None, grade=None,
       B
       仓位 30%
       三AI理论胜率 74.3%
-      三AI理论单笔盈利率 +3.2%
+      三AI理论盈利单盈利率 +7.2%
     """
     title = short_strategy_title(strategy_key, strategy_name)
     lines = [title or str(strategy_key or "未命名策略")]
@@ -268,7 +268,7 @@ def format_live_strategy_card(strategy_key, strategy_name=None, grade=None,
         if (ai_theoretical_mean_net_avg is not None
                 and ai_theoretical_mean_net_avg != ""):
             lines.append(
-                "三AI理论单笔盈利率 %+.3f%%" % float(ai_theoretical_mean_net_avg)
+                "三AI理论盈利单盈利率 %+.3f%%" % float(ai_theoretical_mean_net_avg)
             )
     except Exception:
         pass
