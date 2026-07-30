@@ -754,22 +754,25 @@ def build_slots_board(vector_root=None, display_history=5):
         "slots": slots,
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "note_zh": (
-            "自主三复核流水线：第一次复核（机制/忠实度/密度）→第二次复核（单标的稳定性）"
-            "→第三次复核（适应度/矩阵/四维）。失败则 AI 优化≤3 轮，仍失败则 WxPusher 失败播报并归档；"
-            "三复核全过走原人工确认通道，永不自动上线。"
+            "创立后复核已重构为 ADA-T3 校准三复核：第一次（安全结构）→第二次（证据稳定性："
+            "成交≥10 / 胜率≥50% / 净值均值>0）→第三次（AI+人工确认 Wx）。"
+            "旧 L0/L1/Gate2 硬门槛仅作标签，不再阻塞准入。"
             "本机可用内存约 %dMB / 总量 %dMB，并发卡槽容量 %d。"
             "已完成(100%%)卡槽最多展示 %d 个；累计≥3 时自动归档最旧记录，不再显示。"
-            "正式第三次复核门槛不降（Payoff≥2.5 / Calmar≥1.5）。"
+            "失败则 AI 优化≤3 轮后 Wx 失败播报归档；全过走原人工确认通道，永不自动上线。"
             % (avail_mb, total_mb, capacity, MAX_COMPLETED_VISIBLE)
         ),
         "funnel": {
-            "name": "three_review_v1",
+            "name": "admission_v2_ada_t3",
             "stages": ["第一次复核", "第二次复核", "第三次复核"],
             "stages_compact": ["R1", "R2", "R3"],
-            "formal_gate2_floors": {"payoff": 2.5, "calmar": 1.5},
+            "blocking_profile": "ada_t3_calibrated_v1",
+            "legacy_floors_advisory": True,
+            "formal_gate2_floors": {"payoff": 2.5, "calmar": 1.5, "blocking": False},
             "max_ai_optimize": 3,
             "wx_human_confirm_kind": "strategy_pending_confirm",
             "wx_failure_kind": "strategy_review_failed",
+            "golden_sample": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
         },
         "human_confirm_required": True,
         "auto_mount": False,
