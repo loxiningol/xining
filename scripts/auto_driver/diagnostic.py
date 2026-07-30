@@ -129,7 +129,7 @@ def _main_cause_l0(l0):
     dens = m.get("density")
     return {
         "code": "REJECT_TOO_RARE" if "REJECT_TOO_RARE" in rejects else (rejects[0] if rejects else "l0_fail"),
-        "title_zh": "开仓密度过稀 (L0 Density Cull)",
+        "title_zh": "第一次复核：开仓密度过稀",
         "detail_zh": "历史触发 %s/%s（密度 %s）；拒绝进入矩阵回测以节省算力"
         % (
             trig if trig is not None else "—",
@@ -156,7 +156,7 @@ def _main_cause_l1(l1):
         return {
             "code": "weak_payoff",
             "title_zh": "盈亏比过低 (Weak Payoff)",
-            "detail_zh": "L1 payoff 未越过 1.2 门槛，边不够厚",
+            "detail_zh": "第二次复核 payoff 未越过 1.2 门槛，边不够厚",
         }
     if "severe_mae_gt_2.5x_avg_win" in rejects:
         return {
@@ -173,7 +173,7 @@ def _main_cause_l1(l1):
         }
     return {
         "code": "l1_fail",
-        "title_zh": "L1 微观筛选未过",
+        "title_zh": "第二次复核未过",
         "detail_zh": "样本或收益期望未达标",
     }
 
@@ -183,7 +183,7 @@ def _main_cause_gate2(g2):
     tags = list(g2.get("verdict_tags") or [])
     parts = [_CHECK_ZH.get(x, x) for x in failed[:4]]
     tag_zh = [_TAG_ZH.get(t, t) for t in tags[:3]]
-    title = "Gate2 适应度门禁未过"
+    title = "第三次复核：适应度门禁未过"
     if "remove_max_win_stable" in failed or "lottery_overfitting" in tags:
         title = "彩票单 / 过拟合风险 (Lottery Overfit)"
     elif "worst5_loss_share_le_40pct" in failed:
@@ -212,7 +212,7 @@ def _bottlenecks(stage, l1, g2, conds, family, l0=None):
 
     if stage == "l0":
         notes.append(
-            "L0 触发 %s / %s（密度 %s），低于秒杀阈值；勿上矩阵。"
+            "第一次复核触发 %s / %s（密度 %s），低于秒杀阈值；勿上矩阵。"
             % (l0m.get("triggers"), l0m.get("evaluated_bars"), l0m.get("density"))
         )
         if thr is not None:
@@ -269,7 +269,7 @@ def _ai_prompt(stage, title_zh, family, l1, g2, cause, bottlenecks, symbol, time
     l0m = l0.get("metrics") or {}
     if stage == "l0":
         tip = (
-            "策略 %s（%s）在 L0 开仓密度预检被秒杀：触发 %s/%s（密度 %s）。"
+            "策略 %s（%s）在第一次复核被秒杀：触发 %s/%s（密度 %s）。"
             % (
                 fam, title_zh,
                 l0m.get("triggers"), l0m.get("evaluated_bars"), l0m.get("density"),
@@ -279,7 +279,7 @@ def _ai_prompt(stage, title_zh, family, l1, g2, cause, bottlenecks, symbol, time
             tip += " " + bottlenecks[0]
         tip += (
             " 下一轮：保留扫荡+收回因果核心，优先下调 vol_z / 减少 AND 条数以抬密度；"
-            "通过 L0 后再谈锚定 L1 / 矩阵。正式 Gate2 门槛（payoff≥2.5 / calmar≥1.5）不降；禁止自动上实盘。"
+            "通过第一次复核后再谈第二次复核 / 矩阵。正式第三次复核门槛（payoff≥2.5 / calmar≥1.5）不降；禁止自动上实盘。"
         )
         return tip
     if stage == "l1":
@@ -287,19 +287,19 @@ def _ai_prompt(stage, title_zh, family, l1, g2, cause, bottlenecks, symbol, time
         pay = l1.get("payoff_ratio")
         rej = ",".join(l1.get("reject_reasons") or []) or cause.get("code")
         tip = (
-            "策略 %s（%s）在 L1 因「%s」淘汰。关键数据：n=%s，payoff=%s，reject=%s。"
+            "策略 %s（%s）在第二次复核因「%s」淘汰。关键数据：n=%s，payoff=%s，reject=%s。"
             % (fam, title_zh, cause.get("title_zh"), n, _fmt(pay), rej)
         )
         if bottlenecks:
             tip += " 条件堵塞：" + bottlenecks[0]
         tip += (
-            " 下一轮请在不降低 Gate2 正式门槛（payoff≥2.5 / calmar≥1.5）的前提下，"
+            " 下一轮请在不降低第三次复核正式门槛（payoff≥2.5 / calmar≥1.5）的前提下，"
             "优先放松非因果核心过滤或改时框/矩阵扩样本；禁止自动上实盘。"
         )
         return tip
     if stage == "gate2":
         tip = (
-            "策略 %s（%s）过了 L1 但倒在 Gate2：%s。关键数据：payoff=%s，calmar=%s，w5=%s，failed=%s。"
+            "策略 %s（%s）过了第二次复核但倒在第三次复核：%s。关键数据：payoff=%s，calmar=%s，w5=%s，failed=%s。"
             % (
                 fam, title_zh, cause.get("title_zh"),
                 _fmt(g2.get("payoff_ratio")), _fmt(g2.get("calmar")),
@@ -310,8 +310,8 @@ def _ai_prompt(stage, title_zh, family, l1, g2, cause, bottlenecks, symbol, time
         if bottlenecks:
             tip += " 诊断：" + bottlenecks[0]
         tip += (
-            " 下一轮禁止降低 Gate2 门槛；优先改 exit / scale-out / 多标的矩阵平滑，"
-            "Gate2-after-L1 时不要砍 entry 导致样本回落。"
+            " 下一轮禁止降低第三次复核门槛；优先改 exit / scale-out / 多标的矩阵平滑，"
+            "第三次复核阶段不要砍 entry 导致样本回落。"
         )
         return tip
     if stage in ("kb", "spec"):
@@ -320,7 +320,7 @@ def _ai_prompt(stage, title_zh, family, l1, g2, cause, bottlenecks, symbol, time
             % (fam, title_zh, symbol or "?", timeframe or "?", cause.get("title_zh") or "未知")
         )
     return (
-        "策略 %s（%s / %s %s）演进失败：%s。先补齐 L0/L1/Gate2 证据快照再决定是微扰还是换族。"
+        "策略 %s（%s / %s %s）演进失败：%s。先补齐三复核证据快照再决定是微扰还是换族。"
         % (fam, title_zh, symbol or "?", timeframe or "?", cause.get("title_zh") or "未知")
     )
 
@@ -365,13 +365,13 @@ def build_diagnostic(ctx=None, result=None, pack=None, title_zh=None,
 
         if stage == "l0":
             cause = _main_cause_l0(l0)
-            culled_at = "L0 开仓密度预检"
+            culled_at = "第一次复核 · 开仓密度预检"
         elif stage == "l1":
             cause = _main_cause_l1(l1)
-            culled_at = "L1 微观筛选器"
+            culled_at = "第二次复核 · 单标的稳定性"
         elif stage == "gate2":
             cause = _main_cause_gate2(g2)
-            culled_at = "Gate2 / L2 门禁"
+            culled_at = "第三次复核 · 适应度 / 矩阵"
         elif stage == "kb":
             cause = {"code": "kb_blocked", "title_zh": "Failure KB 负面指纹拦截", "detail_zh": "该机制路径已被归档封锁"}
             culled_at = "Failure KB"
@@ -379,7 +379,7 @@ def build_diagnostic(ctx=None, result=None, pack=None, title_zh=None,
             cause = {"code": "immutable_spec", "title_zh": "不可协商规格冲突", "detail_zh": "补丁触犯 non_negotiable / DSL 硬边界"}
             culled_at = "规格门禁"
         else:
-            cause = {"code": str(reason or "unknown"), "title_zh": humanizer.humanize_code(reason) or "状态未完整落盘", "detail_zh": "缺少足够的 L0/L1/Gate2 证据快照"}
+            cause = {"code": str(reason or "unknown"), "title_zh": humanizer.humanize_code(reason) or "状态未完整落盘", "detail_zh": "缺少足够的三复核证据快照"}
             culled_at = "未知阶段"
 
         bottlenecks = _bottlenecks(stage, l1, g2, conds, family, l0=l0)
@@ -396,7 +396,7 @@ def build_diagnostic(ctx=None, result=None, pack=None, title_zh=None,
                 "density": l0m.get("density"),
             }
             fatal_line = (
-                "L0 触发次数 = %s / 评估K线 = %s | 密度 = %s | 阈值 = ≥%s"
+                "第一次复核触发 = %s / 评估K线 = %s | 密度 = %s | 阈值 = ≥%s"
                 % (
                     fatal["n"] if fatal["n"] is not None else "—",
                     fatal.get("evaluated_bars") if fatal.get("evaluated_bars") is not None else "—",

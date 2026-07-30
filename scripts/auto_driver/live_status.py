@@ -104,7 +104,9 @@ def humanize_causal_blurb(mechanism_spec=None, fallback=None):
 
 
 def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
-    """Build pipeline checklist for UI (lightweight funnel: G0→G1→L0→L1→G2→4D)."""
+    """Build pipeline checklist for UI (user-facing: 第一/二/三次复核)."""
+    from . import review_lexicon as lex
+
     reason = str(reason or "")
     l1 = l1 or {}
     l0 = l0 or {}
@@ -131,7 +133,7 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
     reached_l0 = is_l0_fail or is_l1_fail or reason in (
         "repair_exhausted_or_drift", "gate2_3_fail", "ok", "success",
     ) or bool(l0) or bool(l1)
-    # Gate0/1 are upstream of L0; if we have an L0/L1 verdict they already passed
+    # Review-1 upstream of density; if density/stability verdict exists they passed
     reached_gates = reached_l0 or reason not in ("", "exception", "kb_blocked")
     l0_pass = bool(l0.get("pass")) or (reached_l0 and not is_l0_fail and (
         is_l1_fail or reason in ("repair_exhausted_or_drift", "gate2_3_fail", "ok", "success")
@@ -147,19 +149,19 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
     rows = [
         {
             "id": "gate0",
-            "label": "Gate0 机制完整性",
+            "label": lex.pipe_label("gate0"),
             "status": _st(g0.get("pass") if g0 else reached_gates),
             "detail": "语义完整 / 因果闭环" if (g0.get("pass") or reached_gates) else (reason or "待执行"),
         },
         {
             "id": "gate1",
-            "label": "Gate1 代码忠实度",
+            "label": lex.pipe_label("gate1"),
             "status": _st(g1.get("pass") if g1 else reached_l0),
             "detail": "DSL 语法通过" if reached_l0 else "待执行",
         },
         {
             "id": "l0",
-            "label": "L0 开仓密度预检",
+            "label": lex.pipe_label("l0"),
             "status": (
                 "done" if l0_pass else (
                     "fail" if is_l0_fail else (
@@ -180,7 +182,7 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
         },
         {
             "id": "l1",
-            "label": "L1 微观筛选器",
+            "label": lex.pipe_label("l1"),
             "status": (
                 "done" if l1_pass else (
                     "fail" if is_l1_fail or (reached_l1 and not l1_pass) else (
@@ -194,13 +196,13 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
                     ("%.2f" % float(l1["payoff_ratio"])) if l1.get("payoff_ratio") is not None else "—",
                 )
                 if reached_l1 and not is_l0_fail else (
-                    "未进入（L0 未过）" if is_l0_fail else "待执行"
+                    "未进入（第一次复核未过）" if is_l0_fail else "待执行"
                 )
             ),
         },
         {
             "id": "gate2",
-            "label": "Gate2 / L2 门禁",
+            "label": lex.pipe_label("gate2"),
             "status": "done" if g2_pass else ("fail" if (g2_running or reason in ("repair_exhausted_or_drift", "gate2_3_fail")) else "pending"),
             "detail": (
                 "Calmar=%s, Payoff=%s, w5=%s" % (
@@ -213,9 +215,9 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
         },
         {
             "id": "audit4d",
-            "label": "四维攻击复核",
+            "label": lex.pipe_label("audit4d"),
             "status": "done" if g2_pass else "pending",
-            "detail": "未进入 (Gate2 未过)" if not g2_pass else "进入四维复核 (因果 / 博弈 / 回测诚信 / 执行摩擦)",
+            "detail": "未进入（第三次复核未过）" if not g2_pass else "进入四维攻击（因果 / 博弈 / 回测诚信 / 执行摩擦）",
         },
     ]
     return rows
@@ -391,7 +393,7 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
         "engine": {
             "name": "真挚之语 (True Words) 自主量化演进引擎",
             "version": "v2.5",
-            "roles": "GLM-5.2 总设计师 · Codex 总工程师 · 四维正式复核",
+            "roles": "GLM-5.2 总设计师 · Codex 总工程师 · 三复核 + 人工确认",
         },
         "strategy": {
             "title_zh": title,

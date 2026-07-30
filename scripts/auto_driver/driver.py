@@ -15,6 +15,8 @@ from . import live_status
 from . import metrics
 from . import patch_apply
 from . import report
+from . import review_lexicon as review_lex
+from . import review_notify
 
 
 def _pub(cfg, state, pack, phase="running", result=None, seed_idx=None, seed_max=None, message=None):
@@ -280,6 +282,11 @@ def run_driver(cfg):
         "ai_abort": False,
         "ai_abort_reason": None,
         "kb_blocked_exhausted": False,
+        "ai_optimize_count": 0,
+        "ai_optimize_cap_hit": False,
+        "wx_notify": None,
+        "archive_record": None,
+        "human_confirm": None,
         "final_status": None,
         "stop_code": None,
         "stop_detail": {},
@@ -288,16 +295,22 @@ def run_driver(cfg):
         "n_iterations": 0,
     }
 
-    max_iter = int(cfg.get("max_iterations") or 10)
+    max_iter = int(cfg.get("max_iterations") or 4)  # 1 eval + ≤3 AI rounds by default
+    max_ai_optimize = int(cfg.get("max_ai_optimize") or 3)
     kb_bumps = 0
     max_kb_bumps = int(cfg.get("max_kb_family_bumps") or 3)
     cfg = dict(cfg)
     cfg["workdir"] = str(workdir)
+    cfg["max_ai_optimize"] = max_ai_optimize
     cfg["_t0"] = t_start
     state["_t0"] = t_start
 
-    print("[auto_driver] start workdir=%s pack=%s dry_run=%s" % (workdir, pack_path, dry_run), flush=True)
-    _pub(cfg, state, pack, phase="running", message="Auto-Driver 启动")
+    print(
+        "[auto_driver] start workdir=%s pack=%s dry_run=%s max_ai_optimize=%d"
+        % (workdir, pack_path, dry_run, max_ai_optimize),
+        flush=True,
+    )
+    _pub(cfg, state, pack, phase="running", message="Auto-Driver 启动 · 三复核流水线")
 
     for iteration in range(1, max_iter + 1):
         state["n_iterations"] = iteration
@@ -433,11 +446,33 @@ def run_driver(cfg):
             ))
             break
 
-        # --- AI optimize ---
+        # --- AI optimize (hard cap ≤ max_ai_optimize, default 3) ---
+        if int(state.get("ai_optimize_count") or 0) >= max_ai_optimize:
+            state["ai_optimize_cap_hit"] = True
+            state["stop_code"] = "MAX_AI_OPTIMIZE"
+            state["stop_detail"] = {
+                "message": "ai_optimize_rounds_exhausted",
+                "ai_optimize_count": state.get("ai_optimize_count"),
+                "max_ai_optimize": max_ai_optimize,
+                "last_reason": reason,
+            }
+            state["iterations"].append(_iter_record(
+                iteration, result, ctx, elapsed,
+                ai_decision="MAX_AI_OPTIMIZE", applied=[],
+                ai_rationale="AI optimize cap reached; refuse further decorate",
+                limit_reason="max_ai_optimize=%d" % max_ai_optimize,
+            ))
+            _dump_json(iter_dir / "pack.after.json", pack)
+            _pub(cfg, state, pack, phase="max_ai_optimize", result=result,
+                 message="AI 优化已达上限 %d 轮" % max_ai_optimize)
+            print("[auto_driver] MAX_AI_OPTIMIZE hit (%d) → stop" % max_ai_optimize, flush=True)
+            break
+
         history = ai_optimize.history_tail_from_iterations(state["iterations"], n=3)
         state["elapsed_sec"] = round(time.time() - t_start, 2)
         _pub(cfg, state, pack, phase="calling_ai", result=result,
-             message="三方 AI 出补丁中")
+             message="三方 AI 出补丁中（%d/%d）" % (
+                 int(state.get("ai_optimize_count") or 0) + 1, max_ai_optimize))
         if dry_run and cfg.get("dry_run_skip_ai"):
             merged = {
                 "decision": "LIMIT_REACHED",
@@ -447,13 +482,15 @@ def run_driver(cfg):
                 "provider_rows": [],
             }
         else:
-            print("[auto_driver] calling AI providers: %s" % providers, flush=True)
+            print("[auto_driver] calling AI providers: %s (round %d/%d)" % (
+                providers, int(state.get("ai_optimize_count") or 0) + 1, max_ai_optimize), flush=True)
             rows = ai_optimize.propose_from_all(
                 providers, ctx, history_tail=history,
                 max_tokens=int(cfg.get("ai_max_tokens") or 2800),
             )
             _dump_json(iter_dir / "ai_provider_rows.json", rows)
             merged = ai_optimize.merge_proposals(rows, prefer_provider=prefer)
+            state["ai_optimize_count"] = int(state.get("ai_optimize_count") or 0) + 1
         _dump_json(iter_dir / "ai_merged.json", merged)
 
         ai_decision = str(merged.get("decision") or "").upper()
@@ -593,7 +630,13 @@ def run_driver(cfg):
         state["stop_code"] = state.get("stop_code") or "SUCCESS"
     else:
         stop, code, detail = limits.detect_limits(state, cfg)
-        if not state.get("stop_code"):
+        if state.get("ai_optimize_cap_hit") and not state.get("stop_code"):
+            state["stop_code"] = "MAX_AI_OPTIMIZE"
+            state["stop_detail"] = detail or {
+                "message": "ai_optimize_rounds_exhausted",
+                "ai_optimize_count": state.get("ai_optimize_count"),
+            }
+        elif not state.get("stop_code"):
             state["stop_code"] = code or "MAX_ITERATIONS"
             state["stop_detail"] = detail or {"message": "loop_ended"}
         state["final_status"] = "LIMIT_REACHED_FAILED"
@@ -616,6 +659,78 @@ def run_driver(cfg):
         shutil.copyfile(str(report_path), str(dest))
         print("[auto_driver] report copied to %s" % dest, flush=True)
 
+    # ── WxPusher terminal hooks (same channel as human confirm) ──────────
+    # SUCCESS: reuse existing strategy_pending_confirm path (pipeline may
+    # already have enqueued). FAIL: NEW strategy_review_failed + archive.
+    last_reason = None
+    last_diag_cause = None
+    iters = state.get("iterations") or []
+    if iters:
+        last_reason = iters[-1].get("pipeline_reason")
+        diag = iters[-1].get("diagnostic") or {}
+        if isinstance(diag, dict):
+            last_diag_cause = (
+                (diag.get("main_cause") or {}).get("title_zh")
+                or diag.get("main_cause_line")
+                or diag.get("fatal_line")
+            )
+    review_n = review_lex.review_n_from_reason(last_reason) or review_lex.review_n_from_reason(
+        state.get("stop_code")
+    )
+
+    if state.get("success") and not dry_run and not cfg.get("skip_wx_notify"):
+        # Prefer the last successful pipeline result if available on disk
+        success_result = {}
+        try:
+            for seed_file in sorted(workdir.glob("iter_*_seed_*_result.json"), reverse=True):
+                blob = _load_json(seed_file)
+                r = (blob or {}).get("result") or {}
+                if r.get("ok"):
+                    success_result = r
+                    break
+        except Exception:
+            success_result = {}
+        hc = review_notify.ensure_human_confirm_on_success(
+            result=success_result, pack=final_pack, cfg=cfg,
+        )
+        state["human_confirm"] = hc
+        print("[auto_driver] human_confirm channel=%s ok=%s key=%s" % (
+            hc.get("channel"), hc.get("ok"), hc.get("key")), flush=True)
+    elif (not state.get("success")) and not dry_run and not cfg.get("skip_wx_notify"):
+        skip_fail_wx = bool(cfg.get("skip_failure_wx"))
+        arch = review_notify.archive_failed_pack(
+            final_pack,
+            reason=last_reason,
+            review_n=review_n,
+            stop_code=state.get("stop_code"),
+            workdir=workdir,
+            vector_root=root,
+            extra={
+                "final_status": state.get("final_status"),
+                "ai_optimize_count": state.get("ai_optimize_count"),
+            },
+        )
+        state["archive_record"] = arch
+        if not skip_fail_wx:
+            wx = review_notify.notify_strategy_failure(
+                pack=final_pack,
+                cfg=cfg,
+                reason=last_reason,
+                stop_code=state.get("stop_code"),
+                review_n=review_n,
+                core_cause=last_diag_cause or last_reason or state.get("ai_limit_reason"),
+                ai_optimize_used=state.get("ai_optimize_count"),
+                archive_record=arch,
+                dry_run=False,
+            )
+            state["wx_notify"] = wx
+            print("[auto_driver] failure_wx kind=strategy_review_failed sent=%s review=%s" % (
+                wx.get("sent"), review_lex.review_label(review_n)), flush=True)
+        else:
+            print("[auto_driver] failure archived at %s (wx skipped)" % arch.get("pack_path"), flush=True)
+
+    _dump_json(workdir / "driver_state.json", state)
+
     end_phase = "success" if state.get("success") else str(state.get("stop_code") or "limit_reached_failed").lower()
     _pub(cfg, state, final_pack, phase=end_phase,
          message="终态 %s · %s · 报告 %s" % (
@@ -631,6 +746,9 @@ def run_driver(cfg):
         "report_path": str(report_path),
         "state": state,
         "final_pack": final_pack,
+        "human_confirm": state.get("human_confirm"),
+        "archive_record": state.get("archive_record"),
+        "wx_notify": state.get("wx_notify"),
     }
 
 
@@ -649,6 +767,7 @@ def _iter_record(iteration, result, ctx, elapsed, ai_decision=None, applied=None
         "failed_checks": g2.get("failed_checks"),
         "l1_reject": l1.get("reject_reasons"),
         "l1": l1,
+        "l0": ctx.get("l0") or {},
         "gate2": {
             "payoff_ratio": g2.get("payoff_ratio"),
             "calmar": g2.get("calmar"),

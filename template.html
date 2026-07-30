@@ -926,23 +926,31 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   }
   function humanizeLeak(text){
     // Client-side safety net: never show SCREAMING_SNAKE enums raw.
+    // User-facing lexicon: 第一/二/三次复核 (purge Gate/L codes from UI).
     const map={
       LIMIT_REACHED_FAILED:'触达当前机制演进极限（已自动归档）',
       LIMIT_REACHED:'触达当前机制演进极限（已自动归档）',
       NO_PROGRESS_REPEATED_REASON:'策略参数陷入局部收敛，连续多轮无性能突破',
-      SUCCESS:'完美穿透全关卡，策略待人工签发',
+      SUCCESS:'三次复核均已通过，策略待人工确认签发',
       CONVERGED_NO_IMPROVEMENT:'统计指标已达帕累托前沿，终止微扰',
       MAX_ITERATIONS:'已用尽本轮演进配额，自动收束',
+      MAX_AI_OPTIMIZE:'AI 优化已达上限（≤3 轮），策略失败归档',
       AI_LIMIT_REACHED:'智能体判定已无优化空间，归档机制族',
       AI_ABORT:'触发不可协商风控红线，已主动中止',
-      funnel_l0_cull:'开仓密度预检过滤（触发过稀）',
-      funnel_l0_fail:'开仓密度预检未过（逻辑过稀 / AND 堵塞）',
-      funnel_l1_cull:'微观筛选过滤（样本量或期望不足）',
-      funnel_l1_fail:'微观筛选未过（样本或收益期望不足）',
+      funnel_l0_cull:'第一次复核未过：开仓密度过稀',
+      funnel_l0_fail:'第一次复核未过：开仓密度不足 / 逻辑过稀',
+      funnel_l1_cull:'第二次复核未过：样本量或期望不足',
+      funnel_l1_fail:'第二次复核未过：单标的稳定性不足',
       insufficient_evidence:'统计证据不足（未达到显著性要求）',
       kb_blocked:'触发 Failure KB 负面指纹拦截',
-      repair_exhausted_or_drift:'修补次数耗尽或出现逻辑漂移',
-      gate2_3_fail:'Gate2 适应度门禁未过'
+      repair_exhausted_or_drift:'第三次复核未过：修补耗尽或逻辑漂移',
+      gate2_3_fail:'第三次复核未过：适应度 / 矩阵门禁',
+      pretest_quality_fail:'第一次复核未过：预检契约失败',
+      'Gate0':'第一次复核',
+      'Gate1':'第一次复核',
+      'Gate2':'第三次复核',
+      'L0':'第一次复核',
+      'L1':'第二次复核'
     };
     let s=String(text===null||text===undefined?'':text);
     Object.keys(map).forEach(function(k){

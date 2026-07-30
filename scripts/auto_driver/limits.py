@@ -9,6 +9,7 @@ def detect_limits(state, cfg):
     Codes:
       SUCCESS
       MAX_ITERATIONS
+      MAX_AI_OPTIMIZE
       CONVERGED_NO_IMPROVEMENT
       AI_LIMIT_REACHED
       AI_ABORT
@@ -17,12 +18,31 @@ def detect_limits(state, cfg):
     """
     iterations = state.get("iterations") or []
     max_iter = int(cfg.get("max_iterations") or 10)
+    max_ai = int(cfg.get("max_ai_optimize") or 3)
     eps = float(cfg.get("convergence_eps") or 0.02)
     patience = int(cfg.get("convergence_patience") or 3)
     stagnant_reason_n = int(cfg.get("stagnant_reason_patience") or 4)
 
     if state.get("success"):
-        return True, "SUCCESS", {"message": "strategy_passed_pipeline"}
+        return True, "SUCCESS", {"message": "strategy_passed_three_reviews"}
+
+    ai_used = int(state.get("ai_optimize_count") or 0)
+    if ai_used <= 0:
+        # Count recorded AI decisions that were real optimize rounds
+        for it in iterations:
+            d = str(it.get("ai_decision") or "").upper()
+            if d and d not in ("N/A", "NA", "", "NONE"):
+                ai_used += 1
+    if ai_used >= max_ai and not state.get("success"):
+        # Only trip when last iteration still failed (cap reached)
+        last = iterations[-1] if iterations else {}
+        last_ok = bool(last.get("ok") or str(last.get("pipeline_reason") or "") in ("ok", "success"))
+        if not last_ok and state.get("ai_optimize_cap_hit"):
+            return True, "MAX_AI_OPTIMIZE", {
+                "message": "ai_optimize_rounds_exhausted max=%d" % max_ai,
+                "ai_optimize_count": ai_used,
+                "max_ai_optimize": max_ai,
+            }
 
     if len(iterations) >= max_iter:
         return True, "MAX_ITERATIONS", {
