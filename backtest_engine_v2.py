@@ -470,6 +470,10 @@ def precompute_indicators(df, timeframe="1h"):
     df["prev_high48"] = h.shift(1).rolling(48, min_periods=48).max()
     df["prev_low48"] = l.shift(1).rolling(48, min_periods=48).min()
     df["prev_mid48"] = (df["prev_high48"] + df["prev_low48"]) / 2.0
+    # Rolling 24H box on 5m (288 bars), prior completed bars only — no lookahead.
+    df["h24_high"] = h.shift(1).rolling(288, min_periods=288).max()
+    df["h24_low"] = l.shift(1).rolling(288, min_periods=288).min()
+    df["h24_mid"] = (df["h24_high"] + df["h24_low"]) / 2.0
 
     # vol_z20: true volume z-score when volume present; else bar-range z-score
     # proxy (documented as range_vol_proxy — participation/expansion stand-in).
@@ -681,6 +685,7 @@ def _build_kwargs(df):
         "k","d","j","cci","macd_stick","open","high","low","close",
         "atr14","h1_ema19","h1_ema53","h1_atr14",
         "rsi14","z20","prev_high20","prev_low20","prev_high48","prev_low48","prev_mid48",
+        "h24_high","h24_low","h24_mid",
         "h1_slope4",
         "vol_z20","vol_ma20_ratio","pdh","pdl","pdc","h4_high24","h4_low24",
         "hour_utc","asia_high","asia_low","asia_mid","asia_range",

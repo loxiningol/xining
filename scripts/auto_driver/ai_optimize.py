@@ -29,6 +29,8 @@ SYSTEM_PROMPT = _charter.prompt_prefix() + """
 4b. ny_open_liq_fade*：必须保留 12.5<=hour_utc<15.5、london_high/low 扫荡收回、
    vol_ma20_ratio>1.2、entry_wick_buffer(0.0008)、partial_tp_feature(vwap@0.5)、atr_trailing≈3.2；
    严禁 swing_extreme / asia_* / prev_high48 偷换。
+4c. rolling_24h_sweep*：入场必须恰好 3 叶（h24 sweep+reclaim + vol_ma20_ratio>1.1）；
+   严禁第 4 条、hour_utc、inside-box；必须 entry_wick_buffer(0.0008)+h24_mid TP+atr_trailing≈3.2。
 5. DSL 边界：atr_trailing.n_atr ∈ [2.5,5.0]；entry_wick_buffer.buffer_pct ∈ [0.0003,0.003]。
 6. 若 pretest_quality / invariants 已判定 SHIT_TRANSLATION → 只能 RESET，禁止 PRUNE/PATCH。
 7. 若连续多轮都在同一错误基底上调 n_atr/max_hold → LIMIT_REACHED（承认起点是屎，停止雕花）。

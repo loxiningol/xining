@@ -50,6 +50,20 @@ def _exit_ops(node, out=None):
     return out
 
 
+def _count_leaves(node):
+    """Count DSL condition leaves (feature cmps + exit_ops)."""
+    if not isinstance(node, dict):
+        return 0
+    if "all" in node or "any" in node:
+        key = "all" if "all" in node else "any"
+        return sum(_count_leaves(c) for c in (node.get(key) or []))
+    if "not" in node:
+        return _count_leaves(node.get("not") or {})
+    if node.get("exit_op") or node.get("op"):
+        return 1
+    return 0
+
+
 def _has_feature_cmp(node, left_feat, op, right_feat):
     if not isinstance(node, dict):
         return False
@@ -177,6 +191,8 @@ def resolve_contract_for_pack(pack, search_roots=None):
         candidates.append("rolling_4h_sweep_5m_v1")
     if "ny_open_liq_fade" in family and "ny_open_liq_fade_v1" not in candidates:
         candidates.append("ny_open_liq_fade_v1")
+    if "rolling_24h_sweep" in family and "rolling_24h_sweep_5m_v1" not in candidates:
+        candidates.append("rolling_24h_sweep_5m_v1")
     for root in roots:
         for cand_name in candidates:
             cand = Path(root) / "contracts" / ("%s.contract.json" % cand_name)
@@ -218,6 +234,21 @@ def check_invariants(pack, contract=None, direction=None):
 
     # required entry feature comparisons
     entry = dsl.get("entry") or {}
+    # 3-condition rule (hard): entry leaves must not exceed max_entry_leaves
+    max_entry = contract.get("max_entry_leaves")
+    if max_entry is not None:
+        n_entry = _count_leaves(entry)
+        if n_entry > int(max_entry):
+            violations.append(
+                "TOO_MANY_ENTRY_CONDITIONS:%d>%d" % (n_entry, int(max_entry))
+            )
+        if contract.get("exact_entry_leaves") is not None:
+            exact = int(contract.get("exact_entry_leaves"))
+            if n_entry != exact:
+                violations.append(
+                    "ENTRY_LEAF_COUNT_MISMATCH:%d!=%d" % (n_entry, exact)
+                )
+
     entry_cmps = contract.get("required_entry_feature_cmps") or []
     if str(direction) == "short" and contract.get("required_entry_feature_cmps_short"):
         entry_cmps = contract.get("required_entry_feature_cmps_short") or []
@@ -231,6 +262,13 @@ def check_invariants(pack, contract=None, direction=None):
             violations.append(
                 "MISSING_ENTRY_VALUE:%s %s %s" % (req["left"], req["op"], req["value"])
             )
+
+    # ban time-window filters when contract forbids them (24H all-session packs)
+    if contract.get("ban_time_window_filters"):
+        for feat in ("hour_utc", "asia_high", "asia_low", "asia_mid", "asia_range",
+                     "asia_range_atr_ratio", "london_high", "london_low", "london_mid"):
+            if feat in _features_used(entry):
+                violations.append("FORBIDDEN_TIME_OR_SESSION_FEATURE:%s" % feat)
 
     # forbidden features / exit ops (context drift detectors)
     used = _features_used(entry)

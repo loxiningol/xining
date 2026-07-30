@@ -315,6 +315,70 @@ def assert_ny_open_liq_fade_short(dsl):
     return failures
 
 
+
+
+def assert_rolling_24h_sweep_long(dsl):
+    """Exactly-3-condition rolling 24H sweep long asserts."""
+    failures = []
+    direction = "long"
+    # Count entry leaves hard
+    entry = (dsl or {}).get("entry") or {}
+    def _cnt(n):
+        if not isinstance(n, dict):
+            return 0
+        if "all" in n or "any" in n:
+            k = "all" if "all" in n else "any"
+            return sum(_cnt(c) for c in (n.get(k) or []))
+        if "not" in n:
+            return _cnt(n.get("not") or {})
+        return 1 if (n.get("op") or n.get("exit_op")) else 0
+    if _cnt(entry) != 3:
+        failures.append("ASSERT_FAIL:entry_must_be_exactly_3_got_%d" % _cnt(entry))
+
+    fr = _base_frame()
+    i = 50
+    fr.set(i, low=97.5, close=98.2, high=98.5, h24_low=98.0, h24_high=102.0, h24_mid=100.0, vol_ma20_ratio=1.15)
+    if not _eval_entry(dsl, fr, i):
+        failures.append("ASSERT_FAIL:h24_sweep_reclaim_vol_must_enter")
+    fr_b = fr.copy(); fr_b.set(i, close=97.8)
+    if _eval_entry(dsl, fr_b, i):
+        failures.append("ASSERT_FAIL:no_reclaim_must_reject")
+    fr_c = fr.copy(); fr_c.set(i, vol_ma20_ratio=1.05)
+    if _eval_entry(dsl, fr_c, i):
+        failures.append("ASSERT_FAIL:vol_below_1_1_must_reject")
+    # 4th filter must NOT be required: outside-box close still OK under 3-cond rule
+    fr_out = fr.copy(); fr_out.set(i, close=102.5, high=103.0)
+    # reclaim still true vs h24_low=98; 3-cond allows this (no inside-box leaf)
+    if not _eval_entry(dsl, fr_out, i):
+        failures.append("ASSERT_FAIL:3cond_should_allow_close_above_h24_high")
+
+    pos = {"price": 98.2, "peak_high": 98.5, "peak_low": 97.5, "entry_bar_low": 97.5, "entry_bar_high": 98.5}
+    j = i + 1
+    fr_e = fr.copy()
+    stop = 97.5 * (1.0 - 0.0008)
+    fr_e.set(j, low=stop - 0.01, high=98.0, close=97.9, h24_mid=100.0, atr14=1.0)
+    ok, fired = _eval_exit_op_only(dsl, fr_e, j, pos, direction)
+    if "entry_wick_buffer" not in fired:
+        failures.append("ASSERT_FAIL:entry_wick_buffer_must_fire got=%s" % ",".join(fired))
+    fr_m = fr.copy(); fr_m.set(j, low=99.0, high=100.5, close=100.2, h24_mid=100.0)
+    ok_m, fired_m = _eval_exit_op_only(dsl, fr_m, j, dict(pos), direction)
+    if not (ok_m or any("mid" in x for x in fired_m)):
+        failures.append("ASSERT_FAIL:h24_mid_tp_must_fire got=%s" % ",".join(fired_m))
+    return failures
+
+
+def assert_rolling_24h_sweep_short(dsl):
+    failures = []
+    fr = _base_frame(); i = 50
+    fr.set(i, high=102.5, close=101.8, low=101.5, h24_high=102.0, h24_low=98.0, h24_mid=100.0, vol_ma20_ratio=1.15)
+    if not _eval_entry(dsl, fr, i):
+        failures.append("ASSERT_FAIL:short_h24_sweep_reclaim_vol_must_enter")
+    fr_b = fr.copy(); fr_b.set(i, close=102.2)
+    if _eval_entry(dsl, fr_b, i):
+        failures.append("ASSERT_FAIL:short_no_reclaim_must_reject")
+    return failures
+
+
 ASSERT_REGISTRY = {
     "rolling_4h_sweep_5m_v1": {
         "long": assert_rolling_4h_sweep_long,
@@ -331,6 +395,14 @@ ASSERT_REGISTRY = {
     "ny_open_liq_fade_clean_v1": {
         "long": assert_ny_open_liq_fade_long,
         "short": assert_ny_open_liq_fade_short,
+    },
+    "rolling_24h_sweep_5m_v1": {
+        "long": assert_rolling_24h_sweep_long,
+        "short": assert_rolling_24h_sweep_short,
+    },
+    "rolling_24h_sweep_clean_v1": {
+        "long": assert_rolling_24h_sweep_long,
+        "short": assert_rolling_24h_sweep_short,
     },
 }
 

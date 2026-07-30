@@ -21,6 +21,8 @@ FEATURES = {
     "atr14", "rsi14", "z20", "vol_z20", "prev_high20", "prev_low20",
     # Rolling 4H-on-5m (48×5m) liquidity box + mild volume ratio
     "prev_high48", "prev_low48", "prev_mid48", "vol_ma20_ratio",
+    # Rolling 24H-on-5m (288×5m) sweep box
+    "h24_high", "h24_low", "h24_mid",
     "h1_ema19", "h1_ema53", "h1_atr14", "h1_slope4",
     # Macro SFP anchors (research, no lookahead): prior-day + 4h swing24
     "pdh", "pdl", "pdc", "h4_high24", "h4_low24",

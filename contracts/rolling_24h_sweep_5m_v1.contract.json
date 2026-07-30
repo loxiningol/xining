@@ -1,0 +1,128 @@
+{
+  "schema": "qiyu_invariants_contract_v1",
+  "contract_id": "rolling_24h_sweep_5m_v1",
+  "title_zh": "[BTC/ETH/SOL 5m] 滚动24小时极值流动性扫荡",
+  "assert_suite": "rolling_24h_sweep_5m_v1",
+  "require_sanity_asserts": true,
+  "must_timeframe": "5m",
+  "max_entry_leaves": 3,
+  "exact_entry_leaves": 3,
+  "ban_swing_as_wick_proxy": true,
+  "ban_time_window_filters": true,
+  "mechanism_pseudocode": {
+    "box": "h24_high/h24_low = max/min of prior 288×5m bars (rolling 24H), no lookahead",
+    "long_entry_3": "low < h24_low AND close > h24_low AND vol_ma20_ratio > 1.1",
+    "short_entry_3": "high > h24_high AND close < h24_high AND vol_ma20_ratio > 1.1",
+    "rule": "MAX 3 entry leaves — never add 4th (no hour_utc, no inside-box, no z-score)",
+    "stop": "entry_wick_buffer buffer_pct=0.0008",
+    "tp1": "feature exit to h24_mid (24H midline)",
+    "tp2": "atr_trailing n_atr=3.2 atr_period=14",
+    "outer_sl": "protective 0.9% immutable"
+  },
+  "required_entry_feature_cmps": [
+    {
+      "left": "low",
+      "op": "lt",
+      "right": "h24_low"
+    },
+    {
+      "left": "close",
+      "op": "gt",
+      "right": "h24_low"
+    }
+  ],
+  "required_entry_feature_cmps_short": [
+    {
+      "left": "high",
+      "op": "gt",
+      "right": "h24_high"
+    },
+    {
+      "left": "close",
+      "op": "lt",
+      "right": "h24_high"
+    }
+  ],
+  "required_entry_value_cmps": [
+    {
+      "left": "vol_ma20_ratio",
+      "op": "gt",
+      "value": 1.1
+    }
+  ],
+  "required_exit_ops": [
+    {
+      "exit_op": "entry_wick_buffer",
+      "buffer_pct": 0.0008,
+      "role": "invalidation"
+    },
+    {
+      "exit_op": "atr_trailing",
+      "n_atr": 3.2,
+      "atr_period": 14,
+      "role": "take_profit"
+    }
+  ],
+  "required_exit_feature_cmps": [
+    {
+      "left": "close",
+      "op": "gte",
+      "right": "h24_mid"
+    }
+  ],
+  "required_exit_feature_cmps_short": [
+    {
+      "left": "close",
+      "op": "lte",
+      "right": "h24_mid"
+    }
+  ],
+  "forbidden_features": [
+    "hour_utc",
+    "asia_high",
+    "asia_low",
+    "asia_mid",
+    "asia_range",
+    "asia_range_atr_ratio",
+    "london_high",
+    "london_low",
+    "london_mid",
+    "prev_high48",
+    "prev_low48",
+    "prev_mid48",
+    "pdh",
+    "pdl",
+    "pdc",
+    "h4_high24",
+    "h4_low24",
+    "ema6",
+    "ema21",
+    "ema53",
+    "cci",
+    "rsi14",
+    "vol_z20"
+  ],
+  "forbidden_exit_ops": [
+    "fixed_pct_tp",
+    "swing_extreme"
+  ],
+  "non_negotiable_rules": [
+    "protective_sl_0.9_pct_immutable",
+    "no_fixed_pct_take_profit",
+    "must_use_5m_timeframe",
+    "max_3_entry_conditions",
+    "no_time_window_filters",
+    "must_keep_h24_sweep_and_reclaim",
+    "must_keep_mild_vol_ma20_ratio_gt_1_1",
+    "must_use_entry_wick_buffer_0_0008",
+    "must_use_h24_mid_initial_tp",
+    "must_use_atr_trailing_3_2",
+    "no_swing_extreme_as_wick_proxy",
+    "never_lower_gate2_floors"
+  ],
+  "prune_audit_instructions_zh": [
+    "入场最多 3 叶；出现第 4 条 = SHIT_TRANSLATION → RESET。",
+    "禁止加 hour_utc / 亚盘 / 伦敦窗 / inside-box / vol_z。",
+    "只允许剪枝或清零重译，禁止加法雕花。"
+  ]
+}
