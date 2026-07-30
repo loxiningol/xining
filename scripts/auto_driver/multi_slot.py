@@ -127,6 +127,10 @@ def _infer_slot_state(payload):
             if row.get("id") == "audit4d" and row.get("status") in ("running", "done"):
                 return "breakthrough"
         return "running"
+    # Terminal fail marks on pipeline ⇒ archived even without final_status
+    for row in payload.get("pipeline") or []:
+        if (row or {}).get("id") in ("l0", "l1", "gate2") and (row or {}).get("status") == "fail":
+            return "archived"
     return "idle"
 
 
