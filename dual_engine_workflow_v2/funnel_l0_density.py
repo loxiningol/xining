@@ -57,9 +57,46 @@ def count_entry_triggers(frame, definition, stride=DEFAULT_STRIDE, start=None):
 def run_l0_density(definition=None, frame=None, stride=DEFAULT_STRIDE,
                    min_triggers=MIN_TRIGGERS, min_density=MIN_DENSITY):
     """L0 verdict. pass=False → REJECT_TOO_RARE (do not enter matrix)."""
+    stride = max(1, int(stride or 1))
     triggers, evaluated, wall_ms = count_entry_triggers(
         frame, definition, stride=stride,
     )
+    # Rare-but-real edges (e.g. 24H extreme sweep) can be undersampled by
+    # even/odd stride. If stride>1 fails the absolute floor, confirm once at
+    # stride=1 — do NOT loosen strategy entry conditions.
+    confirmed = None
+    if (
+        frame is not None
+        and evaluated > 0
+        and stride > 1
+        and triggers < int(min_triggers)
+    ):
+        t1, e1, ms1 = count_entry_triggers(frame, definition, stride=1)
+        confirmed = {"triggers": t1, "evaluated_bars": e1, "wall_ms": ms1}
+        if t1 >= int(min_triggers):
+            dens1 = (float(t1) / float(e1)) if e1 else 0.0
+            if dens1 >= float(min_density):
+                return {
+                    "pass": True,
+                    "reject_reasons": [],
+                    "metrics": {
+                        "triggers": t1,
+                        "evaluated_bars": e1,
+                        "density": round(dens1, 6),
+                        "stride": 1,
+                        "min_triggers": int(min_triggers),
+                        "min_density": float(min_density),
+                        "stride_confirm": True,
+                        "stride_sampled_triggers": triggers,
+                        "stride_sampled": stride,
+                    },
+                    "wall_time_ms": round(wall_ms + ms1, 3),
+                    "target_wall_time_ms": 50.0,
+                    "under_target": (wall_ms + ms1) < 50.0,
+                    "fail_closed": True,
+                    "stage": "funnel_l0_density",
+                }
+
     density = (float(triggers) / float(evaluated)) if evaluated else 0.0
     reasons = []
     if evaluated <= 0 or frame is None:
@@ -69,18 +106,27 @@ def run_l0_density(definition=None, frame=None, stride=DEFAULT_STRIDE,
         reasons.append("l0_triggers_lt_%d" % int(min_triggers))
     if evaluated > 0 and density < float(min_density):
         reasons.append("l0_density_lt_%.4f" % float(min_density))
+    # If confirm still fails, expose full-count for diagnostics
+    if confirmed is not None and reasons:
+        reasons.append(
+            "stride1_confirm_triggers_%d" % int(confirmed.get("triggers") or 0)
+        )
     passed = not reasons
+    metrics = {
+        "triggers": triggers,
+        "evaluated_bars": evaluated,
+        "density": round(density, 6),
+        "stride": int(stride),
+        "min_triggers": int(min_triggers),
+        "min_density": float(min_density),
+    }
+    if confirmed is not None:
+        metrics["stride1_confirm_triggers"] = confirmed.get("triggers")
+        metrics["stride1_confirm_evaluated"] = confirmed.get("evaluated_bars")
     return {
         "pass": bool(passed),
         "reject_reasons": reasons,
-        "metrics": {
-            "triggers": triggers,
-            "evaluated_bars": evaluated,
-            "density": round(density, 6),
-            "stride": int(stride),
-            "min_triggers": int(min_triggers),
-            "min_density": float(min_density),
-        },
+        "metrics": metrics,
         "wall_time_ms": round(wall_ms, 3),
         "target_wall_time_ms": 50.0,
         "under_target": wall_ms < 50.0,
