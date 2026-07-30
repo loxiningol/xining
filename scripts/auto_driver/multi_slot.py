@@ -104,13 +104,18 @@ def _slot_from_live_payload(payload, slot_id):
     strat = payload.get("strategy") or {}
     prog = payload.get("progress") or {}
     final = payload.get("final") or {}
+    diag = payload.get("diagnostic") or {}
     state = _infer_slot_state(payload)
     status = payload.get("status_label") or ""
     # ensure humanized
-    if final.get("status") or final.get("stop_code"):
+    if diag.get("terminal_zh") and state in ("archived", "success"):
+        status = diag.get("terminal_zh")
+    elif final.get("status") or final.get("stop_code"):
         status = humanizer.humanize_final(
             final.get("status"), final.get("stop_code"), success=bool(final.get("success")),
         )
+        if diag.get("terminal_zh"):
+            status = diag.get("terminal_zh")
     elif status and re_is_raw(status):
         status = humanizer.humanize_status_label(
             phase=payload.get("phase"),
@@ -119,6 +124,11 @@ def _slot_from_live_payload(payload, slot_id):
             stop_code=final.get("stop_code"),
             success=bool(final.get("success")),
         )
+    # Rebuild diagnostic if missing but we have metrics / can load failure_context
+    if not diag.get("ok"):
+        diag = _ensure_diagnostic(payload)
+        if diag.get("terminal_zh") and state == "archived":
+            status = diag.get("terminal_zh")
     pct = float(prog.get("percent") or 0)
     eta = prog.get("eta_sec")
     elapsed = prog.get("elapsed_sec")
@@ -139,13 +149,124 @@ def _slot_from_live_payload(payload, slot_id):
         "elapsed_sec": elapsed,
         "pipeline": payload.get("pipeline") or [],
         "pipeline_compact": _compact_pipe(payload.get("pipeline") or []),
-        "final_zh": humanizer.humanize_final(
-            final.get("status"), final.get("stop_code"), success=bool(final.get("success")),
-        ) if (final.get("status") or final.get("stop_code")) else None,
+        "diagnostic": diag,
+        "final_zh": (
+            diag.get("terminal_zh")
+            or (
+                humanizer.humanize_final(
+                    final.get("status"), final.get("stop_code"), success=bool(final.get("success")),
+                ) if (final.get("status") or final.get("stop_code")) else None
+            )
+        ),
         "updated_at": payload.get("updated_at"),
         "workdir": final.get("workdir") or (payload.get("final") or {}).get("workdir"),
         "source": payload.get("source"),
     }
+
+
+def _ensure_diagnostic(payload):
+    """Best-effort rebuild diagnostic from payload metrics or run artifacts."""
+    try:
+        from . import diagnostic as diagnostic_mod
+        existing = payload.get("diagnostic") or {}
+        if existing.get("ok") and existing.get("ai_prompt") and existing.get("fatal_metrics", {}).get("n") is not None:
+            return existing
+        strat = payload.get("strategy") or {}
+        metrics = payload.get("metrics") or {}
+        wd = (payload.get("final") or {}).get("workdir")
+        ctx = {
+            "pipeline_reason": metrics.get("pipeline_reason") or payload.get("phase"),
+            "l1": {
+                "pass": False,
+                "filled_entries": metrics.get("l1_filled_entries"),
+                "payoff_ratio": metrics.get("l1_payoff"),
+                "expectancy_factor": None,
+                "reject_reasons": list(metrics.get("l1_reject") or []),
+            },
+            "gate2_fitness": {
+                "payoff_ratio": metrics.get("gate2_payoff"),
+                "calmar": metrics.get("gate2_calmar"),
+                "worst5_loss_share": metrics.get("gate2_w5"),
+                "failed_checks": list(metrics.get("failed_checks") or []),
+                "sample_size": None,
+                "verdict_tags": [],
+            },
+            "mechanism_family": strat.get("family"),
+            "symbol": strat.get("symbol"),
+            "timeframe": strat.get("timeframe"),
+        }
+        pack = {}
+        if wd:
+            from pathlib import Path
+            import json
+            run = Path(wd)
+            best_ctx = None
+            best_score = -1
+            for fc in run.glob("iter_*/failure_context.json"):
+                try:
+                    cand = json.loads(fc.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                score = 0
+                l1 = cand.get("l1") or {}
+                g2 = cand.get("gate2_fitness") or {}
+                if l1.get("filled_entries") is not None:
+                    score += 3
+                if l1.get("reject_reasons"):
+                    score += 2
+                if g2.get("failed_checks"):
+                    score += 3
+                if g2.get("payoff_ratio") is not None:
+                    score += 2
+                if cand.get("pipeline_reason"):
+                    score += 1
+                if score > best_score:
+                    best_score = score
+                    best_ctx = cand
+            if best_ctx:
+                ctx = best_ctx
+            # Enrich empty L1 from seed result files
+            l1 = ctx.get("l1") or {}
+            if l1.get("filled_entries") is None or not l1.get("reject_reasons"):
+                seeds = sorted(run.glob("iter_*/*seed*_result.json")) + sorted(run.glob("iter_*_seed_*_result.json"))
+                for sp in reversed(seeds[-12:]):
+                    try:
+                        sd = json.loads(sp.read_text(encoding="utf-8"))
+                    except Exception:
+                        continue
+                    res = sd.get("result") or sd
+                    ph = ((res.get("phase3_funnel") or {}).get("l1_micro_screen") or {})
+                    if not ph:
+                        continue
+                    m = ph.get("metrics") or {}
+                    if m.get("filled_entries") is None and not ph.get("reject_reasons"):
+                        continue
+                    ctx["l1"] = {
+                        "pass": bool(ph.get("pass")),
+                        "reject_reasons": list(ph.get("reject_reasons") or []),
+                        "filled_entries": m.get("filled_entries"),
+                        "payoff_ratio": m.get("payoff_ratio"),
+                        "win_rate": m.get("win_rate"),
+                        "expectancy_factor": m.get("expectancy_factor"),
+                    }
+                    if not ctx.get("pipeline_reason") or ctx.get("pipeline_reason") in ("UNKNOWN_STOPPED", "unknown_stopped", "stopped"):
+                        ctx["pipeline_reason"] = res.get("reason") or "funnel_l1_fail"
+                    break
+            for name in ("pack_final.json", "pack_initial.json"):
+                p = run / name
+                if p.exists():
+                    try:
+                        pack = json.loads(p.read_text(encoding="utf-8"))
+                        break
+                    except Exception:
+                        pass
+        return diagnostic_mod.build_diagnostic(
+            ctx=ctx, pack=pack, title_zh=strat.get("title_zh"),
+            symbol=strat.get("symbol"), timeframe=strat.get("timeframe"),
+            direction=strat.get("direction"),
+        )
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "terminal_zh": "诊断不可用", "ai_prompt": ""}
 
 
 def re_is_raw(text):

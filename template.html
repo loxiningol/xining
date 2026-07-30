@@ -334,6 +334,27 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .atm-tw-pipe-inline .ok{color:var(--gain)}
   .atm-tw-pipe-inline .run{color:#d6aa82}
   .atm-tw-pipe-inline .fail{color:var(--loss)}
+  .atm-tw-diag{
+    margin-top:10px;padding:10px 11px;border:1px solid var(--line);border-radius:10px;
+    background:rgba(255,255,255,.02);
+  }
+  .atm-tw-diag-title{font-size:11px;color:var(--focus);letter-spacing:.04em;margin:0 0 8px;font-weight:600}
+  .atm-tw-diag-row{font-size:11px;color:var(--muted);line-height:1.55;margin:0 0 5px}
+  .atm-tw-diag-row b{color:var(--text);font-weight:500}
+  .atm-tw-diag-list{margin:4px 0 8px;padding-left:1.1em;color:var(--muted);font-size:11px;line-height:1.55}
+  .atm-tw-diag-list li{margin:2px 0}
+  .atm-tw-prompt{
+    margin-top:6px;padding:9px 10px;border:1px dashed rgba(155,191,154,.35);
+    border-radius:9px;background:rgba(155,191,154,.05);color:var(--text);
+    font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-word;
+  }
+  .atm-tw-diag-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .atm-tw-copy{
+    padding:5px 10px;border-radius:8px;font-size:11px;cursor:pointer;
+    border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);
+  }
+  .atm-tw-copy:hover{background:rgba(255,255,255,.08)}
+  .atm-tw-copy.ok{color:var(--gain);border-color:rgba(155,191,154,.35)}
   .atm-tw-note{margin-top:10px;font-size:11px;color:var(--muted);line-height:1.55}
   .atm-tw-charter{font-size:11px;color:var(--muted);line-height:1.65;margin:0 0 12px;padding:10px 12px;border-left:3px solid rgba(155,191,154,.45);background:rgba(155,191,154,.05);border-radius:0 10px 10px 0}
   #strategyCreatorModule{display:none!important}
@@ -942,6 +963,51 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       return '<b>'+zoneEsc(id)+'</b>:<span class="'+cls+'">'+zoneEsc(mk)+'</span>';
     }).join(' · ')+'</div>';
   }
+  function diagnosticHtml(diag, slotId){
+    diag=diag||{};
+    if(!diag.ok && !diag.main_cause_line && !diag.ai_prompt) return '';
+    const cause=humanizeLeak(diag.main_cause_line||((diag.main_cause||{}).title_zh)||'—');
+    const fatal=humanizeLeak(diag.fatal_line||'—');
+    const bots=Array.isArray(diag.bottlenecks)?diag.bottlenecks:[];
+    const prompt=diag.ai_prompt||'';
+    let html='<div class="atm-tw-diag">';
+    html+='<div class="atm-tw-diag-title">归因诊断与经验沉淀（可复制给 AI）</div>';
+    html+='<div class="atm-tw-diag-row"><b>淘汰主因</b> · '+zoneEsc(cause)+'</div>';
+    html+='<div class="atm-tw-diag-row"><b>致命数据</b> · '+zoneEsc(fatal)+'</div>';
+    if(bots.length){
+      html+='<div class="atm-tw-diag-row"><b>条件堵塞分析</b></div><ul class="atm-tw-diag-list">';
+      bots.forEach(function(b){ html+='<li>'+zoneEsc(b)+'</li>'; });
+      html+='</ul>';
+    }
+    if(prompt){
+      html+='<div class="atm-tw-diag-row"><b>AI 进化指导指令</b></div>';
+      html+='<div class="atm-tw-prompt" id="atmTwPrompt'+zoneEsc(slotId)+'">'+zoneEsc(prompt)+'</div>';
+      html+='<div class="atm-tw-diag-actions">';
+      html+='<button type="button" class="atm-tw-copy" data-copy-target="atmTwPrompt'+zoneEsc(slotId)+'" onclick="copyTwPrompt(this)">复制给 Gemini / Codex</button>';
+      html+='</div>';
+    }
+    html+='</div>';
+    return html;
+  }
+  window.copyTwPrompt=async function(btn){
+    try{
+      const id=btn.getAttribute('data-copy-target');
+      const node=$(id);
+      const text=node?node.textContent:'';
+      if(!text) return;
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(text);
+      }else{
+        const ta=document.createElement('textarea');
+        ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+      }
+      btn.classList.add('ok');
+      btn.textContent='已复制';
+      setTimeout(function(){ btn.classList.remove('ok'); btn.textContent='复制给 Gemini / Codex'; }, 1800);
+    }catch(e){
+      btn.textContent='复制失败';
+    }
+  };
   function renderTrueWordsConsole(board, adFallback){
     const el=$('atmTwConsole');
     if(!el) return;
@@ -974,6 +1040,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       eta_sec:(adFallback.progress||{}).eta_sec,
       elapsed_sec:(adFallback.progress||{}).elapsed_sec,
       pipeline_compact:[],
+      diagnostic:adFallback.diagnostic||{},
       final_zh:(adFallback.final||{}).status_zh,
       running:!!adFallback.running
     }]:[]);
@@ -999,6 +1066,9 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         html+='<div class="atm-tw-slot-meta"><span>'+zoneEsc(slot.round_label||'')+'</span><span>'+zoneEsc(timeBit)+'</span></div>';
         html+='<div class="atm-tw-bar-track"><div class="atm-tw-bar-fill" style="width:'+pct+'%"></div></div>';
         html+=pipeInlineHtml(slot.pipeline_compact);
+        if(st==='archived' || st==='success' || (slot.diagnostic&&slot.diagnostic.ai_prompt)){
+          html+=diagnosticHtml(slot.diagnostic, slot.slot_id||0);
+        }
         html+='</div>';
       });
     }

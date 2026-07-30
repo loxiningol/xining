@@ -201,6 +201,13 @@ def _eta_sec(elapsed, pct):
         return None
 
 
+def _select_dsl_for_diag(pack, direction):
+    pack = pack or {}
+    if str(direction or "long").lower() == "short":
+        return pack.get("dsl_short") or pack.get("dsl") or {}
+    return pack.get("dsl_long") or pack.get("dsl") or {}
+
+
 def publish_live_status(cfg, state, pack, *, phase="running", result=None,
                         seed_idx=None, seed_max=None, message=None,
                         write_global=True):
@@ -269,6 +276,33 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
         seed_idx=seed_idx,
         seed_max=seed_max,
     )
+    # Build / refresh diagnostic post-mortem
+    diagnostic = last.get("diagnostic") if isinstance(last, dict) else None
+    try:
+        from . import diagnostic as diagnostic_mod
+        ctx_like = {
+            "pipeline_reason": reason,
+            "l1": l1,
+            "gate2_fitness": g2,
+            "mechanism_family": fam,
+            "dsl": _select_dsl_for_diag(pack, cfg.get("direction")),
+            "mechanism_spec": spec,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "direction": cfg.get("direction"),
+        }
+        diagnostic = diagnostic_mod.build_diagnostic(
+            ctx=ctx_like, result=result if isinstance(result, dict) else None,
+            pack=pack, title_zh=title,
+            symbol=symbol, timeframe=timeframe, direction=cfg.get("direction"),
+        )
+        if state.get("final_status") and diagnostic.get("terminal_zh"):
+            # Prefer cull-stage terminal label over generic stop codes
+            if diagnostic.get("stage") in ("l1", "gate2", "kb", "spec"):
+                status_label = diagnostic.get("terminal_zh")
+    except Exception as exc:
+        diagnostic = diagnostic or {"ok": False, "error": str(exc)}
+
     message_zh = None
     if message:
         message_zh = humanizer.humanize_code(message, fallback=str(message))
@@ -280,6 +314,8 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
             state.get("final_status"), state.get("stop_code"),
             success=bool(state.get("success")),
         )
+        if diagnostic and diagnostic.get("terminal_zh") and diagnostic.get("stage") in ("l1", "gate2", "kb", "spec"):
+            final_zh = "%s；%s" % (diagnostic.get("terminal_zh"), final_zh)
     payload = {
         "schema": "qiyu_auto_driver_live_v1",
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -315,6 +351,7 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
             "seed_max": seed_max,
         },
         "pipeline": _gate_rows_from_reason(reason, l1=l1, g2=g2, gates=gates),
+        "diagnostic": diagnostic,
         "metrics": {
             "composite_score": last.get("composite_score"),
             "total_gap": last.get("total_gap"),

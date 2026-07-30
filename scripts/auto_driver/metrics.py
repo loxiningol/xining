@@ -91,7 +91,7 @@ def build_failure_context(result, pack, iteration, symbol, timeframe, direction,
     spec = (pack or {}).get("mechanism_spec") or {}
     dsl = _active_dsl(pack, direction)
     gaps = metric_gaps(g2, l1, reason)
-    return {
+    ctx = {
         "iteration": iteration,
         "symbol": symbol,
         "timeframe": timeframe,
@@ -115,6 +115,15 @@ def build_failure_context(result, pack, iteration, symbol, timeframe, direction,
         "dsl": copy.deepcopy(dsl) if isinstance(dsl, dict) else {},
         "mechanism_spec": copy.deepcopy(spec) if isinstance(spec, dict) else {},
     }
+    try:
+        from . import diagnostic as diagnostic_mod
+        ctx["diagnostic"] = diagnostic_mod.build_diagnostic(
+            ctx=ctx, result=result, pack=pack,
+            symbol=symbol, timeframe=timeframe, direction=direction,
+        )
+    except Exception as exc:
+        ctx["diagnostic"] = {"ok": False, "error": str(exc)}
+    return ctx
 
 
 def _active_dsl(pack, direction):
