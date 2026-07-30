@@ -36,6 +36,7 @@ def probe_easyquant():
         "notes": [
             "Local OKX candle factor miner active (EasyQuant-style automation).",
             "eqlib A-share package is optional and not required for crypto swaps.",
+            "Prefer research R2/S3 long history when configured; formal_* remains live short window.",
         ],
         "probed_at": _now(),
     }
@@ -44,6 +45,11 @@ def probe_easyquant():
         out["available"] = False
         out["notes"] = ["QIYU_EASYQUANT_MODE=off"]
         return out
+    try:
+        from . import research_candle_store as rcs
+        out["research_candles"] = rcs.probe()
+    except Exception as exc:
+        out["research_candles"] = {"ok": False, "error": str(exc)[:120]}
     try:
         import eqlib  # noqa: F401
         out["eqlib"] = getattr(__import__("eqlib"), "__version__", "present")
@@ -77,17 +83,77 @@ def resolve_candle_cache(symbol, timeframe):
     return path if path.exists() else (alt if alt.exists() else path)
 
 
-def load_candles(symbol, timeframe, max_bars=1200):
+def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookback_days=None):
+    """Load candles for creation/research.
+
+    Preference:
+      1) Research store (R2/S3/local long history) when enabled & populated
+      2) formal_* short rolling live cache (never mutated by research path)
+
+    prefer_research: None → auto from env QIYU_CREATION_PREFER_RESEARCH (default 1)
+    """
+    if prefer_research is None:
+        prefer_research = str(os.environ.get("QIYU_CREATION_PREFER_RESEARCH") or "1").strip().lower() not in (
+            "0", "false", "no", "off",
+        )
+    lookback_days = int(
+        lookback_days
+        if lookback_days is not None
+        else (os.environ.get("QIYU_RESEARCH_LOOKBACK_DAYS") or 400)
+    )
+
+    research_meta = None
+    if prefer_research:
+        try:
+            from . import research_candle_store as rcs
+            # allow large max_bars for research; cap by env
+            cap = int(os.environ.get("QIYU_RESEARCH_MAX_BARS") or max(int(max_bars), 50000))
+            got = rcs.load_for_creation(
+                symbol, timeframe, lookback_days=lookback_days, max_bars=cap,
+            )
+            research_meta = {
+                "ok": got.get("ok"),
+                "backend": got.get("backend"),
+                "n": got.get("n"),
+                "error": got.get("error"),
+                "start_ts": got.get("start_ts"),
+                "end_ts": got.get("end_ts"),
+            }
+            if got.get("ok") and got.get("candles"):
+                rows = got["candles"]
+                if max_bars and len(rows) > int(max_bars):
+                    rows = rows[-int(max_bars):]
+                return {
+                    "ok": True,
+                    "path": "research_store:%s" % got.get("backend"),
+                    "n": len(rows),
+                    "candles": rows,
+                    "source": "research_r2_or_local",
+                    "research": research_meta,
+                    "fetched_at": got.get("at"),
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                }
+        except Exception as exc:
+            research_meta = {"ok": False, "error": str(exc)[:200]}
+
     path = resolve_candle_cache(symbol, timeframe)
     if not path.exists():
-        return {"ok": False, "error": "candle_cache_missing", "path": str(path), "candles": []}
+        return {
+            "ok": False,
+            "error": "candle_cache_missing",
+            "path": str(path),
+            "candles": [],
+            "research": research_meta,
+            "hint_zh": "短窗缺失且研究仓无数据；请配置 R2 并回填，或等待 formal 热缓存。",
+        }
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        return {"ok": False, "error": str(exc), "path": str(path), "candles": []}
+        return {"ok": False, "error": str(exc), "path": str(path), "candles": [], "research": research_meta}
     candles = raw.get("candles") if isinstance(raw, dict) else raw
     if not isinstance(candles, list):
-        return {"ok": False, "error": "bad_candle_shape", "path": str(path), "candles": []}
+        return {"ok": False, "error": "bad_candle_shape", "path": str(path), "candles": [], "research": research_meta}
     rows = []
     for c in candles[-int(max_bars):]:
         if not isinstance(c, dict):
@@ -107,6 +173,13 @@ def load_candles(symbol, timeframe, max_bars=1200):
         "path": str(path),
         "n": len(rows),
         "candles": rows,
+        "source": "formal_short_cache",
+        "research": research_meta,
+        "note_zh": (
+            "使用实盘 formal 短窗；若需 2024YTD 请配置 R2 并运行 research_candles_backfill_r2.py"
+            if research_meta and not research_meta.get("ok")
+            else None
+        ),
         "fetched_at": (raw.get("fetched_at") if isinstance(raw, dict) else None),
         "symbol": symbol,
         "timeframe": timeframe,

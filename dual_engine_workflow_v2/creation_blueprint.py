@@ -30,6 +30,7 @@ from . import creation_meta_think as meta
 from . import creation_stress_lite as stress
 from . import easyquant_bridge as eq
 from . import quantoracle_bridge as qo
+from . import research_candle_store as rcs
 
 
 MAX_LOOP = 5
@@ -43,10 +44,19 @@ def _root():
     return Path(os.environ.get("VECTOR_ROOT") or "/root")
 
 
-def _load_matrix(symbol, timeframe, horizon=3, max_bars=1200):
-    loaded = eq.load_candles(symbol, timeframe, max_bars=max_bars)
+def _load_matrix(symbol, timeframe, horizon=3, max_bars=None):
+    # Prefer long research history when R2/local store is populated.
+    if max_bars is None:
+        max_bars = int(os.environ.get("QIYU_CREATION_MAX_BARS") or 20000)
+    loaded = eq.load_candles(symbol, timeframe, max_bars=max_bars, prefer_research=True)
     if not loaded.get("ok"):
-        return {"ok": False, "error": loaded.get("error"), "path": loaded.get("path")}
+        return {
+            "ok": False,
+            "error": loaded.get("error"),
+            "path": loaded.get("path"),
+            "research": loaded.get("research"),
+            "hint_zh": loaded.get("hint_zh"),
+        }
     candles = loaded["candles"]
     closes = [r["close"] for r in candles]
     matrix = eq._build_factor_matrix(candles)
@@ -58,6 +68,9 @@ def _load_matrix(symbol, timeframe, horizon=3, max_bars=1200):
         "fwd": fwd,
         "n_bars": loaded.get("n"),
         "path": loaded.get("path"),
+        "source": loaded.get("source"),
+        "research": loaded.get("research"),
+        "note_zh": loaded.get("note_zh"),
     }
 
 
@@ -246,6 +259,13 @@ def run_creation_blueprint(
             "detail": data,
             "at": _now(),
         }
+    stages["data"] = {
+        "n_bars": data.get("n_bars"),
+        "path": data.get("path"),
+        "source": data.get("source"),
+        "research": data.get("research"),
+        "note_zh": data.get("note_zh"),
+    }
 
     # ① Meta-think
     meta_pack = meta.run_meta_think(
@@ -441,7 +461,9 @@ def run_creation_blueprint(
             "easyquant": eq.probe_easyquant(),
             "quantoracle": qo.probe(),
             "stress": stress.probe(),
+            "research_candles": rcs.probe(),
         },
+        "data": stages.get("data"),
         "handoff_zh": (
             "创造蓝图 ①–⑤ 完成（或熔断）。下一步才是现有 ADA5 四复核；"
             "本编排器不调用、不修改复核代码。"
