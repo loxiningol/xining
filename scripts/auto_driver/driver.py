@@ -190,10 +190,10 @@ def _l1_seed_retries(pack, cfg, workdir, iteration, state=None):
         enable_matrix = True
     last = None
     for seed in range(1, max_seeds + 1):
-        print("[auto_driver] iter=%d L1-seed %d/%d" % (iteration, seed, max_seeds), flush=True)
+        print("[auto_driver] iter=%d 第二次复核-seed %d/%d" % (iteration, seed, max_seeds), flush=True)
         if state is not None:
             _pub(cfg, state, pack, phase="seed", seed_idx=seed, seed_max=max_seeds,
-                 message="L1 seed %d/%d" % (seed, max_seeds))
+                 message="第二次复核 seed %d/%d" % (seed, max_seeds))
         try:
             result, elapsed = run_once_step_a(
                 pack, symbol, timeframe, direction, tag, try_idx=seed,
@@ -385,7 +385,7 @@ def run_driver(cfg):
                 state["ai_limit_reached"] = True
                 state["stop_code"] = "L0_SPARSE_CLEAN_PACK"
                 state["ai_limit_reason"] = (
-                    "L0 density sparse on pretest-clean pack; refuse entry loosening / shit-decorate"
+                    "第一次复核：清洁包密度过稀；拒绝放宽入场雕花"
                 )
                 state["iterations"].append(_iter_record(
                     iteration, result, ctx, elapsed,
@@ -396,7 +396,7 @@ def run_driver(cfg):
                 _dump_json(iter_dir / "pack.after.json", pack)
                 _pub(cfg, state, pack, phase="l0_sparse_limit", result=result,
                      message=state["ai_limit_reason"])
-                print("[auto_driver] L0 sparse on CLEAN pack → LIMIT (no decorate)", flush=True)
+                print("[auto_driver] 第一次复核密度过稀(清洁包) → LIMIT (no decorate)", flush=True)
                 break
 
         # pretest fail = SHIT_TRANSLATION → RESET only, never call additive AI
@@ -597,7 +597,7 @@ def run_driver(cfg):
         # to reduce immediate kb_blocked on the next iteration.
         if reason in ("repair_exhausted_or_drift", "gate2_3_fail") and cfg.get("auto_bump_family_after_gate2", True):
             pack, new_fam = patch_apply.bump_family_for_kb(pack, iteration + 1)
-            print("[auto_driver] post-gate2 family bump → %s" % new_fam, flush=True)
+            print("[auto_driver] 第三次复核后家族重命名 → %s" % new_fam, flush=True)
             applied.append({"op": "rename_family", "to": new_fam, "auto": True})
 
         _dump_json(iter_dir / "pack.after.json", pack)

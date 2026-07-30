@@ -22,7 +22,7 @@ SYSTEM_PROMPT = _charter.prompt_prefix() + """
 
 硬约束：
 1. 不得建议固定百分比止盈。只允许契约内的 ATR / prev_mid48 / entry_wick_buffer / partial_tp_atr。
-2. 不得削弱 0.9% 保护止损；不得降低 Gate2（payoff≥2.5 / calmar≥1.5 / WF≥7/10）。
+2. 不得削弱 0.9% 保护止损；不得降低【第三次复核】正式门槛（payoff≥2.5 / calmar≥1.5 / WF≥7/10）。
 3. 不得建议 live mount / human confirm 绕过。
 4. rolling_4h_sweep_5m*：必须保留 vol_ma20_ratio>1.15、prev_high48/prev_low48 扫荡收回、
    entry_wick_buffer(0.0008)、prev_mid48 初 TP、atr_trailing≈3.2；严禁 swing_extreme 当影线止损代理。
@@ -68,24 +68,41 @@ def _call_provider(provider, system_prompt, user_payload, max_tokens=2800, tempe
 
 
 def propose_from_provider(provider, failure_context, history_tail=None, max_tokens=2800):
+    from . import review_lexicon as lex
     pretest = (failure_context or {}).get("pretest_quality") or {}
     shit = str(pretest.get("quality") or "") == "SHIT_TRANSLATION"
+    # Scrub legacy Gate/L tokens so AI does not hallucinate on internal codes.
+    ctx = copy.deepcopy(failure_context or {})
+    for key in ("pipeline_reason", "message", "ai_limit_reason", "notes"):
+        if isinstance(ctx.get(key), str):
+            ctx[key] = lex.scrub(ctx[key])
+    if isinstance(ctx.get("diagnostic"), dict):
+        for dk in ("main_cause_line", "fatal_line", "ai_prompt", "terminal_zh", "culled_at"):
+            if ctx["diagnostic"].get(dk):
+                ctx["diagnostic"][dk] = lex.scrub(str(ctx["diagnostic"].get(dk)))
     user_payload = {
         "role": "prune_auditor",
         "provider_slot": provider,
-        "failure_context": failure_context,
+        "failure_context": ctx,
         "recent_iterations": history_tail or [],
-        "optimize_goals": (failure_context or {}).get("optimize_goals") or [],
-        "invariants_contract": (failure_context or {}).get("invariants_contract"),
+        "optimize_goals": (ctx or {}).get("optimize_goals") or [],
+        "invariants_contract": (ctx or {}).get("invariants_contract"),
         "pretest_quality": pretest,
+        "review_lexicon": {
+            "r1": "【第一次复核】（基础语法、逻辑断言、开仓密度预检）",
+            "r2": "【第二次复核】（单标的历史回测与样本收益稳定性）",
+            "r3": "【第三次复核】（多标的矩阵验证与抗风险离群测试）",
+            "forbid_legacy_codes": ["Gate0", "Gate1", "Gate2", "L0", "L1", "L2", "L3"],
+        },
         "instructions": {
             "mode": "RESET_ONLY" if shit else "PRUNE_OR_RESET",
             "ban_additive_optimization": True,
             "must_respect_non_negotiables": True,
             "if_semantic_drift": "RESET",
             "if_no_room_left": "LIMIT_REACHED",
-            "never_lower_gate2_floors": True,
+            "never_lower_review3_floors": True,
             "never_fake_wick_with_swing_extreme": True,
+            "use_only_three_review_names": True,
         },
     }
     t0 = time.time()

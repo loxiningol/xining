@@ -1,26 +1,27 @@
 # -*- coding: utf-8 -*-
-"""AI-readable post-mortem diagnostics for L1 / Gate2 failures."""
+"""AI-readable post-mortem diagnostics for 三复核 failures."""
 from __future__ import print_function
 
 import re
 
 from . import status_humanizer as humanizer
+from . import review_lexicon as lex
 
 
 _REJECT_ZH = {
     "sample_filled_entries_lt_5": "样本量饥饿 — 无法满足最小统计显性 (n ≥ 5)",
-    "sample_payoff_le_1.2": "盈亏比过低 — payoff 未达 L1 门槛 (≤ 1.2)",
+    "sample_payoff_le_1.2": "盈亏比过低 — 未达%s样本收益门槛 (≤ 1.2)" % lex.REVIEW_2,
     "severe_mae_gt_2.5x_avg_win": "逆向波动过大 — MAE 超过平均盈利 2.5 倍",
     "expectancy_non_positive": "期望收益非正 — classic expectancy ≤ 0",
 }
 
 _CHECK_ZH = {
-    "payoff_ge_2_5": "盈亏比未达 Gate2 门槛 (payoff < 2.5)",
-    "calmar_ge_1_5": "Calmar 未达 Gate2 门槛 (< 1.5)",
+    "payoff_ge_2_5": "盈亏比未达%s门槛 (payoff < 2.5)" % lex.REVIEW_3,
+    "calmar_ge_1_5": "Calmar 未达%s门槛 (< 1.5)" % lex.REVIEW_3,
     "worst5_loss_share_le_40pct": "亏损集中度过高 (worst5 > 40%)",
     "remove_max_win_stable": "彩票单依赖 / 去掉最大盈利后崩塌",
     "expectancy_factor_ge_1_0": "因子期望不足 (< 1.0)",
-    "sample_size_ge_8": "Gate2 样本量不足 (< 8)",
+    "sample_size_ge_8": "%s样本量不足 (< 8)" % lex.REVIEW_3,
     "mae_dead_hold_clear": "死扛 / MAE 异常",
 }
 

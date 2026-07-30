@@ -754,25 +754,31 @@ def build_slots_board(vector_root=None, display_history=5):
         "slots": slots,
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "note_zh": (
-            "创立后复核已重构为 ADA-T3 校准三复核：第一次（安全结构）→第二次（证据稳定性："
-            "成交≥10 / 胜率≥50% / 净值均值>0）→第三次（AI+人工确认 Wx）。"
-            "旧 L0/L1/Gate2 硬门槛仅作标签，不再阻塞准入。"
+            "创立后三复核："
+            "【第一次复核】（基础语法、逻辑断言、开仓密度预检）→"
+            "【第二次复核】（单标的历史回测与样本收益稳定性）→"
+            "【第三次复核】（多标的矩阵验证与抗风险离群测试）；"
+            "通过后进入人工确认签发（Wx），永不自动上线。"
             "本机可用内存约 %dMB / 总量 %dMB，并发卡槽容量 %d。"
             "已完成(100%%)卡槽最多展示 %d 个；累计≥3 时自动归档最旧记录，不再显示。"
-            "失败则 AI 优化≤3 轮后 Wx 失败播报归档；全过走原人工确认通道，永不自动上线。"
+            "失败则 AI 优化≤3 轮后 Wx 失败播报归档。"
             % (avail_mb, total_mb, capacity, MAX_COMPLETED_VISIBLE)
         ),
         "funnel": {
-            "name": "admission_v2_ada_t3",
-            "stages": ["第一次复核", "第二次复核", "第三次复核"],
+            "name": "three_review_v2",
+            "stages": [
+                "第一次复核（基础语法、逻辑断言、开仓密度预检）",
+                "第二次复核（单标的历史回测与样本收益稳定性）",
+                "第三次复核（多标的矩阵验证与抗风险离群测试）",
+            ],
             "stages_compact": ["R1", "R2", "R3"],
             "blocking_profile": "ada_t3_calibrated_v1",
-            "legacy_floors_advisory": True,
-            "formal_gate2_floors": {"payoff": 2.5, "calmar": 1.5, "blocking": False},
+            "legacy_codes_forbidden_in_ui": True,
             "max_ai_optimize": 3,
             "wx_human_confirm_kind": "strategy_pending_confirm",
             "wx_failure_kind": "strategy_review_failed",
             "golden_sample": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+            "post_pass_gate": "人工确认签发",
         },
         "human_confirm_required": True,
         "auto_mount": False,

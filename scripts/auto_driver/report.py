@@ -51,7 +51,7 @@ def write_delivery_report(path, state, cfg, initial_pack, final_pack):
 
     lines.append("## 2. 迭代轨迹表")
     lines.append("")
-    lines.append("| Iter | Reason | Score | Gap | Pay | Calmar | W5 | L1 fills | AI decision | Patches |")
+    lines.append("| Iter | Reason | Score | Gap | Pay | Calmar | W5 | 第二次复核 fills | AI decision | Patches |")
     lines.append("|---:|---|---:|---:|---:|---:|---:|---:|---|---|")
     for it in (state.get("iterations") or []):
         g2 = it.get("gate2") or {}
@@ -98,7 +98,7 @@ def write_delivery_report(path, state, cfg, initial_pack, final_pack):
         lines.append("## 3. 过关说明")
         lines.append("")
         lines.append("策略已通过当前驱动所托管的 STEP A 管道（`result.ok=true`）。")
-        lines.append("请人工审查 `pending` / Gate7 确认流程；**本驱动不会自动 mount / confirm。**")
+        lines.append("请人工审查 `pending` / 人工确认签发流程；**本驱动不会自动 mount / confirm。**")
         lines.append("")
 
     lines.append("## 4. Key Diff / 变更说明")
@@ -167,7 +167,7 @@ def _diff_summary(initial_pack, final_pack, state):
         for p in (it.get("applied_patches") or []):
             all_ops.append(p)
     if not all_ops:
-        lines.append("- 无成功应用的 AI 补丁（可能仅 L1 seed 重试或 AI 不可用）。")
+        lines.append("- 无成功应用的 AI 补丁（可能仅第二次复核 seed 重试或 AI 不可用）。")
     else:
         lines.append("- 累计应用补丁 %d 条：" % len(all_ops))
         for p in all_ops[:40]:
@@ -189,10 +189,10 @@ def _default_suggestions(status, state):
     tips = []
     if status == "SUCCESS":
         tips.append("审查 pending human confirm 材料；仅在人工确认后 mount。")
-        tips.append("核对 Walk-Forward / Gate4–6 证据是否与 Gate2 一致，防止样本运气。")
+        tips.append("核对 Walk-Forward / 抗风险拆分证据是否与第三次复核一致，防止样本运气。")
         tips.append("将成功 pack 归档到 strategy 版本库，并记录 auto-driver 迭代轨迹。")
     else:
-        tips.append("阅读第 3 节极限分析：若瓶颈是 Gate2 worst5/lottery 与 vol 选择性冲突，需换机制族而非继续调参。")
+        tips.append("阅读第 3 节极限分析：若瓶颈是第三次复核 worst5/lottery 与 vol 选择性冲突，需换机制族而非继续调参。")
         tips.append("检查 workdir 中各 iter 的 pack 快照与 gate JSON，确认 AI 补丁是否被 DSL validate 拒绝。")
         tips.append("若 AI_ABORT：检查 `/root/auto_trade/ai_ecosystem.env` 密钥与 `ai_research_consent.json`。")
         tips.append("不要手动解锁 KB family 后无差异重提；需有可区分的机制/样本策略。")

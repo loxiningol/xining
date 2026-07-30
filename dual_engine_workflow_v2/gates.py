@@ -37,7 +37,7 @@ def evaluate_gate0(mechanism_spec, normalize_ok):
         "family_present": bool(str(spec.get("mechanism_family") or "").strip()),
     }
     return _gate(
-        "gate0_mechanism_integrity", "机制完整性",
+        "gate0_mechanism_integrity", "第一次复核·基础语法/机制完整性",
         all(checks.values()), checks,
     )
 
@@ -52,11 +52,11 @@ def evaluate_gate1(fidelity_diff, definition, mechanism_spec):
         "no_non_negotiable_violations": not bool(fd.get("non_negotiable_violations")),
         "no_future_feature_tokens": "future_" not in str(fd.get("feature_set") or "").lower(),
     }
-    return _gate("gate1_code_fidelity", "代码忠实度", all(checks.values()), checks)
+    return _gate("gate1_code_fidelity", "第一次复核·逻辑断言/代码忠实度", all(checks.values()), checks)
 
 
 def evaluate_gate2(base_metrics, trades):
-    """Gate2 base backtest + Phase-2 multi-objective fitness hard gates."""
+    """第三次复核 · 矩阵/抗离群 fitness（内部函数名保留）。"""
     from .fitness_engine import evaluate_multi_objective
 
     m = base_metrics or {}
@@ -93,14 +93,14 @@ def evaluate_gate2(base_metrics, trades):
     # Hard: sample + metrics recorded + multi-objective fitness
     passed = bool(fitness.get("pass")) and m.get("mean_net") is not None
     notes = [
-        "gate2_phase2_multi_objective_fitness",
+        "review3_matrix_outlier_fitness",
         "calmar>=1.5; payoff>=2.5; WR*payoff>=1.0; worst5_loss<=40%; "
         "MAE>2*avg_win demote; remove-max-win Calmar/Sharpe drop>50% reject",
         "protective_0.9pct_SL_unchanged",
     ]
     if fitness.get("verdict_tags"):
         notes.append("tags=" + ",".join(fitness["verdict_tags"]))
-    return _gate("gate2_base_backtest", "基础回测", passed, evidence, notes=notes)
+    return _gate("gate2_base_backtest", "第三次复核·矩阵/抗离群", passed, evidence, notes=notes)
 
 
 def evaluate_gate3(walk_forward, trades=None, base_metrics=None, null_hypothesis=None):
@@ -175,7 +175,7 @@ def evaluate_gate3(walk_forward, trades=None, base_metrics=None, null_hypothesis
         notes.append("fitness_failed_on_oos_trades")
     if nh is not None and not nh_ok:
         notes.append("phase3_null_hypothesis_fail_closed")
-    return _gate("gate3_walk_forward", "Walk-forward", passed, evidence, notes=notes)
+    return _gate("gate3_walk_forward", "第三次复核·抗离群稳健(WF)", passed, evidence, notes=notes)
 
 
 def evaluate_gate4(split_summary):
@@ -192,7 +192,7 @@ def evaluate_gate4(split_summary):
     executed = int(s.get("n_tests") or 0) >= 20
     blocked = bool(s.get("gate4_block"))
     passed = executed and not blocked
-    return _gate("gate4_split_destruction", "逻辑破坏拆分测试", passed, evidence,
+    return _gate("gate4_split_destruction", "第三次复核·抗风险拆分测试", passed, evidence,
                  notes=["INCONCLUSIVE allowed; mechanism_failure FAIL blocks"])
 
 
@@ -207,7 +207,7 @@ def evaluate_gate5(mc_summary, friction):
         "friction_sharpe_not_unacceptable": fr_sharpe > -0.5,
         "friction_mean_not_clearly_negative": fr_mean > -0.01,
     }
-    return _gate("gate5_mc_friction", "蒙特卡洛与摩擦压力", all(checks.values()), {
+    return _gate("gate5_mc_friction", "第三次复核·摩擦稳健", all(checks.values()), {
         "mc": mc, "friction": {"sharpe": fr_sharpe, "mean_net": fr_mean}, "checks": checks,
     })
 
@@ -228,7 +228,7 @@ def evaluate_gate6(reviews):
         "averaged_score_forbidden": True,
         "checks": checks,
     }
-    return _gate("gate6_multi_ai_review", "多AI复核", all(checks.values()), evidence)
+    return _gate("gate6_multi_ai_review", "多方AI评议", all(checks.values()), evidence)
 
 
 def evaluate_gate7(human_confirm_state):
@@ -240,12 +240,12 @@ def evaluate_gate7(human_confirm_state):
         "human_confirmed": confirmed,
         "auto_open_mounted": bool(h.get("auto_open_mounted")),
         "real_size_granted": bool(h.get("real_size_granted")),
-        "policy": "Gate7 required before candidate pool / auto_open / real size",
+        "policy": "人工确认签发 required before candidate pool / auto_open / real size",
     }
     # Passing Gate7 means: pushed to pending AND awaiting/received human confirm.
     # Auto-mount without confirm is FAIL.
     if h.get("auto_open_mounted") and not confirmed:
-        return _gate("gate7_human_confirm", "人工确认", False, evidence,
+        return _gate("gate7_human_confirm", "人工确认签发", False, evidence,
                      notes=["illegal_auto_mount_without_human_confirm"])
     passed = bool(h.get("pending_ok")) and (
         confirmed or h.get("awaiting_human") is True
@@ -253,7 +253,7 @@ def evaluate_gate7(human_confirm_state):
     # Strict: "pass" for pipeline continuation to pending is awaiting_human;
     # production mount requires confirmed.
     return _gate(
-        "gate7_human_confirm", "人工确认",
+        "gate7_human_confirm", "人工确认签发",
         passed,
         evidence,
         notes=["production_mount_requires_human_confirmed=true"],

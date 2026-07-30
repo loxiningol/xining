@@ -68,6 +68,6 @@ def run_pretest_quality(pack, direction=None, search_roots=None):
         "reason": None,
         "invariants": contract_report,
         "sanity": sanity_report,
-        "message_zh": "契约+断言通过，允许进入 L0/L1。",
+        "message_zh": "契约+断言通过，允许进入第一次/第二次复核。",
         "contract_source": src,
     }

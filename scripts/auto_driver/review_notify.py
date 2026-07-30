@@ -35,7 +35,7 @@ def _wx(text, kind, meta=None):
     """Send via the verified formal notify channel (same as human confirm)."""
     try:
         import auto_trade_formal_notify as notify
-        return notify.send_message(str(text or ""), kind=kind, meta=meta or {})
+        return notify.send_message(lex.scrub(str(text or "")), kind=kind, meta=meta or {})
     except Exception as exc:
         return {"ok": False, "sent": False, "error": str(exc)}
 

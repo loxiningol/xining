@@ -50,7 +50,7 @@ def soft_progress(metrics):
         "formal_payoff_min": 2.5,
         "formal_calmar_min": 1.5,
         "note_zh": (
-            "萌芽门槛仅用于指导演进与提前淘汰；正式通关仍须 Gate2 "
+            "萌芽门槛仅用于指导演进与提前淘汰；正式通关仍须【第三次复核】 "
             "Payoff≥2.5 / Calmar≥1.5，不得下调。"
         ),
     }

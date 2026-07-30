@@ -1201,7 +1201,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         "lightweight_funnel": True,
     }
     print(
-        "[pipeline_step_a] L0 density pass=%s triggers=%s/%s wall=%.1fms"
+        "[pipeline_step_a] 第一次复核·密度 pass=%s triggers=%s/%s wall=%.1fms"
         % (
             l0.get("pass"),
             (l0.get("metrics") or {}).get("triggers"),
@@ -1229,7 +1229,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             _archive_step_a(
                 task, stage="funnel_l0_density",
                 failed_tests=["density_precheck"],
-                reason="L0 density reject: %s" % ",".join(l0.get("reject_reasons") or ["l0_fail"]),
+                reason="第一次复核·密度拒绝: %s" % ",".join(l0.get("reject_reasons") or ["l0_fail"]),
                 verdict="funnel_l0_cull",
                 is_mech_absent=False,
             )
@@ -1267,7 +1267,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         )
         matrix_frames, frame_errs = _load_matrix_frames(stage_syms, tf, dual)
         print(
-            "[pipeline_step_a] lightweight L1-anchor n_syms=%d frames=%d primary=%s mode=%s"
+            "[pipeline_step_a] 第二次复核·锚点 n_syms=%d frames=%d primary=%s mode=%s"
             % (len(stage_syms), len(matrix_frames), sym, (ram_budget or {}).get("mode")),
             flush=True,
         )
@@ -1290,7 +1290,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             # drop already-tested anchors from reload set? keep full subset for pool consistency
             matrix_frames2, frame_errs2 = _load_matrix_frames(expand_syms, tf, dual)
             print(
-                "[pipeline_step_a] lightweight L1-expand n_syms=%d frames=%d"
+                "[pipeline_step_a] 第二次复核·扩展 n_syms=%d frames=%d"
                 % (len(expand_syms), len(matrix_frames2)),
                 flush=True,
             )
@@ -1345,7 +1345,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             _archive_step_a(
                 task, stage="funnel_l1_micro_screen",
                 failed_tests=["micro_screen"],
-                reason="L1 micro-screen reject: %s" % ",".join(
+                reason="第二次复核拒绝: %s" % ",".join(
                     l1.get("reject_reasons") or ["l1_fail"]),
                 verdict="funnel_l1_cull",
                 # Sample-slice cull is NOT proof of mechanism absence — do not
@@ -1380,7 +1380,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     task["matrix_eval"]["skip_full_matrix_pool"] = bool(skip_pool)
     if enable_multi_symbol_matrix and len(matrix_syms) > 1 and not skip_pool:
         print(
-            "[pipeline_step_a] multi_symbol_matrix Gate2 pool n_syms=%d primary=%s mode=%s"
+            "[pipeline_step_a] 第三次复核·矩阵池 n_syms=%d primary=%s mode=%s"
             % (len(matrix_syms), sym, (ram_budget or {}).get("mode")),
             flush=True,
         )
@@ -1399,7 +1399,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             wf["matrix_pooled"] = True
     elif skip_pool:
         print(
-            "[pipeline_step_a] skip matrix Gate2 pool (primary calmar soft-kill); formal Gate2 on primary only",
+            "[pipeline_step_a] 跳过第三次复核全矩阵池（主标的 calmar soft-kill）；仅主标的跑抗离群",
             flush=True,
         )
         task["matrix_eval"]["gate2_pool"] = {
@@ -1730,7 +1730,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             task["gate_results"] = assemble_gate_results(task["gates"], tid)
             save_gate_results(tid, task["gate_results"])
             _archive_step_a(task, stage="gate2_3", failed_tests=["backtest_or_wf"],
-                            reason="gate2/3 still failing", verdict="backtest_wf_fail",
+                            reason="第三次复核仍未通过", verdict="backtest_wf_fail",
                             is_mech_absent=not g3["pass"])
             dual.save_task(task)
             store.save_task_meta(task)

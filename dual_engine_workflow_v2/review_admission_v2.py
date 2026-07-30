@@ -1,28 +1,20 @@
 # -*- coding: utf-8 -*-
-"""ADA-T3 calibrated three-review admission (replaces blocking Gate/L floors).
+"""ADA-T3 calibrated three-review admission.
 
 Golden sample: ADA5顺势回升·0725T3 (codex0725t3_ada5m_trendpb_r42_z2p3_h14)
-  - Live via safety + 3AI theoretical + human --confirm (2026-07-25)
-  - Under legacy L0/L1/Gate2: FAIL (triggers<30, payoff≈0.70, worst5=100%)
 
-Verdict (2026-07-30 prod audit):
-  L0 FAIL (20 triggers < 30)
-  L1 FAIL (payoff 0.70 ≤ 1.2 + MAE)
-  Gate2 FAIL (payoff/expectancy/worst5/mae)
-  → Cannot "relax" floors without voiding Gate2 philosophy
-  → Reconstruct blocking review around the path that actually admitted ADA T3.
+User-facing names (ONLY these):
+  【第一次复核】（基础语法、逻辑断言、开仓密度预检）
+  【第二次复核】（单标的历史回测与样本收益稳定性）
+  【第三次复核】（多标的矩阵验证与抗风险离群测试）
+人工确认签发 = post-pass Wx mount gate（不是第N次复核）
 
-Blocking reviews (user-facing 第一/二/三次复核):
-  R1 Safety+Structure — DSL validate / no lookahead / no death conflict
-  R2 Evidence stability — trades≥10, WR≥50%, mean_net>0 (real friction BT)
-  R3 AI+Human — 3AI approved + WxPusher pending confirm (never auto-mount)
-
-Legacy L0/L1/Gate2 fitness remain ADVISORY tags only (not blocking).
+Blocking under ada_t3_calibrated_v1:
+  R1 safety/structure · R2 evidence (n≥10, WR≥50%, mean_net>0)
+  R3 matrix/outlier is advisory (soft) when legacy fitness fails
+  then AI+human confirm channel
 """
 from __future__ import print_function
-
-import json
-from pathlib import Path
 
 PROFILE = "ada_t3_calibrated_v1"
 GOLDEN_KEY = "codex0725t3_ada5m_trendpb_r42_z2p3_h14"
@@ -54,7 +46,7 @@ def _sf(x, default=None):
 
 def review1_safety(definition=None, *, lookahead_ok=None, death_reason=None,
                    validate_error=None):
-    """第一次复核：安全与结构（ADA T3 safety_screen blocking set）。"""
+    """【第一次复核】（基础语法、逻辑断言、开仓密度预检）。"""
     checks = {
         "dsl_validated": validate_error is None and bool(definition),
         "no_lookahead": True if lookahead_ok is None else bool(lookahead_ok),
@@ -70,7 +62,8 @@ def review1_safety(definition=None, *, lookahead_ok=None, death_reason=None,
     return {
         "review_n": 1,
         "review_label": "第一次复核",
-        "name": "safety_structure",
+        "review_scope": "基础语法、逻辑断言、开仓密度预检",
+        "name": "review1_syntax_assert_density",
         "pass": all(checks.values()),
         "blocking": True,
         "checks": checks,
@@ -81,7 +74,7 @@ def review1_safety(definition=None, *, lookahead_ok=None, death_reason=None,
 
 
 def review2_evidence(metrics=None, trades=None):
-    """第二次复核：单标的实盘摩擦证据稳定性（非 Gate2 payoff/calmar）。"""
+    """【第二次复核】（单标的历史回测与样本收益稳定性）。"""
     m = dict(metrics or {})
     trades = list(trades or [])
     n = int(m.get("trades") or m.get("total_trades") or len(trades) or 0)
@@ -123,7 +116,8 @@ def review2_evidence(metrics=None, trades=None):
     return {
         "review_n": 2,
         "review_label": "第二次复核",
-        "name": "evidence_stability",
+        "review_scope": "单标的历史回测与样本收益稳定性",
+        "name": "review2_single_symbol_stability",
         "pass": all(checks.values()),
         "blocking": True,
         "checks": checks,
@@ -142,12 +136,12 @@ def review2_evidence(metrics=None, trades=None):
         },
         "profile": PROFILE,
         "calibrated_to": GOLDEN_KEY,
-        "note_zh": "门槛对齐 ADA5顺势回升·0725T3 实盘准入（非 Gate2 payoff≥2.5）",
+        "note_zh": "门槛对齐 ADA5顺势回升·0725T3 实盘准入（第三次复核正式门槛作标签）",
     }
 
 
 def review3_ai_human(ai_review=None, pending_ok=None, human_confirmed=False):
-    """第三次复核：3AI 通过 + 进入人工确认通道（永不自动上线）。"""
+    """人工确认签发前置（非第三次复核本体；矩阵/抗离群见 legacy_advisory）。"""
     ai = ai_review or {}
     approved = bool(ai.get("approved"))
     checks = {
@@ -164,7 +158,9 @@ def review3_ai_human(ai_review=None, pending_ok=None, human_confirmed=False):
     return {
         "review_n": 3,
         "review_label": "第三次复核",
-        "name": "ai_human_confirm",
+        "review_scope": "多标的矩阵验证与抗风险离群测试",
+        "name": "review3_matrix_outlier_then_human",
+        "human_confirm_gate": "人工确认签发",
         "pass": approved and (pending_ok is not False),
         "blocking": True,
         "checks": checks,
@@ -180,7 +176,7 @@ def review3_ai_human(ai_review=None, pending_ok=None, human_confirmed=False):
 
 
 def legacy_fitness_advisory(l0=None, l1=None, gate2_fitness=None):
-    """Attach old L0/L1/Gate2 as non-blocking advisory evidence."""
+    """Attach legacy density/stability/matrix checks as non-blocking advisory."""
     l0 = l0 or {}
     l1 = l1 or {}
     g2 = gate2_fitness or {}
@@ -195,7 +191,7 @@ def legacy_fitness_advisory(l0=None, l1=None, gate2_fitness=None):
         "legacy_gate2_failed_checks": list(g2.get("failed_checks") or []),
         "legacy_thresholds": dict(LEGACY_ADVISORY),
         "note_zh": (
-            "旧 L0/L1/Gate2 仅作标签；ADA-T3 证明高胜率低盈亏比策略可人工准入，"
+            "旧密度/盈亏比硬门槛仅作【第三次复核】标签；ADA-T3 证明高胜率低盈亏比策略可人工准入，"
             "故不再作为创立后阻塞复核。"
         ),
     }
