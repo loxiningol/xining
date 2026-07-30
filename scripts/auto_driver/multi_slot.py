@@ -12,11 +12,20 @@ from . import status_humanizer as humanizer
 
 
 SLOTS_FILE = "auto_driver_slots.json"
+DISPLAY_ARCHIVE_FILE = "auto_driver_slots_display_archive.json"
+# Completed (100% / archived / success) cards kept on the module.
+# When cumulative completed ≥ 3, oldest are auto-archived off-display.
+MAX_COMPLETED_VISIBLE = 2
 
 
 def slots_path(vector_root=None):
     root = Path(vector_root or os.environ.get("VECTOR_ROOT") or "/root")
     return root / "auto_trade" / "dual_engine" / SLOTS_FILE
+
+
+def display_archive_path(vector_root=None):
+    root = Path(vector_root or os.environ.get("VECTOR_ROOT") or "/root")
+    return root / "auto_trade" / "dual_engine" / DISPLAY_ARCHIVE_FILE
 
 
 def read_meminfo_mb():
@@ -283,6 +292,148 @@ def re_search_cjk(s):
     return bool(__import__("re").search(r"[\u4e00-\u9fff]", s))
 
 
+def _payload_mtime(payload):
+    """Best-effort mtime for ordering (newer = larger)."""
+    payload = payload or {}
+    mt = payload.get("_mtime") or 0
+    wd = (payload.get("final") or {}).get("workdir")
+    try:
+        if wd and Path(wd).exists():
+            mt = max(float(mt or 0), float(Path(wd).stat().st_mtime))
+    except Exception:
+        pass
+    if not mt:
+        try:
+            # ISO / common timestamps on live payload
+            ts = payload.get("updated_at") or ""
+            if ts:
+                # tolerate "YYYY-mm-dd HH:MM:SS"
+                import datetime as _dt
+                for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+                    try:
+                        mt = _dt.datetime.strptime(str(ts)[:19], fmt).timestamp()
+                        break
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+    return float(mt or 0)
+
+
+def _is_completed_100(payload):
+    """True when campaign finished (archived/success ≈100%) and should count toward prune."""
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("running"):
+        return False
+    state = _infer_slot_state(payload)
+    if state not in ("archived", "success"):
+        return False
+    prog = payload.get("progress") or {}
+    try:
+        pct = float(prog.get("percent") or 0)
+    except Exception:
+        pct = 0.0
+    final = payload.get("final") or {}
+    if pct >= 99.5:
+        return True
+    if final.get("status") or final.get("stop_code") or payload.get("success") or final.get("success"):
+        return True
+    # Terminal archived/success without explicit percent still counts as done.
+    return True
+
+
+def _append_display_archive(vector_root, hidden_payloads, reason="completed_overflow_gt_2"):
+    """Persist off-display completed slots (oldest pruned when ≥3 completed)."""
+    if not hidden_payloads:
+        return
+    path = display_archive_path(vector_root)
+    try:
+        existing = []
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                existing = list(data.get("items") or [])
+            except Exception:
+                existing = []
+        seen = {str(it.get("key") or "") for it in existing}
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        for payload in hidden_payloads:
+            strat = payload.get("strategy") or {}
+            wd = ((payload.get("final") or {}).get("workdir")
+                  or payload.get("source")
+                  or strat.get("family")
+                  or "")
+            key = str(wd)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            existing.append({
+                "key": key,
+                "archived_at": now,
+                "reason": reason,
+                "title_zh": strat.get("title_zh"),
+                "family": strat.get("family") or strat.get("family_base"),
+                "final_status": ((payload.get("final") or {}).get("status")
+                                 or payload.get("final_status")),
+                "stop_code": ((payload.get("final") or {}).get("stop_code")
+                              or payload.get("stop_code")),
+                "mtime": _payload_mtime(payload),
+                "source": payload.get("source"),
+            })
+        # Cap archive file growth
+        existing = existing[-200:]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(
+            json.dumps({
+                "schema": "qiyu_auto_driver_slots_display_archive_v1",
+                "policy": (
+                    "模块内已完成(100%%)卡槽最多保留 %d 个；"
+                    "累计≥3 时自动归档时间最旧的，不再于真挚之语模块展示。"
+                    % MAX_COMPLETED_VISIBLE
+                ),
+                "max_completed_visible": MAX_COMPLETED_VISIBLE,
+                "updated_at": now,
+                "items": existing,
+            }, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        os.replace(str(tmp), str(path))
+    except Exception:
+        pass
+
+
+def prune_completed_for_display(ordered_payloads, vector_root=None,
+                                max_completed=None):
+    """Keep running/active + newest ≤max_completed finished cards; archive rest.
+
+    Policy: when completed(100%) count ≥ 3, auto-archive oldest off the module.
+    """
+    max_completed = int(max_completed if max_completed is not None else MAX_COMPLETED_VISIBLE)
+    active = []
+    completed = []
+    for payload in ordered_payloads or []:
+        if _is_completed_100(payload):
+            completed.append(payload)
+        else:
+            active.append(payload)
+    completed.sort(key=_payload_mtime, reverse=True)  # newest first
+    keep = completed[:max_completed]
+    hidden = completed[max_completed:]
+    if hidden:
+        _append_display_archive(vector_root, hidden)
+    # Reassemble: running first, then newest completed
+    merged = list(active) + list(keep)
+
+    def _sort_key(p):
+        running = 0 if p.get("running") else 1
+        return (running, -_payload_mtime(p))
+
+    merged.sort(key=_sort_key)
+    return merged, hidden
+
+
 def _recent_run_payloads(vector_root, limit=8):
     root = Path(vector_root or os.environ.get("VECTOR_ROOT") or "/root")
     runs_dir = root / "auto_trade" / "dual_engine" / "workflow_v2" / "auto_driver_runs"
@@ -367,7 +518,8 @@ def build_slots_board(vector_root=None, display_history=5):
     capacity = recommend_slot_count(total_mb, avail_mb)
 
     current = live_status.read_live_status(str(root))
-    recent = _recent_run_payloads(str(root), limit=display_history + 3)
+    # Pull enough history to prune completed correctly (keep newest 2 of ≥3).
+    recent = _recent_run_payloads(str(root), limit=max(display_history + 6, 12))
 
     seen = set()
     ordered = []
@@ -389,22 +541,14 @@ def build_slots_board(vector_root=None, display_history=5):
         seen.add(key)
         ordered.append(payload)
 
-    def _sort_key(p):
-        running = 0 if p.get("running") else 1
-        wd = (p.get("final") or {}).get("workdir")
-        mt = p.get("_mtime") or 0
-        try:
-            if wd and Path(wd).exists():
-                mt = Path(wd).stat().st_mtime
-        except Exception:
-            pass
-        return (running, -float(mt or 0))
+    ordered.sort(key=lambda p: (0 if p.get("running") else 1, -_payload_mtime(p)))
+    ordered, hidden_completed = prune_completed_for_display(
+        ordered, vector_root=str(root), max_completed=MAX_COMPLETED_VISIBLE,
+    )
 
-    ordered.sort(key=_sort_key)
-
-    display_n = max(capacity, min(display_history, 5))
+    # Show full pruned set: all non-completed + newest ≤MAX_COMPLETED_VISIBLE finished.
     slots = []
-    for i, payload in enumerate(ordered[:display_n], start=1):
+    for i, payload in enumerate(ordered, start=1):
         slots.append(_slot_from_live_payload(payload, i))
 
     while len(slots) < capacity:
@@ -426,6 +570,7 @@ def build_slots_board(vector_root=None, display_history=5):
         })
 
     active = sum(1 for s in slots if s.get("running") or s.get("state") in ("running", "breakthrough"))
+    completed_shown = sum(1 for s in slots if s.get("state") in ("archived", "success"))
     board = {
         "schema": "qiyu_auto_driver_slots_v1",
         "ok": True,
@@ -442,12 +587,16 @@ def build_slots_board(vector_root=None, display_history=5):
         },
         "capacity": capacity,
         "active_slots": active,
+        "completed_visible": completed_shown,
+        "completed_max_visible": MAX_COMPLETED_VISIBLE,
+        "completed_hidden": len(hidden_completed or []),
         "slots": slots,
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "note_zh": (
             "本机可用内存约 %dMB / 总量 %dMB，并发卡槽容量 %d。"
+            "已完成(100%%)卡槽最多展示 %d 个；累计≥3 时自动归档最旧记录，不再显示。"
             "容量自适应：>8GB→5，4–8GB→3，低配主机→1，防止 OOM。"
-            % (avail_mb, total_mb, capacity)
+            % (avail_mb, total_mb, capacity, MAX_COMPLETED_VISIBLE)
         ),
         "human_confirm_required": True,
         "auto_mount": False,
