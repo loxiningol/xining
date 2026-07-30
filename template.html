@@ -280,20 +280,62 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .atm-de-table{width:100%;border-collapse:collapse;font-size:12px}
   .atm-de-table th,.atm-de-table td{padding:8px 8px;text-align:left;border-bottom:1px solid var(--line)}
   .atm-de-table th{color:var(--muted);font-weight:500}
-  .atm-tw-console{font-family:"SF Mono","JetBrains Mono","Fira Code",ui-monospace,Menlo,Consolas,monospace;background:linear-gradient(165deg,rgba(12,18,28,.96),rgba(8,12,20,.98));border:1px solid rgba(126,182,255,.22);border-radius:14px;padding:16px 18px;color:#c9d6e8;font-size:12.5px;line-height:1.65;margin-bottom:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 40px rgba(0,0,0,.22);overflow-x:auto}
-  .atm-tw-console .tw-rule{color:rgba(126,182,255,.45);letter-spacing:.04em;white-space:pre;overflow:hidden}
-  .atm-tw-console .tw-line{margin:.15em 0;white-space:pre-wrap;word-break:break-word}
-  .atm-tw-console .tw-muted{color:#7f8ea3}
-  .atm-tw-console .tw-accent{color:#9ec5ff}
-  .atm-tw-console .tw-ok{color:#9bbf9a}
-  .atm-tw-console .tw-run{color:#dab869}
-  .atm-tw-console .tw-fail{color:#d27b7b}
-  .atm-tw-console .tw-title{color:#e8f0ff;font-weight:650;font-size:13.5px}
-  .atm-tw-bar{display:inline-block;letter-spacing:-.08em;color:#7eb6ff}
-  .atm-tw-pipe{margin-top:10px;padding-top:8px;border-top:1px dashed rgba(126,182,255,.2)}
-  .atm-tw-pipe .tw-pipe-row{display:flex;gap:8px;align-items:flex-start;margin:.2em 0}
-  .atm-tw-pipe .tw-mark{min-width:1.6em;text-align:center}
-  .atm-tw-charter{font-size:11px;color:var(--muted);line-height:1.65;margin:0 0 12px;padding:10px 12px;border-left:3px solid rgba(155,191,154,.45);background:rgba(155,191,154,.05)}
+  .atm-tw-console{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    background:rgba(255,255,255,.014);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 16px 12px;
+    color:var(--text);
+    font-size:12px;
+    line-height:1.6;
+    margin-bottom:14px;
+    overflow-x:auto;
+  }
+  .atm-tw-console .tw-head{
+    display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-start;
+    padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line);
+  }
+  .atm-tw-console .tw-head-title{font-size:13px;color:var(--focus);letter-spacing:.06em;font-weight:600}
+  .atm-tw-console .tw-head-meta{font-size:11px;color:var(--muted);text-align:right;line-height:1.55}
+  .atm-tw-slot{
+    margin:0 0 10px;padding:12px 12px 10px;
+    border:1px solid var(--line);border-radius:12px;
+    background:rgba(255,255,255,.018);
+  }
+  .atm-tw-slot:last-child{margin-bottom:0}
+  .atm-tw-slot.is-running{border-color:rgba(214,170,130,.35);background:rgba(214,170,130,.05)}
+  .atm-tw-slot.is-success,.atm-tw-slot.is-breakthrough{border-color:rgba(155,191,154,.32);background:rgba(155,191,154,.05)}
+  .atm-tw-slot.is-archived{border-color:rgba(197,143,132,.28);background:rgba(197,143,132,.04)}
+  .atm-tw-slot.is-idle{opacity:.78}
+  .atm-tw-slot-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px}
+  .atm-tw-slot-id{font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .atm-tw-slot-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:3px 9px;border-radius:999px;font-size:11px;
+    border:1px solid var(--line);color:var(--muted);background:rgba(255,255,255,.03);
+  }
+  .atm-tw-slot.is-running .atm-tw-slot-badge{color:#d6aa82;border-color:rgba(214,170,130,.38);background:rgba(214,170,130,.08)}
+  .atm-tw-slot.is-success .atm-tw-slot-badge,
+  .atm-tw-slot.is-breakthrough .atm-tw-slot-badge{color:var(--gain);border-color:rgba(155,191,154,.32);background:rgba(155,191,154,.08)}
+  .atm-tw-slot.is-archived .atm-tw-slot-badge{color:var(--loss);border-color:rgba(197,143,132,.32);background:rgba(197,143,132,.08)}
+  .atm-tw-slot-title{font-size:13px;color:var(--text);font-weight:600;margin:2px 0 4px}
+  .atm-tw-slot-fam{font-size:11px;color:var(--muted)}
+  .atm-tw-slot-status{font-size:12px;color:var(--focus);margin:6px 0 4px;line-height:1.5}
+  .atm-tw-slot-meta{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted);margin-bottom:8px}
+  .atm-tw-bar-track{height:7px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+  .atm-tw-bar-fill{height:100%;border-radius:999px;background:var(--focus);width:0%;transition:width .35s ease}
+  .atm-tw-slot.is-running .atm-tw-bar-fill{background:#d6aa82}
+  .atm-tw-slot.is-success .atm-tw-bar-fill,
+  .atm-tw-slot.is-breakthrough .atm-tw-bar-fill{background:var(--gain)}
+  .atm-tw-slot.is-archived .atm-tw-bar-fill{background:var(--loss)}
+  .atm-tw-pipe-inline{margin-top:8px;font-size:11px;color:var(--muted);letter-spacing:.02em}
+  .atm-tw-pipe-inline b{color:var(--text);font-weight:500}
+  .atm-tw-pipe-inline .ok{color:var(--gain)}
+  .atm-tw-pipe-inline .run{color:#d6aa82}
+  .atm-tw-pipe-inline .fail{color:var(--loss)}
+  .atm-tw-note{margin-top:10px;font-size:11px;color:var(--muted);line-height:1.55}
+  .atm-tw-charter{font-size:11px;color:var(--muted);line-height:1.65;margin:0 0 12px;padding:10px 12px;border-left:3px solid rgba(155,191,154,.45);background:rgba(155,191,154,.05);border-radius:0 10px 10px 0}
   #strategyCreatorModule{display:none!important}
   @media(max-width:980px){
     .atm-module{padding:18px}
@@ -381,7 +423,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     <div class="atm-section-head">
       <div>
         <h2 class="atm-section-title">真挚之语 · 策略创造演进</h2>
-        <div class="atm-section-sub">GLM-5.2 总设计师 · Codex 总工程师 · 四维正式复核。通过后仅进入人工确认队列，绝不自动上实盘。代号强制语义化为自然语言标题。</div>
+        <div class="atm-section-sub">GLM-5.2 总设计师 · Codex 总工程师 · 四维正式复核。多卡槽并发演进（容量随内存自适应）。通过后仅进入人工确认队列，绝不自动上实盘。</div>
       </div>
       <div class="atm-section-meta">
         <button type="button" class="atm-btn atm-btn-primary" id="btnDualStart" onclick="dualEngineStartTask()">启动新策略创造任务</button>
@@ -390,10 +432,10 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       </div>
     </div>
     <div class="atm-tw-charter" id="atmTwCharter">
-      运行宪章 v2.5：自然语言优先 · 拒绝彩票夏普 · Gate2 不过则归档 LIMIT_REACHED · 人类 --confirm 为唯一实盘门禁。旧「±20%逻辑破坏」已替换为必要性 / 参数稳定 / 贡献度测试。
+      运行宪章 v2.5：自然语言优先 · 拒绝彩票夏普 · 触达极限则归档 · 人类签发为唯一实盘门禁。卡槽容量随主机内存自适应，低配主机单卡槽保护，避免 OOM。
     </div>
     <div class="atm-tw-console" id="atmTwConsole" aria-live="polite">
-      <div class="tw-muted">正在连接 Auto-Driver 状态…</div>
+      <div class="tw-head-meta">正在连接并发演进阵列…</div>
     </div>
     <div class="atm-de-grid">
       <div class="atm-de-card">
@@ -852,77 +894,120 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     return 'hyp';
   }
   function fmtDur(sec){
+    if(sec===null||sec===undefined||sec==='') return '—';
     sec=Math.max(0, Math.round(Number(sec)||0));
     const m=Math.floor(sec/60), s=sec%60;
     if(m>=60){
       const h=Math.floor(m/60), mm=m%60;
-      return h+' 时 '+String(mm).padStart(2,'0')+' 分';
+      return h+':'+String(mm).padStart(2,'0')+':'+String(s).padStart(2,'0');
     }
-    return String(m).padStart(2,'0')+' 分 '+String(s).padStart(2,'0')+' 秒';
+    return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
   }
-  function progressBar(pct){
-    const n=Math.max(0, Math.min(100, Number(pct)||0));
-    const filled=Math.round(n/2.5);
-    const empty=40-filled;
-    return '['+'█'.repeat(filled)+'░'.repeat(empty)+'] '+n.toFixed(0)+'%';
+  function humanizeLeak(text){
+    // Client-side safety net: never show SCREAMING_SNAKE enums raw.
+    const map={
+      LIMIT_REACHED_FAILED:'触达当前机制演进极限（已自动归档）',
+      LIMIT_REACHED:'触达当前机制演进极限（已自动归档）',
+      NO_PROGRESS_REPEATED_REASON:'策略参数陷入局部收敛，连续多轮无性能突破',
+      SUCCESS:'完美穿透全关卡，策略待人工签发',
+      CONVERGED_NO_IMPROVEMENT:'统计指标已达帕累托前沿，终止微扰',
+      MAX_ITERATIONS:'已用尽本轮演进配额，自动收束',
+      AI_LIMIT_REACHED:'智能体判定已无优化空间，归档机制族',
+      AI_ABORT:'触发不可协商风控红线，已主动中止',
+      funnel_l1_cull:'微观筛选过滤（样本量或期望不足）',
+      funnel_l1_fail:'微观筛选未过（样本或收益期望不足）',
+      insufficient_evidence:'统计证据不足（未达到显著性要求）',
+      kb_blocked:'触发 Failure KB 负面指纹拦截',
+      repair_exhausted_or_drift:'修补次数耗尽或出现逻辑漂移',
+      gate2_3_fail:'Gate2 适应度门禁未过'
+    };
+    let s=String(text===null||text===undefined?'':text);
+    Object.keys(map).forEach(function(k){
+      if(s.indexOf(k)>=0) s=s.split(k).join(map[k]);
+    });
+    s=s.replace(/\s*\/\s*/g,'；');
+    return s;
   }
-  function pipeMark(st){
-    if(st==='done') return {m:'✓', cls:'tw-ok'};
-    if(st==='running') return {m:'🔄', cls:'tw-run'};
-    if(st==='fail') return {m:'✗', cls:'tw-fail'};
-    return {m:'⌛', cls:'tw-muted'};
+  function pipeInlineHtml(marks){
+    const list=Array.isArray(marks)?marks:[];
+    if(!list.length) return '<span class="atm-tw-pipe-inline">流水线待同步</span>';
+    return '<div class="atm-tw-pipe-inline">'+list.map(function(m){
+      const parts=String(m).split(':');
+      const id=parts[0]||'?';
+      const mk=parts[1]||'·';
+      let cls='';
+      if(mk==='✓') cls='ok';
+      else if(mk==='⏳') cls='run';
+      else if(mk==='✗') cls='fail';
+      return '<b>'+zoneEsc(id)+'</b>:<span class="'+cls+'">'+zoneEsc(mk)+'</span>';
+    }).join(' · ')+'</div>';
   }
-  function renderTrueWordsConsole(ad){
+  function renderTrueWordsConsole(board, adFallback){
     const el=$('atmTwConsole');
     if(!el) return;
-    ad=ad||{};
-    const eng=ad.engine||{};
-    const strat=ad.strategy||{};
-    const prog=ad.progress||{};
-    const pipe=Array.isArray(ad.pipeline)?ad.pipeline:[];
-    const rule='='.repeat(100);
-    const thin='-'.repeat(100);
-    const title=strat.title_zh||'—';
-    const causal=strat.causal_blurb||'机制因果说明待补充';
-    const fam=strat.family||strat.family_base||'—';
-    const status=ad.status_label||(ad.running?'自主演进运行中':'当前无 Auto-Driver 任务');
-    const pct=prog.percent==null?0:prog.percent;
-    const round=prog.round_label||('Round '+(prog.iteration||0)+'/'+(prog.max_iterations||0));
-    const eta=prog.eta_sec!=null?fmtDur(prog.eta_sec):'—';
-    const used=prog.elapsed_sec!=null?fmtDur(prog.elapsed_sec):'—';
+    board=board||{};
+    const slots=Array.isArray(board.slots)?board.slots:[];
+    const ram=board.ram||{};
+    const eng=board.engine||{};
+    const cap=board.capacity||slots.length||1;
+    const active=board.active_slots!=null?board.active_slots:slots.filter(function(s){return s.running;}).length;
+    const usedGb=(ram.total_gb!=null&&ram.available_gb!=null)
+      ? Math.max(0, Number(ram.total_gb)-Number(ram.available_gb)).toFixed(1)
+      : (ram.total_mb!=null?((Number(ram.total_mb)-Number(ram.available_mb||0))/1024).toFixed(1):'—');
+    const totalGb=ram.total_gb!=null?Number(ram.total_gb).toFixed(1):(ram.total_mb!=null?(Number(ram.total_mb)/1024).toFixed(1):'—');
+
     let html='';
-    html+='<div class="tw-rule">'+zoneEsc(rule)+'</div>';
-    html+='<div class="tw-line tw-title"> 🚀 '+(zoneEsc(eng.name||'真挚之语 (True Words) 自主量化演进引擎'))+' '+(zoneEsc(eng.version||'v2.5'))+' | 双引擎：GLM-5.2 + Codex</div>';
-    html+='<div class="tw-rule">'+zoneEsc(rule)+'</div>';
-    html+='<div class="tw-line"> 📌 正在演进策略 : <span class="tw-accent">'+zoneEsc(title)+'</span></div>';
-    html+='<div class="tw-line"> 💡 核心因果机制 : '+zoneEsc(causal)+'</div>';
-    html+='<div class="tw-line tw-muted"> 🏷️ 策略家族指纹 : '+zoneEsc(fam)+'</div>';
-    html+='<div class="tw-rule">'+zoneEsc(thin)+'</div>';
-    html+='<div class="tw-line"> ⏳ 当前运行状态 : '+(ad.running?'<span class="tw-run">':'<span class="tw-muted">')+zoneEsc(status)+'</span></div>';
-    html+='<div class="tw-line"> 📊 演进迭代进度 : <span class="tw-bar">'+zoneEsc(progressBar(pct))+'</span>  <span class="tw-muted">('+zoneEsc(round)+')</span></div>';
-    html+='<div class="tw-line"> ⏱️ 预计剩余时间 : '+zoneEsc(eta)+' <span class="tw-muted">(已用时: '+zoneEsc(used)+')</span></div>';
-    html+='<div class="atm-tw-pipe">';
-    html+='<div class="tw-line tw-muted"> -------------------------------- 校验流水线 (Pipeline Status) --------------------------------</div>';
-    if(pipe.length){
-      pipe.forEach(function(row){
-        const mk=pipeMark(row.status);
-        html+='<div class="tw-pipe-row"><span class="tw-mark '+mk.cls+'">['+mk.m+']</span><span><b>'+zoneEsc(row.label||row.id)+'</b> : '+zoneEsc(row.detail||'')+'</span></div>';
-      });
-    }else{
-      html+='<div class="tw-line tw-muted">  暂无流水线快照 · 等待 Auto-Driver 发布状态</div>';
-    }
+    html+='<div class="tw-head">';
+    html+='<div class="tw-head-title">'+(zoneEsc(eng.name||'真挚之语 · 并发演进阵列'))+' '+(zoneEsc(eng.version||'v2.5'))+'</div>';
+    html+='<div class="tw-head-meta">内存 '+zoneEsc(usedGb)+'GB / '+zoneEsc(totalGb)+'GB<br>活跃卡槽 '+zoneEsc(active)+' / '+zoneEsc(cap)+'</div>';
     html+='</div>';
-    if(ad.message){
-      html+='<div class="tw-line tw-muted" style="margin-top:8px"> · '+zoneEsc(ad.message)+'</div>';
+
+    const rows=slots.length?slots:(adFallback?[{
+      slot_id:1,
+      state:adFallback.running?'running':((adFallback.final&&adFallback.final.status)?'archived':'idle'),
+      state_label:adFallback.running?'运行中':'—',
+      title_zh:(adFallback.strategy||{}).title_zh||'—',
+      family:(adFallback.strategy||{}).family||'—',
+      status_label:adFallback.status_label||'—',
+      percent:(adFallback.progress||{}).percent||0,
+      round_label:(adFallback.progress||{}).round_label||'',
+      eta_sec:(adFallback.progress||{}).eta_sec,
+      elapsed_sec:(adFallback.progress||{}).elapsed_sec,
+      pipeline_compact:[],
+      final_zh:(adFallback.final||{}).status_zh,
+      running:!!adFallback.running
+    }]:[]);
+
+    if(!rows.length){
+      html+='<div class="atm-tw-slot is-idle"><div class="atm-tw-slot-status">当前无演进任务</div></div>';
+    }else{
+      rows.forEach(function(slot){
+        const st=String(slot.state||'idle');
+        const pct=Math.max(0,Math.min(100,Number(slot.percent)||0));
+        const status=humanizeLeak(slot.final_zh||slot.status_label||slot.state_label||'—');
+        const timeBit=slot.running
+          ?('剩余 '+fmtDur(slot.eta_sec))
+          :(slot.elapsed_sec!=null?('耗时 '+fmtDur(slot.elapsed_sec)):'');
+        html+='<div class="atm-tw-slot is-'+zoneEsc(st)+'">';
+        html+='<div class="atm-tw-slot-top">';
+        html+='<span class="atm-tw-slot-id">槽位 '+zoneEsc(slot.slot_id||'-')+'</span>';
+        html+='<span class="atm-tw-slot-badge">'+zoneEsc(slot.state_label||st)+(pct?(' · '+pct.toFixed(0)+'%'):'')+'</span>';
+        html+='</div>';
+        html+='<div class="atm-tw-slot-title">'+zoneEsc(slot.title_zh||'—')+'</div>';
+        html+='<div class="atm-tw-slot-fam">家族指纹 · '+zoneEsc(slot.family||'—')+'</div>';
+        html+='<div class="atm-tw-slot-status">'+zoneEsc(status)+'</div>';
+        html+='<div class="atm-tw-slot-meta"><span>'+zoneEsc(slot.round_label||'')+'</span><span>'+zoneEsc(timeBit)+'</span></div>';
+        html+='<div class="atm-tw-bar-track"><div class="atm-tw-bar-fill" style="width:'+pct+'%"></div></div>';
+        html+=pipeInlineHtml(slot.pipeline_compact);
+        html+='</div>';
+      });
     }
-    if(ad.final&&ad.final.status){
-      html+='<div class="tw-line"> 🏁 终态 : '+zoneEsc(ad.final.status)+(ad.final.stop_code?(' / '+zoneEsc(ad.final.stop_code)):'')+'</div>';
+    if(board.note_zh){
+      html+='<div class="atm-tw-note">'+zoneEsc(board.note_zh)+'</div>';
     }
-    html+='<div class="tw-rule">'+zoneEsc(rule)+'</div>';
-    html+='<div class="tw-line tw-muted"> 人类确认门禁开启 · 过关策略仅进入 Pending Queue · 绝不自动上实盘</div>';
     el.innerHTML=html;
   }
-  function renderDualEngine(st, adOverride){
+  function renderDualEngine(st, adOverride, slotsOverride){
     st=st||{};
     const wf=st.workflow||{};
     const evo=st.evolution||{};
@@ -948,7 +1033,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         ?('GLM 洞察：'+sum)
         :(task.id?('最近任务 '+task.id+' · '+(task.stage_label||task.stage||'-')):'尚无洞察');
     }
-    // legacy soft-compat
     if($('atmDeWfEntry')) $('atmDeWfEntry').textContent=wf.creation_entry||'legacy';
     if($('atmDeWfFlow')) $('atmDeWfFlow').textContent=(wf.flow==='new'?'新流程':'旧流程');
     if($('atmDeWfMode')) $('atmDeWfMode').textContent=task.exploration_mode||wf.exploration_mode||'-';
@@ -965,17 +1049,20 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       }).join(''):'<tr><td colspan="5" style="color:var(--muted)">暂无待确认策略</td></tr>';
     }
     const ad=adOverride||st.auto_driver||{};
-    renderTrueWordsConsole(ad);
+    const board=slotsOverride||st.auto_driver_slots||{};
+    renderTrueWordsConsole(board, ad);
     const job=st.job||{};
+    const active=board.active_slots!=null?board.active_slots:(ad.running?1:0);
+    const cap=board.capacity||1;
     if($('atmDeJobStatus')){
-      if(ad.running){
-        $('atmDeJobStatus').textContent='Auto-Driver 运行中 · '+(ad.status_label||'')+' · 更新于 '+(ad.updated_at||'');
+      if(active>0){
+        $('atmDeJobStatus').textContent='并发演进阵列运行中 · 活跃卡槽 '+active+'/'+cap+' · 更新于 '+(board.updated_at||ad.updated_at||'');
       }else if(job.running){
         $('atmDeJobStatus').textContent='后台任务运行中：'+(job.kind||'')+' · 开始于 '+(job.started_at||'');
       }else if(st.last_error){
-        $('atmDeJobStatus').textContent='最近错误：'+st.last_error;
+        $('atmDeJobStatus').textContent='最近错误：'+humanizeLeak(st.last_error);
       }else{
-        $('atmDeJobStatus').textContent='真挚之语就绪 · 流程 '+(wf.flow||'old')+' · '+(ad.status_label||st.stage_label||st.stage||'idle');
+        $('atmDeJobStatus').textContent='真挚之语就绪 · 卡槽容量 '+cap+' · '+(humanizeLeak(ad.status_label||st.stage_label||st.stage||'idle'));
       }
     }
   }
@@ -983,6 +1070,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   window.dualEngineRefresh=async function(){
     let st={};
     let ad=null;
+    let board=null;
     let errMsg='';
     try{
       const res=await fetch('/api/dual_engine/status',{credentials:'same-origin',cache:'no-store'});
@@ -990,26 +1078,28 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       if(!res.ok||data.ok===false) throw new Error(data.error||('HTTP '+res.status));
       st=data.status||{};
       ad=st.auto_driver||null;
+      board=st.auto_driver_slots||null;
     }catch(e){
       errMsg=(e&&e.message)?e.message:String(e);
     }
     try{
       const res2=await fetch('/api/dual_engine/auto_driver',{credentials:'same-origin',cache:'no-store'});
       const data2=await res2.json();
-      if(res2.ok&&data2.ok!==false&&data2.auto_driver){
-        ad=data2.auto_driver;
+      if(res2.ok&&data2.ok!==false){
+        if(data2.auto_driver) ad=data2.auto_driver;
+        if(data2.slots) board=data2.slots;
       }
     }catch(e2){
-      if(!ad) errMsg=errMsg||((e2&&e2.message)?e2.message:String(e2));
+      if(!ad&&!board) errMsg=errMsg||((e2&&e2.message)?e2.message:String(e2));
     }
-    if(errMsg&&!st.workflow&&!ad){
+    if(errMsg&&!st.workflow&&!ad&&!board){
       if($('atmTwConsole')){
-        $('atmTwConsole').innerHTML='<div class="tw-fail">状态读取失败：'+zoneEsc(errMsg)+'</div>';
+        $('atmTwConsole').innerHTML='<div style="color:var(--loss)">状态读取失败：'+zoneEsc(errMsg)+'</div>';
       }
       if($('atmDeInsight')) $('atmDeInsight').textContent='双引擎状态读取失败：'+errMsg;
       return;
     }
-    renderDualEngine(st, ad);
+    renderDualEngine(st, ad, board);
   };
   window.dualEngineStartTask=async function(){
     const btn=$('btnDualStart');

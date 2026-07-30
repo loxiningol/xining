@@ -545,10 +545,12 @@ def load_status():
             "flow": "old",
             "error": str(exc),
         }
-    # Auto-Driver live progress (True Words console)
+    # Auto-Driver live progress + multi-slot board (True Words console)
     try:
         from scripts.auto_driver import live_status as _ad_live
+        from scripts.auto_driver import multi_slot as _ad_slots
         st["auto_driver"] = _ad_live.read_live_status()
+        st["auto_driver_slots"] = _ad_slots.read_slots_board()
     except Exception:
         try:
             import sys
@@ -557,9 +559,12 @@ def load_status():
             if scripts_dir not in sys.path:
                 sys.path.insert(0, scripts_dir)
             from auto_driver import live_status as _ad_live  # type: ignore
+            from auto_driver import multi_slot as _ad_slots  # type: ignore
             st["auto_driver"] = _ad_live.read_live_status()
+            st["auto_driver_slots"] = _ad_slots.read_slots_board()
         except Exception as exc:
             st["auto_driver"] = {"ok": False, "running": False, "error": str(exc)}
+            st["auto_driver_slots"] = {"ok": False, "slots": [], "capacity": 1, "error": str(exc)}
     st["updated_at"] = _now()
     return st
 

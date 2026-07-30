@@ -668,7 +668,7 @@ def api_dual_engine_status():
 @app.route("/api/dual_engine/auto_driver", methods=["GET"])
 @auth.login_required
 def api_dual_engine_auto_driver():
-    """Auto-Driver live progress for True Words console (NL title + pipeline)."""
+    """Auto-Driver live progress + multi-slot board for True Words console."""
     try:
         import sys
         from pathlib import Path
@@ -680,15 +680,19 @@ def api_dual_engine_auto_driver():
                 sys.path.insert(0, d)
         try:
             from auto_driver import live_status as ad_live  # type: ignore
+            from auto_driver import multi_slot as ad_slots  # type: ignore
         except Exception:
             from scripts.auto_driver import live_status as ad_live
+            from scripts.auto_driver import multi_slot as ad_slots
         data = ad_live.read_live_status(str(root))
-        return jsonify({"ok": True, "auto_driver": data})
+        board = ad_slots.read_slots_board(str(root))
+        return jsonify({"ok": True, "auto_driver": data, "slots": board})
     except Exception as e:
         return jsonify({
             "ok": False,
             "error": str(e),
             "auto_driver": {"ok": False, "running": False},
+            "slots": {"ok": False, "slots": [], "capacity": 1},
         }), 500
 
 

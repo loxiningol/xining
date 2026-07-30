@@ -9,6 +9,9 @@ import time
 from pathlib import Path
 
 
+from . import status_humanizer as humanizer
+
+
 LIVE_STATUS_NAME = "auto_driver_live.json"
 
 
@@ -80,14 +83,14 @@ def humanize_mechanism_title(symbol, timeframe, family=None, mechanism_name=None
 
 def humanize_causal_blurb(mechanism_spec=None, fallback=None):
     spec = mechanism_spec or {}
-    for key in ("why_edge_exists", "market_inefficiency", "entry_logic", "counterparty_source"):
-        val = str(spec.get(key) or "").strip()
-        if val:
-            # keep first sentence-ish
-            cut = re.split(r"[。\n]", val)[0].strip()
-            if cut:
-                return cut[:180]
-    return str(fallback or "机制因果说明待补充")[:180]
+    return humanizer.prefer_chinese_text(
+        spec.get("counterparty_source"),
+        spec.get("market_inefficiency"),
+        spec.get("why_edge_exists"),
+        spec.get("entry_logic"),
+        fallback=fallback or "机制因果说明待补充",
+        max_len=160,
+    )
 
 
 def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None):
@@ -199,15 +202,25 @@ def _eta_sec(elapsed, pct):
 
 
 def publish_live_status(cfg, state, pack, *, phase="running", result=None,
-                        seed_idx=None, seed_max=None, message=None):
+                        seed_idx=None, seed_max=None, message=None,
+                        write_global=True):
     """Write dashboard-facing live status JSON (atomic)."""
     path = live_status_path(cfg.get("vector_root"))
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if write_global:
+        path.parent.mkdir(parents=True, exist_ok=True)
     spec = (pack or {}).get("mechanism_spec") or {}
     fam = spec.get("mechanism_family")
     symbol = cfg.get("symbol")
     timeframe = cfg.get("timeframe")
     title = humanize_mechanism_title(symbol, timeframe, fam, spec.get("mechanism_name"), spec)
+    # Prefer Chinese display title from pack meta if present
+    meta_title = ((pack or {}).get("meta") or {}).get("title_zh") or ((pack or {}).get("meta") or {}).get("title")
+    if meta_title and re.search(r"[\u4e00-\u9fff]", str(meta_title)):
+        # keep symbol/tf prefix style when meta is campaign title
+        if str(meta_title).startswith("["):
+            title = str(meta_title)
+        else:
+            title = humanize_mechanism_title(symbol, timeframe, fam, meta_title, spec)
     causal = humanize_causal_blurb(spec)
 
     iters = list((state or {}).get("iterations") or [])
@@ -245,48 +258,36 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
         phase = "success"
     elif state.get("final_status"):
         phase = str(state.get("stop_code") or state.get("final_status") or "stopped").lower()
-
-    status_label_map = {
-        "running": "自主演进运行中",
-        "seed": "L1 种子重试中",
-        "l1": "L1 微观筛选中",
-        "calling_ai": "三方 AI 出补丁中 (DeepSeek / Qwen / GLM)",
-        "ai": "三方 AI 出补丁中 (DeepSeek / Qwen / GLM)",
-        "patch": "应用补丁并 DSL 校验",
-        "repair_exhausted_or_drift": "正在进行 Gate2 适应度门禁",
-        "funnel_l1_fail": "L1 未过 · 准备结构补丁",
-        "success": "已通过流水线 · 等待人类确认",
-        "limit_reached_failed": "已触达极限并归档 (LIMIT_REACHED)",
-        "converged_no_improvement": "收敛无改善 · 已归档",
-        "no_progress_repeated_reason": "无进展重复失败 · 已归档 LIMIT_REACHED",
-        "max_iterations": "已达最大轮次 · 归档",
-        "ai_limit_reached": "AI 判定无优化空间 · 归档",
-        "stopped": "已停止",
-    }
-    phase_l = str(phase).lower()
-    reason_l = str(reason).lower()
-    if state.get("final_status"):
-        # Prefer terminal labels over last mid-pipeline reason
-        status_label = (
-            status_label_map.get(phase_l)
-            or status_label_map.get(str(state.get("stop_code") or "").lower())
-            or status_label_map.get(str(state.get("final_status") or "").lower())
-            or ("已通过流水线 · 等待人类确认" if state.get("success") else "已结束并归档")
-        )
         pct = 100.0
-    else:
-        status_label = status_label_map.get(phase_l) or status_label_map.get(reason_l) or "自主演进运行中"
-        if seed_idx and seed_max:
-            status_label = "L1 种子重试 %s/%s · %s" % (seed_idx, seed_max, status_label)
+
+    status_label = humanizer.humanize_status_label(
+        phase=phase,
+        reason=reason,
+        final_status=state.get("final_status"),
+        stop_code=state.get("stop_code"),
+        success=bool(state.get("success")),
+        seed_idx=seed_idx,
+        seed_max=seed_max,
+    )
+    message_zh = None
+    if message:
+        message_zh = humanizer.humanize_code(message, fallback=str(message))
 
     eta = _eta_sec(elapsed, pct)
+    final_zh = None
+    if state.get("final_status") or state.get("stop_code"):
+        final_zh = humanizer.humanize_final(
+            state.get("final_status"), state.get("stop_code"),
+            success=bool(state.get("success")),
+        )
     payload = {
         "schema": "qiyu_auto_driver_live_v1",
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "running": not bool(state.get("final_status")),
         "phase": phase,
+        "phase_zh": humanizer.humanize_code(phase),
         "status_label": status_label,
-        "message": message,
+        "message": message_zh or message,
         "engine": {
             "name": "真挚之语 (True Words) 自主量化演进引擎",
             "version": "v2.5",
@@ -325,11 +326,13 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
             "failed_checks": last.get("failed_checks") or g2.get("failed_checks"),
             "task_id": last.get("task_id") or (result or {}).get("task_id") if isinstance(result, dict) else last.get("task_id"),
             "pipeline_reason": reason,
+            "pipeline_reason_zh": humanizer.humanize_code(reason),
             "ai_decision": last.get("ai_decision"),
         },
         "final": {
             "status": state.get("final_status"),
             "stop_code": state.get("stop_code"),
+            "status_zh": final_zh,
             "success": bool(state.get("success")),
             "workdir": state.get("workdir") or cfg.get("workdir"),
             "report_path": None,
@@ -338,15 +341,23 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
         "human_confirm_required": True,
         "auto_mount": False,
     }
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    os.replace(str(tmp), str(path))
+    if write_global:
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        os.replace(str(tmp), str(path))
     # also mirror into workdir if known
     wd = state.get("workdir") or cfg.get("workdir")
     if wd:
         try:
             wdp = Path(wd) / LIVE_STATUS_NAME
             wdp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        except Exception:
+            pass
+    # refresh multi-slot board (best-effort)
+    if write_global:
+        try:
+            from . import multi_slot
+            multi_slot.build_slots_board(cfg.get("vector_root"))
         except Exception:
             pass
     return payload
