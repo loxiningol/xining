@@ -11,9 +11,26 @@ from pathlib import Path
 
 from . import ai_optimize
 from . import limits
+from . import live_status
 from . import metrics
 from . import patch_apply
 from . import report
+
+
+def _pub(cfg, state, pack, phase="running", result=None, seed_idx=None, seed_max=None, message=None):
+    """Best-effort dashboard live status publish (never abort the driver)."""
+    try:
+        state = dict(state or {})
+        if "_t0" not in state and cfg.get("_t0"):
+            state["_t0"] = cfg["_t0"]
+        return live_status.publish_live_status(
+            cfg, state, pack,
+            phase=phase, result=result,
+            seed_idx=seed_idx, seed_max=seed_max, message=message,
+        )
+    except Exception as exc:
+        print("[auto_driver] live_status publish failed: %s" % exc, flush=True)
+        return None
 
 
 def _load_json(path):
@@ -100,7 +117,7 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1,
     return result, elapsed
 
 
-def _l1_seed_retries(pack, cfg, workdir, iteration):
+def _l1_seed_retries(pack, cfg, workdir, iteration, state=None):
     """Mirror submit_* L1 seed retries without AI (cheap)."""
     max_seeds = int(cfg.get("l1_seed_retries") or 6)
     symbol = cfg["symbol"]
@@ -114,6 +131,9 @@ def _l1_seed_retries(pack, cfg, workdir, iteration):
     last = None
     for seed in range(1, max_seeds + 1):
         print("[auto_driver] iter=%d L1-seed %d/%d" % (iteration, seed, max_seeds), flush=True)
+        if state is not None:
+            _pub(cfg, state, pack, phase="seed", seed_idx=seed, seed_max=max_seeds,
+                 message="L1 seed %d/%d" % (seed, max_seeds))
         try:
             result, elapsed = run_once_step_a(
                 pack, symbol, timeframe, direction, tag, try_idx=seed,
@@ -133,6 +153,9 @@ def _l1_seed_retries(pack, cfg, workdir, iteration):
             "result": result,
         })
         last = result
+        if state is not None:
+            _pub(cfg, state, pack, phase="l1", result=result,
+                 seed_idx=seed, seed_max=max_seeds)
         reason = str((result or {}).get("reason") or "")
         if (result or {}).get("ok"):
             return result, "success"
@@ -191,11 +214,17 @@ def run_driver(cfg):
     max_iter = int(cfg.get("max_iterations") or 10)
     kb_bumps = 0
     max_kb_bumps = int(cfg.get("max_kb_family_bumps") or 3)
+    cfg = dict(cfg)
+    cfg["workdir"] = str(workdir)
+    cfg["_t0"] = t_start
+    state["_t0"] = t_start
 
     print("[auto_driver] start workdir=%s pack=%s dry_run=%s" % (workdir, pack_path, dry_run), flush=True)
+    _pub(cfg, state, pack, phase="running", message="Auto-Driver 启动")
 
     for iteration in range(1, max_iter + 1):
         state["n_iterations"] = iteration
+        state["elapsed_sec"] = round(time.time() - t_start, 2)
         iter_dir = workdir / ("iter_%02d" % iteration)
         iter_dir.mkdir(parents=True, exist_ok=True)
 
@@ -207,6 +236,8 @@ def run_driver(cfg):
             iteration, max_iter,
             ((pack.get("mechanism_spec") or {}).get("mechanism_family")),
         ), flush=True)
+        _pub(cfg, state, pack, phase="seed",
+             message="Round %d/%d 开始" % (iteration, max_iter))
 
         if skip_pipeline or dry_run:
             # Synthetic failure context for dry-run / AI-only smoke
@@ -225,7 +256,7 @@ def run_driver(cfg):
             }
             elapsed = 0.0
         else:
-            result, seed_mode = _l1_seed_retries(pack, cfg, iter_dir, iteration)
+            result, seed_mode = _l1_seed_retries(pack, cfg, iter_dir, iteration, state=state)
             elapsed = 0.0  # detailed in seed files
             if seed_mode == "success":
                 state["success"] = True
@@ -240,6 +271,7 @@ def run_driver(cfg):
                     ai_decision="N/A", applied=[], ai_rationale="passed_without_further_ai",
                 ))
                 _dump_json(iter_dir / "pack.after.json", pack)
+                _pub(cfg, state, pack, phase="success", result=result)
                 break
 
         ctx = metrics.build_failure_context(
@@ -249,6 +281,7 @@ def run_driver(cfg):
             notes=cfg.get("notes"),
         )
         _dump_json(iter_dir / "failure_context.json", ctx)
+        _pub(cfg, state, pack, phase=str((result or {}).get("reason") or "l1"), result=result)
 
         reason = str((result or {}).get("reason") or "")
         print("[auto_driver] reason=%s score=%.4f gap=%.4f" % (
@@ -282,6 +315,9 @@ def run_driver(cfg):
 
         # --- AI optimize ---
         history = ai_optimize.history_tail_from_iterations(state["iterations"], n=3)
+        state["elapsed_sec"] = round(time.time() - t_start, 2)
+        _pub(cfg, state, pack, phase="calling_ai", result=result,
+             message="三方 AI 出补丁中")
         if dry_run and cfg.get("dry_run_skip_ai"):
             merged = {
                 "decision": "LIMIT_REACHED",
@@ -314,6 +350,8 @@ def run_driver(cfg):
                 limit_reason=state["ai_limit_reason"],
             ))
             _dump_json(iter_dir / "pack.after.json", pack)
+            _pub(cfg, state, pack, phase="ai_limit_reached", result=result,
+                 message=state["ai_limit_reason"])
             break
 
         if ai_decision == "ABORT":
@@ -325,10 +363,14 @@ def run_driver(cfg):
                 ai_rationale=state["ai_abort_reason"],
             ))
             _dump_json(iter_dir / "pack.after.json", pack)
+            _pub(cfg, state, pack, phase="stopped", result=result,
+                 message=state["ai_abort_reason"])
             break
 
         # PATCH
         if ai_decision == "PATCH":
+            _pub(cfg, state, pack, phase="patch", result=result,
+                 message="应用补丁并 DSL 校验")
             # Gate2-after-L1: drop entry mutations; then clamp DSL hard bounds.
             patches = patch_apply.filter_patches_for_reason(
                 merged.get("patches") or [], reason,
@@ -427,6 +469,11 @@ def run_driver(cfg):
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(str(report_path), str(dest))
         print("[auto_driver] report copied to %s" % dest, flush=True)
+
+    end_phase = "success" if state.get("success") else str(state.get("stop_code") or "limit_reached_failed").lower()
+    _pub(cfg, state, final_pack, phase=end_phase,
+         message="终态 %s · %s · 报告 %s" % (
+             state["final_status"], state["stop_code"], report_path.name))
 
     print("[auto_driver] DONE status=%s stop=%s report=%s" % (
         state["final_status"], state["stop_code"], report_path), flush=True)

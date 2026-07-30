@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>VECTOR 量化工作台</title>
+<style>
+:root{
+  --bg:#11100e;--panel:#191816;--panel2:#201f1c;--line:rgba(255,255,255,.10);
+  --text:#e8e4dc;--muted:#9d978c;--soft:#6f695f;--gain:#9bbf9a;--loss:#c58f84;--focus:#d8d0c3;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:32px;background:radial-gradient(circle at top,#1d1b18 0,#11100e 42%,#0d0c0b 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.02em}
+h1{margin:0 0 8px;font-size:28px;font-weight:300;letter-spacing:.18em}
+.subtitle{color:var(--muted);margin-bottom:32px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}
+.full{grid-column:1/-1}
+.panel{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.018));border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.22)}
+.title{font-size:16px;font-weight:400;color:var(--focus);margin-bottom:18px;letter-spacing:.12em}
+button{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text);border-radius:12px;padding:9px 14px;cursor:pointer;transition:background .25s,border .25s}
+button:hover{background:rgba(255,255,255,.08)}
+input,select,textarea{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+textarea{width:100%;min-height:90px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.number{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.gain{color:var(--gain)}.loss{color:var(--loss)}.muted{color:var(--muted)}
+details{border:1px solid var(--line);border-radius:16px;padding:12px 14px;background:rgba(255,255,255,.025);margin-bottom:12px}
+summary{cursor:pointer;color:var(--focus)}
+.strategy-summary-title{display:block}
+.strategy-summary-meta{display:block;margin-top:6px;color:var(--muted);font-size:12px;letter-spacing:.02em}
+.strategy-body{margin-top:12px;color:var(--muted);line-height:1.7}
+.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:8px}
+.badge-off{color:var(--loss);border-color:rgba(197,143,132,.35)}
+.badge-blocked{color:#d6aa82;border-color:rgba(214,170,130,.38);background:rgba(214,170,130,.08)}
+.disabled{opacity:.55}
+table{width:100%;border-collapse:collapse;margin-top:14px}
+th,td{border:1px solid var(--line);padding:9px;text-align:center;font-size:13px}
+th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
+.progress{height:7px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-top:8px}
+.progress div{height:100%;background:var(--focus);width:0%}
+.param-row{display:grid;grid-template-columns:1fr 120px 70px 70px;gap:8px;margin-bottom:8px}
+.status-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px}.on{background:var(--gain)}.off{background:var(--loss)}
+.bt-strategy-picker{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+.bt-strategy-option{display:flex;align-items:flex-start;gap:8px;padding:9px 10px;border:1px solid transparent;border-radius:10px;color:var(--muted);cursor:pointer}
+.bt-strategy-option:hover{background:rgba(255,255,255,.035);border-color:var(--line)}
+.bt-strategy-option input{margin-top:3px}.bt-strategy-option span{line-height:1.45}.bt-selection-note{width:100%;font-size:12px;color:var(--muted)}
+.bt-strategy-option.scope-dedicated{grid-column:1/-1;border-color:rgba(58,166,255,.45);background:rgba(58,166,255,.09);color:var(--text)}
+.bt-strategy-option.scope-dedicated:hover{border-color:var(--focus);background:rgba(58,166,255,.14)}
+.bt-scope-badge{display:inline-block;margin-left:8px;padding:2px 7px;border:1px solid rgba(58,166,255,.45);border-radius:999px;color:var(--focus);font-size:11px;white-space:nowrap}
+.bt-combo-summary{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
+.bt-result-block{margin-top:14px;padding-top:2px}.bt-result-title{margin:14px 0 8px;color:var(--focus);font-size:15px;letter-spacing:.06em}
+.bt-data-coverage{width:100%;font-size:12px;color:var(--muted);line-height:1.65}
+.market-monitor{min-height:290px;padding:30px}
+.market-monitor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px}
+.market-monitor-head .title{margin:0}
+.market-monitor-subtitle{margin-top:7px;color:var(--muted);font-size:12px}
+.market-monitor-time{color:var(--soft);font-size:12px;white-space:nowrap}
+.market-monitor-assets{display:grid;gap:18px}
+.market-monitor-asset{padding:16px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.012)}
+.market-monitor-asset-title{font-size:14px;color:var(--focus);margin:0 0 13px 2px;letter-spacing:.08em}
+.market-monitor-grid{display:grid;grid-template-columns:1.15fr 1.6fr repeat(4,minmax(110px,.7fr));gap:12px}
+.market-monitor-card{min-height:112px;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
+.market-monitor-card.wide{min-width:0}
+.market-monitor-label{color:var(--muted);font-size:11px;letter-spacing:.08em;margin-bottom:12px}
+.market-monitor-value{font-size:20px;color:var(--text);line-height:1.35}
+.market-monitor-value.price{font-size:28px}
+.market-monitor-value.compact{font-size:14px;word-break:break-word}
+.market-monitor-foot{margin-top:9px;color:var(--soft);font-size:11px}
+.market-monitor-state{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;border:1px solid rgba(155,191,154,.28);color:var(--gain);background:rgba(155,191,154,.08);font-size:12px}
+.market-monitor-state.error{color:var(--loss);border-color:rgba(197,143,132,.32);background:rgba(197,143,132,.08)}
+.system-goal-panel{padding:28px 30px}
+.system-goal-intro{max-width:1050px;color:var(--muted);font-size:13px;line-height:1.8;margin:-4px 0 18px}
+.system-goal-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.system-goal-item{padding:16px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.022)}
+.system-goal-label{font-size:11px;color:var(--muted);letter-spacing:.08em;margin-bottom:9px}
+.system-goal-value{font-size:17px;color:var(--focus);line-height:1.45}
+.system-goal-foot{margin-top:14px;padding:12px 14px;border-left:3px solid var(--gain);background:rgba(155,191,154,.055);border-radius:4px 12px 12px 4px;color:var(--muted);font-size:12px;line-height:1.7}
+.system-timeline{position:relative;margin-top:2px;padding-left:20px}
+.system-timeline:before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:1px;background:var(--line)}
+.system-timeline-item{position:relative;display:grid;grid-template-columns:120px 1fr;gap:18px;padding:0 0 22px}
+.system-timeline-item:last-child{padding-bottom:0}
+.system-timeline-item:before{content:"";position:absolute;left:-19px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--gain);box-shadow:0 0 0 4px rgba(155,191,154,.09)}
+.system-timeline-date{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--focus);font-size:13px}
+.system-timeline-event{color:var(--text);font-size:13px;line-height:1.6}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.param-row{grid-template-columns:1fr}}
+@media(max-width:1100px){.market-monitor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.system-goal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.market-monitor{padding:22px}.market-monitor-head{display:block}.market-monitor-time{margin-top:10px}.market-monitor-grid{grid-template-columns:1fr}.system-goal-grid{grid-template-columns:1fr}.system-timeline-item{grid-template-columns:1fr;gap:5px}}
+.site-health-head-v7{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.site-health-summary-v7{font-size:15px;color:var(--focus);letter-spacing:.06em}
+.site-health-meta-v7{margin-top:6px;color:var(--muted);font-size:12px}
+.site-health-pill-v7{flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(155,191,154,.30);color:var(--gain);background:rgba(155,191,154,.08);font-size:12px;white-space:nowrap}
+.site-health-pill-v7.error{color:var(--loss);border-color:rgba(197,143,132,.34);background:rgba(197,143,132,.08)}
+.site-health-grid-v7{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.site-health-card-v7{padding:14px 15px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+.site-health-card-v7.error{border-color:rgba(197,143,132,.35);background:rgba(197,143,132,.05)}
+.site-health-card-v7.warning{border-color:rgba(214,170,130,.35);background:rgba(214,170,130,.05)}
+.site-health-name-v7{display:flex;align-items:center;gap:8px;margin-bottom:8px;color:var(--focus);font-size:13px;letter-spacing:.04em}
+.site-health-dot-v7{width:8px;height:8px;border-radius:50%;background:var(--gain);flex:0 0 auto}
+.site-health-card-v7.error .site-health-dot-v7{background:var(--loss)}
+.site-health-card-v7.warning .site-health-dot-v7{background:#d6aa82}
+.site-health-detail-v7{color:var(--muted);font-size:12px;line-height:1.65;white-space:pre-line;word-break:break-word}
+.site-health-detail-v7 ul{margin:0;padding-left:1.1em}
+.site-health-detail-v7 li{margin:2px 0}
+@media(max-width:620px){.site-health-head-v7{flex-direction:column}}
+</style>
+</head>
+<body>
+<h1>VECTOR</h1>
+<div class="subtitle">量化工作台</div>
+
+<div class="grid">
+  <div class="panel full system-goal-panel">
+    <div class="title">系统总目标</div>
+    <div class="system-goal-intro">以可验证的正期望为前提，在资金曲线安全与策略生命周期有效的条件下，提高有效交易频率，让稳定优势通过足够的交易次数形成资金量变。</div>
+    <div class="system-goal-grid">
+      <div class="system-goal-item"><div class="system-goal-label">目标胜率</div><div class="system-goal-value">约 75%</div></div>
+      <div class="system-goal-item"><div class="system-goal-label">单笔盈利目标</div><div class="system-goal-value">约 20% 及以上</div></div>
+      <div class="system-goal-item"><div class="system-goal-label">核心风险基准</div><div class="system-goal-value">20×｜0.9% 止损</div></div>
+      <div class="system-goal-item"><div class="system-goal-label">频率原则</div><div class="system-goal-value">安全优先，再求高频</div></div>
+    </div>
+    <div class="system-goal-foot">20×杠杆下，标的价格反向0.9%约对应保证金亏损18%，手续费另计。策略评价以含手续费净收益、回撤、止损簇、样本数量及近期市场环境共同判断，不以单一高胜率替代资金曲线安全。</div>
+  </div>
+  <div class="panel full market-monitor">
+    <div class="market-monitor-head">
+      <div>
+        <div class="title">盘面状态监控</div>
+        <div class="market-monitor-subtitle" id="marketMonitorSubtitle">BTC / CL / XAU / NG / XAG / LTC / ADA · 多周期行情指标与均线状态</div>
+      </div>
+      <div>
+        <select id="market_timeframe" aria-label="盘面监控周期" onchange="loadDialysis()">
+          <option value="1h" selected>1小时</option>
+          <option value="15m">15分钟</option>
+          <option value="5m">5分钟</option>
+        </select>
+        <div id="marketMonitorTime" class="market-monitor-time">正在读取最新行情…</div>
+      </div>
+    </div>
+    <div id="dialysisBox">加载中...</div>
+  </div>
+  <div class="panel full"><div class="title">实验策略模块</div><div id="experimentalStrategies">加载中...</div></div>
+
+  <div class="panel full">
+    <div class="title">策略回测控制台</div>
+    <div class="row">
+      <div id="active_strat" class="bt-strategy-picker"></div>
+      <div id="btSelectionNote" class="bt-selection-note">请选择至少一条策略；可同时选择任意数量进行等权组合回测。</div>
+      <select id="bt_instrument" aria-label="回测标的" onchange="onBacktestScopeChange()">
+        <option value="BTC-USDT-SWAP">BTC 永续合约</option>
+        <option value="CL-USDT-SWAP">CL 永续合约</option>
+        <option value="XAU-USDT-SWAP">XAU 永续合约</option>
+        <option value="NG-USDT-SWAP">NG 永续合约</option>
+        <option value="XAG-USDT-SWAP">XAG 永续合约</option>
+        <option value="LTC-USDT-SWAP">LTC 永续合约</option>
+        <option value="ADA-USDT-SWAP">ADA 永续合约</option>
+        <option value="ETH-USDT-SWAP">ETH 永续合约</option>
+        <option value="SOL-USDT-SWAP">SOL 永续合约</option>
+        <option value="XRP-USDT-SWAP">XRP 永续合约</option>
+        <option value="DOGE-USDT-SWAP">DOGE 永续合约</option>
+        <option value="BNB-USDT-SWAP">BNB 永续合约</option>
+      </select>
+      <select id="bt_timeframe" aria-label="回测周期" onchange="onBacktestScopeChange()">
+        <option value="1h" selected>1小时周期</option>
+        <option value="15m">15分钟周期</option>
+        <option value="5m">5分钟周期</option>
+      </select>
+      <div class="bt-selection-note">切换至“BTC 永续合约＋15分钟周期”后，BTC 15分钟专用策略会置顶并自动选中。专用策略可读取上一根已闭合1小时K线作为背景；回测资格与自动交易资格相互独立。</div>
+      <input id="bt_start" type="datetime-local" value="2026-01-01T00:00">
+      <input id="bt_end" type="datetime-local" value="2026-06-28T00:00">
+      <button id="btRunButton" onclick="executeBacktest()">开始回测</button>
+    </div>
+    <div id="btDataCoverage" class="bt-data-coverage">正在读取所选标的与周期的历史覆盖…</div>
+    <div id="btProgress"></div>
+    <div id="btResult"></div>
+  </div>
+
+  <div class="panel full" id="strategyEditorPanel">
+    <div class="title">实验策略优化工作台</div>
+    <div class="row">
+      <select id="editor_strategy_select" onchange="loadEditorStrategy()"></select>
+      <button onclick="saveStrategyConfig(false)">仅保存配置</button>
+      <button onclick="saveStrategyConfig(true)">保存并记录回测快照</button>
+    </div>
+    <div class="row">
+      <label><input id="editor_enabled" type="checkbox"> 启用策略</label>
+      <input id="editor_version" placeholder="版本号">
+    </div>
+    <div class="row">
+      <textarea id="editor_trigger" placeholder="触发条件"></textarea>
+      <textarea id="editor_exit" placeholder="止盈/止损条件"></textarea>
+    </div>
+    <div id="editor_params"></div>
+    <div id="editor_status" class="muted"></div>
+  </div>
+
+  <div class="panel full">
+<!-- VECTOR_AUTO_TRADE_STATE_V5_NOGUESS_START -->
+<style>
+  .atm-module{margin:0;padding:28px 30px 32px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.014));color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  .atm-module *{box-sizing:border-box}
+  .atm-module-title{font-size:20px;font-weight:600;color:var(--focus);letter-spacing:.1em;margin:0 0 22px}
+  .atm-section{margin:0 0 26px;padding:22px 22px 18px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.018)}
+  .atm-section:last-child{margin-bottom:0}
+  .atm-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+  .atm-section-title{font-size:15px;font-weight:600;color:var(--focus);letter-spacing:.08em;margin:0}
+  .atm-section-sub{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.55}
+  .atm-section-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .atm-count{padding:5px 10px;border-radius:999px;font-size:11px;color:var(--gain);border:1px solid rgba(155,191,154,.28);background:rgba(155,191,154,.08)}
+  .atm-btn{padding:7px 12px;border-radius:10px;font-size:12px;color:var(--text);border:1px solid var(--line);background:rgba(255,255,255,.04);cursor:pointer}
+  .atm-btn:hover{background:rgba(255,255,255,.07)}
+  .atm-btn:disabled{opacity:.55;cursor:wait}
+  .atm-btn-primary{border-color:rgba(61,139,253,.45);background:rgba(61,139,253,.16);color:#dceaff}
+  .atm-empty{padding:14px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);font-size:12px;line-height:1.6}
+  .atm-roster{display:grid;gap:8px}
+  .atm-row{border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.014);overflow:hidden}
+  .atm-row-main{display:grid;grid-template-columns:minmax(180px,2.2fr) 72px minmax(110px,1fr) minmax(110px,1fr) auto;gap:10px;align-items:center;padding:12px 14px}
+  .atm-row-title{font-size:13px;color:var(--text);font-weight:500;line-height:1.45}
+  .atm-row-scope{font-size:11px;color:var(--muted);margin-top:3px}
+  .atm-field-label{display:block;font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:.04em}
+  .atm-field-value{font-size:13px;color:var(--text);font-weight:500}
+  .atm-grade{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+  .atm-grade.grade-s{color:#f0d78c;border-color:rgba(240,215,140,.65);background:linear-gradient(180deg,rgba(240,215,140,.22),rgba(180,140,40,.12))}
+  .atm-grade.grade-a{color:#c4a0ff;border-color:rgba(180,120,255,.55);background:rgba(150,100,255,.14)}
+  .atm-grade.grade-b{color:#7eb6ff;border-color:rgba(100,160,255,.5);background:rgba(80,140,255,.12)}
+  .atm-grade.grade-c{color:#a8a8a8;border-color:rgba(160,160,160,.45);background:rgba(140,140,140,.1)}
+  .atm-row details{border-top:1px solid rgba(255,255,255,.06)}
+  .atm-row summary{list-style:none;cursor:pointer;padding:8px 14px;font-size:11px;color:var(--muted)}
+  .atm-row summary::-webkit-details-marker{display:none}
+  .atm-row summary::after{content:'▾';float:right;opacity:.7}
+  .atm-row details[open] summary::after{content:'▴'}
+  .atm-trade-wrap{padding:0 12px 12px;overflow-x:auto}
+  .atm-trade-table{width:100%;border-collapse:collapse;min-width:560px;font-size:11px}
+  .atm-trade-table th,.atm-trade-table td{padding:6px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.05)}
+  .atm-trade-table th{color:var(--muted);font-weight:500}
+  .atm-trade-table .gain{color:var(--gain)}
+  .atm-trade-table .loss{color:var(--loss)}
+  .atm-ops{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.012)}
+  .atm-ops>summary{list-style:none;cursor:pointer;padding:12px 14px;font-size:12px;color:var(--focus);letter-spacing:.04em}
+  .atm-ops>summary::-webkit-details-marker{display:none}
+  .atm-ops-body{padding:0 14px 14px;display:grid;gap:12px}
+  .atm-ops-zone{padding:12px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.014)}
+  .atm-ops-zone-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--text)}
+  .atm-ops-zone-state{font-size:11px;color:var(--muted)}
+  .atm-ops-risk{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+  .atm-ops-risk select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--text)}
+  .atm-ops-status{grid-column:1/-1;min-height:16px;font-size:11px;color:var(--muted)}
+  .vector-daily-ledger-v10{margin:0;padding:0;border:0;border-radius:0;background:transparent}
+  .vector-daily-ledger-head-v10{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
+  .vector-daily-ledger-title-v10{font-size:15px;color:var(--focus);letter-spacing:.08em;font-weight:600}
+  .vector-daily-ledger-sub-v10{font-size:11px;color:var(--muted);margin-top:6px}
+  .vector-daily-day-v10{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:rgba(255,255,255,.014);overflow:hidden}
+  .vector-daily-day-v10 summary{display:grid;grid-template-columns:1.2fr repeat(4,minmax(90px,1fr));gap:10px;align-items:center;padding:14px 16px;cursor:pointer;list-style:none;font-size:12px;color:var(--text)}
+  .vector-daily-day-v10 summary::-webkit-details-marker{display:none}
+  .vector-daily-day-v10 summary span{color:var(--muted)}
+  .vector-daily-day-v10 summary strong{font-weight:500;color:var(--text)}
+  .vector-daily-day-v10 .gain{color:var(--gain)}
+  .vector-daily-day-v10 .loss{color:var(--loss)}
+  .vector-daily-events-v10{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px 16px}
+  .vector-daily-events-v10 h4{font-size:11px;color:var(--focus);font-weight:500;margin:0 0 7px}
+  .vector-daily-event-v10{padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:11px;line-height:1.55;color:var(--muted);margin-bottom:6px}
+  .vector-daily-event-v10 b{color:var(--text);font-weight:500}
+  .vector-auto-empty-v5{font-size:12px;color:var(--soft);margin-top:8px}
+  .atm-forecast-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+  .atm-metric{padding:12px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.02)}
+  .atm-metric span{display:block;font-size:10px;color:var(--muted);margin-bottom:6px}
+  .atm-metric strong{font-size:20px;font-weight:600;color:var(--text)}
+  .atm-forecast-summary{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 10px}
+  .atm-forecast-status{font-size:12px;color:var(--muted);min-height:18px;margin-bottom:10px}
+  .atm-forecast-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  .atm-forecast-table{width:100%;border-collapse:collapse;min-width:640px;font-size:12px}
+  .atm-forecast-table th,.atm-forecast-table td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  .atm-forecast-table th{color:var(--muted);font-weight:500;background:rgba(255,255,255,.02)}
+  .atm-ok{color:var(--gain)}
+  .atm-warn{color:var(--focus)}
+  .atm-de-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px}
+  .atm-de-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
+  .atm-de-card h3{margin:0 0 8px;font-size:12px;color:var(--focus);letter-spacing:.06em;font-weight:600}
+  .atm-de-insight{font-size:12px;color:var(--text);line-height:1.65;min-height:48px}
+  .atm-de-meta{font-size:11px;color:var(--muted);margin-top:8px}
+  .atm-de-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+  .atm-de-table{width:100%;border-collapse:collapse;font-size:12px}
+  .atm-de-table th,.atm-de-table td{padding:8px 8px;text-align:left;border-bottom:1px solid var(--line)}
+  .atm-de-table th{color:var(--muted);font-weight:500}
+  .atm-tw-console{font-family:"SF Mono","JetBrains Mono","Fira Code",ui-monospace,Menlo,Consolas,monospace;background:linear-gradient(165deg,rgba(12,18,28,.96),rgba(8,12,20,.98));border:1px solid rgba(126,182,255,.22);border-radius:14px;padding:16px 18px;color:#c9d6e8;font-size:12.5px;line-height:1.65;margin-bottom:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 40px rgba(0,0,0,.22);overflow-x:auto}
+  .atm-tw-console .tw-rule{color:rgba(126,182,255,.45);letter-spacing:.04em;white-space:pre;overflow:hidden}
+  .atm-tw-console .tw-line{margin:.15em 0;white-space:pre-wrap;word-break:break-word}
+  .atm-tw-console .tw-muted{color:#7f8ea3}
+  .atm-tw-console .tw-accent{color:#9ec5ff}
+  .atm-tw-console .tw-ok{color:#9bbf9a}
+  .atm-tw-console .tw-run{color:#dab869}
+  .atm-tw-console .tw-fail{color:#d27b7b}
+  .atm-tw-console .tw-title{color:#e8f0ff;font-weight:650;font-size:13.5px}
+  .atm-tw-bar{display:inline-block;letter-spacing:-.08em;color:#7eb6ff}
+  .atm-tw-pipe{margin-top:10px;padding-top:8px;border-top:1px dashed rgba(126,182,255,.2)}
+  .atm-tw-pipe .tw-pipe-row{display:flex;gap:8px;align-items:flex-start;margin:.2em 0}
+  .atm-tw-pipe .tw-mark{min-width:1.6em;text-align:center}
+  .atm-tw-charter{font-size:11px;color:var(--muted);line-height:1.65;margin:0 0 12px;padding:10px 12px;border-left:3px solid rgba(155,191,154,.45);background:rgba(155,191,154,.05)}
+  #strategyCreatorModule{display:none!important}
+  @media(max-width:980px){
+    .atm-module{padding:18px}
+    .atm-row-main{grid-template-columns:1fr 1fr}
+    .atm-forecast-metrics{grid-template-columns:1fr 1fr}
+    .atm-ops-risk{grid-template-columns:1fr}
+    .atm-de-grid{grid-template-columns:1fr}
+    .vector-daily-day-v10 summary{grid-template-columns:1fr 1fr}
+    .vector-daily-events-v10{grid-template-columns:1fr}
+  }
+</style>
+
+<div class="atm-module" id="vectorAutoTradeModule" data-atm-layout="unified-v14">
+  <div class="atm-module-title">自动交易模块</div>
+
+  <!-- 第一栏：运行策略 -->
+  <section class="atm-section" id="atmSectionStrategies" data-atm-section="1">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">运行策略</h2>
+        <div class="atm-section-sub">全部已挂载/运行中的自动交易策略合集（全标的 · 全周期），每条一行；展开可查看近10组开平仓记录。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn" onclick="vectorAutoFetch()">刷新</button>
+        <div class="atm-count" id="atmStrategyCount">0 条策略</div>
+      </div>
+    </div>
+    <div class="atm-roster" id="atmStrategyRoster"><div class="atm-empty">正在读取运行策略…</div></div>
+    <details class="atm-ops" id="atmOpsControls">
+      <summary>标的执行控制（下一次新开仓参数 / 刷新）</summary>
+      <div class="atm-ops-body" id="atmOpsBody"><div class="atm-empty">暂无标的控制项</div></div>
+    </details>
+  </section>
+
+  <!-- 第二栏：每日自动交易记录 -->
+  <section class="atm-section" id="atmSectionDaily" data-atm-section="2">
+    <div class="vector-daily-ledger-v10" id="vectorDailyLedger">
+      <div class="vector-daily-ledger-head-v10">
+        <div>
+          <div class="vector-daily-ledger-title-v10">每日自动交易记录</div>
+          <div class="vector-daily-ledger-sub-v10">按北京时间分别记录每日开仓、平仓、胜负及已实现净盈亏；每日23:59发送WxPusher日志。</div>
+        </div>
+      </div>
+      <div id="vectorDailyLedgerRows"><div class="vector-auto-empty-v5">正在读取每日交易记录…</div></div>
+    </div>
+  </section>
+
+  <!-- 第三栏：系统规划预测 -->
+  <section class="atm-section" id="atmSectionForecast" data-atm-section="3">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">系统规划预测</h2>
+        <div class="atm-section-sub">三AI推演未来开仓节奏；手动触发等同 <code>python3 /root/auto_trade_system_forecast.py --run</code>（含 Wx 推送）。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn atm-btn-primary" id="btnSystemForecast" onclick="runSystemForecastFromMonitor()">手动触发</button>
+        <a class="atm-btn" href="/forecast" style="text-decoration:none">完整预测页</a>
+      </div>
+    </div>
+    <div class="atm-forecast-status" id="systemForecastPanel">加载最新预测…</div>
+    <div class="atm-forecast-metrics">
+      <div class="atm-metric"><span>预计日均成交</span><strong id="atmFcDaily">暂无</strong></div>
+      <div class="atm-metric"><span>预计周总成交</span><strong id="atmFcWeekly">暂无</strong></div>
+      <div class="atm-metric"><span>挂载策略</span><strong id="atmFcActive">暂无</strong></div>
+      <div class="atm-metric"><span>可开仓 / 暂停</span><strong id="atmFcOpenPause">暂无</strong></div>
+    </div>
+    <p class="atm-forecast-summary" id="atmFcGap"></p>
+    <p class="atm-forecast-summary" id="atmFcSummary"></p>
+    <p class="atm-forecast-summary" id="atmFcGenerated"></p>
+    <div class="atm-forecast-table-wrap">
+      <table class="atm-forecast-table">
+        <thead>
+          <tr>
+            <th>策略</th><th>标的/周期</th><th>等级</th><th>状态</th>
+            <th>周成交区间</th><th>家族</th><th>近7日成交</th>
+          </tr>
+        </thead>
+        <tbody id="atmFcRows"><tr><td colspan="7" class="atm-empty" style="border:0">暂无预测数据</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 第四栏：策略创造训练（双引擎） -->
+  <section class="atm-section" id="atmSectionDualEngine" data-atm-section="4">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">真挚之语 · 策略创造演进</h2>
+        <div class="atm-section-sub">GLM-5.2 总设计师 · Codex 总工程师 · 四维正式复核。通过后仅进入人工确认队列，绝不自动上实盘。代号强制语义化为自然语言标题。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn atm-btn-primary" id="btnDualStart" onclick="dualEngineStartTask()">启动新策略创造任务</button>
+        <button type="button" class="atm-btn" id="btnDualEvolve" onclick="dualEngineForceEvolve()">强制进化池迭代</button>
+        <button type="button" class="atm-btn" onclick="dualEngineRefresh()">刷新</button>
+      </div>
+    </div>
+    <div class="atm-tw-charter" id="atmTwCharter">
+      运行宪章 v2.5：自然语言优先 · 拒绝彩票夏普 · Gate2 不过则归档 LIMIT_REACHED · 人类 --confirm 为唯一实盘门禁。旧「±20%逻辑破坏」已替换为必要性 / 参数稳定 / 贡献度测试。
+    </div>
+    <div class="atm-tw-console" id="atmTwConsole" aria-live="polite">
+      <div class="tw-muted">正在连接 Auto-Driver 状态…</div>
+    </div>
+    <div class="atm-de-grid">
+      <div class="atm-de-card">
+        <h3>工作流 · 进化池</h3>
+        <div class="atm-de-metrics">
+          <div class="atm-metric"><span>工作流</span><strong id="atmDeWfVer">-</strong></div>
+          <div class="atm-metric"><span>池 / 代数</span><strong id="atmDePoolGen">-</strong></div>
+          <div class="atm-metric"><span>最佳适应度</span><strong id="atmDeBestFit">-</strong></div>
+        </div>
+        <div class="atm-de-meta" id="atmDeWfMeta">加载中…</div>
+        <div class="atm-de-insight" id="atmDeInsight" style="margin-top:8px;min-height:0;font-size:12px">—</div>
+      </div>
+      <div class="atm-de-card">
+        <h3>待确认队列（人类签署）</h3>
+        <div style="overflow-x:auto">
+          <table class="atm-de-table">
+            <thead><tr><th>时间</th><th>策略标题</th><th>标的</th><th>状态</th><th>标注</th></tr></thead>
+            <tbody id="atmDeFormalRows"><tr><td colspan="5" style="color:var(--muted)">暂无</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="atm-forecast-status" id="atmDeJobStatus"></div>
+    <!-- legacy hidden anchors kept for soft-compat -->
+    <div style="display:none" aria-hidden="true">
+      <span id="atmDeWfEntry"></span><span id="atmDeWfMode"></span><span id="atmDeWfFlow"></span>
+      <span id="atmDeInsightMeta"></span><span id="atmDeTaskMeta"></span>
+      <span id="atmDeMechanism"></span><span id="atmDeFailLevel"></span>
+      <span id="atmDeAudits"></span><span id="atmDe4d"></span>
+      <span id="atmDePoolSize"></span><span id="atmDeGen"></span><span id="atmDeEvoMeta"></span>
+      <span id="atmDeSpark"></span><div id="atmDeSteps"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  function $(id){return document.getElementById(id)}
+  function zoneEsc(v){
+    return String(v===null||v===undefined?'':v).replace(/[&<>"']/g,function(ch){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+    });
+  }
+  function fmtPct(pct, digits){
+    if(pct===null||pct===undefined||pct===''||Number.isNaN(Number(pct))) return {text:'-',cls:''};
+    const n=Number(pct);
+    const d=(digits===undefined)?2:digits;
+    return {text:(n>=0?'+':'')+n.toFixed(d)+'%',cls:n>=0?'gain':'loss'};
+  }
+  function fmtWr(pct){
+    if(pct===null||pct===undefined||pct===''||Number.isNaN(Number(pct))) return '-';
+    return Number(pct).toFixed(1)+'%';
+  }
+  function normalizeGrade(stat){
+    let grade=String(stat.lifecycle_grade||stat.grade||'B').trim();
+    const gradeUp=grade.toUpperCase();
+    if(!grade||grade==='未评级'||grade==='待评级'||['UNRATED','NONE','NULL','PENDING','DELETED'].indexOf(gradeUp)>=0){
+      grade='B';
+    }else if(gradeUp==='SHADOW'){
+      grade='SHADOW';
+    }else if(/^[SABCDE]$/.test(gradeUp)){
+      grade=gradeUp;
+    }
+    return grade;
+  }
+  function gradeClass(grade){
+    if(/^[SABC]$/.test(grade)) return 'grade-'+grade.toLowerCase();
+    if(grade==='SHADOW') return 'grade-c';
+    return '';
+  }
+  function keepNewestTradeGroups(trades){
+    const list=Array.isArray(trades)?trades.slice():[];
+    // API returns newest-first; keep newest 10 only.
+    return list.slice(0,10);
+  }
+  function renderTradeDropdown(recent){
+    const rows=keepNewestTradeGroups(recent);
+    if(!rows.length){
+      return '<div class="atm-empty" style="margin:0 14px 12px">近10组：暂无开平仓记录</div>';
+    }
+    return '<div class="atm-trade-wrap"><table class="atm-trade-table"><thead><tr><th>开仓时间</th><th>平仓时间</th><th>总仓位盈/亏率</th><th>单笔盈利率</th></tr></thead><tbody>'+
+      rows.map(function(t){
+        const eq=fmtPct(t.equity_return_pct);
+        const singleRaw=(t.single_trade_pnl_pct!==null&&t.single_trade_pnl_pct!==undefined)?t.single_trade_pnl_pct:t.pnl_rate_pct;
+        const single=fmtPct(singleRaw);
+        return '<tr><td>'+zoneEsc(t.opened_at||'-')+'</td><td>'+zoneEsc(t.closed_at||'-')+'</td><td class="'+eq.cls+'">'+zoneEsc(eq.text)+'</td><td class="'+single.cls+'">'+zoneEsc(single.text)+'</td></tr>';
+      }).join('')+
+      '</tbody></table></div>';
+  }
+  function fmtMetric(stat, kind){
+    // kind: wr | equity | margin
+    const status=(stat.metric_status||{});
+    if(kind==='wr'){
+      const v=(stat.calibrated_expected_win_rate_pct!=null)?stat.calibrated_expected_win_rate_pct:stat.expected_win_rate_pct;
+      if(v===null||v===undefined||v===''||Number.isNaN(Number(v))||status.win_rate==='missing'){
+        return {text: status.display_win_rate || '暂无样本/未校准', cls:'muted', missing:true};
+      }
+      const cred=(stat.credibility!=null)?Number(stat.credibility):null;
+      const n=(stat.sample_n!=null)?stat.sample_n:(stat.backtest_trades||0);
+      const hi=!!stat.wr_high_confidence;
+      let text=Number(v).toFixed(1)+'%';
+      if(!hi){
+        text += '（低可信 n='+n+(cred!=null?(' cred='+cred.toFixed(2)):'')+'）';
+      }else{
+        text += '（n='+n+'）';
+      }
+      return {text: text, cls: hi?'':'muted', missing:false};
+    }
+    const v=(kind==='equity')?stat.net_expectancy_equity_pct:stat.net_expectancy_margin_pct;
+    if(v===null||v===undefined||v===''||Number.isNaN(Number(v))||status.expectancy==='missing'){
+      return {text: status.display_expectancy || '暂无样本/未校准', cls:'muted', missing:true};
+    }
+    const n=Number(v);
+    // ≥4 decimals when near zero so "约0.00%" never hides sign/magnitude
+    const abs=Math.abs(n);
+    const digits=(abs>0 && abs<0.05)?4:2;
+    return {text:(n>=0?'+':'')+n.toFixed(digits)+'%', cls:n>=0?'gain':'loss', missing:false};
+  }
+  function fmtWrSplit(stat){
+    function one(v, label){
+      if(v===null||v===undefined||v===''||Number.isNaN(Number(v))) return label+':暂无';
+      return label+':'+Number(v).toFixed(1)+'%';
+    }
+    return [
+      one(stat.ai_logic_wr_pct!=null?stat.ai_logic_wr_pct:stat.ai_theoretical_wr_avg,'AI逻辑'),
+      one(stat.walk_forward_wr_pct,'WF'),
+      one(stat.backtest_wr_pct,'回测'),
+      one(stat.live_wr_pct,'实盘'),
+      one(stat.calibrated_expected_win_rate_pct,'校准预期'),
+      'n='+(stat.sample_n!=null?stat.sample_n:(stat.backtest_trades||0)),
+      '可信度='+(stat.credibility!=null?Number(stat.credibility).toFixed(2):'暂无'),
+      (stat.wr_high_confidence?'高可信':'非高可信')
+    ].join(' · ');
+  }
+  function renderStrategyRow(stat, zoneMeta){
+    const grade=normalizeGrade(stat);
+    const title=stat.strategy_title||stat.strategy_name||'未命名策略';
+    const assetShort=(zoneMeta.symbol||'').replace('-USDT-SWAP','');
+    const tfLabel=zoneMeta.timeframeLabel||zoneMeta.timeframe||'';
+    const wr=fmtMetric(stat,'wr');
+    const equity=fmtMetric(stat,'equity');
+    const margin=fmtMetric(stat,'margin');
+    const recent=Array.isArray(stat.recent_trades)?stat.recent_trades:[];
+    const nGroups=Math.min(recent.length,10);
+    const funnel=stat.funnel_7d||{};
+    const freq=stat.frequency_forecast||{};
+    const family=stat.mechanism_family||'';
+    const expandStatus = nGroups===0
+      ? '近10组成交：暂无已平仓记录（不是评分）'
+      : ('近'+nGroups+'组已平仓记录（最多展示10组）');
+    const aiRef=fmtWrSplit(stat);
+    return '<div class="atm-row" data-strategy-key="'+zoneEsc(stat.strategy_key||'')+'" data-asset-symbol="'+zoneEsc(zoneMeta.symbol||'')+'" data-asset-timeframe="'+zoneEsc(zoneMeta.timeframe||'')+'">'+
+      '<div class="atm-row-main">'+
+        '<div><div class="atm-row-title">'+zoneEsc(title)+'</div><div class="atm-row-scope">'+zoneEsc(assetShort+(tfLabel?(' · '+tfLabel):'')+(family?(' · '+family):''))+'</div></div>'+
+        '<div><span class="atm-field-label">策略评级</span><span class="atm-grade '+gradeClass(grade)+'">'+zoneEsc(grade)+'</span></div>'+
+        '<div><span class="atm-field-label">校准预期胜率</span><span class="atm-field-value '+(wr.missing?'atm-muted':'')+'">'+zoneEsc(wr.text)+'</span></div>'+
+        '<div><span class="atm-field-label">净期望(权益)</span><span class="atm-field-value '+(equity.cls||'')+'">'+zoneEsc(equity.text)+'</span></div>'+
+        '<div><span class="atm-field-label">净期望(保证金)</span><span class="atm-field-value '+(margin.cls||'')+'">'+zoneEsc(margin.text)+'</span></div>'+
+      '</div>'+
+      '<div class="atm-wr-split" style="margin:4px 14px 0;font-size:11px;color:var(--muted)">'+zoneEsc(aiRef)+'</div>'+
+      '<details>'+
+        '<summary>'+zoneEsc(expandStatus)+'</summary>'+
+        '<div class="atm-funnel" style="margin:8px 14px;font-size:12px;color:var(--muted)">'+
+          '近7日漏斗：信号 '+zoneEsc(funnel.signals==null?'?':funnel.signals)+
+          ' · 尝试 '+zoneEsc(funnel.attempts==null?'?':funnel.attempts)+
+          ' · 成交 '+zoneEsc(funnel.fills==null?'?':funnel.fills)+
+          ' · 平仓 '+zoneEsc(funnel.exits==null?'?':funnel.exits)+
+          ' · 阻断 '+zoneEsc(funnel.blocked==null?'?':funnel.blocked)+
+          (freq.expected_weekly_fills!=null?(' · 统计周期望成交 '+Number(freq.expected_weekly_fills).toFixed(2)):'')+
+          (freq.class?(' · 频率分类 '+freq.class):'')+
+          '<div style="margin-top:4px">'+zoneEsc(aiRef)+'</div>'+
+          (stat.cost_price_pct!=null?('<div>单笔成本(价格) '+Number(stat.cost_price_pct).toFixed(3)+'% · PF '+(stat.profit_factor==null?'暂无':stat.profit_factor)+' · 可信度 '+(stat.credibility==null?'暂无':stat.credibility)+'</div>'):'')+
+        '</div>'+
+        renderTradeDropdown(recent)+
+      '</details>'+
+    '</div>';
+  }
+  function renderOpsZones(zones){
+    const body=$('atmOpsBody');
+    if(!body)return;
+    const active=zones.filter(function(zone){
+      const stats=((zone.records||{}).strategy_stats)||[];
+      return stats.length>0||zone.auto_open||(zone.position&&typeof zone.position==='object');
+    });
+    if(!active.length){
+      body.innerHTML='<div class="atm-empty">暂无需要展示的标的执行控制</div>';
+      return;
+    }
+    body.innerHTML=active.map(function(zone){
+      const cfg=zone.config||{};
+      const timeframe=zone.timeframe||cfg.timeframe||'1h';
+      const timeframeLabel=zone.timeframe_label||(timeframe==='5m'?'5分钟':(timeframe==='15m'?'15分钟':'1小时'));
+      const leverage=Number(cfg.leverage||20);
+      const stopLoss=Number(cfg.stop_loss_pct||0.009);
+      const assetShort=String(zone.symbol||'').replace('-USDT-SWAP','');
+      const current=zone.position&&typeof zone.position==='object'?zone.position:null;
+      return '<div class="atm-ops-zone" data-asset-symbol="'+zoneEsc(zone.symbol)+'" data-asset-timeframe="'+zoneEsc(timeframe)+'">'+
+        '<div class="atm-ops-zone-head"><div><strong>'+zoneEsc(assetShort)+' · '+zoneEsc(timeframeLabel)+'</strong><div class="atm-ops-zone-state">'+zoneEsc(zone.runtime_state||'状态未知')+(zone.auto_open?' · 自动开仓已启用':' · 自动开仓已停用')+(current?(' · 持仓中'):' · 无持仓')+'</div></div>'+
+        '<button type="button" class="atm-btn" onclick="vectorAutoFetch()">刷新 '+zoneEsc(assetShort)+' '+zoneEsc(timeframeLabel)+'</button></div>'+
+        '<div class="atm-ops-risk">'+
+          '<select data-risk-leverage>'+
+            '<option value="20"'+(leverage===20?' selected':'')+'>20x 杠杆</option>'+
+            '<option value="30"'+(leverage===30?' selected':'')+'>30x 杠杆</option>'+
+            '<option value="50"'+(leverage===50?' selected':'')+'>50x 杠杆</option>'+
+          '</select>'+
+          '<select data-risk-stop>'+
+            '<option value="0.003"'+(Math.abs(stopLoss-0.003)<1e-9?' selected':'')+'>0.3% 止损</option>'+
+            '<option value="0.006"'+(Math.abs(stopLoss-0.006)<1e-9?' selected':'')+'>0.6% 止损</option>'+
+            '<option value="0.009"'+(Math.abs(stopLoss-0.009)<1e-9?' selected':'')+'>0.9% 止损</option>'+
+          '</select>'+
+          '<button type="button" class="atm-btn" onclick="vectorAssetSaveRisk(\''+zoneEsc(zone.symbol)+'\',\''+zoneEsc(timeframe)+'\',this)">应用到下一次新开仓</button>'+
+          '<div class="atm-ops-status" data-risk-status></div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+  function renderAssetZones(zones){
+    const box=$('atmStrategyRoster');
+    const countEl=$('atmStrategyCount');
+    if(!box)return;
+    if(!Array.isArray(zones)||!zones.length){
+      box.innerHTML='<div class="atm-empty">未读取到自动交易状态。</div>';
+      if(countEl) countEl.textContent='0 条策略';
+      renderOpsZones([]);
+      return;
+    }
+    const assetOrder={'BTC-USDT-SWAP':0,'CL-USDT-SWAP':1,'XAU-USDT-SWAP':2,'NG-USDT-SWAP':3,'XAG-USDT-SWAP':4,'LTC-USDT-SWAP':5,'ADA-USDT-SWAP':6};
+    const tfOrder={'1h':0,'15m':1,'5m':2};
+    const combined=[];
+    zones.forEach(function(zone){
+      const cfg=zone.config||{};
+      const timeframe=zone.timeframe||cfg.timeframe||'1h';
+      const timeframeLabel=zone.timeframe_label||(timeframe==='5m'?'5分钟':(timeframe==='15m'?'15分钟':'1小时'));
+      const stats=Array.isArray((zone.records||{}).strategy_stats)?(zone.records||{}).strategy_stats:[];
+      stats.forEach(function(stat){
+        combined.push({stat:stat,zone:zone,timeframe:timeframe,timeframeLabel:timeframeLabel});
+      });
+    });
+    combined.sort(function(a,b){
+      const ga=normalizeGrade(a.stat);
+      const gb=normalizeGrade(b.stat);
+      const rank={'S':4,'A':3,'B':2,'C':1,'SHADOW':0};
+      const rd=(rank[gb]||0)-(rank[ga]||0);
+      if(rd!==0) return rd;
+      const assetDiff=(assetOrder[a.zone.symbol]??99)-(assetOrder[b.zone.symbol]??99);
+      if(assetDiff!==0) return assetDiff;
+      const tfDiff=(tfOrder[a.timeframe]??9)-(tfOrder[b.timeframe]??9);
+      if(tfDiff!==0) return tfDiff;
+      const ta=String(a.stat.strategy_title||a.stat.strategy_name||'');
+      const tb=String(b.stat.strategy_title||b.stat.strategy_name||'');
+      return ta.localeCompare(tb,'zh');
+    });
+    if(countEl) countEl.textContent=combined.length+' 条策略';
+    box.innerHTML=combined.length
+      ? combined.map(function(item){
+          return renderStrategyRow(item.stat,{
+            symbol:item.zone.symbol,
+            timeframe:item.timeframe,
+            timeframeLabel:item.timeframeLabel
+          });
+        }).join('')
+      : '<div class="atm-empty">当前没有已挂载的运行策略。</div>';
+    renderOpsZones(zones);
+  }
+  function renderDailyRecords(days){
+    const box=$('vectorDailyLedgerRows');
+    if(!box)return;
+    if(!Array.isArray(days)||!days.length){box.innerHTML='<div class="vector-auto-empty-v5">暂无每日交易记录。</div>';return}
+    function eventHtml(row,type){
+      const at=type==='open'?(row.opened_at||'-'):(row.closed_at||'-');
+      const rate=row.pnl_rate_pct===null||row.pnl_rate_pct===undefined?'':`｜收益率 ${(Number(row.pnl_rate_pct)>=0?'+':'')+Number(row.pnl_rate_pct).toFixed(2)}%`;
+      const pnl=type==='close'&&row.net_pnl_usdt!==null&&row.net_pnl_usdt!==undefined?`｜净盈亏 ${(Number(row.net_pnl_usdt)>=0?'+':'')+Number(row.net_pnl_usdt).toFixed(6)} USDT`:'';
+      const action=type==='open'?(String(row.side||'').toLowerCase()==='short'?'做空开仓':'做多开仓'):(row.close_type||'平仓');
+      return `<div class="vector-daily-event-v10"><b>${zoneEsc(at)}</b>｜${zoneEsc((row.symbol||'-').replace('-USDT-SWAP',''))} ${zoneEsc(row.timeframe||'')}<br>${zoneEsc(row.strategy_name||'未命名策略')}｜${zoneEsc(action)}${zoneEsc(pnl)}${zoneEsc(rate)}</div>`;
+    }
+    box.innerHTML=days.map(function(day,index){
+      const net=Number(day.net_pnl_usdt||0); const netClass=net>0?'gain':(net<0?'loss':'');
+      const opens=Array.isArray(day.open_events)?day.open_events:[]; const closes=Array.isArray(day.close_events)?day.close_events:[];
+      return `<details class="vector-daily-day-v10" ${index===0?'open':''}><summary><strong>${zoneEsc(day.date||'-')}</strong><span>开仓 <strong>${Number(day.open_count||0)}</strong></span><span>平仓 <strong>${Number(day.close_count||0)}</strong></span><span>胜/负 <strong>${Number(day.wins||0)}/${Number(day.losses||0)}</strong></span><span>净盈亏 <strong class="${netClass}">${net>=0?'+':''}${net.toFixed(6)} USDT</strong></span></summary><div class="vector-daily-events-v10"><div><h4>当日开仓</h4>${opens.length?opens.map(function(x){return eventHtml(x,'open')}).join(''):'<div class="vector-daily-event-v10">无开仓</div>'}</div><div><h4>当日平仓</h4>${closes.length?closes.map(function(x){return eventHtml(x,'close')}).join(''):'<div class="vector-daily-event-v10">无平仓</div>'}</div></div></details>`;
+    }).join('');
+  }
+  window.vectorAssetSaveRisk=async function(symbol,timeframe,button){
+    const zone=button.closest('.atm-ops-zone')||button.closest('[data-asset-symbol]');
+    const leverage=Number(zone.querySelector('[data-risk-leverage]').value);
+    const stopLoss=Number(zone.querySelector('[data-risk-stop]').value);
+    const status=zone.querySelector('[data-risk-status]');
+    button.disabled=true;
+    if(status)status.textContent='正在应用到 '+String(symbol).replace('-USDT-SWAP','')+' 的下一次新开仓…';
+    try{
+      const res=await fetch('/api/vector/auto_trade/risk_settings',{
+        method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({symbol:symbol,timeframe:timeframe,leverage:leverage,stop_loss_pct:stopLoss})
+      });
+      const data=await res.json();
+      if(!res.ok||data.ok!==true)throw new Error(data.error||'参数调整失败');
+      if(status)status.textContent='切换成功'+(data.notification_sent?'，WxPusher已发送。':'，WxPusher未确认发送。');
+      await window.vectorAutoFetch();
+    }catch(e){
+      if(status)status.textContent='切换失败：'+(e&&e.message?e.message:'未知错误');
+    }finally{button.disabled=false}
+  };
+  function renderForecastReport(rep){
+    const panel=$('systemForecastPanel');
+    if(!rep||!rep.generated_at){
+      if(panel) panel.textContent='尚无预测报告，可点击「手动触发」。';
+      $('atmFcDaily')&&($('atmFcDaily').textContent='暂无');
+      $('atmFcWeekly')&&($('atmFcWeekly').textContent='暂无');
+      $('atmFcActive')&&($('atmFcActive').textContent='暂无');
+      $('atmFcOpenPause')&&($('atmFcOpenPause').textContent='暂无');
+      $('atmFcGap')&&($('atmFcGap').textContent='');
+      $('atmFcSummary')&&($('atmFcSummary').textContent='');
+      $('atmFcGenerated')&&($('atmFcGenerated').textContent='');
+      const rows=$('atmFcRows');
+      if(rows) rows.innerHTML='<tr><td colspan="7" style="color:var(--muted)">暂无预测数据</td></tr>';
+      return;
+    }
+    const o=rep.overall||{};
+    const ai=rep.ai_status||{};
+    if(panel){
+      panel.innerHTML='最新报告 · 统计基线×regime · 三AI(解释-only)：'+
+        '<span class="'+(ai.deepseek_ok?'atm-ok':'atm-warn')+'">DeepSeek</span> / '+
+        '<span class="'+(ai.qwen_ok?'atm-ok':'atm-warn')+'">Qwen</span> / '+
+        '<span class="'+(ai.chatgpt_ok?'atm-ok':'atm-warn')+'">GLM</span>';
+    }
+    if($('atmFcDaily')) $('atmFcDaily').textContent=o.daily_opens_expected==null?'暂无':o.daily_opens_expected;
+    if($('atmFcWeekly')) $('atmFcWeekly').textContent=o.weekly_opens_expected==null?'暂无':o.weekly_opens_expected;
+    if($('atmFcActive')) $('atmFcActive').textContent=rep.active_strategy_count==null?'暂无':rep.active_strategy_count;
+    if($('atmFcOpenPause')) $('atmFcOpenPause').textContent=
+      (rep.can_open_strategy_count==null?'?':rep.can_open_strategy_count)+' / '+
+      (rep.paused_strategy_count==null?'?':rep.paused_strategy_count);
+    const gap=rep.frequency_gap||{};
+    if($('atmFcGap')){
+      $('atmFcGap').textContent=gap.expected_daily_fills==null?'频率缺口：暂无'
+        :('频率缺口：日 '+gap.expected_daily_fills+' (目标0.5–1.0, gap='+gap.gap_daily_to_band+
+          ') · 周 '+gap.expected_weekly_fills+' (目标3.5–7, gap='+gap.gap_weekly_to_band+
+          ') · '+ (gap.status||''));
+    }
+    if($('atmFcSummary')){
+      const contrib=o.weekly_contributors_zh||'';
+      const sum=o.summary_zh||'';
+      $('atmFcSummary').textContent=contrib?(contrib+(sum?('\n'+sum):'')):sum;
+      $('atmFcSummary').style.whiteSpace='pre-line';
+    }
+    if($('atmFcGenerated')) $('atmFcGenerated').textContent='生成时间：'+(rep.generated_at||'');
+    const body=(rep.per_strategy||[]).map(function(r){
+      return '<tr>'+
+        '<td>'+zoneEsc(r.strategy_title||r.strategy_name||r.strategy_key)+'</td>'+
+        '<td>'+zoneEsc((r.symbol||'').replace('-USDT-SWAP',''))+' / '+zoneEsc(r.timeframe)+'</td>'+
+        '<td>'+zoneEsc(r.grade)+'</td>'+
+        '<td>'+(r.can_open?'<span class="atm-ok">可开仓</span>':'<span class="atm-warn">暂停</span>')+'</td>'+
+        '<td>'+zoneEsc(r.weekly_opens_low==null?'暂无':r.weekly_opens_low)+' - '+zoneEsc(r.weekly_opens_high==null?'暂无':r.weekly_opens_high)+'</td>'+
+        '<td>'+zoneEsc(r.mechanism_family||'other')+'</td>'+
+        '<td>'+zoneEsc(r.opens_7d_actual==null?'暂无':r.opens_7d_actual)+'</td>'+
+      '</tr>';
+    }).join('');
+    if($('atmFcRows')) $('atmFcRows').innerHTML=body||'<tr><td colspan="7" style="color:var(--muted)">无分策略数据</td></tr>';
+  }
+  async function loadForecastLatest(){
+    try{
+      const res=await fetch('/api/forecast/latest',{credentials:'same-origin',cache:'no-store'});
+      const data=await res.json();
+      renderForecastReport(data.report||data);
+    }catch(e){
+      const panel=$('systemForecastPanel');
+      if(panel) panel.textContent='预测加载失败：'+e;
+    }
+  }
+  async function pollForecastStatus(maxMs){
+    const start=Date.now();
+    const limit=maxMs||180000;
+    while(Date.now()-start<limit){
+      await new Promise(function(r){setTimeout(r,2500)});
+      try{
+        const res=await fetch('/api/forecast/run_status',{credentials:'same-origin',cache:'no-store'});
+        const st=await res.json();
+        const panel=$('systemForecastPanel');
+        if(st.running){
+          if(panel) panel.textContent='三AI系统规划预测运行中…（约1-2分钟）';
+          continue;
+        }
+        if(st.ok===false && st.error){
+          throw new Error(st.error||st.message||'预测失败');
+        }
+        if(st.report){
+          renderForecastReport(st.report);
+          const wxOk=st.wx&&st.wx.ok;
+          if(panel){
+            panel.innerHTML=(panel.innerHTML||'')+' · 手动触发完成'+(wxOk?' · Wx已推送':' · Wx未确认');
+          }
+          return st;
+        }
+        await loadForecastLatest();
+        return st;
+      }catch(e){
+        if(Date.now()-start>limit-3000) throw e;
+      }
+    }
+    throw new Error('预测超时，请稍后刷新查看 /api/forecast/latest');
+  }
+  window.runSystemForecastFromMonitor=async function(){
+    var btn=document.getElementById('btnSystemForecast');
+    var panel=document.getElementById('systemForecastPanel');
+    if(btn) btn.disabled=true;
+    if(panel) panel.textContent='正在启动三AI系统规划预测（约1-2分钟，含Wx推送）…';
+    try{
+      var res=await fetch('/api/forecast/run',{
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({push_wx:true,async:true})
+      });
+      var data=await res.json();
+      if(res.status===409 || data.status==='running'){
+        if(panel) panel.textContent='已有预测任务在运行，转入等待…';
+        await pollForecastStatus(180000);
+        return;
+      }
+      if(data.async || data.status==='started' || res.status===202){
+        await pollForecastStatus(180000);
+        return;
+      }
+      if(!res.ok){
+        throw new Error(data.message||data.error||('HTTP '+res.status));
+      }
+      renderForecastReport(data.report||{});
+      var wxOk=data.wx&&data.wx.ok;
+      if(panel){
+        panel.innerHTML=(panel.innerHTML||'')+' · 手动触发完成'+(wxOk?' · Wx已推送':' · Wx未确认');
+      }
+    }catch(e){
+      if(panel) panel.textContent='系统规划预测失败：'+e;
+    }finally{
+      if(btn) btn.disabled=false;
+    }
+  };
+  window.vectorAutoFetch=async function(){
+    try{
+      const res=await fetch('/api/vector/auto_trade/status',{credentials:'same-origin',cache:'no-store'});
+      const j=await res.json();
+      renderAssetZones(j.asset_zones||[]);
+      renderDailyRecords(j.daily_trade_records||[]);
+    }catch(e){
+      const box=$('atmStrategyRoster');
+      if(box) box.innerHTML='<div class="atm-empty">状态读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</div>';
+      renderDailyRecords([]);
+    }
+  };
+  function phaseFromStage(stage){
+    const s=String(stage||'');
+    if(s.indexOf('step1')===0||s==='idle'||s==='mode_lock'||s==='collect_isolate'||s==='mechanism_statement'||s==='codex_dsl') return 'hyp';
+    if(s.indexOf('step2')===0||s==='fidelity_audit'||s==='abc_tests') return 'test';
+    if(s.indexOf('step3')===0||s==='repair') return 'sim';
+    if(s.indexOf('step4')===0||s==='done'||s==='formal_4d') return 'formal';
+    if(s==='archived'||s==='failed') return 'formal';
+    return 'hyp';
+  }
+  function fmtDur(sec){
+    sec=Math.max(0, Math.round(Number(sec)||0));
+    const m=Math.floor(sec/60), s=sec%60;
+    if(m>=60){
+      const h=Math.floor(m/60), mm=m%60;
+      return h+' 时 '+String(mm).padStart(2,'0')+' 分';
+    }
+    return String(m).padStart(2,'0')+' 分 '+String(s).padStart(2,'0')+' 秒';
+  }
+  function progressBar(pct){
+    const n=Math.max(0, Math.min(100, Number(pct)||0));
+    const filled=Math.round(n/2.5);
+    const empty=40-filled;
+    return '['+'█'.repeat(filled)+'░'.repeat(empty)+'] '+n.toFixed(0)+'%';
+  }
+  function pipeMark(st){
+    if(st==='done') return {m:'✓', cls:'tw-ok'};
+    if(st==='running') return {m:'🔄', cls:'tw-run'};
+    if(st==='fail') return {m:'✗', cls:'tw-fail'};
+    return {m:'⌛', cls:'tw-muted'};
+  }
+  function renderTrueWordsConsole(ad){
+    const el=$('atmTwConsole');
+    if(!el) return;
+    ad=ad||{};
+    const eng=ad.engine||{};
+    const strat=ad.strategy||{};
+    const prog=ad.progress||{};
+    const pipe=Array.isArray(ad.pipeline)?ad.pipeline:[];
+    const rule='='.repeat(100);
+    const thin='-'.repeat(100);
+    const title=strat.title_zh||'—';
+    const causal=strat.causal_blurb||'机制因果说明待补充';
+    const fam=strat.family||strat.family_base||'—';
+    const status=ad.status_label||(ad.running?'自主演进运行中':'当前无 Auto-Driver 任务');
+    const pct=prog.percent==null?0:prog.percent;
+    const round=prog.round_label||('Round '+(prog.iteration||0)+'/'+(prog.max_iterations||0));
+    const eta=prog.eta_sec!=null?fmtDur(prog.eta_sec):'—';
+    const used=prog.elapsed_sec!=null?fmtDur(prog.elapsed_sec):'—';
+    let html='';
+    html+='<div class="tw-rule">'+zoneEsc(rule)+'</div>';
+    html+='<div class="tw-line tw-title"> 🚀 '+(zoneEsc(eng.name||'真挚之语 (True Words) 自主量化演进引擎'))+' '+(zoneEsc(eng.version||'v2.5'))+' | 双引擎：GLM-5.2 + Codex</div>';
+    html+='<div class="tw-rule">'+zoneEsc(rule)+'</div>';
+    html+='<div class="tw-line"> 📌 正在演进策略 : <span class="tw-accent">'+zoneEsc(title)+'</span></div>';
+    html+='<div class="tw-line"> 💡 核心因果机制 : '+zoneEsc(causal)+'</div>';
+    html+='<div class="tw-line tw-muted"> 🏷️ 策略家族指纹 : '+zoneEsc(fam)+'</div>';
+    html+='<div class="tw-rule">'+zoneEsc(thin)+'</div>';
+    html+='<div class="tw-line"> ⏳ 当前运行状态 : '+(ad.running?'<span class="tw-run">':'<span class="tw-muted">')+zoneEsc(status)+'</span></div>';
+    html+='<div class="tw-line"> 📊 演进迭代进度 : <span class="tw-bar">'+zoneEsc(progressBar(pct))+'</span>  <span class="tw-muted">('+zoneEsc(round)+')</span></div>';
+    html+='<div class="tw-line"> ⏱️ 预计剩余时间 : '+zoneEsc(eta)+' <span class="tw-muted">(已用时: '+zoneEsc(used)+')</span></div>';
+    html+='<div class="atm-tw-pipe">';
+    html+='<div class="tw-line tw-muted"> -------------------------------- 校验流水线 (Pipeline Status) --------------------------------</div>';
+    if(pipe.length){
+      pipe.forEach(function(row){
+        const mk=pipeMark(row.status);
+        html+='<div class="tw-pipe-row"><span class="tw-mark '+mk.cls+'">['+mk.m+']</span><span><b>'+zoneEsc(row.label||row.id)+'</b> : '+zoneEsc(row.detail||'')+'</span></div>';
+      });
+    }else{
+      html+='<div class="tw-line tw-muted">  暂无流水线快照 · 等待 Auto-Driver 发布状态</div>';
+    }
+    html+='</div>';
+    if(ad.message){
+      html+='<div class="tw-line tw-muted" style="margin-top:8px"> · '+zoneEsc(ad.message)+'</div>';
+    }
+    if(ad.final&&ad.final.status){
+      html+='<div class="tw-line"> 🏁 终态 : '+zoneEsc(ad.final.status)+(ad.final.stop_code?(' / '+zoneEsc(ad.final.stop_code)):'')+'</div>';
+    }
+    html+='<div class="tw-rule">'+zoneEsc(rule)+'</div>';
+    html+='<div class="tw-line tw-muted"> 人类确认门禁开启 · 过关策略仅进入 Pending Queue · 绝不自动上实盘</div>';
+    el.innerHTML=html;
+  }
+  function renderDualEngine(st, adOverride){
+    st=st||{};
+    const wf=st.workflow||{};
+    const evo=st.evolution||{};
+    const task=st.current_task||{};
+    if($('atmDeWfVer')) $('atmDeWfVer').textContent=(wf.workflow_version||'v1')+' / '+(wf.creation_entry||'legacy');
+    if($('atmDePoolGen')){
+      $('atmDePoolGen').textContent=(evo.size==null?'-':evo.size)+' / '+(evo.generation==null?'-':evo.generation);
+    }
+    if($('atmDeBestFit')) $('atmDeBestFit').textContent=evo.best_fitness==null?'-':Number(evo.best_fitness).toFixed(1);
+    if($('atmDeWfMeta')){
+      const acc=wf.acceptance||{};
+      const accTxt=Object.keys(acc).sort().map(function(k){return k+':'+(acc[k]?'✓':'·');}).join(' ');
+      $('atmDeWfMeta').textContent=
+        (wf.flow==='new'?'新流程':'旧流程')+' · '+
+        (wf.upgrade_status||'-')+
+        (evo.last_evolve_at?(' · 最近进化 '+evo.last_evolve_at):'')+
+        (accTxt?(' · 验收 '+accTxt):'');
+    }
+    const insight=st.insight||{};
+    if($('atmDeInsight')){
+      const sum=st.insight_summary||insight.summary_zh||'';
+      $('atmDeInsight').textContent=sum
+        ?('GLM 洞察：'+sum)
+        :(task.id?('最近任务 '+task.id+' · '+(task.stage_label||task.stage||'-')):'尚无洞察');
+    }
+    // legacy soft-compat
+    if($('atmDeWfEntry')) $('atmDeWfEntry').textContent=wf.creation_entry||'legacy';
+    if($('atmDeWfFlow')) $('atmDeWfFlow').textContent=(wf.flow==='new'?'新流程':'旧流程');
+    if($('atmDeWfMode')) $('atmDeWfMode').textContent=task.exploration_mode||wf.exploration_mode||'-';
+    if($('atmDePoolSize')) $('atmDePoolSize').textContent=evo.size==null?'-':evo.size;
+    if($('atmDeGen')) $('atmDeGen').textContent=evo.generation==null?'-':evo.generation;
+
+    const formal=Array.isArray(st.formal_recent)?st.formal_recent:[];
+    if($('atmDeFormalRows')){
+      $('atmDeFormalRows').innerHTML=formal.length?formal.map(function(r){
+        const title=r.title_zh||r.title||r.key||'-';
+        return '<tr><td>'+zoneEsc(r.time||'-')+'</td><td>'+zoneEsc(title)+'</td><td>'+
+          zoneEsc(String(r.symbol||'').replace('-USDT-SWAP',''))+'/'+zoneEsc(r.timeframe||'')+
+          '</td><td>'+zoneEsc(r.status||'-')+'</td><td>'+zoneEsc(r.annotation||'-')+'</td></tr>';
+      }).join(''):'<tr><td colspan="5" style="color:var(--muted)">暂无待确认策略</td></tr>';
+    }
+    const ad=adOverride||st.auto_driver||{};
+    renderTrueWordsConsole(ad);
+    const job=st.job||{};
+    if($('atmDeJobStatus')){
+      if(ad.running){
+        $('atmDeJobStatus').textContent='Auto-Driver 运行中 · '+(ad.status_label||'')+' · 更新于 '+(ad.updated_at||'');
+      }else if(job.running){
+        $('atmDeJobStatus').textContent='后台任务运行中：'+(job.kind||'')+' · 开始于 '+(job.started_at||'');
+      }else if(st.last_error){
+        $('atmDeJobStatus').textContent='最近错误：'+st.last_error;
+      }else{
+        $('atmDeJobStatus').textContent='真挚之语就绪 · 流程 '+(wf.flow||'old')+' · '+(ad.status_label||st.stage_label||st.stage||'idle');
+      }
+    }
+  }
+  function taskOrDash(st, fallback){ return fallback; }
+  window.dualEngineRefresh=async function(){
+    let st={};
+    let ad=null;
+    let errMsg='';
+    try{
+      const res=await fetch('/api/dual_engine/status',{credentials:'same-origin',cache:'no-store'});
+      const data=await res.json();
+      if(!res.ok||data.ok===false) throw new Error(data.error||('HTTP '+res.status));
+      st=data.status||{};
+      ad=st.auto_driver||null;
+    }catch(e){
+      errMsg=(e&&e.message)?e.message:String(e);
+    }
+    try{
+      const res2=await fetch('/api/dual_engine/auto_driver',{credentials:'same-origin',cache:'no-store'});
+      const data2=await res2.json();
+      if(res2.ok&&data2.ok!==false&&data2.auto_driver){
+        ad=data2.auto_driver;
+      }
+    }catch(e2){
+      if(!ad) errMsg=errMsg||((e2&&e2.message)?e2.message:String(e2));
+    }
+    if(errMsg&&!st.workflow&&!ad){
+      if($('atmTwConsole')){
+        $('atmTwConsole').innerHTML='<div class="tw-fail">状态读取失败：'+zoneEsc(errMsg)+'</div>';
+      }
+      if($('atmDeInsight')) $('atmDeInsight').textContent='双引擎状态读取失败：'+errMsg;
+      return;
+    }
+    renderDualEngine(st, ad);
+  };
+  window.dualEngineStartTask=async function(){
+    const btn=$('btnDualStart');
+    if(btn) btn.disabled=true;
+    if($('atmDeJobStatus')) $('atmDeJobStatus').textContent='正在启动双引擎创造任务…';
+    try{
+      const res=await fetch('/api/dual_engine/start_task',{
+        method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({})
+      });
+      const data=await res.json();
+      if(res.status===409||data.status==='running'){
+        if($('atmDeJobStatus')) $('atmDeJobStatus').textContent='已有任务在运行，转入轮询…';
+      }else if(!res.ok&&res.status!==202){
+        throw new Error(data.error||data.message||('HTTP '+res.status));
+      }else{
+        if($('atmDeJobStatus')) $('atmDeJobStatus').textContent='创造任务已启动（后台四步流水线）';
+      }
+      await dualEngineRefresh();
+    }catch(e){
+      if($('atmDeJobStatus')) $('atmDeJobStatus').textContent='启动失败：'+(e&&e.message?e.message:e);
+    }finally{
+      if(btn) btn.disabled=false;
+    }
+  };
+  window.dualEngineForceEvolve=async function(){
+    const btn=$('btnDualEvolve');
+    if(btn) btn.disabled=true;
+    if($('atmDeJobStatus')) $('atmDeJobStatus').textContent='正在强制进化池迭代…';
+    try{
+      const res=await fetch('/api/dual_engine/evolve',{
+        method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({})
+      });
+      const data=await res.json();
+      if(!res.ok&&res.status!==202&&res.status!==409){
+        throw new Error(data.error||data.message||('HTTP '+res.status));
+      }
+      if($('atmDeJobStatus')) $('atmDeJobStatus').textContent=
+        data.status==='running'?'进化任务已在运行':'进化迭代已启动';
+      setTimeout(dualEngineRefresh, 2500);
+    }catch(e){
+      if($('atmDeJobStatus')) $('atmDeJobStatus').textContent='进化失败：'+(e&&e.message?e.message:e);
+    }finally{
+      if(btn) btn.disabled=false;
+    }
+  };
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){
+      window.vectorAutoFetch();
+      loadForecastLatest();
+      dualEngineRefresh();
+    });
+  }else{
+    window.vectorAutoFetch();
+    loadForecastLatest();
+    dualEngineRefresh();
+  }
+  setInterval(window.vectorAutoFetch,15000);
+  setInterval(dualEngineRefresh,5000);
+})();
+</script>
+<!-- VECTOR_AUTO_TRADE_STATE_V5_NOGUESS_END -->
+
+</div>
+  <section class="strategy-creator-module" id="strategyCreatorModule">
+    <style>
+      .strategy-creator-module{grid-column:1/-1;padding:26px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.012));box-shadow:0 18px 45px rgba(0,0,0,.16)}
+      .strategy-creator-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+      .strategy-creator-title{font-size:20px;color:var(--text);font-weight:650;letter-spacing:.03em}
+      .strategy-creator-sub{font-size:12px;color:var(--muted);line-height:1.7;margin-top:6px;max-width:820px}
+      .strategy-creator-pill{border:1px solid rgba(155,191,154,.32);background:rgba(155,191,154,.08);color:var(--gain);padding:7px 12px;border-radius:999px;font-size:11px;white-space:nowrap}
+      .strategy-creator-pill.ready{color:var(--focus);border-color:rgba(218,184,105,.38);background:rgba(218,184,105,.09)}
+      .strategy-creator-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:18px}
+      .strategy-creator-step{border:1px solid var(--line);border-radius:11px;padding:10px 9px;background:rgba(255,255,255,.018);font-size:11px;color:var(--muted);text-align:center;line-height:1.5}
+      .strategy-creator-step b{display:block;color:var(--text);font-size:12px;margin-bottom:2px}
+      .strategy-creator-status{padding:14px 16px;border:1px solid var(--line);border-radius:12px;color:var(--muted);font-size:12px;line-height:1.7;margin-bottom:14px}
+      .strategy-matrix{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:14px}
+      .strategy-matrix-cell{border:1px solid var(--line);border-radius:10px;padding:10px;background:rgba(255,255,255,.016);color:var(--muted);font-size:10px;line-height:1.45}
+      .strategy-matrix-cell strong{display:block;color:var(--text);font-size:14px;margin-top:3px}
+      .strategy-creator-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+      .strategy-candidate-card{border:1px solid rgba(218,184,105,.30);border-radius:15px;background:rgba(218,184,105,.045);padding:18px}
+      .strategy-candidate-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+      .strategy-candidate-name{font-size:16px;color:var(--text);font-weight:650}
+      .strategy-candidate-meta{font-size:11px;color:var(--muted);margin-top:5px}
+      .strategy-candidate-state{font-size:10px;color:var(--focus);border:1px solid rgba(218,184,105,.35);padding:5px 8px;border-radius:999px;white-space:nowrap}
+      .strategy-candidate-description{font-size:12px;color:var(--muted);line-height:1.75;margin-bottom:12px}
+      .strategy-candidate-rule{border-top:1px solid var(--line);padding-top:11px;margin-top:11px;font-size:12px;line-height:1.75;color:var(--text)}
+      .strategy-candidate-rule b{color:var(--focus);font-weight:600;margin-right:7px}
+      .strategy-candidate-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:13px}
+      .strategy-candidate-metric{border:1px solid var(--line);border-radius:9px;padding:9px;color:var(--muted);font-size:10px}
+      .strategy-candidate-metric strong{display:block;color:var(--text);font-size:12px;margin-top:3px}
+      .strategy-creator-empty{padding:26px;text-align:center;border:1px dashed var(--line);border-radius:14px;color:var(--muted);font-size:13px;line-height:1.8}
+      .strategy-creator-foot{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.65}
+      @media(max-width:900px){.strategy-creator-flow{grid-template-columns:1fr 1fr}.strategy-matrix{grid-template-columns:repeat(2,minmax(0,1fr))}.strategy-creator-grid{grid-template-columns:1fr}.strategy-candidate-metrics{grid-template-columns:1fr 1fr}.strategy-creator-head{flex-direction:column}}
+    </style>
+    <div class="strategy-creator-head">
+      <div><div class="strategy-creator-title">策略创造训练</div><div class="strategy-creator-sub">每小时双槽并行探索：算力优先追击有开仓频率与成本幸存迹象的方向。实盘分两条轨道——条件频率探针（在场白名单+C/B仓位，每小时生命治理轮换）与完整认知矩阵晋级。每条可开仓策略必须绑定适用微观环境边界（DeepSeek起草/Qwen审计/OpenAI终审）；环境外信号只抑制，不作为淘汰依据。策略会自动降级/淘汰/抢占补位；影子满7天且三AI同意可自动获C级探针。风控门槛不松动；完整晋级仍须人工确认。</div></div>
+      <div class="strategy-creator-pill" id="strategyCreatorPill">训练中</div>
+    </div>
+    <div class="strategy-creator-flow">
+      <div class="strategy-creator-step"><b>生存必要性交集</b>受控条件｜硬伤否决</div>
+      <div class="strategy-creator-step"><b>初筛死亡地形</b>分层归档｜反死因约束</div>
+      <div class="strategy-creator-step"><b>慢微观基元</b>无监督｜无结果标签</div>
+      <div class="strategy-creator-step"><b>三倍成本探针</b>精确窄窗｜疑似正例</div>
+      <div class="strategy-creator-step"><b>失败认知燃料</b>解剖｜规则隔离晋级</div>
+      <div class="strategy-creator-step"><b>四关确认</b>滚动｜极端｜容量｜七日影子</div>
+      <div class="strategy-creator-step"><b>Codex复核</b>逻辑、代码与生产安全</div>
+      <div class="strategy-creator-step"><b>你的确认</b>确认后才可加入实盘</div>
+    </div>
+    <div class="strategy-creator-status" id="strategyCreatorStatus">正在读取持续训练状态…</div>
+    <div class="strategy-matrix" id="strategyCreatorMatrix"></div>
+    <div class="strategy-creator-grid" id="strategyCreatorCandidates"><div class="strategy-creator-empty">训练中<br>暂时没有通过全部门槛的新策略。</div></div>
+    <div class="strategy-creator-foot">持续训练采用分时单任务模式以控制服务器内存；外部 AI 不能写生产代码、不能修改资金参数，也没有最终批准权。候选策略不会因为出现在这里而自动获得实盘权限。</div>
+    <script>
+      (function(){
+        const esc=v=>String(v===null||v===undefined?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const number=(v,d=2)=>Number.isFinite(Number(v))?Number(v).toFixed(d):'-';
+        async function loadCreator(){
+          const pill=document.getElementById('strategyCreatorPill');
+          const status=document.getElementById('strategyCreatorStatus');
+          const matrixBox=document.getElementById('strategyCreatorMatrix');
+          const box=document.getElementById('strategyCreatorCandidates');
+          if(!pill||!status||!box||!matrixBox)return;
+          try{
+            const response=await fetch('/api/strategy-ecosystem/status',{credentials:'same-origin',cache:'no-store'});
+            const payload=await response.json();
+            if(!response.ok||payload.ok!==true)throw new Error(payload.error||'状态读取失败');
+            const training=payload.strategy_creation_training||{};
+            const candidates=Array.isArray(training.candidates)?training.candidates:[];
+            pill.textContent=training.label||'训练中';
+            pill.className='strategy-creator-pill'+(candidates.length?' ready':'');
+            const last=training.last_run||{};
+            const assignment=last.assignment||{};
+            const search=payload.search_learning||{};
+            const matrix=training.cluster_matrix||search.research_cluster_matrix||{};
+            const budget=search.budget_counts||{};
+            const micro=search.forward_microstructure||{};
+            const primitive=search.slow_microstructure_vocabulary||{};
+            const association=(search.death_micro_cooccurrence||{}).latest||{};
+            const solvability=(search.system_solvability||{}).latest||{};
+            const intel=payload.intelligence_counts||{};
+            const microCount=Object.values(micro.sample_counts||{}).reduce((a,b)=>a+Number(b||0),0);
+            const core=search.positive_core_counts||{};
+            const probes=search.probe_state_counts||{};
+            const rules=search.pruning_rule_state_counts||{};
+            const confirmations=search.positive_confirmation_state_counts||{};
+            const solvDetMap={SAT_WITNESS:'确定性检查仍认为规则空间逻辑可解',CONTRADICTION:'确定性检查发现规则之间存在逻辑矛盾'};
+            const solvAiMap={unanimous_logically_feasible:'三家AI一致认为规则空间逻辑上仍可满足',mixed_requires_codex_review:'三家AI意见不一致，需Codex与人工回溯',incomplete_fail_closed:'三家AI未完整返回，按失败关闭处理',ai_empty_conflicts_with_deterministic_witness:'AI认为规则空间为空但确定性见证仍可解'};
+            const solvDet=solvDetMap[solvability.deterministic_state]||solvability.deterministic_state_zh||'确定性检查待确认';
+            const solvAi=solvAiMap[solvability.ai_state]||solvability.ai_state_zh||'三家AI状态待确认';
+            status.innerHTML=`<b>${esc(training.schedule||'持续训练')}</b>｜研究目标 ${Number(training.target_count||0)} 组｜当前/最近任务 ${esc((assignment.symbol||'-')+' '+(assignment.timeframe||''))}｜最近完成 ${esc(last.finished_at||last.started_at||'-')}<br>分支学习 ${Number((search.branch_learning_counts||{}).observations||0)} 条｜初筛审计流水 ${Number(intel.prescreen_rejections||0)} 条｜去重死亡证据 ${Number(intel.prescreen_rejection_unique_evidence||0)} 条｜死亡地图 ${Number(intel.prescreen_death_maps||0)} 张｜节省 AI 调用 ${Number(budget.ai_calls_saved||0)} 次<br>前向微观摘要 ${microCount} 条｜慢微观窗口 ${Number(primitive.windows_built||0)} 个｜注册描述基元 ${Number(primitive.registered_descriptive||0)} 个｜死亡-微观同期信号 ${Number(association.observation_count||0)} 个（合格共现 ${Number(association.eligible_cell_count||0)}）<br>系统可解性 ${esc(solvDet)} / ${esc(solvAi)}｜隔离/生效剪枝规则 ${Number(rules.quarantined||0)}/${Number(rules.active||0)}｜七日影子中 ${Number(confirmations.awaiting_shadow_validation||0)} 个｜影子环境快照 ${Number(intel.shadow_environment_snapshots||0)} 条｜核心正例 ${Number(core.verified_shadow_positive||0)} 个<br>理论蓝图/微观基元作为正例：<b>禁止</b>｜实盘自动晋级：<b>关闭</b>｜自动放松规则：<b>禁止</b>｜人工确认：<b>强制要求</b>｜候选：<b>${candidates.length}</b>`;
+            const ms=matrix.summary||{};
+            const selected=matrix.selected||((matrix.planner||{}).selected)||{};
+            matrixBox.innerHTML=[
+              ['独立研究集群',Number(matrix.target_count||training.target_count||0)],
+              ['当前算力目标',esc((selected.symbol||'-')+' '+(selected.timeframe||''))],
+              ['14日独立死亡证据',Number(ms.independent_death_evidence_14d||0)],
+              ['14日 AI 调用',Number(ms.ai_calls_used_14d||0)],
+              ['14日节省调用',Number(ms.ai_calls_saved_14d||0)],
+              ['荒漠 / 漂移复核',Number(ms.cognitive_deserts||0)+' / '+Number(ms.drift_reviews||0)]
+            ].map(x=>`<div class="strategy-matrix-cell">${x[0]}<strong>${x[1]}</strong></div>`).join('');
+            if(!candidates.length){
+              box.innerHTML='<div class="strategy-creator-empty">训练中<br>暂时没有通过“胜率、频率、正期望、回撤、止损簇、留出段、三轮训练和 Codex 复核”全部门槛的新策略。</div>';
+              return;
+            }
+            box.innerHTML=candidates.map(c=>{
+              const m=c.backtest||{};
+              return `<article class="strategy-candidate-card">
+                <div class="strategy-candidate-head"><div><div class="strategy-candidate-name">${esc(c.title||'未命名候选')}</div><div class="strategy-candidate-meta">${esc(c.symbol||'-')}｜${esc(c.timeframe||'-')}｜${esc(c.direction||'-')}｜候选 ${esc(c.short_hash||'')}</div></div><div class="strategy-candidate-state">${esc(c.state_label||'等待确认')}</div></div>
+                ${c.description?`<div class="strategy-candidate-description">${esc(c.description)}</div>`:''}
+                <div class="strategy-candidate-rule"><b>触发条件</b>${esc(c.trigger_conditions||'-')}</div>
+                <div class="strategy-candidate-rule"><b>止盈条件</b>${esc(c.take_profit||'-')}；最长持仓 ${esc(c.max_hold_bars||'-')} 根K线</div>
+                <div class="strategy-candidate-metrics">
+                  <div class="strategy-candidate-metric">回测次数<strong>${number(m.trades,0)}</strong></div>
+                  <div class="strategy-candidate-metric">胜率<strong>${number(m.win_rate_pct)}%</strong></div>
+                  <div class="strategy-candidate-metric">期望/单<strong>${number(m.expectancy_pct)}%</strong></div>
+                  <div class="strategy-candidate-metric">每日频率<strong>${number(m.trades_per_day,3)}</strong></div>
+                  <div class="strategy-candidate-metric">复合收益<strong>${number(m.compound_return_pct)}%</strong></div>
+                  <div class="strategy-candidate-metric">最大回撤<strong>${number(m.max_drawdown_pct)}%</strong></div>
+                  <div class="strategy-candidate-metric">最大连损<strong>${number(m.max_loss_streak,0)}</strong></div>
+                  <div class="strategy-candidate-metric">AI最终一致<strong>${Number(c.ai_consensus||0)}/3</strong></div>
+                </div>
+              </article>`;
+            }).join('');
+          }catch(error){
+            pill.textContent='状态异常';
+            status.textContent='策略创造训练状态读取失败：'+(error&&error.message?error.message:'未知错误');
+          }
+        }
+        window.strategyCreatorRefresh=loadCreator;
+        if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadCreator);else loadCreator();
+        setInterval(loadCreator,30000);
+      })();
+    </script>
+  </section>
+  <div class="panel full">
+    <div class="title">网站运行状态</div>
+    <div id="processBox">加载中...</div>
+  </div>
+  <div class="panel">
+    <div class="title">系统操作</div>
+    <div class="row">
+      <button onclick="postSimple('/api/calibrate','指标校准已发送')">核心指标校准</button>
+      <button onclick="postSimple('/api/clear_signals','活跃信号已清空')">清空活跃信号</button>
+    </div>
+  </div>
+  <div class="panel full">
+    <div class="title">系统大事年表</div>
+    <div class="system-timeline">
+      <div class="system-timeline-item"><div class="system-timeline-date">2026/07/17</div><div class="system-timeline-event">第一次自动化成功开仓</div></div>
+      <div class="system-timeline-item"><div class="system-timeline-date">2026/07/18</div><div class="system-timeline-event">第一次自动化平仓并盈利</div></div>
+      <div class="system-timeline-item"><div class="system-timeline-date">2026/07/19</div><div class="system-timeline-event">第一个纯AI策略上线系统</div></div>
+      <div class="system-timeline-item"><div class="system-timeline-date">2026/07/19</div><div class="system-timeline-event">系统总目标提出：在正期望与资金曲线安全的前提下，追求更高的有效交易频率</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let STRATEGY_CONFIG_RAW = null;
+let STRATEGIES = [];
+
+function safe(v){
+  if(v===null || v===undefined) return '';
+  return String(v).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function deepCopy(obj){
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function apiGet(url){
+  return fetch(url).then(function(r){
+    return r.json().catch(function(){return {};}).then(function(d){
+      if(!r.ok){throw new Error(d.error || d.message || ('请求失败 '+r.status));}
+      return d;
+    });
+  });
+}
+
+function apiPost(url, body){
+  return fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body || {})
+  }).then(function(r){
+    return r.json().catch(function(){return {};}).then(function(d){
+      if(!r.ok){throw new Error(d.error || d.message || ('请求失败 '+r.status));}
+      return d;
+    });
+  });
+}
+
+function strategyTitle(s){
+  return safe((s.group||'')+'｜'+(s.direction||'')+'｜'+(s.name||s.key||''));
+}
+
+function strategyCard(s){
+  let off = s.enabled === false;
+  let autoBlocked = s.auto_trade_eligible === false;
+  let qualification = s.auto_trade_qualification_status || (s.auto_trade_eligible===true?'已授予自动交易资格':'可回测，尚未启用自动交易');
+  let timeframeText=Array.isArray(s.supported_timeframes)&&s.supported_timeframes.length?s.supported_timeframes.map(function(v){return v==='15m'?'15分钟':(v==='1h'?'1小时':v);}).join(' / '):'1小时 / 15分钟研究';
+  let instrumentText=Array.isArray(s.supported_instruments)&&s.supported_instruments.length?s.supported_instruments.map(function(v){return String(v).replace('-USDT-SWAP','');}).join(' / '):'全部回测标的';
+  let recommendedRisk=s.recommended_leverage?`<div>建议回测组合：${safe(s.recommended_leverage)}x｜止损${(Number(s.recommended_stop_loss_pct||0.009)*100).toFixed(1)}%</div>`:'';
+  return `
+  <details class="${off?'disabled':''}">
+    <summary>
+      <span class="strategy-summary-title">${strategyTitle(s)} ${off?'<span class="badge badge-off">已停用</span>':''}${autoBlocked?'<span class="badge badge-blocked">可回测｜未启用自动交易</span>':''}</span>
+      <span class="strategy-summary-meta">版本：${safe(s.version)} ｜ 最新修改：${safe(s.modified_at_beijing)}（北京时间）</span>
+    </summary>
+    <div class="strategy-body">
+      <div>策略名称：${safe(s.name)}</div>
+      <div>方向：${safe(s.direction)}</div>
+      <div>适用范围：${safe(instrumentText)}｜${safe(timeframeText)}</div>
+      ${recommendedRisk}
+      <div>自动交易资格：${safe(qualification)}</div>
+      <div>触发条件：${safe(s.trigger)}</div>
+      <div>止盈/止损：${safe(s.exit)}</div>
+    </div>
+  </details>`;
+}
+
+function loadStrategyConfig(){
+  return apiGet('/api/strategy_config').then(function(data){
+    STRATEGY_CONFIG_RAW = data.config;
+    STRATEGIES = STRATEGY_CONFIG_RAW.strategies || [];
+    renderStrategies();
+    renderBacktestSelector();
+    renderEditorSelector();
+  });
+}
+
+function renderStrategies(){
+  document.getElementById('experimentalStrategies').innerHTML =
+    STRATEGIES.filter(function(s){return s.group==='实验策略';}).map(strategyCard).join('') || '暂无实验策略';
+}
+
+function renderBacktestSelector(resetSelection){
+  let sel=document.getElementById('active_strat');
+  let old=resetSelection?[]:Array.from(sel.querySelectorAll('input:checked')).map(function(x){return x.value;});
+  let instrument=(document.getElementById('bt_instrument')||{}).value||'BTC-USDT-SWAP';
+  let timeframe=(document.getElementById('bt_timeframe')||{}).value||'1h';
+  let list=STRATEGIES.filter(function(s){
+    if(s.enabled===false)return false;
+    let timeframes=Array.isArray(s.supported_timeframes)?s.supported_timeframes:[];
+    let instruments=Array.isArray(s.supported_instruments)?s.supported_instruments:[];
+    return (!timeframes.length||timeframes.indexOf(timeframe)>=0)&&(!instruments.length||instruments.indexOf(instrument)>=0);
+  });
+  function isDedicated(s){
+    let timeframes=Array.isArray(s.supported_timeframes)?s.supported_timeframes:[];
+    let instruments=Array.isArray(s.supported_instruments)?s.supported_instruments:[];
+    return timeframes.indexOf(timeframe)>=0&&instruments.indexOf(instrument)>=0;
+  }
+  list.sort(function(a,b){return Number(isDedicated(b))-Number(isDedicated(a));});
+  let preferred=list.find(function(s){return isDedicated(s);});
+  sel.innerHTML=list.map(function(s,i){
+    let dedicated=isDedicated(s);
+    let checked=old.indexOf(s.key)>=0 || (!old.length && ((preferred&&s.key===preferred.key)||(!preferred&&i===0)));
+    let scopeBadge=dedicated?`<span class="bt-scope-badge">${timeframe==='15m'?'15分钟专用':'当前周期专用'}｜${safe(instrument.replace('-USDT-SWAP',''))}</span>`:'';
+    return `<label class="bt-strategy-option${dedicated?' scope-dedicated':''}"><input type="checkbox" value="${safe(s.key)}" ${checked?'checked':''} onchange="updateBacktestSelectionNote()"><span>${strategyTitle(s)}${scopeBadge}</span></label>`;
+  }).join('');
+  updateBacktestSelectionNote();
+}
+
+function onBacktestScopeChange(){
+  renderBacktestSelector(true);
+  loadBacktestCoverage();
+}
+
+function selectedBacktestStrategies(){
+  return Array.from(document.querySelectorAll('#active_strat input:checked')).map(function(x){return x.value;});
+}
+
+function updateBacktestSelectionNote(){
+  let keys=selectedBacktestStrategies();
+  let note=document.getElementById('btSelectionNote');
+  if(note) note.textContent=keys.length?'已选择 '+keys.length+' 条策略'+(keys.length>1?'，组合按等权资金分配计算。':'。'):'请至少选择一条策略。';
+}
+
+function renderEditorSelector(){
+  let sel=document.getElementById('editor_strategy_select');
+  let old=sel.value || '';
+  sel.innerHTML=STRATEGIES.map(function(s){return `<option value="${safe(s.key)}">${strategyTitle(s)}</option>`;}).join('');
+  if(STRATEGIES.some(function(s){return s.key===old;})){sel.value=old;}
+  if(STRATEGIES.length) loadEditorStrategy();
+}
+
+function currentEditorStrategy(){
+  let key=document.getElementById('editor_strategy_select').value;
+  return STRATEGIES.find(function(s){return s.key===key;});
+}
+
+function loadEditorStrategy(){
+  let s=currentEditorStrategy();
+  if(!s) return;
+  document.getElementById('editor_enabled').checked = s.enabled !== false;
+  document.getElementById('editor_version').value = s.version || '';
+  document.getElementById('editor_trigger').value = s.trigger || '';
+  document.getElementById('editor_exit').value = s.exit || '';
+  renderParams(s.params || {}, s.param_meta || {});
+}
+
+function renderParams(params, meta){
+  let box=document.getElementById('editor_params');
+  let keys=Object.keys(params||{}).sort();
+  if(!keys.length){ box.innerHTML='<div class="muted">暂无可调参数</div>'; return; }
+  box.innerHTML = keys.map(function(k){
+    let m=meta[k] || {};
+    return `<div class="param-row">
+      <input class="pkey" value="${safe(k)}" readonly>
+      <input class="pval" type="number" step="${safe(m.step || 0.5)}" min="${safe(m.min ?? '')}" max="${safe(m.max ?? '')}" value="${safe(params[k])}">
+      <button onclick="stepParam(this,-1)">－</button>
+      <button onclick="stepParam(this,1)">＋</button>
+    </div>`;
+  }).join('');
+}
+
+function stepParam(btn, dir){
+  let row=btn.closest('.param-row');
+  let input=row.querySelector('.pval');
+  let step=Number(input.step || 1);
+  let val=Number(input.value || 0);
+  let next=val + dir*step;
+  if(input.min!=='' && next<Number(input.min)) next=Number(input.min);
+  if(input.max!=='' && next>Number(input.max)) next=Number(input.max);
+  input.value=(next).toFixed(step < 1 ? 4 : 0);
+}
+
+function collectParams(){
+  let out={};
+  document.querySelectorAll('#editor_params .param-row').forEach(function(row){
+    let k=row.querySelector('.pkey').value;
+    let v=Number(row.querySelector('.pval').value);
+    if(k && isFinite(v)) out[k]=v;
+  });
+  return out;
+}
+
+function saveStrategyConfig(runSnapshot){
+  let cur=currentEditorStrategy();
+  if(!cur || !STRATEGY_CONFIG_RAW) return;
+
+  let nextConfig=deepCopy(STRATEGY_CONFIG_RAW);
+  let list=nextConfig.strategies || [];
+  let s=list.find(function(x){return x.key===cur.key;});
+  if(!s) return;
+
+  s.enabled=document.getElementById('editor_enabled').checked;
+  s.version=document.getElementById('editor_version').value;
+  s.trigger=document.getElementById('editor_trigger').value;
+  s.exit=document.getElementById('editor_exit').value;
+  s.params=collectParams();
+
+  document.getElementById('editor_status').innerHTML='正在保存...';
+
+  apiPost('/api/strategy_config/update',{
+    config: nextConfig,
+    changed_strategy_key: s.key,
+    backtest_start: document.getElementById('bt_start').value,
+    backtest_end: document.getElementById('bt_end').value,
+    run_backtest_snapshot: !!runSnapshot
+  }).then(function(data){
+    if(data.status!=='ok') throw new Error(data.message || data.error || '保存失败');
+    document.getElementById('editor_status').innerHTML='保存成功，备份：'+safe(data.backup_path||'');
+    return loadStrategyConfig();
+  }).catch(function(err){
+    document.getElementById('editor_status').innerHTML='保存失败：'+safe(err.message);
+  });
+}
+
+let backtestPollTimer=null;
+
+function setBacktestRunState(running){
+  let button=document.getElementById('btRunButton');
+  if(button){
+    button.disabled=!!running;
+    button.textContent=running?'回测计算中…':'开始回测';
+  }
+}
+
+function executeBacktest(){
+  let strategies=selectedBacktestStrategies();
+  let instrument=document.getElementById('bt_instrument').value;
+  let timeframe=document.getElementById('bt_timeframe').value;
+  let start=document.getElementById('bt_start').value;
+  let end=document.getElementById('bt_end').value;
+
+  if(!strategies.length){
+    document.getElementById('btResult').innerHTML='<div class="loss">请至少选择一条策略。</div>';
+    return;
+  }
+
+  if(backtestPollTimer){
+    clearInterval(backtestPollTimer);
+    backtestPollTimer=null;
+  }
+  setBacktestRunState(true);
+  document.getElementById('btProgress').innerHTML='正在启动回测…'+(timeframe==='15m'?' 15分钟长区间数据通常需要等待数十秒。':'')+'<div class="progress"><div style="width:4%"></div></div>';
+  document.getElementById('btResult').innerHTML='';
+
+  apiPost('/api/backtest',{
+    instrument:instrument,
+    timeframe:timeframe,
+    strategy:strategies[0],
+    strategies:strategies,
+    start_time:start,
+    end_time:end
+  }).then(function(data){
+    if(!data.task_id) throw new Error(data.error || '回测启动失败');
+    pollBacktest(data.task_id);
+  }).catch(function(err){
+    setBacktestRunState(false);
+    document.getElementById('btResult').innerHTML='<div class="loss">回测阻断：'+safe(err.message)+'</div>';
+  });
+}
+
+function pollBacktest(tid){
+  backtestPollTimer=setInterval(function(){
+    apiGet('/api/backtest_progress/'+tid).then(function(info){
+      let cur=Number(info.current||0);
+      let total=Number(info.total||0);
+      let pct=total>0?Math.min(100,Math.round(cur/total*100)):0;
+      document.getElementById('btProgress').innerHTML =
+        `回测计算中：${cur} / ${total} 项，${pct}%<div class="progress"><div style="width:${Math.max(4,pct)}%"></div></div>`;
+      if(info.status==='done'){
+        clearInterval(backtestPollTimer);
+        backtestPollTimer=null;
+        setBacktestRunState(false);
+        document.getElementById('btProgress').innerHTML =
+          `回测完成：${cur} / ${total} 项，100%<div class="progress"><div style="width:100%"></div></div>`;
+        renderBacktestResult(info.result || {});
+      }else if(info.status==='error'||info.status==='failed'){
+        clearInterval(backtestPollTimer);
+        backtestPollTimer=null;
+        setBacktestRunState(false);
+        document.getElementById('btResult').innerHTML='<div class="loss">回测失败：'+safe(info.error||info.message||'未知错误')+'</div>';
+      }
+    }).catch(function(err){
+      clearInterval(backtestPollTimer);
+      backtestPollTimer=null;
+      setBacktestRunState(false);
+      document.getElementById('btResult').innerHTML='<div class="loss">进度读取失败：'+safe(err.message)+'</div>';
+    });
+  },500);
+}
+
+function pickAuditHash(audit){
+  return audit.strategy_logic_hash || audit.strategy_hash || audit.strategy_config_hash || '';
+}
+
+function backtestStrategyName(key){
+  let s=STRATEGIES.find(function(x){return x.key===key;});
+  return s?(s.name||'未命名策略'):'未命名策略';
+}
+
+function backtestTradeType(t,defaultStrategy){
+  let name=backtestStrategyName(t.strategy||defaultStrategy);
+  let result=t.stop_loss?'止损':(t.exit_type==='定时强制平仓'?'定时强制平仓':'止盈');
+  return name+'｜'+result;
+}
+
+function backtestResultHtml(r,title){
+  if(r.error){
+    return '<div class="loss">'+(title?'<strong>'+safe(title)+'</strong>｜':'')+'回测阻断：'+safe(r.error)+'</div>';
+  }
+  let tel=r.telemetry || {};
+  let audit=r.consistency_audit || {};
+  let timeframeLabel=r.timeframe_label||(r.timeframe==='15m'?'15分钟':'1小时');
+  let h=`
+    <div class="panel bt-result-block">
+      ${title?'<div class="bt-result-title">'+safe(title)+'</div>':''}
+      <div>回测周期：<strong>${safe(timeframeLabel)}</strong>｜执行诊断：扫描 ${safe(tel.bars_scanned||0)} 根｜触发 ${safe(tel.entry_conditions_met||0)} 次｜开仓 ${safe(tel.actual_opens||0)} 次｜平仓 ${safe(tel.actual_closes||0)} 次</div>
+      <div class="muted">数据 SHA256：${safe(audit.data_version || audit.data_hash || '')} ｜ 策略 SHA256：${safe(pickAuditHash(audit))}</div>
+      <div>回测报告（扣除手续费与滑点）：总交易数 <span class="number">${safe(r.total_trades||0)}</span> ｜ 复利收益率 <span class="${Number(r.total_return_percent||0)>=0?'gain':'loss'} number">${Number(r.total_return_percent||0).toFixed(2)}%</span> ｜ 胜率 <span class="number">${Number(r.win_rate_percent||0).toFixed(1)}%</span></div>
+    </div>`;
+  if(r.trades && r.trades.length){
+    h+='<table><tr><th>开仓时间</th><th>平仓时间</th><th>开仓价</th><th>平仓价</th><th>收益</th><th>类型</th></tr>';
+    r.trades.forEach(function(t){
+      h+=`<tr><td>${safe(t.entry_time)}</td><td>${safe(t.exit_time)}</td><td>${Number(t.entry_price||0).toFixed(2)}</td><td>${Number(t.exit_price||0).toFixed(2)}</td><td class="${Number(t.pnl_ratio||0)>=0?'gain':'loss'}">${(Number(t.pnl_ratio||0)*100).toFixed(2)}%</td><td>${safe(backtestTradeType(t,r.strategy))}</td></tr>`;
+    });
+    h+='</table>';
+  }
+  h+='</div>';
+  return h;
+}
+
+function renderBacktestResult(r){
+  if(!r.combination){
+    let timeframeLabel=r.timeframe_label||(r.timeframe==='15m'?'15分钟':'1小时');
+    document.getElementById('btResult').innerHTML=backtestResultHtml(r,(r.instrument||'BTC-USDT-SWAP').replace('-USDT-SWAP','')+'｜'+timeframeLabel);
+    return;
+  }
+  let names=(r.strategies||[]).map(backtestStrategyName).join(' ＋ ');
+  let asset=(r.instrument||'BTC-USDT-SWAP').replace('-USDT-SWAP','');
+  let timeframeLabel=r.timeframe_label||(r.timeframe==='15m'?'15分钟':'1小时');
+  let h=`<div class="panel bt-result-block">
+    <div class="bt-result-title">${safe(asset)}｜${safe(timeframeLabel)}｜${safe(names)}</div>
+    <div>回测报告：策略数 <span class="number">${safe(r.strategy_count||0)}</span> ｜ 总交易数 <span class="number">${safe(r.total_trades||0)}</span> ｜ 等权平均收益 <span class="${Number(r.total_return_percent||0)>=0?'gain':'loss'} number">${Number(r.total_return_percent||0).toFixed(2)}%</span> ｜ 复合复利收益 <span class="${Number(r.compound_return_percent||0)>=0?'gain':'loss'} number">${Number(r.compound_return_percent||0).toFixed(2)}%</span> ｜ 胜率 <span class="number">${Number(r.win_rate_percent||0).toFixed(1)}%</span></div>
+    <div class="muted" style="margin-top:7px">复合复利按所有策略交易的平仓时间排序，并将每笔收益依次计入同一账户净值。</div>`;
+  if(r.trades&&r.trades.length){
+    h+='<table><tr><th>开仓时间</th><th>平仓时间</th><th>开仓价</th><th>平仓价</th><th>收益</th><th>类型</th></tr>';
+    r.trades.forEach(function(t){
+      h+=`<tr><td>${safe(t.entry_time)}</td><td>${safe(t.exit_time)}</td><td>${Number(t.entry_price||0).toFixed(2)}</td><td>${Number(t.exit_price||0).toFixed(2)}</td><td class="${Number(t.pnl_ratio||0)>=0?'gain':'loss'}">${(Number(t.pnl_ratio||0)*100).toFixed(2)}%</td><td>${safe(backtestTradeType(t,''))}</td></tr>`;
+    });
+    h+='</table>';
+  }else{
+    h+='<div class="muted" style="margin-top:12px">所选策略在该区间内暂无交易。</div>';
+  }
+  h+='</div>';
+  document.getElementById('btResult').innerHTML=h;
+}
+
+function loadDialysis(){
+  const timeframe=(document.getElementById('market_timeframe')||{}).value||'1h';
+  apiGet('/api/dialysis?timeframe='+encodeURIComponent(timeframe)).then(function(d){
+    const signalCount=Array.isArray(d.signals)?d.signals.length:(d.signals&&typeof d.signals==='object'?Object.keys(d.signals).length:0);
+    const timeframeLabel=d.timeframe_label||(timeframe==='15m'?'15分钟':'1小时');
+    document.getElementById('marketMonitorSubtitle').textContent='BTC / CL / XAU / NG / XAG / LTC / ADA · '+timeframeLabel+'行情指标与均线状态';
+    document.getElementById('marketMonitorTime').textContent=timeframeLabel+'｜更新时间：'+(d.updated_at||new Date().toLocaleString('zh-CN',{hour12:false}));
+    const markets=Array.isArray(d.markets)&&d.markets.length?d.markets:[d];
+    document.getElementById('dialysisBox').innerHTML='<div class="market-monitor-assets">'+markets.map(function(m){
+      const ok=!!m.ok&&Number(m.price||0)>0;
+      return `<div class="market-monitor-asset">
+      <div class="market-monitor-asset-title">${safe(m.symbol||'BTC-USDT-SWAP')}</div>
+      <div class="market-monitor-grid">
+        <div class="market-monitor-card">
+          <div class="market-monitor-label">最新确认价格</div>
+          <div class="market-monitor-value price number">${Number(m.price||0).toFixed(2)}</div>
+          <div class="market-monitor-foot"><span class="market-monitor-state ${ok?'':'error'}">${ok?'行情连接正常':'行情获取异常'}</span></div>
+        </div>
+        <div class="market-monitor-card wide">
+          <div class="market-monitor-label">均线排列</div>
+          <div class="market-monitor-value compact">${safe(m.ma_status||'-')}</div>
+          <div class="market-monitor-foot">由高至低排列</div>
+        </div>
+        <div class="market-monitor-card"><div class="market-monitor-label">KDJ · K</div><div class="market-monitor-value number">${Number(m.kdj_k||0).toFixed(2)}</div></div>
+        <div class="market-monitor-card"><div class="market-monitor-label">KDJ · D</div><div class="market-monitor-value number">${Number(m.kdj_d||0).toFixed(2)}</div></div>
+        <div class="market-monitor-card"><div class="market-monitor-label">KDJ · J</div><div class="market-monitor-value number">${Number(m.kdj_j||0).toFixed(2)}</div></div>
+        <div class="market-monitor-card"><div class="market-monitor-label">CCI</div><div class="market-monitor-value number">${Number(m.cci||0).toFixed(2)}</div><div class="market-monitor-foot">当前激活信号 ${signalCount} 个</div></div>
+      </div></div>`;
+    }).join('')+'</div>';
+  }).catch(function(err){
+    document.getElementById('marketMonitorTime').textContent='行情读取失败';
+    document.getElementById('dialysisBox').innerHTML='<span class="loss">盘面状态读取失败：'+safe(err.message)+'</span>';
+  });
+}
+
+function loadProcessStatus(){
+  apiGet('/api/process_status').then(function(d){
+    const box=document.getElementById('processBox');
+    box.textContent='';
+    const head=document.createElement('div');
+    head.className='site-health-head-v7';
+    const summaryWrap=document.createElement('div');
+    const summary=document.createElement('div');
+    summary.className='site-health-summary-v7';
+    summary.textContent=d.summary||'状态未知';
+    const meta=document.createElement('div');
+    meta.className='site-health-meta-v7';
+    meta.textContent='检查时间：'+(d.checked_at||'-')+'｜正常 '+Number(d.healthy_count||0)+' / '+Number(d.total_count||0);
+    summaryWrap.appendChild(summary);
+    summaryWrap.appendChild(meta);
+    const pill=document.createElement('div');
+    pill.className='site-health-pill-v7 '+(d.overall==='healthy'?'':'error');
+    pill.textContent=d.overall==='healthy'?'核心正常':'存在异常';
+    head.appendChild(summaryWrap);
+    head.appendChild(pill);
+    box.appendChild(head);
+    const grid=document.createElement('div');
+    grid.className='site-health-grid-v7';
+    (Array.isArray(d.components)?d.components:[]).forEach(function(item){
+      const card=document.createElement('div');
+      card.className='site-health-card-v7 '+(item.state||'error');
+      const name=document.createElement('div');
+      name.className='site-health-name-v7';
+      const dot=document.createElement('span');
+      dot.className='site-health-dot-v7';
+      const label=document.createElement('span');
+      label.textContent=item.name||'未命名组件';
+      name.appendChild(dot);
+      name.appendChild(label);
+      const detail=document.createElement('div');
+      detail.className='site-health-detail-v7';
+      const lines=(Array.isArray(item.detail_lines)&&item.detail_lines.length)
+        ? item.detail_lines
+        : String(item.detail||'-').split('\n').filter(function(x){return x!=='';});
+      if(lines.length>1){
+        const list=document.createElement('ul');
+        lines.forEach(function(line){
+          const li=document.createElement('li');
+          li.textContent=String(line).replace(/^[·•\-]\s*/, '');
+          list.appendChild(li);
+        });
+        detail.appendChild(list);
+      }else{
+        detail.textContent=lines[0]||'-';
+      }
+      card.appendChild(name);
+      card.appendChild(detail);
+      grid.appendChild(card);
+    });
+    box.appendChild(grid);
+  }).catch(function(err){
+    document.getElementById('processBox').textContent='网站运行状态读取失败：'+String(err.message||'未知错误');
+  });
+}
+
+function localDatetimeValue(value){
+  if(!value) return '';
+  let text=String(value);
+  if(!/[zZ]|[+-]\\d\\d:\\d\\d$/.test(text)) text+='Z';
+  let date=new Date(text);
+  if(isNaN(date.getTime())) return '';
+  let pad=function(v){return String(v).padStart(2,'0');};
+  return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+'T'+pad(date.getHours())+':'+pad(date.getMinutes());
+}
+
+let BACKTEST_COVERAGE_KEY='';
+const DEFAULT_BACKTEST_START='2026-01-01T00:00';
+function loadBacktestCoverage(){
+  const instrument=(document.getElementById('bt_instrument')||{}).value||'BTC-USDT-SWAP';
+  const timeframe=(document.getElementById('bt_timeframe')||{}).value||'1h';
+  const coverageKey=instrument+'|'+timeframe;
+  apiGet('/api/backtest/data_coverage?instrument='+encodeURIComponent(instrument)+'&timeframe='+encodeURIComponent(timeframe)).then(function(data){
+    let selected=data.selected||{};
+    let gapCount=selected.non_expected_gap_count;
+    if(gapCount===undefined||gapCount===null)gapCount=selected.non_hourly_gap_count;
+    const instrumentLabel=instrument.replace('-USDT-SWAP','');
+    const timeframeLabel=selected.timeframe_label||(timeframe==='15m'?'15分钟':'1小时');
+    document.getElementById('btDataCoverage').innerHTML=
+      `${safe(instrumentLabel)}｜${safe(timeframeLabel)}数据：${safe(selected.earliest_utc||'-')} UTC 至 ${safe(selected.latest_utc||'-')} UTC｜${safe(selected.rows||0)}根｜非预期间隔 ${safe(gapCount||0)}。`;
+    let start=document.getElementById('bt_start');
+    let end=document.getElementById('bt_end');
+    if(coverageKey!==BACKTEST_COVERAGE_KEY){
+      if(start){
+        let earliest=selected.earliest_utc?localDatetimeValue(selected.earliest_utc):'';
+        start.value=earliest&&earliest>DEFAULT_BACKTEST_START?earliest:DEFAULT_BACKTEST_START;
+      }
+      if(end && selected.latest_utc)end.value=localDatetimeValue(selected.latest_utc);
+      BACKTEST_COVERAGE_KEY=coverageKey;
+    }
+  }).catch(function(err){
+    document.getElementById('btDataCoverage').textContent='历史覆盖读取失败：'+String(err.message||err);
+  });
+}
+
+function postSimple(url,msg){
+  apiPost(url,{}).then(function(){alert(msg);}).catch(function(e){alert(e.message);});
+}
+
+function init(){
+  loadStrategyConfig();
+  loadBacktestCoverage();
+  loadDialysis();
+  loadProcessStatus();
+  setInterval(loadDialysis,5000);
+  setInterval(loadProcessStatus,10000);
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+
+<script id="bt-risk-controls-strict-v3">
+(function () {
+  var LEVERAGES = [20, 30, 50];
+  var STOP_LOSSES = [0.003, 0.006, 0.009];
+
+  function pctLabel(v) {
+    return (v * 100).toFixed(1) + "%";
+  }
+
+  function makeSelect(id, values, formatter, defaultValue) {
+    var sel = document.createElement("select");
+    sel.id = id;
+    sel.style.margin = "0 8px 0 4px";
+    sel.style.padding = "6px 8px";
+    sel.style.borderRadius = "6px";
+    sel.style.border = "1px solid rgba(255,255,255,0.25)";
+    sel.style.background = "rgba(0,0,0,0.18)";
+    sel.style.color = "inherit";
+
+    values.forEach(function (v) {
+      var opt = document.createElement("option");
+      opt.value = String(v);
+      opt.textContent = formatter(v);
+      if (String(v) === String(defaultValue)) opt.selected = true;
+      sel.appendChild(opt);
+    });
+
+    return sel;
+  }
+
+  function findBacktestAnchor() {
+    var nodes = Array.prototype.slice.call(document.querySelectorAll("button,input[type='button'],a"));
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var text = (n.textContent || n.value || "").toLowerCase();
+      var onclick = String(n.getAttribute("onclick") || "").toLowerCase();
+      if (
+        onclick.indexOf("executebacktest") >= 0 ||
+        text.indexOf("回测") >= 0 ||
+        text.indexOf("backtest") >= 0
+      ) {
+        return n;
+      }
+    }
+    return null;
+  }
+
+  function ensureRiskControls() {
+    if (document.getElementById("btRiskControls")) return;
+
+    var wrap = document.createElement("div");
+    wrap.id = "btRiskControls";
+    wrap.style.display = "flex";
+    wrap.style.alignItems = "center";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.gap = "8px";
+    wrap.style.margin = "10px 0";
+    wrap.style.padding = "10px";
+    wrap.style.border = "1px solid rgba(255,255,255,0.18)";
+    wrap.style.borderRadius = "10px";
+    wrap.style.background = "rgba(255,255,255,0.04)";
+
+    var title = document.createElement("span");
+    title.textContent = "回测风险参数";
+    title.style.fontWeight = "600";
+    title.style.marginRight = "8px";
+
+    var levLabel = document.createElement("label");
+    levLabel.textContent = "杠杆";
+    levLabel.setAttribute("for", "btLeverageSelect");
+
+    var lev = makeSelect("btLeverageSelect", LEVERAGES, function (v) { return v + "x"; }, 20);
+
+    var slLabel = document.createElement("label");
+    slLabel.textContent = "加杠杆前止损";
+    slLabel.setAttribute("for", "btStopLossSelect");
+
+    var sl = makeSelect("btStopLossSelect", STOP_LOSSES, pctLabel, 0.009);
+
+    wrap.appendChild(title);
+    wrap.appendChild(levLabel);
+    wrap.appendChild(lev);
+    wrap.appendChild(slLabel);
+    wrap.appendChild(sl);
+
+    var anchor = findBacktestAnchor();
+    if (anchor && anchor.parentNode) {
+      anchor.parentNode.insertBefore(wrap, anchor);
+    } else {
+      document.body.insertBefore(wrap, document.body.firstChild);
+    }
+  }
+
+  function getRiskParams() {
+    ensureRiskControls();
+
+    var levNode = document.getElementById("btLeverageSelect");
+    var slNode = document.getElementById("btStopLossSelect");
+
+    var leverage = levNode ? parseInt(levNode.value, 10) : 20;
+    var stopLossRatio = slNode ? parseFloat(slNode.value) : 0.009;
+
+    if (LEVERAGES.indexOf(leverage) < 0) leverage = 20;
+    if (STOP_LOSSES.indexOf(stopLossRatio) < 0) stopLossRatio = 0.009;
+
+    return {
+      leverage: leverage,
+      stop_loss_ratio: stopLossRatio,
+      stop_loss_pct: stopLossRatio
+    };
+  }
+
+  window.getBacktestRiskParams = getRiskParams;
+
+  function isBacktestUrl(url) {
+    return /\/api\/backtest(?:\?|$)/.test(String(url || "")) && String(url || "").indexOf("progress") < 0;
+  }
+
+  function injectBody(body) {
+    var obj = {};
+
+    if (typeof body === "string" && body.trim()) {
+      try {
+        obj = JSON.parse(body);
+      } catch (e) {
+        obj = {};
+      }
+    } else if (!body) {
+      obj = {};
+    } else {
+      return body;
+    }
+
+    var risk = getRiskParams();
+    obj.leverage = risk.leverage;
+    obj.stop_loss_ratio = risk.stop_loss_ratio;
+    obj.stop_loss_pct = risk.stop_loss_pct;
+
+    return JSON.stringify(obj);
+  }
+
+  function patchFetch() {
+    if (window.__btRiskFetchPatchedV3) return;
+    if (!window.fetch) return;
+
+    var oldFetch = window.fetch;
+
+    window.fetch = function (input, init) {
+      try {
+        var url = "";
+        if (typeof input === "string") {
+          url = input;
+        } else if (input && input.url) {
+          url = input.url;
+        }
+
+        if (isBacktestUrl(url)) {
+          init = init || {};
+          var method = String(init.method || "POST").toUpperCase();
+
+          if (method === "POST" || init.body) {
+            init.body = injectBody(init.body || "{}");
+            init.headers = init.headers || {};
+            if (!init.headers["Content-Type"] && !init.headers["content-type"]) {
+              init.headers["Content-Type"] = "application/json";
+            }
+          }
+        }
+      } catch (e) {}
+
+      return oldFetch.call(this, input, init);
+    };
+
+    window.__btRiskFetchPatchedV3 = true;
+  }
+
+  function patchXHR() {
+    if (window.__btRiskXHRPatchedV3) return;
+    if (!window.XMLHttpRequest) return;
+
+    var oldOpen = window.XMLHttpRequest.prototype.open;
+    var oldSend = window.XMLHttpRequest.prototype.send;
+    var oldSetHeader = window.XMLHttpRequest.prototype.setRequestHeader;
+
+    window.XMLHttpRequest.prototype.open = function (method, url) {
+      this.__btRiskMethod = method;
+      this.__btRiskUrl = url;
+      this.__btRiskHasContentType = false;
+      return oldOpen.apply(this, arguments);
+    };
+
+    window.XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
+      if (String(name || "").toLowerCase() === "content-type") {
+        this.__btRiskHasContentType = true;
+      }
+      return oldSetHeader.apply(this, arguments);
+    };
+
+    window.XMLHttpRequest.prototype.send = function (body) {
+      try {
+        if (isBacktestUrl(this.__btRiskUrl)) {
+          body = injectBody(body || "{}");
+          if (!this.__btRiskHasContentType) {
+            this.setRequestHeader("Content-Type", "application/json");
+          }
+        }
+      } catch (e) {}
+
+      return oldSend.call(this, body);
+    };
+
+    window.__btRiskXHRPatchedV3 = true;
+  }
+
+  function initRiskControls() {
+    ensureRiskControls();
+    patchFetch();
+    patchXHR();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initRiskControls);
+  } else {
+    initRiskControls();
+  }
+
+  setTimeout(initRiskControls, 300);
+  setTimeout(initRiskControls, 1000);
+})();
+</script>
+
+
+<!-- AUTO_TRADE_CONSOLE_STAGE8_START -->
+<style>
+  #autoTradeConsole {
+    display: none !important;
+    margin: 22px 0;
+    padding: 18px;
+    border: 1px solid rgba(120, 140, 170, 0.35);
+    border-radius: 14px;
+    background: rgba(20, 28, 42, 0.72);
+  }
+
+  #autoTradeConsole .auto-trade-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  #autoTradeConsole h2 {
+    margin: 0 0 6px 0;
+    font-size: 22px;
+  }
+
+  #autoTradeConsole .auto-trade-subtitle {
+    opacity: 0.78;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  #autoTradeConsole .auto-trade-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  #autoTradeConsole button,
+  #autoTradeConsole select,
+  #autoTradeConsole input {
+    border-radius: 8px;
+    border: 1px solid rgba(150, 165, 190, 0.38);
+    background: rgba(12, 18, 28, 0.92);
+    color: inherit;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  #autoTradeConsole button {
+    cursor: pointer;
+  }
+
+  #autoTradeConsole button:hover {
+    filter: brightness(1.12);
+  }
+
+  #autoTradeConsole .auto-trade-message {
+    margin: 10px 0;
+    min-height: 18px;
+    font-size: 13px;
+    opacity: 0.9;
+  }
+
+  #autoTradeConsole .auto-trade-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+  }
+
+  #autoTradeConsole .auto-trade-kv {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  #autoTradeConsole .auto-trade-kv .k {
+    font-size: 12px;
+    opacity: 0.68;
+    margin-bottom: 4px;
+  }
+
+  #autoTradeConsole .auto-trade-kv .v {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  #autoTradeConsole .auto-trade-section-title {
+    margin: 18px 0 10px 0;
+    font-weight: 700;
+    font-size: 16px;
+  }
+
+  #autoTradeConsole .auto-trade-strategy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 12px;
+  }
+
+  #autoTradeConsole .auto-trade-card {
+    border: 1px solid rgba(150, 165, 190, 0.26);
+    border-radius: 13px;
+    padding: 13px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  #autoTradeConsole .auto-trade-card-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  #autoTradeConsole .auto-trade-key {
+    font-weight: 700;
+    font-size: 14px;
+    word-break: break-all;
+  }
+
+  #autoTradeConsole .auto-trade-name {
+    opacity: 0.72;
+    font-size: 12px;
+    margin-top: 3px;
+  }
+
+  #autoTradeConsole .auto-trade-status {
+    white-space: nowrap;
+    font-size: 12px;
+    border-radius: 999px;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  #autoTradeConsole .s-monitoring { background: rgba(53, 136, 255, 0.18); }
+  #autoTradeConsole .s-holding { background: rgba(36, 170, 90, 0.20); }
+  #autoTradeConsole .s-cooldown { background: rgba(210, 170, 45, 0.22); }
+  #autoTradeConsole .s-error,
+  #autoTradeConsole .s-stale_data { background: rgba(230, 70, 70, 0.24); }
+  #autoTradeConsole .s-paused,
+  #autoTradeConsole .s-disabled { background: rgba(140, 145, 155, 0.18); }
+  #autoTradeConsole .s-blocked { background: rgba(240, 135, 45, 0.22); }
+
+  #autoTradeConsole .auto-trade-card-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px 10px;
+    font-size: 12px;
+    line-height: 1.45;
+    margin: 10px 0 12px 0;
+  }
+
+  #autoTradeConsole .auto-trade-card-body .label {
+    opacity: 0.62;
+  }
+
+  #autoTradeConsole .auto-trade-risk {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  #autoTradeConsole .auto-trade-risk label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    opacity: 0.95;
+  }
+
+  #autoTradeConsole .auto-trade-risk .wide {
+    grid-column: 1 / -1;
+  }
+
+  #autoTradeConsole .auto-trade-card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  #autoTradeConsole .auto-trade-events {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    overflow: hidden;
+    border-radius: 10px;
+  }
+
+  #autoTradeConsole .auto-trade-events th,
+  #autoTradeConsole .auto-trade-events td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 7px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  #autoTradeConsole .auto-trade-events th {
+    opacity: 0.68;
+    font-weight: 600;
+  }
+
+  #autoTradeConsole .auto-trade-empty {
+    opacity: 0.58;
+    padding: 14px;
+    border: 1px dashed rgba(150, 165, 190, 0.28);
+    border-radius: 10px;
+  }
+
+  @media (max-width: 720px) {
+    #autoTradeConsole {
+      padding: 12px;
+    }
+
+    #autoTradeConsole .auto-trade-strategy-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #autoTradeConsole .auto-trade-card-body,
+    #autoTradeConsole .auto-trade-risk {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<section id="autoTradeConsole">
+  <div class="auto-trade-head">
+    <div>
+<!-- AUTO_TRADE_HEALTH_CONSOLE_STAGE8_11C_END -->
+
+
+<!-- TEMP_TEST_MODULE_STAGE8_18_UI_START -->
+
+
+<!-- TEMP_TEST_MODULE_STAGE8_18_UI_END -->
+
+
+<!-- AUTO_TRADE_STAGE8_FINAL_CONSOLE_UI_8_18C_START -->
+
+
+<!-- AUTO_TRADE_STAGE8_FINAL_CONSOLE_UI_8_18C_END -->
+
+
+
+
+<!-- REAL_TEMP_TEST_SAFE_V52_MODULE_STAGE8_18_UI_PATCH_START -->
+
+
+<!-- REAL_TEMP_TEST_SAFE_V52_MODULE_STAGE8_18_UI_PATCH_END -->
+
+</body>
+</html>

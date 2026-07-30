@@ -458,7 +458,41 @@ def load_status():
     formal = _read(FORMAL_PATH, {"items": []})
     items = list(formal.get("items") or [])[-12:]
     items.reverse()
-    st["formal_recent"] = items
+    # Humanize formal queue titles (reject raw codes like sol_tp47_h32)
+    try:
+        import auto_trade_strategy_titles as _titles
+        enriched = []
+        for row in items:
+            if not isinstance(row, dict):
+                enriched.append(row)
+                continue
+            r = dict(row)
+            key = r.get("key") or r.get("strategy_key") or r.get("title") or r.get("name")
+            # Prefer the most informative raw string for wash (title may carry mechanism tokens)
+            wash_src = r.get("title") or key
+            if r.get("title") and key and _titles._needs_semantic_wash(r.get("title")):
+                wash_src = r.get("title")
+            elif key and _titles._needs_semantic_wash(str(key)):
+                wash_src = key
+            tf = r.get("timeframe")
+            if not tf and wash_src:
+                import re as _re
+                m_tf = _re.search(r"(?i)(\d+[mh])\b", str(wash_src))
+                if m_tf:
+                    tf = m_tf.group(1).lower()
+            title_zh = _titles.humanize_creation_title(
+                wash_src,
+                symbol=r.get("symbol"),
+                timeframe=tf,
+                family=r.get("mechanism_family") or r.get("family"),
+            )
+            r["title_zh"] = title_zh
+            if _titles._needs_semantic_wash(r.get("title")) or _titles._looks_like_raw_code(r.get("title")):
+                r["title"] = title_zh
+            enriched.append(r)
+        st["formal_recent"] = enriched
+    except Exception:
+        st["formal_recent"] = items
     insight = _read(INSIGHT_PATH, {})
     if insight:
         st["insight_summary"] = insight.get("summary_zh") or insight.get("summary") or ""
@@ -511,6 +545,21 @@ def load_status():
             "flow": "old",
             "error": str(exc),
         }
+    # Auto-Driver live progress (True Words console)
+    try:
+        from scripts.auto_driver import live_status as _ad_live
+        st["auto_driver"] = _ad_live.read_live_status()
+    except Exception:
+        try:
+            import sys
+            from pathlib import Path
+            scripts_dir = str(Path(__file__).resolve().parent / "scripts")
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            from auto_driver import live_status as _ad_live  # type: ignore
+            st["auto_driver"] = _ad_live.read_live_status()
+        except Exception as exc:
+            st["auto_driver"] = {"ok": False, "running": False, "error": str(exc)}
     st["updated_at"] = _now()
     return st
 

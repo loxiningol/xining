@@ -7,9 +7,13 @@ import json
 import time
 
 
-SYSTEM_PROMPT = """你是量化策略无人值守优化器（只输出 JSON，不要 Markdown）。
+from . import charter as _charter
+
+SYSTEM_PROMPT = _charter.prompt_prefix() + """
+你是量化策略无人值守优化器（只输出 JSON，不要 Markdown）。
 目标：在不违反 non_negotiable_rules / forbidden_transformations 的前提下，
 针对当前 STEP A Gate / L1 失败，提出可执行的策略包补丁，使下一轮更接近过关。
+自然语言优先：rationale / limit_reason 必须使用人类可读中文；禁止只用 sol_tp47 这类乱码代号指代策略。
 
 硬约束：
 1. 不得建议固定百分比止盈（如 1%/2% TP）。只允许 ATR 倍数 / swing / partial_tp_atr。

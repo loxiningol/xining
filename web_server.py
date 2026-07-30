@@ -665,6 +665,33 @@ def api_dual_engine_status():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/dual_engine/auto_driver", methods=["GET"])
+@auth.login_required
+def api_dual_engine_auto_driver():
+    """Auto-Driver live progress for True Words console (NL title + pipeline)."""
+    try:
+        import sys
+        from pathlib import Path
+        root = Path(os.environ.get("VECTOR_ROOT") or "/root")
+        scripts_dir = str(root / "scripts")
+        local_scripts = str(Path(__file__).resolve().parent / "scripts")
+        for d in (scripts_dir, local_scripts):
+            if d not in sys.path:
+                sys.path.insert(0, d)
+        try:
+            from auto_driver import live_status as ad_live  # type: ignore
+        except Exception:
+            from scripts.auto_driver import live_status as ad_live
+        data = ad_live.read_live_status(str(root))
+        return jsonify({"ok": True, "auto_driver": data})
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+            "auto_driver": {"ok": False, "running": False},
+        }), 500
+
+
 @app.route("/api/dual_engine/bootstrap", methods=["POST"])
 @auth.login_required
 def api_dual_engine_bootstrap():
