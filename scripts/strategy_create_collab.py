@@ -2,19 +2,22 @@
 # -*- coding: utf-8 -*-
 """Professional strategy creation collab (pre-review).
 
-Flow:
+Flywheel (NO review code touched):
   human brief
-    → EasyQuant-style factor mining (OKX candles)
-    → QuantOracle certify risk/stats
-    → GLM mechanism_spec (anchored to certified factors)
-    → optional Codex implement / STEP A submit (ADA5 admission)
+    → ① MetaGPT/AutoGen-style meta-think
+    → ② Alphalens/CausalImpact-style hypothesis validation
+    → ③ EasyQuant + DeepSeek mine → QuantOracle certify
+    → ④ Alphalens rescreen
+    → ⑤ Backtrader extreme + AutoGen red-team
+    → GLM mechanism_spec (anchored to blueprint)
+    → optional Codex / STEP A (existing ADA5 review is separate)
 
 Usage:
   python3 scripts/strategy_create_collab.py \\
     --symbol ETH-USDT-SWAP --timeframe 5m --direction long \\
     --brief "用户口述"
 
-Does NOT mount. Never skips ADA5 four-review.
+Does NOT mount. Never skips ADA5 four-review when --submit-step-a.
 """
 from __future__ import print_function
 
@@ -31,7 +34,9 @@ os.chdir(str(ROOT))
 
 
 def main():
-    ap = argparse.ArgumentParser(description="QuantOracle+EasyQuant+GLM creation collab")
+    ap = argparse.ArgumentParser(
+        description="Creation blueprint ①–⑤ + GLM (pre-review)"
+    )
     ap.add_argument("--symbol", default="ETH-USDT-SWAP")
     ap.add_argument("--timeframe", default="5m")
     ap.add_argument("--direction", default="long", choices=("long", "short", "both"))
@@ -41,7 +46,11 @@ def main():
                              "combination_mechanism", "failure_reverse_research"))
     ap.add_argument("--horizon", type=int, default=3, help="Forward bars for factor labels")
     ap.add_argument("--skip-research", action="store_true",
-                    help="Debug only: skip factor/QuantOracle stage")
+                    help="Debug only: skip blueprint stages ①–⑤")
+    ap.add_argument("--skip-llm-research", action="store_true", default=True,
+                    help="Blueprint stages without GLM/DeepSeek LLM calls (default)")
+    ap.add_argument("--with-llm-research", action="store_true",
+                    help="Enable GLM meta-enrich + DeepSeek factor proposals in blueprint")
     ap.add_argument("--implement", action="store_true",
                     help="Also run codex_implement_from_spec after GLM spec")
     ap.add_argument("--submit-step-a", action="store_true",
@@ -60,48 +69,78 @@ def main():
     }
 
     research = None
+    blueprint = None
     if not args.skip_research:
-        from dual_engine_workflow_v2.creation_research_stage import run_creation_research
-        print("RESEARCH_START", args.symbol, args.timeframe, flush=True)
+        from dual_engine_workflow_v2.creation_blueprint import run_creation_blueprint
+        skip_llm = False if args.with_llm_research else True
+        print("BLUEPRINT_START", args.symbol, args.timeframe, "skip_llm", skip_llm, flush=True)
         t_res = time.time()
-        research = run_creation_research(
+        blueprint = run_creation_blueprint(
             symbol=args.symbol,
             timeframe=args.timeframe,
             direction=args.direction,
             brief=args.brief,
             horizon=args.horizon,
-            top_k=4,
+            skip_llm=skip_llm,
         )
         print(
-            "RESEARCH_DONE", round(time.time() - t_res, 1),
-            "ok", (research or {}).get("ok"),
-            "qo", ((research or {}).get("quantoracle_probe") or {}).get("ok"),
-            "n_bars", ((research or {}).get("factor_mine") or {}).get("n_bars"),
-            "top", len((research or {}).get("certified_factors") or []),
+            "BLUEPRINT_DONE", round(time.time() - t_res, 1),
+            "ok", (blueprint or {}).get("ok"),
+            "loops", (blueprint or {}).get("loops"),
+            "fuses", (blueprint or {}).get("fuses"),
             flush=True,
         )
-        for row in ((research or {}).get("certified_factors") or [])[:3]:
-            cert = ((row.get("quantoracle") or {}).get("certified") or {})
-            print(
-                "FACTOR", row.get("factor"), row.get("rule"),
-                "wr", round(float((row.get("stats") or {}).get("win_rate") or 0), 3),
-                "mean", round(float((row.get("stats") or {}).get("mean_net") or 0), 5),
-                "sharpe", cert.get("sharpe_ratio"),
-                "kellyQ", cert.get("kelly_quarter"),
-                "src", (row.get("quantoracle") or {}).get("source"),
-                flush=True,
-            )
-        focus["professional_research"] = research.get("glm_research_brief") if research else None
-        focus["easyquant_modeling"] = (research or {}).get("easyquant_envelope")
+        sel = ((blueprint or {}).get("stages") or {}).get("selected") or {}
+        print(
+            "SELECTED", sel.get("factor"), sel.get("rule"),
+            "qo", ((sel.get("quantoracle") or {}).get("source")),
+            "stress", ((blueprint or {}).get("stages") or {}).get("stress", {}).get("passed"),
+            flush=True,
+        )
+        # Compatibility alias for older collab consumers
+        research = {
+            "ok": (blueprint or {}).get("ok"),
+            "schema": "qiyu_creation_research_stage_v1_via_blueprint",
+            "glm_research_brief": (blueprint or {}).get("glm_research_brief"),
+            "certified_factors": ((blueprint or {}).get("stages") or {}).get("certified_factors"),
+            "factor_mine": ((blueprint or {}).get("stages") or {}).get("mine"),
+            "quantoracle_probe": ((blueprint or {}).get("probes") or {}).get("quantoracle"),
+            "easyquant_envelope": None,
+            "blueprint": {
+                "ok": (blueprint or {}).get("ok"),
+                "loops": (blueprint or {}).get("loops"),
+                "fuses": (blueprint or {}).get("fuses"),
+                "deliverables": (blueprint or {}).get("deliverables"),
+            },
+        }
+        focus["professional_research"] = (blueprint or {}).get("glm_research_brief")
+        focus["creation_blueprint"] = {
+            "ok": (blueprint or {}).get("ok"),
+            "stages_summary": {
+                "meta_family": (
+                    ((blueprint or {}).get("stages") or {}).get("meta", {})
+                    .get("design_doc", {}) or {}
+                ).get("mechanism_family"),
+                "hypothesis_passed": (
+                    ((blueprint or {}).get("stages") or {}).get("hypothesis") or {}
+                ).get("passed"),
+                "selected": sel,
+                "stress_passed": (
+                    ((blueprint or {}).get("stages") or {}).get("stress") or {}
+                ).get("passed"),
+            },
+            "fuses": (blueprint or {}).get("fuses"),
+            "deliverables": (blueprint or {}).get("deliverables"),
+        }
         focus["quantoracle"] = {
-            "probe": (research or {}).get("quantoracle_probe"),
-            "certified_factors": (research or {}).get("certified_factors"),
+            "probe": ((blueprint or {}).get("probes") or {}).get("quantoracle"),
+            "certified_factors": ((blueprint or {}).get("stages") or {}).get("certified_factors"),
         }
     else:
-        from dual_engine_workflow_v2.easyquant_bridge import probe_easyquant, modeling_envelope
+        from dual_engine_workflow_v2.easyquant_bridge import modeling_envelope
         focus["easyquant_modeling"] = modeling_envelope(brief=args.brief, focus=focus)
 
-    mode_ctx = {"schema": "qiyu_create_collab_v2", "isolation": args.mode, "mode_name": args.mode}
+    mode_ctx = {"schema": "qiyu_create_collab_v3_blueprint", "isolation": args.mode, "mode_name": args.mode}
     try:
         from dual_engine_workflow_v2 import failure_kb
         kb_ctx = failure_kb.compact_context_for_glm() if hasattr(failure_kb, "compact_context_for_glm") else {}
@@ -110,12 +149,14 @@ def main():
     except Exception:
         kb_ctx = {}
 
-    # Merge research instructions into KB context so GLM must read them
-    if research and research.get("glm_research_brief"):
+    if blueprint and blueprint.get("glm_research_brief"):
+        kb_ctx = dict(kb_ctx or {})
+        kb_ctx["creation_blueprint_mandatory"] = blueprint["glm_research_brief"]
+    elif research and research.get("glm_research_brief"):
         kb_ctx = dict(kb_ctx or {})
         kb_ctx["creation_research_mandatory"] = research["glm_research_brief"]
 
-    focus["order_zh"] = args.brief or "（无额外口述：按已认证因子空白利基提出新机制）"
+    focus["order_zh"] = args.brief or "（无额外口述：按蓝图已验证因子提出新机制）"
 
     print("GLM_SPEC_START", args.symbol, args.timeframe, args.direction, flush=True)
     t0 = time.time()
@@ -128,6 +169,7 @@ def main():
         out = {
             "ok": False,
             "stage": "glm_mechanism_spec",
+            "blueprint": blueprint,
             "research": research,
             "spec_pack": spec_pack,
         }
@@ -140,13 +182,17 @@ def main():
             "direction",
             args.direction if args.direction != "both" else meta.get("direction") or "long",
         )
-        meta["source"] = "glm_live_collab_quantoracle_easyquant"
+        meta["source"] = "glm_live_collab_creation_blueprint_v1"
         meta["human_brief"] = args.brief
         meta["creation_stack"] = [
-            "easyquant_factor_mine",
+            "meta_think_metagpt_autogen",
+            "hypothesis_alphalens_causal",
+            "easyquant_deepseek_mine",
             "quantoracle_certify",
+            "alphalens_rescreen",
+            "backtrader_autogen_stress",
             "glm_mechanism_spec",
-            "ada5_four_review_required",
+            "ada5_four_review_required_later",
         ]
         title = meta.get("title") or spec.get("mechanism_name") or "glm_collab"
         print("MECHANISM", spec.get("mechanism_family"), title)
@@ -161,6 +207,13 @@ def main():
             "attempts": spec_pack.get("attempts"),
             "meta": meta,
             "mechanism_spec": spec,
+            "creation_blueprint": {
+                "ok": (blueprint or {}).get("ok") if blueprint else None,
+                "loops": (blueprint or {}).get("loops") if blueprint else None,
+                "fuses": (blueprint or {}).get("fuses") if blueprint else None,
+                "deliverables": (blueprint or {}).get("deliverables") if blueprint else None,
+                "best_factor": (blueprint or {}).get("best_factor") if blueprint else None,
+            },
             "creation_research": research,
             "errors": [],
         }
@@ -188,7 +241,7 @@ def main():
                 exploration_mode="A",
                 allow_horizontal_expand=False,
                 prebuilt_spec_pack=pack,
-                windtalker_tag="qo_eq_collab_%s" % int(time.time()),
+                windtalker_tag="blueprint_collab_%s" % int(time.time()),
             )
             pack["step_a_result"] = {
                 "ok": (result or {}).get("ok"),
