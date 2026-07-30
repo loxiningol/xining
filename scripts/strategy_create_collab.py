@@ -86,10 +86,47 @@ def main():
         print(
             "BLUEPRINT_DONE", round(time.time() - t_res, 1),
             "ok", (blueprint or {}).get("ok"),
+            "present", (blueprint or {}).get("present_to_human"),
             "loops", (blueprint or {}).get("loops"),
             "fuses", (blueprint or {}).get("fuses"),
             flush=True,
         )
+        prelim = (blueprint or {}).get("prelim") or {}
+        if prelim:
+            print("PRELIM", prelim.get("human_banner_zh") or "ok",
+                  "wr", prelim.get("win_rate"),
+                  "window", ((prelim.get("window") or {}).get("label_zh")),
+                  flush=True)
+        if not (blueprint or {}).get("present_to_human"):
+            print("BLOCKED_NOT_PRESENTABLE_WR_GATE", flush=True)
+            out = {
+                "ok": False,
+                "present_to_human": False,
+                "stage": "prelim_wr_gate",
+                "blueprint": {
+                    "ok": False,
+                    "present_to_human": False,
+                    "prelim": prelim,
+                    "classic_tried": (blueprint or {}).get("classic_tried"),
+                    "fuses": (blueprint or {}).get("fuses"),
+                    "deliverables": (blueprint or {}).get("deliverables"),
+                    "handoff_zh": (blueprint or {}).get("handoff_zh"),
+                },
+                "errors": ["win_rate_below_50pct_or_prelim_failed"],
+            }
+            out_dir = ROOT / "auto_trade" / "dual_engine" / "collab_packs"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            stamp = time.strftime("%Y%m%d_%H%M%S")
+            out_path = out_dir / (
+                "REJECTED_collab_%s_%s_%s.json"
+                % (args.symbol.split("-")[0].lower(), args.timeframe, stamp)
+            )
+            out_path.write_text(
+                json.dumps(out, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+            )
+            print("WROTE", out_path)
+            return 3
+
         sel = ((blueprint or {}).get("stages") or {}).get("selected") or {}
         print(
             "SELECTED", sel.get("factor"), sel.get("rule"),

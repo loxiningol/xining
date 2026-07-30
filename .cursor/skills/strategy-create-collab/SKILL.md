@@ -31,6 +31,8 @@ description: >-
 1. **元思考发散**：GLM 提示词开头强制「先列举 3 种完全不同的市场微观结构视角，再择一深入」——用 Prompt 弥补辩论缺失。
 2. **Alphalens 底线**：轻量适配器必须保留并执行 `winsorize`（去极值）与 `neutralize`（对市值/行业或加密代理暴露中性化），不可省略。
 3. 数字以 QuantOracle 为准；蓝图不含复核，不改 ADA5 路径。
+4. **长历史走 R2/S3 研究仓**（`research_candle_store`），禁止把 formal 短窗当 2024YTD；无密钥时可 `MODE=local` 过渡，回填用 `scripts/research_candles_backfill_r2.py`。
+5. **初评胜率门禁（硬）**：回测/因子初评 **胜率 < 50% → 禁止向人类展示为交付**。必须自动换方向或套用经典策略变式（Donchian / 双均线 / 布林回归 / RSI / 波动压缩突破）。总收益必须标注日历窗口（起止 UTC + 天数），禁止含糊「总收益」。
 
 ## 熔断
 

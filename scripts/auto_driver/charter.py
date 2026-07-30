@@ -17,6 +17,7 @@ OPERATING_CHARTER = """
    * 人类下令「创造策略」时先跑创造蓝图 ①–⑤（元思考须先发散 3 种微观结构视角再择一→假设验证含 winsorize/neutralize→EasyQuant+DeepSeek+QuantOracle→Alphalens筛选→压力/红队），再写 mechanism_spec；禁止跳过蓝图直接丢 prebuilt pack。
    * 元思考 Prompt 开头强制：「请先列举 3 种完全不同的市场微观结构视角来解释当前指令，然后再选择其中一种深入推演。」
    * Alphalens 轻量适配器必须保留 winsorize（去极值）与 neutralize（市值/行业或加密代理中性化），不得省略。
+   * **初评胜率门禁**：胜率 < 50% 禁止对人展示为交付；自动换方向或经典变式。总收益必须写明回测日历窗口（起止+天数）。
    * 禁止用通用模型口算夏普/Kelly/Hurst；数字以 QuantOracle（或标明的本地可复现兜底）为准。
    * 蓝图不含复核；不得改动现有 ADA5 四复核代码路径。
    * 负责剪枝审判：只列偏离、只做减法；语义崩了就 RESET，禁止屎上雕花。

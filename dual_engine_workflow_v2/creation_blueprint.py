@@ -27,6 +27,7 @@ from pathlib import Path
 from . import creation_alphalens_lite as al
 from . import creation_deepseek_factors as dsf
 from . import creation_meta_think as meta
+from . import creation_prelim_eval as prelim
 from . import creation_stress_lite as stress
 from . import easyquant_bridge as eq
 from . import quantoracle_bridge as qo
@@ -34,6 +35,7 @@ from . import research_candle_store as rcs
 
 
 MAX_LOOP = 5
+MIN_PRESENT_WR = prelim.MIN_WIN_RATE
 
 
 def _now():
@@ -159,9 +161,12 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base = "%s_%s_%s" % (symbol.split("-")[0].lower(), timeframe, stamp)
 
+    presentable = bool((blueprint.get("prelim") or {}).get("present_to_human"))
     design = ((blueprint.get("stages") or {}).get("meta") or {}).get("design_doc") or {}
     best = blueprint.get("best_factor") or {}
     stress_pack = ((blueprint.get("stages") or {}).get("stress") or {})
+    prelim_pack = blueprint.get("prelim") or {}
+    window = (prelim_pack.get("window") or {})
 
     params = {
         "symbol": symbol,
@@ -173,7 +178,45 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
         "constraints": design.get("constraints"),
         "quantoracle": (best.get("quantoracle") or {}).get("certified"),
         "blueprint_schema": "qiyu_creation_blueprint_v1",
+        "present_to_human": presentable,
+        "prelim_win_rate": prelim_pack.get("win_rate"),
+        "window": window,
     }
+
+    if not presentable:
+        risk_lines = [
+            "# 【初评未通过·禁止展示为交付】",
+            "",
+            (prelim_pack.get("human_banner_zh") or "胜率门禁未过。"),
+            "",
+            "- %s" % (window.get("label_zh") or ""),
+            "- %s" % (window.get("return_scope_zh") or ""),
+            "- 胜率: %s（门槛 ≥50%%）" % prelim_pack.get("win_rate"),
+            "- 拒绝原因: %s" % ",".join(prelim_pack.get("reject_reasons") or []),
+            "- 已尝试经典变式: %s" % (blueprint.get("classic_tried") or []),
+            "",
+            "不会把胜率<50%的垃圾策略包装成「创造成功」给人看。",
+            "请换方向、拉长样本，或继续自动经典变式迭代。",
+            "",
+        ]
+        code = (
+            "# REJECTED — win_rate gate failed. Not a deliverable.\n"
+            "# present_to_human=False\n"
+            "STRATEGY = %r\n"
+        ) % params
+        paths = {
+            "strategy_code": str(out_dir / ("%s_REJECTED_strategy_code.py" % base)),
+            "params": str(out_dir / ("%s_REJECTED_params.json" % base)),
+            "risk_report": str(out_dir / ("%s_REJECTED_risk_report.md" % base)),
+            "blueprint_json": str(out_dir / ("%s_REJECTED_blueprint.json" % base)),
+        }
+        Path(paths["strategy_code"]).write_text(code, encoding="utf-8")
+        Path(paths["params"]).write_text(
+            json.dumps(params, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+        )
+        Path(paths["risk_report"]).write_text("\n".join(risk_lines), encoding="utf-8")
+        return paths, params
+
     risk_lines = [
         "# 策略创造风险报告（蓝图 ①–⑤，不含复核）",
         "",
@@ -183,6 +226,9 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
         "- 最优因子: %s / %s" % (best.get("factor"), best.get("rule")),
         "- QuantOracle source: %s" % ((best.get("quantoracle") or {}).get("source")),
         "- 压力测试通过: %s" % stress_pack.get("passed"),
+        "- 初评胜率: %s（≥50%% 门禁已过）" % prelim_pack.get("win_rate"),
+        "- %s" % (window.get("label_zh") or ""),
+        "- %s" % (window.get("return_scope_zh") or ""),
         "- 熔断触发: %s" % json.dumps(blueprint.get("fuses") or {}, ensure_ascii=False),
         "",
         "## 失效场景",
@@ -196,10 +242,11 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
         "",
     ])
 
-    # strategy_code.py is a research stub anchored to certified factor — not a live mount
     code = '''# Auto-generated creation blueprint stub — NOT for live mount.
 # Factor: {factor} / {rule}
 # Mechanism: {family}
+# Prelim WR gate: PASSED (>=50%)
+# Window: {window}
 # Next: human/GLM mechanism_spec → existing ADA5 review (unchanged).
 
 STRATEGY = {{
@@ -217,6 +264,7 @@ def describe():
         factor=best.get("factor") or "none",
         rule=best.get("rule") or "none",
         family=design.get("mechanism_family") or "unknown",
+        window=(window.get("label_zh") or "").replace('"', "'"),
         symbol=symbol,
         tf=timeframe,
     )
@@ -232,7 +280,6 @@ def describe():
         json.dumps(params, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
     )
     Path(paths["risk_report"]).write_text("\n".join(risk_lines), encoding="utf-8")
-    # blueprint json written by caller (may be large); path reserved
     return paths, params
 
 
@@ -289,6 +336,9 @@ def run_creation_blueprint(
     best = None
     trade_returns = []
     abort = False
+    classic_tried = []
+    prelim_pack = None
+    presentable = False
 
     while True:
         # ② Hypothesis validation
@@ -394,10 +444,37 @@ def run_creation_blueprint(
             stages["rescreen"]["fallback"] = "positive_mean_net_survivors"
             stages["rescreen"]["n_kept"] = len(kept)
 
+        # Hard prefer WR>=50% candidates before stress
+        wr_ok = [
+            r for r in kept
+            if float((r.get("stats") or {}).get("win_rate") or 0) >= float(MIN_PRESENT_WR)
+        ]
+        if wr_ok:
+            kept = wr_ok
+            stages["rescreen"]["wr50_filter"] = {"kept": len(kept), "applied": True}
+        else:
+            stages["rescreen"]["wr50_filter"] = {
+                "kept": 0, "applied": True,
+                "note_zh": "无胜率≥50%候选；将触发经典变式切换而非对人展示。",
+            }
+
         if not kept:
+            # switch classic variant immediately
+            variant = prelim.next_classic_variant(classic_tried)
+            if variant is None:
+                fuses["abort_reason"] = "no_wr50_candidate_and_classic_exhausted"
+                abort = True
+                break
+            classic_tried.append(variant["id"])
+            design = prelim.apply_variant_to_design(design, variant)
+            core_hints = list(variant.get("factor_hints") or [])
             design.setdefault("mutation_log", []).append({
-                "at": _now(), "reason": "rescreen_empty", "loop": loops["hypothesis"],
+                "at": _now(),
+                "reason": "wr50_gate_switch_classic",
+                "variant": variant.get("id"),
+                "loop": loops["hypothesis"],
             })
+            stages["meta"]["design_doc"] = design
             continue
 
         trade_returns, best = _pick_trade_returns(kept)
@@ -419,31 +496,104 @@ def run_creation_blueprint(
 
         st = stress.run_stress(trade_returns, max_dd_limit=max_dd)
         stages["stress"] = st
-        if st.get("passed"):
+        if not st.get("passed"):
+            design.setdefault("mutation_log", []).append({
+                "at": _now(),
+                "reason": "stress_fail",
+                "loop": loops["stress"],
+                "stress_passed": False,
+            })
+            if best.get("factor") in core_hints:
+                core_hints = [x for x in core_hints if x != best.get("factor")] + ["range_pct", "atr_pct_14"]
+            continue
+
+        # ⑤b Preliminary WR gate — NEVER present WR<50% as delivery
+        st_stats = best.get("stats") or {}
+        # trade-level WR from returns if available
+        if trade_returns:
+            tw = sum(1 for r in trade_returns if r > 0) / float(len(trade_returns))
+        else:
+            tw = st_stats.get("win_rate")
+        candles = data.get("candles") or []
+        first_ts = candles[0]["ts"] if candles else None
+        last_ts = candles[-1]["ts"] if candles else None
+        prelim_pack = prelim.prelim_eval(
+            {
+                "win_rate": tw if tw is not None else st_stats.get("win_rate"),
+                "n_trades": len(trade_returns) or st_stats.get("n"),
+                "total_return": None,
+                "max_drawdown": (st.get("backtrader") or {}).get("full_max_drawdown"),
+                "sharpe_ann_proxy": (
+                    ((best.get("quantoracle") or {}).get("certified") or {}).get("sharpe_ratio")
+                ),
+            },
+            first_ts=first_ts,
+            last_ts=last_ts,
+            n_bars=data.get("n_bars"),
+            timeframe=timeframe,
+            min_win_rate=MIN_PRESENT_WR,
+            min_trades=8,
+        )
+        stages["prelim"] = prelim_pack
+        if prelim_pack.get("present_to_human"):
+            presentable = True
             break
 
-        # mutate risk / factor preference and retry from hypothesis broadening
+        # WR gate failed after stress — switch classic variant
+        variant = prelim.next_classic_variant(classic_tried)
         design.setdefault("mutation_log", []).append({
             "at": _now(),
-            "reason": "stress_fail",
-            "loop": loops["stress"],
-            "stress_passed": False,
+            "reason": "prelim_wr_gate_fail",
+            "win_rate": prelim_pack.get("win_rate"),
+            "banner": prelim_pack.get("human_banner_zh"),
+            "next_variant": (variant or {}).get("id"),
         })
-        # tighten: prefer lower-turnover factors next — drop current best from hints cycle
-        if best.get("factor") in core_hints:
-            core_hints = [x for x in core_hints if x != best.get("factor")] + ["range_pct", "atr_pct_14"]
-        # continue outer while → re-validate / re-mine
+        if variant is None:
+            fuses["abort_reason"] = "prelim_wr_below_50_classic_exhausted"
+            abort = True
+            break
+        classic_tried.append(variant["id"])
+        design = prelim.apply_variant_to_design(design, variant)
+        core_hints = list(variant.get("factor_hints") or [])
+        stages["meta"]["design_doc"] = design
+        best = None
+        presentable = False
         continue
 
-    ok = (not abort) and best is not None and bool((stages.get("stress") or {}).get("passed"))
+    ok = (
+        (not abort)
+        and best is not None
+        and bool((stages.get("stress") or {}).get("passed"))
+        and presentable
+    )
     if abort and not fuses.get("abort_reason"):
         fuses["abort_reason"] = "aborted"
+    if best is not None and not presentable and not fuses.get("abort_reason"):
+        fuses["abort_reason"] = "prelim_wr_below_50_not_presentable"
+
+    # ensure prelim exists even on abort
+    if prelim_pack is None and best is not None:
+        st_stats = best.get("stats") or {}
+        candles = data.get("candles") or []
+        prelim_pack = prelim.prelim_eval(
+            {
+                "win_rate": st_stats.get("win_rate"),
+                "n_trades": st_stats.get("n"),
+            },
+            first_ts=candles[0]["ts"] if candles else None,
+            last_ts=candles[-1]["ts"] if candles else None,
+            n_bars=data.get("n_bars"),
+            timeframe=timeframe,
+        )
+        presentable = bool(prelim_pack.get("present_to_human"))
+        stages["prelim"] = prelim_pack
 
     # deliverables
     if out_dir is None:
         out_dir = _root() / "auto_trade" / "dual_engine" / "creation_blueprint"
     blueprint = {
         "ok": ok,
+        "present_to_human": presentable,
         "schema": "qiyu_creation_blueprint_v1",
         "symbol": symbol,
         "timeframe": timeframe,
@@ -451,9 +601,12 @@ def run_creation_blueprint(
         "brief": brief,
         "loops": loops,
         "fuses": fuses,
+        "classic_tried": classic_tried,
+        "prelim": prelim_pack,
         "stages": stages,
         "best_factor": (
-            {k: v for k, v in (best or {}).items() if k != "returns"} if best else None
+            {k: v for k, v in (best or {}).items() if k != "returns"}
+            if best and presentable else None
         ),
         "probes": {
             "meta": meta.probe(),
@@ -465,8 +618,12 @@ def run_creation_blueprint(
         },
         "data": stages.get("data"),
         "handoff_zh": (
-            "创造蓝图 ①–⑤ 完成（或熔断）。下一步才是现有 ADA5 四复核；"
-            "本编排器不调用、不修改复核代码。"
+            (
+                "创造蓝图通过初评（胜率≥50%）并可进入后续 ADA5 复核；本编排器不改复核代码。"
+                if presentable and ok else
+                (prelim_pack or {}).get("human_banner_zh")
+                or "初评未通过或熔断：禁止把胜率<50%策略当交付展示。"
+            )
         ),
         "at": _now(),
     }
@@ -480,29 +637,43 @@ def run_creation_blueprint(
     blueprint["deliverables"] = paths
     blueprint["params"] = params
 
-    # GLM-facing brief for mechanism_spec (creation only)
-    blueprint["glm_research_brief"] = {
-        "schema": "qiyu_creation_blueprint_brief_v1",
-        "design_doc": {
-            "mechanism_family": design.get("mechanism_family"),
-            "core_logic_zh": design.get("core_logic_zh"),
-            "hypotheses": design.get("hypotheses"),
-            "constraints": design.get("constraints"),
-            "failure_scenarios_zh": design.get("failure_scenarios_zh"),
-        },
-        "best_factor": blueprint.get("best_factor"),
-        "hypothesis_passed": (stages.get("hypothesis") or {}).get("passed"),
-        "rescreen": stages.get("rescreen"),
-        "stress_passed": (stages.get("stress") or {}).get("passed"),
-        "fuses": fuses,
-        "instructions_zh": (
-            "【发散强制】请先列举 3 种完全不同的市场微观结构视角来解释当前指令，"
-            "然后再选择其中一种深入推演——禁止一上来直接写策略。"
-            "你是总指挥。下列结果来自创造蓝图 ①元思考→②假设验证(含winsorize/neutralize)"
-            "→③挖掘+QuantOracle→④Alphalens筛选→⑤压力/红队。"
-            "请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突；"
-            "禁止声称已过复核。"
-        ),
-        "built_at": _now(),
-    }
+    # GLM-facing brief for mechanism_spec (creation only) — only if presentable
+    if presentable and ok:
+        blueprint["glm_research_brief"] = {
+            "schema": "qiyu_creation_blueprint_brief_v1",
+            "design_doc": {
+                "mechanism_family": design.get("mechanism_family"),
+                "core_logic_zh": design.get("core_logic_zh"),
+                "hypotheses": design.get("hypotheses"),
+                "constraints": design.get("constraints"),
+                "failure_scenarios_zh": design.get("failure_scenarios_zh"),
+            },
+            "best_factor": blueprint.get("best_factor"),
+            "hypothesis_passed": (stages.get("hypothesis") or {}).get("passed"),
+            "rescreen": stages.get("rescreen"),
+            "stress_passed": (stages.get("stress") or {}).get("passed"),
+            "prelim": prelim_pack,
+            "fuses": fuses,
+            "instructions_zh": (
+                "【发散强制】请先列举 3 种完全不同的市场微观结构视角来解释当前指令，"
+                "然后再选择其中一种深入推演——禁止一上来直接写策略。"
+                "你是总指挥。下列结果来自创造蓝图且初评胜率≥50%。"
+                "请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突；"
+                "禁止声称已过复核。"
+            ),
+            "built_at": _now(),
+        }
+    else:
+        blueprint["glm_research_brief"] = {
+            "schema": "qiyu_creation_blueprint_brief_v1",
+            "blocked": True,
+            "present_to_human": False,
+            "prelim": prelim_pack,
+            "classic_tried": classic_tried,
+            "instructions_zh": (
+                "初评胜率门禁未过（或熔断）。禁止向人类展示本候选为成功交付。"
+                "请换方向或继续经典变式，不要美化胜率<50%的结果。"
+            ),
+            "built_at": _now(),
+        }
     return blueprint
