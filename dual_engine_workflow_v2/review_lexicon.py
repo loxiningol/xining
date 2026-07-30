@@ -76,7 +76,6 @@ STAGE_TO_REVIEW = {
     "ai_theoretical_review_required": 4,
     "review4_fail": 4,
     "review4_ai_fail": 4,
-    "review4_fail": 4,
     "三AI": 4,
 }
 
@@ -85,26 +84,36 @@ REVIEW_SCOPE = {1: REVIEW_1_SCOPE, 2: REVIEW_2_SCOPE, 3: REVIEW_3_SCOPE, 4: REVI
 REVIEW_FULL = {1: REVIEW_1_FULL, 2: REVIEW_2_FULL, 3: REVIEW_3_FULL, 4: REVIEW_4_FULL}
 
 # Pipeline checklist ids → compact marks + labels (must match backend meaning)
+# UI shows ONLY four reviews + human confirm — never G0/L0/G2 codes.
 PIPE_ID_MAP = {
-    "gate0": "R1a",
-    "gate1": "R1b",
-    "l0": "R1c",
-    "l1": "R2",
-    "gate2": "R3",
-    "audit4d": "R3b",
-    "ai3": "R4",
-    "human": "HC",
+    "r1": "一",
+    "r2": "二",
+    "r3": "三",
+    "r4": "四",
+    "human": "签",
+    # legacy internal ids still map cleanly if any old payload slips through
+    "gate0": "一",
+    "gate1": "一",
+    "l0": "一",
+    "l1": "二",
+    "gate2": "三",
+    "audit4d": "三",
+    "ai3": "四",
 }
 
 PIPE_LABELS = {
-    "gate0": "%s · 基础语法 / 机制完整性" % REVIEW_1,
-    "gate1": "%s · 逻辑断言 / 代码忠实度" % REVIEW_1,
-    "l0": "%s · 开仓密度预检" % REVIEW_1,
-    "l1": "%s · 单标的回测稳定性" % REVIEW_2,
-    "gate2": "%s · 矩阵验证" % REVIEW_3,
-    "audit4d": "%s · 抗风险离群" % REVIEW_3,
-    "ai3": "%s · 三AI理论复核" % REVIEW_4,
+    "r1": REVIEW_1_FULL,
+    "r2": REVIEW_2_FULL,
+    "r3": REVIEW_3_FULL,
+    "r4": REVIEW_4_FULL,
     "human": HUMAN_CONFIRM_GATE,
+    "gate0": REVIEW_1_FULL,
+    "gate1": REVIEW_1_FULL,
+    "l0": REVIEW_1_FULL,
+    "l1": REVIEW_2_FULL,
+    "gate2": REVIEW_3_FULL,
+    "audit4d": REVIEW_3_FULL,
+    "ai3": REVIEW_4_FULL,
 }
 
 _SCRUB_RULES = [
@@ -117,6 +126,9 @@ _SCRUB_RULES = [
     (re.compile(r"review2_evidence_fail", re.I), "%s未过：样本收益稳定性不足" % REVIEW_2),
     (re.compile(r"review4_ai_fail", re.I), "%s未过：三AI理论复核" % REVIEW_4),
     (re.compile(r"ai_theoretical_review_required", re.I), "%s未过：三AI理论复核缺失" % REVIEW_4),
+    (re.compile(r"Gate\s*2\s*/\s*L2\s*门禁|Gate2\s*/\s*L2", re.I), REVIEW_3),
+    (re.compile(r"L2\s*门禁", re.I), REVIEW_3),
+    (re.compile(r"L0\s*开仓密度预检", re.I), "%s · 开仓密度预检" % REVIEW_1),
     (re.compile(r"Gate\s*0|gate0", re.I), REVIEW_1),
     (re.compile(r"Gate\s*1|gate1", re.I), REVIEW_1),
     (re.compile(r"Gate\s*2|gate2", re.I), REVIEW_3),
@@ -125,11 +137,16 @@ _SCRUB_RULES = [
     (re.compile(r"Gate\s*5|gate5", re.I), "%s·摩擦稳健" % REVIEW_3),
     (re.compile(r"Gate\s*6|gate6", re.I), REVIEW_4),
     (re.compile(r"Gate\s*7|gate7", re.I), HUMAN_CONFIRM_GATE),
+    (re.compile(r"\bG0\b"), "一"),
+    (re.compile(r"\bG1\b"), "一"),
+    (re.compile(r"\bG2\b"), "三"),
+    (re.compile(r"\b4D\b"), "三"),
     (re.compile(r"\bL0\b"), REVIEW_1),
     (re.compile(r"\bL1\b"), REVIEW_2),
     (re.compile(r"\bL2\b"), REVIEW_3),
     (re.compile(r"\bL3\b"), REVIEW_3),
     (re.compile(r"G0→G1→L0|G0→G1→L0密度→L1|轻量漏斗"), "四复核流水线"),
+    (re.compile(r"三复核证据"), "四复核证据"),
 ]
 
 

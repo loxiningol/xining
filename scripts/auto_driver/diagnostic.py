@@ -321,7 +321,7 @@ def _ai_prompt(stage, title_zh, family, l1, g2, cause, bottlenecks, symbol, time
             % (fam, title_zh, symbol or "?", timeframe or "?", cause.get("title_zh") or "未知")
         )
     return (
-        "策略 %s（%s / %s %s）演进失败：%s。先补齐三复核证据快照再决定是微扰还是换族。"
+        "策略 %s（%s / %s %s）演进失败：%s。先补齐四复核证据快照再决定是微扰还是换族。"
         % (fam, title_zh, symbol or "?", timeframe or "?", cause.get("title_zh") or "未知")
     )
 
@@ -380,7 +380,7 @@ def build_diagnostic(ctx=None, result=None, pack=None, title_zh=None,
             cause = {"code": "immutable_spec", "title_zh": "不可协商规格冲突", "detail_zh": "补丁触犯 non_negotiable / DSL 硬边界"}
             culled_at = "规格门禁"
         else:
-            cause = {"code": str(reason or "unknown"), "title_zh": humanizer.humanize_code(reason) or "状态未完整落盘", "detail_zh": "缺少足够的三复核证据快照"}
+            cause = {"code": str(reason or "unknown"), "title_zh": humanizer.humanize_code(reason) or "状态未完整落盘", "detail_zh": "缺少足够的四复核证据快照"}
             culled_at = "未知阶段"
 
         bottlenecks = _bottlenecks(stage, l1, g2, conds, family, l0=l0)

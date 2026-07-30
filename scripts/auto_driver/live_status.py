@@ -104,7 +104,7 @@ def humanize_causal_blurb(mechanism_spec=None, fallback=None):
 
 
 def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None, admission=None):
-    """Build pipeline checklist for UI: R1–R4 + 人工确认签发."""
+    """Build UI checklist: 第一次→第四次复核 + 人工确认签发 (no G0/L0/G2)."""
     from . import review_lexicon as lex
 
     reason = str(reason or "")
@@ -117,151 +117,134 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None, admiss
         if isinstance(g, dict) and g.get("gate_id"):
             by_id[str(g["gate_id"])] = g
 
-    def _st(passed, running=False, pending=False):
+    def _st(passed, failed=False, running=False):
         if passed:
             return "done"
+        if failed:
+            return "fail"
         if running:
             return "running"
-        if pending:
-            return "pending"
         return "pending"
 
     g0 = by_id.get("gate0_mechanism_integrity") or {}
     g1 = by_id.get("gate1_fidelity") or by_id.get("gate1_code_fidelity") or {}
 
-    is_l0_fail = reason in ("funnel_l0_fail", "funnel_l0_cull")
+    is_l0_fail = reason in ("funnel_l0_fail", "funnel_l0_cull", "pretest_quality_fail", "gate1_fail")
     is_l1_fail = reason in ("funnel_l1_fail", "funnel_l1_cull")
-    is_r2_fail = reason in ("review2_evidence_fail", "review2_fail")
+    is_r2_fail = reason in ("review2_evidence_fail", "review2_fail") or is_l1_fail
     is_r3_fail = reason in ("repair_exhausted_or_drift", "gate2_3_fail", "review3_fail")
-    is_r4_fail = reason in ("review4_ai_fail", "ai_theoretical_review_required", "gate6_fail")
+    is_r4_fail = reason in ("review4_ai_fail", "ai_theoretical_review_required", "gate6_fail", "phase5_consensus_fail")
     is_success = reason in ("ok", "success", "awaiting_human", "pending_confirm")
-    reached_l0 = is_l0_fail or is_l1_fail or is_r2_fail or is_r3_fail or is_r4_fail or is_success or bool(l0) or bool(l1)
-    reached_gates = reached_l0 or reason not in ("", "exception", "kb_blocked")
-    l0_pass = bool(l0.get("pass")) or (reached_l0 and not is_l0_fail and (
-        is_l1_fail or is_r2_fail or is_r3_fail or is_r4_fail or is_success
-    ))
-    l0_m = l0.get("metrics") or {}
-    reached_l1 = is_l1_fail or is_r2_fail or is_r3_fail or is_r4_fail or is_success or (
-        bool(l1) and not is_l0_fail
+
+    reached_r1 = is_l0_fail or is_r2_fail or is_r3_fail or is_r4_fail or is_success or bool(l0) or bool(l1) or bool(g2) or bool(g0) or bool(g1)
+    r1_pass = (
+        bool(g0.get("pass") if g0 else False)
+        or bool(g1.get("pass") if g1 else False)
+        or (reached_r1 and not is_l0_fail and reason not in ("", "exception", "kb_blocked"))
+        or is_r2_fail or is_r3_fail or is_r4_fail or is_success
     )
-    l1_pass = bool(l1.get("pass")) or reason in (
-        "repair_exhausted_or_drift", "gate2_3_fail", "review4_ai_fail", "ok", "success",
-        "awaiting_human", "pending_confirm",
-    ) or (is_r3_fail or is_r4_fail)
-    # Prefer admission_v2 review2 if present
+    if is_l0_fail:
+        r1_pass = False
+
     r2_adm = (admission.get("review2") or (admission.get("reviews") or {}).get("r2")
               or (admission.get("final") or {}).get("reviews", {}).get("r2") or {})
-    if r2_adm:
-        l1_pass = bool(r2_adm.get("pass"))
-    g2_running = reason in ("repair_exhausted_or_drift", "gate2_3_fail")
-    g2_pass = bool(g2.get("pass") or g2.get("gate_pass"))
+    r2_pass = bool(r2_adm.get("pass")) if r2_adm else (
+        bool(l1.get("pass")) or is_r3_fail or is_r4_fail or is_success
+    )
+    if is_r2_fail or is_l1_fail:
+        r2_pass = False
+    if is_l0_fail:
+        r2_pass = False
+
     r3_adm = (admission.get("review3") or (admission.get("reviews") or {}).get("r3")
               or (admission.get("final") or {}).get("reviews", {}).get("r3") or {})
-    if r3_adm:
-        g2_pass = bool(r3_adm.get("pass"))
-    elif is_success or is_r4_fail:
-        g2_pass = True  # soft-pass path reached R4 / human
+    r3_pass = bool(r3_adm.get("pass")) if r3_adm else bool(g2.get("pass") or g2.get("gate_pass"))
+    if is_success or is_r4_fail:
+        r3_pass = True  # soft-pass path under current admission
+    if is_r3_fail and not r3_adm:
+        r3_pass = False
+    if is_l0_fail or is_r2_fail:
+        r3_pass = False
 
     r4_adm = (admission.get("review4") or (admission.get("reviews") or {}).get("r4")
               or (admission.get("final") or {}).get("reviews", {}).get("r4") or {})
     hc_adm = (admission.get("human_confirm")
               or (admission.get("final") or {}).get("human_confirm") or {})
-    r4_pass = bool(r4_adm.get("pass")) or (is_success and not is_r4_fail)
+    r4_pass = bool(r4_adm.get("pass")) if r4_adm else (is_success and not is_r4_fail)
+    if is_r4_fail:
+        r4_pass = False
+    if not r3_pass:
+        r4_pass = False
     hc_ready = bool(hc_adm.get("pass")) if hc_adm else is_success
     hc_confirmed = bool(hc_adm.get("checks", {}).get("human_confirmed")) if hc_adm else False
 
+    l0_m = l0.get("metrics") or {}
     rows = [
         {
-            "id": "gate0",
-            "label": lex.pipe_label("gate0"),
-            "status": _st(g0.get("pass") if g0 else reached_gates),
-            "detail": "语义完整 / 因果闭环" if (g0.get("pass") or reached_gates) else (reason or "待执行"),
-        },
-        {
-            "id": "gate1",
-            "label": lex.pipe_label("gate1"),
-            "status": _st(g1.get("pass") if g1 else reached_l0),
-            "detail": "DSL 语法通过" if reached_l0 else "待执行",
-        },
-        {
-            "id": "l0",
-            "label": lex.pipe_label("l0"),
-            "status": (
-                "done" if l0_pass else (
-                    "fail" if is_l0_fail else (
-                        "running" if reason in ("seed", "l1") and not reached_l0 else (
-                            "pending" if not reached_l0 else "fail"
-                        )
-                    )
-                )
+            "id": "r1",
+            "label": lex.pipe_label("r1"),
+            "status": _st(
+                r1_pass,
+                failed=is_l0_fail,
+                running=(reason in ("seed", "pretest", "validate") and not reached_r1),
             ),
             "detail": (
-                "触发 %s / %s (密度 %s)" % (
-                    l0_m.get("triggers") if l0_m.get("triggers") is not None else "—",
-                    l0_m.get("evaluated_bars") if l0_m.get("evaluated_bars") is not None else "—",
-                    l0_m.get("density") if l0_m.get("density") is not None else "—",
+                "语法 / 断言 / 密度（触发 %s）" % (
+                    l0_m.get("triggers") if l0_m.get("triggers") is not None else "—"
                 )
-                if reached_l0 else "待执行 · 秒杀过稀逻辑"
+                if reached_r1 else "待执行"
             ),
         },
         {
-            "id": "l1",
-            "label": lex.pipe_label("l1"),
-            "status": (
-                "done" if l1_pass else (
-                    "fail" if is_l1_fail or is_r2_fail or (reached_l1 and not l1_pass) else (
-                        "pending" if is_l0_fail or not reached_l1 else "pending"
-                    )
-                )
+            "id": "r2",
+            "label": lex.pipe_label("r2"),
+            "status": _st(
+                r2_pass,
+                failed=(is_r2_fail or (reached_r1 and not is_l0_fail and bool(l1) and not r2_pass and not is_r3_fail and not is_success)),
+                running=(reason in ("l1", "seed") and r1_pass and not r2_pass),
             ),
             "detail": (
-                "样本 n=%s / payoff=%s" % (
+                "样本 n=%s · payoff=%s" % (
                     l1.get("filled_entries") if l1.get("filled_entries") is not None else "—",
                     ("%.2f" % float(l1["payoff_ratio"])) if l1.get("payoff_ratio") is not None else "—",
                 )
-                if reached_l1 and not is_l0_fail else (
+                if (r2_pass or is_r2_fail or bool(l1)) and not is_l0_fail else (
                     "未进入（第一次复核未过）" if is_l0_fail else "待执行"
                 )
             ),
         },
         {
-            "id": "gate2",
-            "label": lex.pipe_label("gate2"),
-            "status": (
-                "done" if g2_pass else (
-                    "fail" if (g2_running or is_r3_fail) else "pending"
-                )
+            "id": "r3",
+            "label": lex.pipe_label("r3"),
+            "status": _st(
+                r3_pass,
+                failed=is_r3_fail and not r3_pass,
+                running=(reason in ("gate2", "repair_exhausted_or_drift") and r2_pass and not r3_pass),
             ),
             "detail": (
-                "Calmar=%s, Payoff=%s, w5=%s%s" % (
+                "Calmar=%s · Payoff=%s · w5=%s%s" % (
                     ("%.2f" % float(g2["calmar"])) if g2.get("calmar") is not None else "—",
                     ("%.2f" % float(g2["payoff_ratio"])) if g2.get("payoff_ratio") is not None else "—",
                     ("%.2f" % float(g2["worst5_loss_share"])) if g2.get("worst5_loss_share") is not None else "—",
-                    " · soft-pass" if (r3_adm.get("soft_passed") and g2_pass) else "",
+                    " · soft-pass" if (r3_adm.get("soft_passed") and r3_pass) else "",
                 )
-                if (g2_running or g2_pass or g2.get("payoff_ratio") is not None or r3_adm) else "待执行"
+                if (r3_pass or is_r3_fail or g2.get("payoff_ratio") is not None or r3_adm) else (
+                    "未进入" if not r2_pass else "待执行"
+                )
             ),
         },
         {
-            "id": "audit4d",
-            "label": lex.pipe_label("audit4d"),
-            "status": "done" if g2_pass else "pending",
-            "detail": "未进入（第三次复核未过）" if not g2_pass else "抗风险离群 / 四维攻击（因果 / 博弈 / 回测诚信 / 执行摩擦）",
-        },
-        {
-            "id": "ai3",
-            "label": lex.pipe_label("ai3"),
-            "status": (
-                "done" if r4_pass else (
-                    "fail" if is_r4_fail else (
-                        "pending" if not g2_pass else "running"
-                    )
-                )
+            "id": "r4",
+            "label": lex.pipe_label("r4"),
+            "status": _st(
+                r4_pass,
+                failed=is_r4_fail,
+                running=(r3_pass and not r4_pass and not is_r4_fail and reason not in ("",)),
             ),
             "detail": (
                 "三AI理论复核通过" if r4_pass else (
                     "三AI理论复核未过" if is_r4_fail else (
-                        "未进入（第三次复核未过）" if not g2_pass else "待三AI投票"
+                        "未进入（第三次复核未过）" if not r3_pass else "待三AI投票"
                     )
                 )
             ),
@@ -269,12 +252,10 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None, admiss
         {
             "id": "human",
             "label": lex.pipe_label("human"),
-            "status": (
-                "done" if hc_confirmed else (
-                    "running" if (hc_ready and r4_pass and not hc_confirmed) else (
-                        "pending" if not r4_pass else "pending"
-                    )
-                )
+            "status": _st(
+                hc_confirmed,
+                failed=False,
+                running=(hc_ready and r4_pass and not hc_confirmed),
             ),
             "detail": (
                 "已人工 --confirm" if hc_confirmed else (

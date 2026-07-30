@@ -85,6 +85,14 @@ def _compact_pipe(pipeline):
     return marks
 
 
+_TERMINAL_DIAG_STAGES = (
+    "l0", "l1", "gate2", "kb", "spec",
+    "r1", "r2", "r3", "r4",
+)
+_LEGACY_PIPE_IDS = ("gate0", "gate1", "l0", "l1", "gate2", "audit4d", "four_d")
+_NEW_PIPE_IDS = ("r1", "r2", "r3", "r4", "human")
+
+
 def _infer_slot_state(payload):
     if not payload:
         return "idle"
@@ -96,19 +104,21 @@ def _infer_slot_state(payload):
     )
     diag = payload.get("diagnostic") or {}
     status_label = str(payload.get("status_label") or diag.get("terminal_zh") or "")
-    if "已归档" in status_label or diag.get("stage") in ("l0", "l1", "gate2", "kb", "spec"):
+    if "已归档" in status_label or diag.get("stage") in _TERMINAL_DIAG_STAGES:
         if payload.get("success") or (payload.get("final") or {}).get("success"):
             return "success"
         # Even if a stale running=True leaked, terminal cull wins for display
-        if not payload.get("running") or "已归档" in status_label or diag.get("stage") in ("l0", "l1", "gate2", "kb", "spec"):
+        if not payload.get("running") or "已归档" in status_label or diag.get("stage") in _TERMINAL_DIAG_STAGES:
             if reason or diag.get("stage") or "已归档" in status_label:
                 return "archived"
-    if diag.get("stage") in ("l0", "l1", "gate2", "kb", "spec") and not payload.get("running"):
+    if diag.get("stage") in _TERMINAL_DIAG_STAGES and not payload.get("running"):
         if payload.get("success") or (payload.get("final") or {}).get("success"):
             return "success"
         return "archived"
     if reason in ("funnel_l0_fail", "funnel_l0_cull", "funnel_l1_fail", "funnel_l1_cull",
-                  "repair_exhausted_or_drift", "gate2_3_fail", "kb_blocked", "immutable_spec_error"):
+                  "repair_exhausted_or_drift", "gate2_3_fail", "kb_blocked", "immutable_spec_error",
+                  "review2_evidence_fail", "review3_fail", "review4_ai_fail",
+                  "ai_theoretical_review_required"):
         return "archived"
     if payload.get("success") or (payload.get("final") or {}).get("success"):
         return "success"
@@ -118,16 +128,17 @@ def _infer_slot_state(payload):
             return "success"
         return "archived"
     if payload.get("running"):
-        # breakthrough-ish if gate2 done
+        # breakthrough-ish once R3 soft-pass / R4 in flight
         for row in payload.get("pipeline") or []:
-            if row.get("id") == "gate2" and row.get("status") == "done":
+            rid = row.get("id")
+            if rid in ("r3", "gate2") and row.get("status") == "done":
                 return "breakthrough"
-            if row.get("id") == "audit4d" and row.get("status") in ("running", "done"):
+            if rid in ("r4", "human", "audit4d") and row.get("status") in ("running", "done"):
                 return "breakthrough"
         return "running"
     # Terminal fail marks on pipeline ⇒ archived even without final_status
     for row in payload.get("pipeline") or []:
-        if (row or {}).get("id") in ("l0", "l1", "gate2") and (row or {}).get("status") == "fail":
+        if (row or {}).get("id") in ("r1", "r2", "r3", "r4", "l0", "l1", "gate2") and (row or {}).get("status") == "fail":
             return "archived"
     return "idle"
 
@@ -142,9 +153,12 @@ def _slot_from_live_payload(payload, slot_id):
     # Rebuild diagnostic if missing but we have metrics / can load failure_context
     if not diag.get("ok"):
         diag = _ensure_diagnostic(payload)
-    # Rebuild pipe if legacy snapshot lacks L0 stage — BEFORE state inference
+    # Always prefer R1–R4 rows; rebuild whenever payload still carries legacy G0/L0/G2 ids.
+    from . import review_lexicon as lex
     pipeline = payload.get("pipeline") or []
-    if not any((r or {}).get("id") == "l0" for r in pipeline):
+    has_new = any((r or {}).get("id") in _NEW_PIPE_IDS for r in pipeline)
+    has_legacy = any((r or {}).get("id") in _LEGACY_PIPE_IDS for r in pipeline)
+    if (not has_new) or has_legacy or not pipeline:
         try:
             reason = (
                 (payload.get("metrics") or {}).get("pipeline_reason")
@@ -152,8 +166,11 @@ def _slot_from_live_payload(payload, slot_id):
                 or (diag.get("pipeline_reason") if isinstance(diag, dict) else None)
             )
             l0 = {}
-            if isinstance(diag, dict) and diag.get("stage") == "l0":
-                fm = diag.get("fatal_metrics") or {}
+            g2 = {}
+            l1 = {}
+            stage = (diag.get("stage") if isinstance(diag, dict) else None) or ""
+            fm = (diag.get("fatal_metrics") or {}) if isinstance(diag, dict) else {}
+            if stage in ("l0", "r1"):
                 l0 = {
                     "pass": False,
                     "metrics": {
@@ -162,11 +179,31 @@ def _slot_from_live_payload(payload, slot_id):
                         "density": fm.get("density"),
                     },
                 }
+            if stage in ("l1", "r2"):
+                l1 = {
+                    "pass": False,
+                    "filled_entries": fm.get("n"),
+                    "payoff_ratio": fm.get("payoff"),
+                    "expectancy_factor": fm.get("expectancy"),
+                }
+            if stage in ("gate2", "r3"):
+                g2 = {
+                    "pass": False,
+                    "sample_size": fm.get("n"),
+                    "payoff_ratio": fm.get("payoff"),
+                    "expectancy_factor": fm.get("expectancy"),
+                    "calmar": fm.get("calmar"),
+                    "worst5_loss_share": fm.get("w5"),
+                    "failed_checks": (diag.get("reject_lines") or []) if isinstance(diag, dict) else [],
+                }
+                # Under admission_v2 soft-pass, archived-at-gate2 still maps to R3 fail for
+                # *legacy hard* archives; fresh runs pass R3 via admission.review3.
+                if reason in ("repair_exhausted_or_drift", "gate2_3_fail", "review3_fail"):
+                    l1 = {"pass": True, "filled_entries": fm.get("n"), "payoff_ratio": fm.get("payoff")}
+                    l0 = {"pass": True, "metrics": {}}
+            admission = payload.get("admission_v2") or (payload.get("final") or {}).get("admission_v2") or {}
             pipeline = live_status._gate_rows_from_reason(
-                reason,
-                l1={"pass": False, "filled_entries": (diag.get("fatal_metrics") or {}).get("n")} if diag.get("stage") == "l1" else {},
-                g2={},
-                l0=l0,
+                reason, l1=l1, g2=g2, l0=l0, admission=admission,
             )
         except Exception:
             pass
@@ -174,6 +211,18 @@ def _slot_from_live_payload(payload, slot_id):
     payload = dict(payload)
     payload["pipeline"] = pipeline
     if diag:
+        # Scrub any legacy Gate/L codes that survived old diagnostic snapshots.
+        diag = dict(diag)
+        for k in ("terminal_zh", "culled_at", "main_cause_line", "fatal_line", "ai_prompt", "pipeline_reason_zh"):
+            if diag.get(k):
+                diag[k] = lex.scrub(diag[k])
+        mc = diag.get("main_cause")
+        if isinstance(mc, dict) and mc.get("title_zh"):
+            mc = dict(mc)
+            mc["title_zh"] = lex.scrub(mc["title_zh"])
+            if mc.get("detail_zh"):
+                mc["detail_zh"] = lex.scrub(mc["detail_zh"])
+            diag["main_cause"] = mc
         payload["diagnostic"] = diag
     state = _infer_slot_state(payload)
     # ensure humanized status
@@ -195,6 +244,7 @@ def _slot_from_live_payload(payload, slot_id):
         )
     if diag.get("terminal_zh") and state in ("archived", "success"):
         status = diag.get("terminal_zh")
+    status = lex.scrub(status or "")
     pct = float(prog.get("percent") or 0)
     eta = prog.get("eta_sec")
     elapsed = prog.get("elapsed_sec")
