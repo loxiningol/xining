@@ -948,9 +948,12 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     Object.keys(map).forEach(function(k){
       if(s.indexOf(k)>=0) s=s.split(k).join(map[k]);
     });
-    // Protect N/A before slash→semicolon (otherwise N/A becomes N；A).
-    s=s.replace(/\bN\/A\b/gi,'暂无');
+    // Protect N/A and numeric ratios like 28/5875 before slash→semicolon.
+    const protected=[];
+    s=s.replace(/\bN\/A\b/gi, function(){ protected.push('暂无'); return '\u0000'+ (protected.length-1) +'\u0000'; });
+    s=s.replace(/\b\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?\b/g, function(m){ protected.push(m.replace(/\s+/g,'')); return '\u0000'+ (protected.length-1) +'\u0000'; });
     s=s.replace(/\s*\/\s*/g,'；');
+    s=s.replace(/\u0000(\d+)\u0000/g, function(_,i){ return protected[Number(i)]||''; });
     return s;
   }
   function pipeInlineHtml(marks){

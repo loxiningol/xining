@@ -95,10 +95,11 @@ def humanize_causal_blurb(mechanism_spec=None, fallback=None):
     )
 
 
-def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None):
-    """Build pipeline checklist for UI."""
+def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
+    """Build pipeline checklist for UI (lightweight funnel: G0→G1→L0→L1→G2→4D)."""
     reason = str(reason or "")
     l1 = l1 or {}
+    l0 = l0 or {}
     g2 = g2 or {}
     by_id = {}
     for g in gates or []:
@@ -116,8 +117,21 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None):
 
     g0 = by_id.get("gate0_mechanism_integrity") or {}
     g1 = by_id.get("gate1_fidelity") or by_id.get("gate1_code_fidelity") or {}
-    # Infer from pipeline reason when gate payloads sparse
-    reached_l1 = reason in ("funnel_l1_fail", "repair_exhausted_or_drift", "gate2_3_fail", "ok", "success") or bool(l1)
+
+    is_l0_fail = reason in ("funnel_l0_fail", "funnel_l0_cull")
+    is_l1_fail = reason in ("funnel_l1_fail", "funnel_l1_cull")
+    reached_l0 = is_l0_fail or is_l1_fail or reason in (
+        "repair_exhausted_or_drift", "gate2_3_fail", "ok", "success",
+    ) or bool(l0) or bool(l1)
+    # Gate0/1 are upstream of L0; if we have an L0/L1 verdict they already passed
+    reached_gates = reached_l0 or reason not in ("", "exception", "kb_blocked")
+    l0_pass = bool(l0.get("pass")) or (reached_l0 and not is_l0_fail and (
+        is_l1_fail or reason in ("repair_exhausted_or_drift", "gate2_3_fail", "ok", "success")
+    ))
+    l0_m = l0.get("metrics") or {}
+    reached_l1 = is_l1_fail or reason in ("repair_exhausted_or_drift", "gate2_3_fail", "ok", "success") or (
+        bool(l1) and not is_l0_fail
+    )
     l1_pass = bool(l1.get("pass")) or reason in ("repair_exhausted_or_drift", "gate2_3_fail")
     g2_running = reason in ("repair_exhausted_or_drift", "gate2_3_fail")
     g2_pass = bool(g2.get("pass") or g2.get("gate_pass"))
@@ -126,25 +140,54 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None):
         {
             "id": "gate0",
             "label": "Gate0 机制完整性",
-            "status": _st(g0.get("pass") if g0 else reached_l1 or reason not in ("", "exception", "kb_blocked")),
-            "detail": "语义完整 / 因果闭环" if (g0.get("pass") or reached_l1) else (reason or "待执行"),
+            "status": _st(g0.get("pass") if g0 else reached_gates),
+            "detail": "语义完整 / 因果闭环" if (g0.get("pass") or reached_gates) else (reason or "待执行"),
         },
         {
             "id": "gate1",
             "label": "Gate1 代码忠实度",
-            "status": _st(g1.get("pass") if g1 else reached_l1),
-            "detail": "DSL 语法通过" if reached_l1 else "待执行",
+            "status": _st(g1.get("pass") if g1 else reached_l0),
+            "detail": "DSL 语法通过" if reached_l0 else "待执行",
+        },
+        {
+            "id": "l0",
+            "label": "L0 开仓密度预检",
+            "status": (
+                "done" if l0_pass else (
+                    "fail" if is_l0_fail else (
+                        "running" if reason in ("seed", "l1") and not reached_l0 else (
+                            "pending" if not reached_l0 else "fail"
+                        )
+                    )
+                )
+            ),
+            "detail": (
+                "触发 %s / %s (密度 %s)" % (
+                    l0_m.get("triggers") if l0_m.get("triggers") is not None else "—",
+                    l0_m.get("evaluated_bars") if l0_m.get("evaluated_bars") is not None else "—",
+                    l0_m.get("density") if l0_m.get("density") is not None else "—",
+                )
+                if reached_l0 else "待执行 · 秒杀过稀逻辑"
+            ),
         },
         {
             "id": "l1",
             "label": "L1 微观筛选器",
-            "status": "done" if l1_pass else ("running" if reason == "funnel_l1_fail" else ("pending" if not reached_l1 else "fail")),
+            "status": (
+                "done" if l1_pass else (
+                    "fail" if is_l1_fail or (reached_l1 and not l1_pass) else (
+                        "pending" if is_l0_fail or not reached_l1 else "pending"
+                    )
+                )
+            ),
             "detail": (
                 "样本 n=%s / payoff=%s" % (
                     l1.get("filled_entries") if l1.get("filled_entries") is not None else "—",
                     ("%.2f" % float(l1["payoff_ratio"])) if l1.get("payoff_ratio") is not None else "—",
                 )
-                if reached_l1 else "待执行"
+                if reached_l1 and not is_l0_fail else (
+                    "未进入（L0 未过）" if is_l0_fail else "待执行"
+                )
             ),
         },
         {
@@ -240,6 +283,7 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
     reason = reason or last.get("pipeline_reason") or phase
 
     l1 = last.get("l1") or {}
+    l0 = last.get("l0") or {}
     g2 = last.get("gate2") or {}
     if isinstance(result, dict):
         try:
@@ -251,8 +295,17 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
             l1 = ctx.get("l1") or l1
             g2 = ctx.get("gate2_fitness") or g2
             gates = ctx.get("gates") or []
+            ph = (result.get("phase3_funnel") or {})
+            if ph.get("l0_density"):
+                l0 = ph.get("l0_density") or l0
         except Exception:
             gates = []
+            try:
+                ph = (result.get("phase3_funnel") or {})
+                if ph.get("l0_density"):
+                    l0 = ph.get("l0_density") or l0
+            except Exception:
+                pass
     else:
         gates = []
 
@@ -284,6 +337,7 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
         from . import diagnostic as diagnostic_mod
         ctx_like = {
             "pipeline_reason": reason,
+            "l0": l0,
             "l1": l1,
             "gate2_fitness": g2,
             "mechanism_family": fam,
@@ -300,7 +354,7 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
         )
         if state.get("final_status") and diagnostic.get("terminal_zh"):
             # Prefer cull-stage terminal label over generic stop codes
-            if diagnostic.get("stage") in ("l1", "gate2", "kb", "spec"):
+            if diagnostic.get("stage") in ("l0", "l1", "gate2", "kb", "spec"):
                 status_label = diagnostic.get("terminal_zh")
     except Exception as exc:
         diagnostic = diagnostic or {"ok": False, "error": str(exc)}
@@ -352,7 +406,7 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
             "seed_idx": seed_idx,
             "seed_max": seed_max,
         },
-        "pipeline": _gate_rows_from_reason(reason, l1=l1, g2=g2, gates=gates),
+        "pipeline": _gate_rows_from_reason(reason, l1=l1, g2=g2, gates=gates, l0=l0),
         "diagnostic": diagnostic,
         "metrics": {
             "composite_score": last.get("composite_score"),

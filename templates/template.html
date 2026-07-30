@@ -948,9 +948,12 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     Object.keys(map).forEach(function(k){
       if(s.indexOf(k)>=0) s=s.split(k).join(map[k]);
     });
-    // Protect N/A before slash→semicolon (otherwise N/A becomes N；A).
-    s=s.replace(/\bN\/A\b/gi,'暂无');
+    // Protect N/A and numeric ratios like 28/5875 before slash→semicolon.
+    const protected=[];
+    s=s.replace(/\bN\/A\b/gi, function(){ protected.push('暂无'); return '\u0000'+ (protected.length-1) +'\u0000'; });
+    s=s.replace(/\b\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?\b/g, function(m){ protected.push(m.replace(/\s+/g,'')); return '\u0000'+ (protected.length-1) +'\u0000'; });
     s=s.replace(/\s*\/\s*/g,'；');
+    s=s.replace(/\u0000(\d+)\u0000/g, function(_,i){ return protected[Number(i)]||''; });
     return s;
   }
   function pipeInlineHtml(marks){
@@ -1029,7 +1032,12 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     let html='';
     html+='<div class="tw-head">';
     html+='<div class="tw-head-title">'+(zoneEsc(eng.name||'真挚之语 · 并发演进阵列'))+' '+(zoneEsc(eng.version||'v2.5'))+'</div>';
-    html+='<div class="tw-head-meta">内存 '+zoneEsc(usedGb)+'GB / '+zoneEsc(totalGb)+'GB<br>活跃卡槽 '+zoneEsc(active)+' / '+zoneEsc(cap)+'</div>';
+    html+='<div class="tw-head-meta">内存 '+zoneEsc(usedGb)+'GB / '+zoneEsc(totalGb)+'GB<br>活跃卡槽 '+zoneEsc(active)+' / '+zoneEsc(cap);
+    const funnel=board.funnel||{};
+    if(funnel.stages&&funnel.stages.length){
+      html+='<br>漏斗 '+(zoneEsc((funnel.stages||[]).join('→')));
+    }
+    html+='</div>';
     html+='</div>';
 
     const rows=slots.length?slots:(adFallback?[{
@@ -1053,16 +1061,25 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       html+='<div class="atm-tw-slot is-idle"><div class="atm-tw-slot-status">当前无演进任务</div></div>';
     }else{
       rows.forEach(function(slot){
-        const st=String(slot.state||'idle');
+        let st=String(slot.state||'idle');
+        const diag=slot.diagnostic||{};
+        // Prefer archived chrome when diagnostic/terminal says cull, even if stale running flag leaks
+        if((slot.final_zh&&String(slot.final_zh).indexOf('已归档')>=0) || (diag.stage&&['l0','l1','gate2','kb','spec'].indexOf(diag.stage)>=0 && !slot.running)){
+          st='archived';
+        }
+        if(st==='running' && slot.final_zh && String(slot.final_zh).indexOf('已归档')>=0){
+          st='archived';
+        }
         const pct=Math.max(0,Math.min(100,Number(slot.percent)||0));
         const status=humanizeLeak(slot.final_zh||slot.status_label||slot.state_label||'—');
-        const timeBit=slot.running
+        const timeBit=(st==='running')
           ?('剩余 '+fmtDur(slot.eta_sec))
           :(slot.elapsed_sec!=null?('耗时 '+fmtDur(slot.elapsed_sec)):'');
+        const badgeLabel=(st==='archived'?'已归档极限':(slot.state_label||st));
         html+='<div class="atm-tw-slot is-'+zoneEsc(st)+'">';
         html+='<div class="atm-tw-slot-top">';
         html+='<span class="atm-tw-slot-id">槽位 '+zoneEsc(slot.slot_id||'-')+'</span>';
-        html+='<span class="atm-tw-slot-badge">'+zoneEsc(slot.state_label||st)+(pct?(' · '+pct.toFixed(0)+'%'):'')+'</span>';
+        html+='<span class="atm-tw-slot-badge">'+zoneEsc(badgeLabel)+(pct?(' · '+pct.toFixed(0)+'%'):'')+'</span>';
         html+='</div>';
         html+='<div class="atm-tw-slot-title">'+zoneEsc(slot.title_zh||'—')+'</div>';
         html+='<div class="atm-tw-slot-fam">家族指纹 · '+zoneEsc(slot.family||'—')+'</div>';
@@ -1070,8 +1087,8 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         html+='<div class="atm-tw-slot-meta"><span>'+zoneEsc(slot.round_label||'')+'</span><span>'+zoneEsc(timeBit)+'</span></div>';
         html+='<div class="atm-tw-bar-track"><div class="atm-tw-bar-fill" style="width:'+pct+'%"></div></div>';
         html+=pipeInlineHtml(slot.pipeline_compact);
-        if(st==='archived' || st==='success' || (slot.diagnostic&&slot.diagnostic.ai_prompt)){
-          html+=diagnosticHtml(slot.diagnostic, slot.slot_id||0);
+        if(st==='archived' || st==='success' || (diag&&diag.ai_prompt)){
+          html+=diagnosticHtml(diag, slot.slot_id||0);
         }
         html+='</div>';
       });

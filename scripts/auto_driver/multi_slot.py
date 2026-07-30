@@ -70,7 +70,7 @@ def recommend_slot_count(total_mb=None, available_mb=None):
 def _compact_pipe(pipeline):
     marks = []
     id_map = {
-        "gate0": "G0", "gate1": "G1", "l1": "L1", "gate2": "G2", "audit4d": "4D",
+        "gate0": "G0", "gate1": "G1", "l0": "L0", "l1": "L1", "gate2": "G2", "audit4d": "4D",
     }
     for row in pipeline or []:
         short = id_map.get(row.get("id"), (row.get("id") or "?")[:2].upper())
@@ -90,6 +90,21 @@ def _compact_pipe(pipeline):
 def _infer_slot_state(payload):
     if not payload:
         return "idle"
+    # Prefer explicit terminal diagnostics / final over stale running flags
+    reason = str(
+        (payload.get("metrics") or {}).get("pipeline_reason")
+        or payload.get("phase")
+        or ""
+    )
+    diag = payload.get("diagnostic") or {}
+    if diag.get("stage") in ("l0", "l1", "gate2", "kb", "spec") and not payload.get("running"):
+        if payload.get("success") or (payload.get("final") or {}).get("success"):
+            return "success"
+        return "archived"
+    if reason in ("funnel_l0_fail", "funnel_l0_cull", "funnel_l1_fail", "funnel_l1_cull",
+                  "repair_exhausted_or_drift", "gate2_3_fail", "kb_blocked", "immutable_spec_error"):
+        if not payload.get("running"):
+            return "archived"
     if payload.get("success") or (payload.get("final") or {}).get("success"):
         return "success"
     final = (payload.get("final") or {}).get("status") or payload.get("final_status")
@@ -141,23 +156,53 @@ def _slot_from_live_payload(payload, slot_id):
     pct = float(prog.get("percent") or 0)
     eta = prog.get("eta_sec")
     elapsed = prog.get("elapsed_sec")
+    pipeline = payload.get("pipeline") or []
+    # Rebuild pipe if legacy snapshot lacks L0 stage
+    if not any((r or {}).get("id") == "l0" for r in pipeline):
+        try:
+            reason = (
+                (payload.get("metrics") or {}).get("pipeline_reason")
+                or payload.get("phase")
+                or (diag.get("pipeline_reason") if isinstance(diag, dict) else None)
+            )
+            l0 = {}
+            if isinstance(diag, dict) and diag.get("stage") == "l0":
+                fm = diag.get("fatal_metrics") or {}
+                l0 = {
+                    "pass": False,
+                    "metrics": {
+                        "triggers": fm.get("n"),
+                        "evaluated_bars": fm.get("evaluated_bars"),
+                        "density": fm.get("density"),
+                    },
+                }
+            pipeline = live_status._gate_rows_from_reason(
+                reason,
+                l1={"pass": False, "filled_entries": (diag.get("fatal_metrics") or {}).get("n")} if diag.get("stage") == "l1" else {},
+                g2={},
+                l0=l0,
+            )
+        except Exception:
+            pass
+    if diag.get("terminal_zh") and state in ("archived", "success"):
+        status = diag.get("terminal_zh")
     return {
         "slot_id": slot_id,
         "state": state,
         "state_label": humanizer.slot_state_label(state),
-        "running": bool(payload.get("running")),
+        "running": bool(payload.get("running")) and state == "running",
         "title_zh": strat.get("title_zh") or "—",
         "family": strat.get("family") or strat.get("family_base") or "—",
         "causal_blurb": strat.get("causal_blurb") or "",
         "status_label": status,
-        "percent": pct,
+        "percent": 100.0 if state == "archived" else pct,
         "round_label": prog.get("round_label") or "",
         "iteration": prog.get("iteration"),
         "max_iterations": prog.get("max_iterations"),
         "eta_sec": eta,
         "elapsed_sec": elapsed,
-        "pipeline": payload.get("pipeline") or [],
-        "pipeline_compact": _compact_pipe(payload.get("pipeline") or []),
+        "pipeline": pipeline,
+        "pipeline_compact": _compact_pipe(pipeline),
         "diagnostic": diag,
         "final_zh": (
             diag.get("terminal_zh")
@@ -511,6 +556,49 @@ def _recent_run_payloads(vector_root, limit=8):
     return out
 
 
+def _driver_process_alive():
+    """True if auto_driver python process appears running on this host."""
+    try:
+        import subprocess
+        out = subprocess.check_output(
+            ["pgrep", "-f", "run_auto_driver.py"], stderr=subprocess.DEVNULL,
+        ).decode("utf-8", "ignore").strip()
+        return bool(out)
+    except Exception:
+        return False
+
+
+def _normalize_payload_running(payload, is_global_live=False):
+    """Historical run snapshots must not stay stuck as running=True."""
+    payload = dict(payload or {})
+    src = str(payload.get("source") or "")
+    if is_global_live:
+        if payload.get("running") and not _driver_process_alive():
+            payload["running"] = False
+            # keep status for diagnostics; mark stopped
+            if not (payload.get("final") or {}).get("status"):
+                payload.setdefault("final", {})
+                if isinstance(payload["final"], dict) and not payload["final"].get("status"):
+                    payload["final"]["status"] = (
+                        (payload.get("metrics") or {}).get("pipeline_reason")
+                        or payload.get("phase")
+                        or "UNKNOWN_STOPPED"
+                    )
+        return payload
+    # run:/synth: history — never "running"
+    payload["running"] = False
+    reason = (
+        (payload.get("metrics") or {}).get("pipeline_reason")
+        or payload.get("phase")
+        or ""
+    )
+    if reason and not (payload.get("final") or {}).get("status"):
+        payload.setdefault("final", {})
+        if isinstance(payload["final"], dict):
+            payload["final"].setdefault("status", str(reason))
+    return payload
+
+
 def build_slots_board(vector_root=None, display_history=5):
     """Assemble multi-slot board for dashboard (capacity + active + recent)."""
     root = Path(vector_root or os.environ.get("VECTOR_ROOT") or "/root")
@@ -518,19 +606,25 @@ def build_slots_board(vector_root=None, display_history=5):
     capacity = recommend_slot_count(total_mb, avail_mb)
 
     current = live_status.read_live_status(str(root))
+    if isinstance(current, dict):
+        current = _normalize_payload_running(current, is_global_live=True)
+        current["source"] = current.get("source") or "live"
     # Pull enough history to prune completed correctly (keep newest 2 of ≥3).
     recent = _recent_run_payloads(str(root), limit=max(display_history + 6, 12))
+    recent = [_normalize_payload_running(p, is_global_live=False) for p in recent]
 
     seen = set()
+    seen_family_running = set()
     ordered = []
     for payload in [current] + recent:
         if not isinstance(payload, dict):
             continue
         strat = payload.get("strategy") or {}
         title = str(strat.get("title_zh") or "").strip()
+        fam = str(strat.get("family") or strat.get("family_base") or "").strip()
         wd = ((payload.get("final") or {}).get("workdir")
               or payload.get("source")
-              or strat.get("family")
+              or fam
               or title
               or "")
         key = str(wd)
@@ -538,10 +632,30 @@ def build_slots_board(vector_root=None, display_history=5):
             continue
         if title in ("", "—", "-") and not payload.get("running"):
             continue
+        # One running card per family
+        if payload.get("running") and fam:
+            if fam in seen_family_running:
+                continue
+            seen_family_running.add(fam)
         seen.add(key)
         ordered.append(payload)
 
     ordered.sort(key=lambda p: (0 if p.get("running") else 1, -_payload_mtime(p)))
+    # Drop ghost idle/unknown cards when same family already has a terminal archived/success
+    terminal_fams = set()
+    for p in ordered:
+        if _is_completed_100(p):
+            fam = str(((p.get("strategy") or {}).get("family") or "")).strip()
+            if fam:
+                terminal_fams.add(fam)
+    filtered = []
+    for p in ordered:
+        fam = str(((p.get("strategy") or {}).get("family") or "")).strip()
+        st = _infer_slot_state(p)
+        if fam and fam in terminal_fams and st in ("idle",) and not p.get("running"):
+            continue
+        filtered.append(p)
+    ordered = filtered
     ordered, hidden_completed = prune_completed_for_display(
         ordered, vector_root=str(root), max_completed=MAX_COMPLETED_VISIBLE,
     )
@@ -593,11 +707,17 @@ def build_slots_board(vector_root=None, display_history=5):
         "slots": slots,
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "note_zh": (
+            "轻量漏斗 v3：G0→G1→L0密度→L1锚点→RAM预算矩阵→Gate2。"
             "本机可用内存约 %dMB / 总量 %dMB，并发卡槽容量 %d。"
             "已完成(100%%)卡槽最多展示 %d 个；累计≥3 时自动归档最旧记录，不再显示。"
-            "容量自适应：>8GB→5，4–8GB→3，低配主机→1，防止 OOM。"
+            "正式 Gate2 门槛不降（Payoff≥2.5 / Calmar≥1.5）。"
             % (avail_mb, total_mb, capacity, MAX_COMPLETED_VISIBLE)
         ),
+        "funnel": {
+            "name": "lightweight_v3",
+            "stages": ["G0", "G1", "L0", "L1", "G2", "4D"],
+            "formal_gate2_floors": {"payoff": 2.5, "calmar": 1.5},
+        },
         "human_confirm_required": True,
         "auto_mount": False,
         "charter_version": "true_words_v2.5",
