@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""GLM-first strategy creation collaboration (optional EasyQuant modeling envelope).
+"""Professional strategy creation collab (pre-review).
 
-Usage (on VECTOR_ROOT / prod):
+Flow:
+  human brief
+    → EasyQuant-style factor mining (OKX candles)
+    → QuantOracle certify risk/stats
+    → GLM mechanism_spec (anchored to certified factors)
+    → optional Codex implement / STEP A submit (ADA5 admission)
+
+Usage:
   python3 scripts/strategy_create_collab.py \\
     --symbol ETH-USDT-SWAP --timeframe 5m --direction long \\
-    --brief "用户口述的机制偏好"
+    --brief "用户口述"
 
-Does NOT mount. Writes a collab pack under auto_trade/dual_engine/collab_packs/.
+Does NOT mount. Never skips ADA5 four-review.
 """
 from __future__ import print_function
 
@@ -24,7 +31,7 @@ os.chdir(str(ROOT))
 
 
 def main():
-    ap = argparse.ArgumentParser(description="GLM+EasyQuant strategy creation collab")
+    ap = argparse.ArgumentParser(description="QuantOracle+EasyQuant+GLM creation collab")
     ap.add_argument("--symbol", default="ETH-USDT-SWAP")
     ap.add_argument("--timeframe", default="5m")
     ap.add_argument("--direction", default="long", choices=("long", "short", "both"))
@@ -32,13 +39,15 @@ def main():
     ap.add_argument("--mode", default="new_mechanism",
                     choices=("new_mechanism", "known_mechanism_deep_dig",
                              "combination_mechanism", "failure_reverse_research"))
+    ap.add_argument("--horizon", type=int, default=3, help="Forward bars for factor labels")
+    ap.add_argument("--skip-research", action="store_true",
+                    help="Debug only: skip factor/QuantOracle stage")
     ap.add_argument("--implement", action="store_true",
                     help="Also run codex_implement_from_spec after GLM spec")
     ap.add_argument("--submit-step-a", action="store_true",
-                    help="Submit to STEP A without prebuilt bypass of GLM (uses live spec)")
+                    help="Submit to STEP A (ADA5 admission) after GLM design")
     args = ap.parse_args()
 
-    from dual_engine_workflow_v2.easyquant_bridge import probe_easyquant, modeling_envelope
     from dual_engine_workflow_v2.pipeline_step_a import (
         glm_require_mechanism_spec, codex_implement_from_spec,
     )
@@ -49,12 +58,50 @@ def main():
         "direction": args.direction,
         "human_brief": args.brief,
     }
-    eq = probe_easyquant()
-    envelope = modeling_envelope(brief=args.brief, focus=focus, probe=eq)
-    print("EASYQUANT", json.dumps(eq, ensure_ascii=False))
 
-    # glm_require_mechanism_spec expects exploration isolation dict, not Mode A/B/C.
-    mode_ctx = {"schema": "qiyu_create_collab_v1", "isolation": args.mode, "mode_name": args.mode}
+    research = None
+    if not args.skip_research:
+        from dual_engine_workflow_v2.creation_research_stage import run_creation_research
+        print("RESEARCH_START", args.symbol, args.timeframe, flush=True)
+        t_res = time.time()
+        research = run_creation_research(
+            symbol=args.symbol,
+            timeframe=args.timeframe,
+            direction=args.direction,
+            brief=args.brief,
+            horizon=args.horizon,
+            top_k=4,
+        )
+        print(
+            "RESEARCH_DONE", round(time.time() - t_res, 1),
+            "ok", (research or {}).get("ok"),
+            "qo", ((research or {}).get("quantoracle_probe") or {}).get("ok"),
+            "n_bars", ((research or {}).get("factor_mine") or {}).get("n_bars"),
+            "top", len((research or {}).get("certified_factors") or []),
+            flush=True,
+        )
+        for row in ((research or {}).get("certified_factors") or [])[:3]:
+            cert = ((row.get("quantoracle") or {}).get("certified") or {})
+            print(
+                "FACTOR", row.get("factor"), row.get("rule"),
+                "wr", round(float((row.get("stats") or {}).get("win_rate") or 0), 3),
+                "mean", round(float((row.get("stats") or {}).get("mean_net") or 0), 5),
+                "sharpe", cert.get("sharpe_ratio"),
+                "kellyQ", cert.get("kelly_quarter"),
+                "src", (row.get("quantoracle") or {}).get("source"),
+                flush=True,
+            )
+        focus["professional_research"] = research.get("glm_research_brief") if research else None
+        focus["easyquant_modeling"] = (research or {}).get("easyquant_envelope")
+        focus["quantoracle"] = {
+            "probe": (research or {}).get("quantoracle_probe"),
+            "certified_factors": (research or {}).get("certified_factors"),
+        }
+    else:
+        from dual_engine_workflow_v2.easyquant_bridge import probe_easyquant, modeling_envelope
+        focus["easyquant_modeling"] = modeling_envelope(brief=args.brief, focus=focus)
+
+    mode_ctx = {"schema": "qiyu_create_collab_v2", "isolation": args.mode, "mode_name": args.mode}
     try:
         from dual_engine_workflow_v2 import failure_kb
         kb_ctx = failure_kb.compact_context_for_glm() if hasattr(failure_kb, "compact_context_for_glm") else {}
@@ -63,9 +110,12 @@ def main():
     except Exception:
         kb_ctx = {}
 
-    # Inject EasyQuant / human brief into focus so GLM sees it
-    focus["easyquant_modeling"] = envelope
-    focus["order_zh"] = args.brief or "（无额外口述，按空白利基自主提出新机制）"
+    # Merge research instructions into KB context so GLM must read them
+    if research and research.get("glm_research_brief"):
+        kb_ctx = dict(kb_ctx or {})
+        kb_ctx["creation_research_mandatory"] = research["glm_research_brief"]
+
+    focus["order_zh"] = args.brief or "（无额外口述：按已认证因子空白利基提出新机制）"
 
     print("GLM_SPEC_START", args.symbol, args.timeframe, args.direction, flush=True)
     t0 = time.time()
@@ -78,7 +128,7 @@ def main():
         out = {
             "ok": False,
             "stage": "glm_mechanism_spec",
-            "easyquant": eq,
+            "research": research,
             "spec_pack": spec_pack,
         }
     else:
@@ -86,10 +136,18 @@ def main():
         meta = dict(spec_pack.get("meta") or {})
         meta.setdefault("symbol", args.symbol)
         meta.setdefault("timeframe", args.timeframe)
-        meta.setdefault("direction", args.direction if args.direction != "both" else meta.get("direction") or "long")
-        meta["source"] = "glm_live_collab"
-        meta["easyquant_probe"] = eq
+        meta.setdefault(
+            "direction",
+            args.direction if args.direction != "both" else meta.get("direction") or "long",
+        )
+        meta["source"] = "glm_live_collab_quantoracle_easyquant"
         meta["human_brief"] = args.brief
+        meta["creation_stack"] = [
+            "easyquant_factor_mine",
+            "quantoracle_certify",
+            "glm_mechanism_spec",
+            "ada5_four_review_required",
+        ]
         title = meta.get("title") or spec.get("mechanism_name") or "glm_collab"
         print("MECHANISM", spec.get("mechanism_family"), title)
         print("INEFFICIENCY", (spec.get("market_inefficiency") or "")[:160])
@@ -103,7 +161,7 @@ def main():
             "attempts": spec_pack.get("attempts"),
             "meta": meta,
             "mechanism_spec": spec,
-            "easyquant_modeling": envelope,
+            "creation_research": research,
             "errors": [],
         }
 
@@ -124,15 +182,13 @@ def main():
 
         if args.submit_step_a:
             from dual_engine_workflow_v2.pipeline_step_a import run_creation_pipeline_step_a
-            # Pass GLM-produced pack as prebuilt ONLY after live GLM design —
-            # this preserves the spec GLM just wrote (does not skip design).
             result = run_creation_pipeline_step_a(
                 symbol=args.symbol,
                 timeframe=args.timeframe,
                 exploration_mode="A",
                 allow_horizontal_expand=False,
                 prebuilt_spec_pack=pack,
-                windtalker_tag="glm_collab_%s" % int(time.time()),
+                windtalker_tag="qo_eq_collab_%s" % int(time.time()),
             )
             pack["step_a_result"] = {
                 "ok": (result or {}).get("ok"),
@@ -148,14 +204,15 @@ def main():
     out_dir = ROOT / "auto_trade" / "dual_engine" / "collab_packs"
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M%S")
-    out_path = out_dir / ("collab_%s_%s_%s.json" % (args.symbol.split("-")[0].lower(), args.timeframe, stamp))
+    out_path = out_dir / (
+        "collab_%s_%s_%s.json" % (args.symbol.split("-")[0].lower(), args.timeframe, stamp)
+    )
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     print("WROTE", out_path)
     return 0 if out.get("ok") else 2
 
 
 if __name__ == "__main__":
-    # build_mode_context may not exist on older trees — soft import inside main
     try:
         sys.exit(main() or 0)
     except Exception as exc:

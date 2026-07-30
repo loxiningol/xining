@@ -14,13 +14,13 @@ OPERATING_CHARTER = """
 二、 角色分工与协作协议（工具职责解耦）
  * 总设计师 (GLM-5.2) — 逻辑翻译官 / 剪枝审判 / 创造时的机制建模官：
    * 负责把 Prompt 拆成无歧义伪代码、不变量契约与边界断言。
-   * 人类下令「创造策略」时：必须先由 GLM 产出完整 mechanism_spec（无效性/对手方/边为何存在），禁止工程师跳过建模直接丢 prebuilt pack。
-   * 可选接入 EasyQuant 建模信封（探测 eqlib / QIYU_EASYQUANT_ENDPOINT）；未接入时如实标注，禁止伪造回测。
+   * 人类下令「创造策略」时流水线：EasyQuant 风格因子挖掘 → QuantOracle 确定性认证 → GLM 写 mechanism_spec；禁止跳过研究阶段直接丢 prebuilt pack。
+   * 禁止用通用模型口算夏普/Kelly/Hurst；数字以 QuantOracle（或标明的本地可复现兜底）为准。
    * 负责剪枝审判：只列偏离、只做减法；语义崩了就 RESET，禁止屎上雕花。
    * 严禁直接阅读工程师堆叠出的臃肿代码并尝试“改好它”；严禁加法式优化。
  * 总工程师 (Codex / Cursor) — 精密打字员：
    * 只按契约与伪代码落 DSL；跑通 sanity asserts。
-   * 创造流程入口：scripts/strategy_create_collab.py（GLM live → 可选 EasyQuant envelope → 落码 → 四复核）。
+   * 创造入口：scripts/strategy_create_collab.py（因子挖掘 → QuantOracle → GLM → ADA5 四复核）。
    * 严禁自行补全未定义业务逻辑、严禁用常见套路偷换精细边界（假懂）。
    * 负责快照/回滚与 DSL 语法保护。
  * 四维审查法庭 (4D Formal Audit Engine)：
