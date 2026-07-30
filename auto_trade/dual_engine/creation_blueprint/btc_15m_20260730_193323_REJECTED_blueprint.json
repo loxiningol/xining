@@ -1,0 +1,1158 @@
+{
+  "ok": false,
+  "present_to_human": false,
+  "schema": "qiyu_creation_blueprint_v1",
+  "symbol": "BTC-USDT-SWAP",
+  "timeframe": "15m",
+  "direction": "both",
+  "brief": "趋势突破型策略方向：基于经典 Donchian Channel（唐奇安通道）+ 趋势过滤的中频突破策略，研究多周期价格突破后的趋势延续机会。重点思考如何识别有效突破、过滤震荡假突破、捕捉主趋势启动阶段。1周收益率不得低于8%（带杠杆），收益回撤比不得低于1.0；胜率>=50%。",
+  "loops": {
+    "hypothesis": 6,
+    "stress": 0
+  },
+  "fuses": {
+    "iteration": true,
+    "overfit_drops": 0,
+    "var_rejects": 0,
+    "abort_reason": "hypothesis_loop_exceeded"
+  },
+  "classic_tried": [
+    "classic_donchian_breakout",
+    "classic_dual_ma_trend",
+    "classic_bollinger_mean_reversion"
+  ],
+  "perspectives_tried": [
+    "P1_trend_pullback",
+    "P3_vol_regime_breakout"
+  ],
+  "prelim": null,
+  "return_hardness": null,
+  "stages": {
+    "data": {
+      "n_bars": 4500,
+      "path": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/auto_trade/formal_btc_15m_candles_cache.json",
+      "source": "formal_short_cache",
+      "research": {
+        "ok": false,
+        "backend": "local",
+        "n": null,
+        "error": "not_found",
+        "start_ts": null,
+        "end_ts": null
+      },
+      "note_zh": "使用实盘 formal 短窗；若需 2024YTD 请配置 R2 并运行 research_candles_backfill_r2.py"
+    },
+    "meta": {
+      "ok": true,
+      "schema": "qiyu_creation_stage1_meta_v1",
+      "design_doc": {
+        "schema": "qiyu_strategy_design_doc_v1",
+        "title_zh": "BTC 15m liquidity_sweep 策略设计文档",
+        "human_brief": "趋势突破型策略方向：基于经典 Donchian Channel（唐奇安通道）+ 趋势过滤的中频突破策略，研究多周期价格突破后的趋势延续机会。重点思考如何识别有效突破、过滤震荡假突破、捕捉主趋势启动阶段。1周收益率不得低于8%（带杠杆），收益回撤比不得低于1.0；胜率>=50%。",
+        "symbol": "BTC-USDT-SWAP",
+        "timeframe": "15m",
+        "direction": "both",
+        "divergence": {
+          "instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，并估算每种视角在当前环境下可承载的最大年化净收益（max_annual_net_estimate），然后选择一种视角深入推演。禁止选择预期年化净收益低于 6% 的视角（除非三种都不足，则选容量最高者并标注风险）。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。最终策略必须赚钱：1周收益率代理不得低于 8%（带杠杆后的账户权益），收益回撤比不得低于 1.0；禁止产出守财奴式近零收益策略。",
+          "perspectives": [
+            {
+              "id": "P1_trend_pullback",
+              "lens_zh": "趋势回撤 / 惯性延续",
+              "thesis_zh": "高周期方向确认后的低周期回撤切入，信号来自动量与回撤深度",
+              "family": "trend_pullback",
+              "factor_hints": [
+                "ret_12",
+                "ret_3",
+                "close_z_20",
+                "dist_roll_low"
+              ],
+              "max_annual_net_estimate": 0.18,
+              "return_capacity_ok": true
+            },
+            {
+              "id": "P3_vol_regime_breakout",
+              "lens_zh": "波动率状态切换 / 压缩突破",
+              "thesis_zh": "低波压缩后的方向选择与扩张跟随，信号来自 range/ATR 状态",
+              "family": "vol_squeeze_break",
+              "factor_hints": [
+                "range_pct",
+                "atr_pct_14",
+                "ret_12"
+              ],
+              "max_annual_net_estimate": 0.18,
+              "return_capacity_ok": true
+            }
+          ],
+          "selected_id": "classic_bollinger_mean_reversion",
+          "selected_lens_zh": "经典布林带均值回归变式",
+          "selection_reason_zh": "初评胜率门禁触发：切换经典策略变式"
+        },
+        "mechanism_family": "mean_reversion",
+        "core_logic_zh": "价格触及带宽外延后回归中轨；高波环境收紧或不做",
+        "hypotheses": [
+          {
+            "id": "H1_classic",
+            "statement_zh": "价格触及带宽外延后回归中轨；高波环境收紧或不做",
+            "testable_factor_hints": [
+              "close_z_20",
+              "range_pct",
+              "lower_wick_pct",
+              "upper_wick_pct"
+            ]
+          },
+          {
+            "id": "H2_wr_gate",
+            "statement_zh": "初评胜率必须 ≥50%，否则不得对人展示",
+            "testable_factor_hints": [
+              "close_z_20",
+              "range_pct",
+              "lower_wick_pct"
+            ]
+          }
+        ],
+        "constraints": {
+          "max_ann_vol": 0.35,
+          "max_drawdown": 0.18,
+          "max_daily_loss": 0.05,
+          "protective_sl": 0.009,
+          "raw_hints": [
+            "min_weekly_from_brief"
+          ],
+          "minimum_weekly_return": 0.08,
+          "expected_annual_return_range": [
+            0.08,
+            0.2
+          ],
+          "minimum_acceptable_annual_return": 0.06,
+          "minimum_return_mdd": 1.0,
+          "minimum_window_total_return": 0.01,
+          "minimum_factor_weekly_lev": 0.03,
+          "factor_lev_scale": 8.0,
+          "minimum_exposure": 0.1,
+          "minimum_avg_trade_bp": 1.0,
+          "note_zh": "收益硬度：周收益代理≥8%、收益/回撤≥1.0；因子多空周收益(带杠杆)≥3%；退化：暴露<10% 或 单笔<1bp 或 窗内总收益<1% → 换视角重做。"
+        },
+        "expected_annual_return_range": [
+          0.08,
+          0.2
+        ],
+        "minimum_acceptable_annual_return": 0.06,
+        "failure_scenarios_zh": [
+          "政策/指数跳空导致止损缺口扩大",
+          "流动性枯竭使滑点吞没理论边缘",
+          "波动率状态切换使均值回归失效",
+          "单边趋势日反复触发回归信号",
+          "过度避险把仓位压没导致收益归零（策略退化）"
+        ],
+        "invalidation_zh": "政策/指数跳空导致止损缺口扩大；流动性枯竭使滑点吞没理论边缘",
+        "risk_bounds": {
+          "protective_sl_pct": 0.8999999999999999,
+          "max_ann_vol": 0.35,
+          "max_drawdown": 0.18,
+          "max_daily_var": 0.05,
+          "require_quantoracle": true,
+          "minimum_weekly_return": 0.08,
+          "minimum_return_mdd": 1.0,
+          "minimum_acceptable_annual_return": 0.06,
+          "expected_annual_return_range": [
+            0.08,
+            0.2
+          ]
+        },
+        "roles": [
+          {
+            "role": "product_manager",
+            "goal_zh": "把人类意图翻译成可验证的策略产品需求（必须赚钱，不只避险）",
+            "user_intent": "趋势突破型策略方向：基于经典 Donchian Channel（唐奇安通道）+ 趋势过滤的中频突破策略，研究多周期价格突破后的趋势延续机会。重点思考如何识别有效突破、过滤震荡假突破、捕捉主趋势启动阶段。1周收益率不得低于8%（带杠杆），收益回撤比不得低于1.0；胜率>=50%。",
+            "target": {
+              "symbol": "BTC-USDT-SWAP",
+              "timeframe": "15m",
+              "direction": "both"
+            },
+            "success_metrics": {
+              "max_ann_vol": 0.35,
+              "max_drawdown": 0.18,
+              "protective_sl": 0.009,
+              "max_daily_loss_var": 0.05,
+              "expected_annual_return_range": [
+                0.08,
+                0.2
+              ],
+              "minimum_acceptable_annual_return": 0.06,
+              "minimum_weekly_return": 0.08,
+              "minimum_return_mdd": 1.0
+            },
+            "non_goals": [
+              "跳过假设验证直接挖因子",
+              "用 LLM 口算夏普/Kelly",
+              "绕过后续 ADA5 四复核",
+              "用极低仓位刷低回撤/虚高夏普而收益归零"
+            ]
+          },
+          {
+            "role": "architect",
+            "mechanism_family": "liquidity_sweep",
+            "core_logic_zh": "假突破扫流动性后反向回收，信号来自滚动高低点外延与影线",
+            "entry_sketch_zh": "分位信号触发 + 方向过滤 + 保护性止损 0.9%",
+            "exit_sketch_zh": "目标位 / 时间止盈 / 结构破坏离场",
+            "divergence": {
+              "instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，并估算每种视角在当前环境下可承载的最大年化净收益（max_annual_net_estimate），然后选择一种视角深入推演。禁止选择预期年化净收益低于 6% 的视角（除非三种都不足，则选容量最高者并标注风险）。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。最终策略必须赚钱：1周收益率代理不得低于 8%（带杠杆后的账户权益），收益回撤比不得低于 1.0；禁止产出守财奴式近零收益策略。",
+              "perspectives": [
+                {
+                  "id": "P1_trend_pullback",
+                  "lens_zh": "趋势回撤 / 惯性延续",
+                  "thesis_zh": "高周期方向确认后的低周期回撤切入，信号来自动量与回撤深度",
+                  "family": "trend_pullback",
+                  "factor_hints": [
+                    "ret_12",
+                    "ret_3",
+                    "close_z_20",
+                    "dist_roll_low"
+                  ],
+                  "max_annual_net_estimate": 0.18,
+                  "return_capacity_ok": true
+                },
+                {
+                  "id": "P2_liquidity_sweep_stop_hunt",
+                  "lens_zh": "流动性sweep / 止损猎杀",
+                  "thesis_zh": "假突破扫流动性后反向回收，信号来自滚动高低点外延与影线",
+                  "family": "liquidity_sweep",
+                  "factor_hints": [
+                    "dist_roll_high",
+                    "dist_roll_low",
+                    "upper_wick_pct",
+                    "lower_wick_pct"
+                  ],
+                  "max_annual_net_estimate": 0.1,
+                  "return_capacity_ok": true
+                },
+                {
+                  "id": "P3_vol_regime_breakout",
+                  "lens_zh": "波动率状态切换 / 压缩突破",
+                  "thesis_zh": "低波压缩后的方向选择与扩张跟随，信号来自 range/ATR 状态",
+                  "family": "vol_squeeze_break",
+                  "factor_hints": [
+                    "range_pct",
+                    "atr_pct_14",
+                    "ret_12"
+                  ],
+                  "max_annual_net_estimate": 0.18,
+                  "return_capacity_ok": true
+                }
+              ],
+              "selected_id": "P2_liquidity_sweep_stop_hunt",
+              "selected_lens_zh": "流动性sweep / 止损猎杀",
+              "selection_reason_zh": "根据人类指令关键词在三视角中择一，并按收益适配性（年化容量>=6%）校正；选中 P2_liquidity_sweep_stop_hunt（容量≈10%）"
+            },
+            "core_hypotheses": [
+              {
+                "id": "H1",
+                "statement_zh": "在「流动性sweep / 止损猎杀」视角下，目标品种该时框存在可复现边缘",
+                "testable_factor_hints": [
+                  "dist_roll_high",
+                  "dist_roll_low",
+                  "upper_wick_pct",
+                  "lower_wick_pct"
+                ]
+              },
+              {
+                "id": "H2",
+                "statement_zh": "极端分位后的前瞻收益与对照区间存在显著均值差（非伪相关）",
+                "testable_factor_hints": [
+                  "dist_roll_high",
+                  "dist_roll_low",
+                  "upper_wick_pct"
+                ]
+              }
+            ],
+            "symbol": "BTC-USDT-SWAP",
+            "timeframe": "15m",
+            "direction": "both"
+          },
+          {
+            "role": "risk_officer",
+            "hard_bounds": {
+              "protective_sl_pct": 0.8999999999999999,
+              "max_ann_vol": 0.35,
+              "max_drawdown": 0.18,
+              "max_daily_var": 0.05,
+              "require_quantoracle": true,
+              "minimum_weekly_return": 0.08,
+              "minimum_return_mdd": 1.0,
+              "minimum_acceptable_annual_return": 0.06,
+              "expected_annual_return_range": [
+                0.08,
+                0.2
+              ]
+            },
+            "failure_scenarios_zh": [
+              "政策/指数跳空导致止损缺口扩大",
+              "流动性枯竭使滑点吞没理论边缘",
+              "波动率状态切换使均值回归失效",
+              "单边趋势日反复触发回归信号",
+              "过度避险把仓位压没导致收益归零（策略退化）"
+            ],
+            "kill_switches_zh": [
+              "QuantOracle VaR 超阈值立即否决",
+              "Alphalens 换手过高/IC 衰减过快丢弃因子",
+              "压力测试回撤超界后迭代不超过 5 次",
+              "周收益代理<8% 或 收益/回撤<1.0 → 收益硬度熔断",
+              "暴露<10% / 单笔<1bp / 窗内总收益<1% → 策略退化熔断并换视角",
+              "因子多空周收益(带杠杆)<3% → 丢弃（即使 IC 显著）"
+            ]
+          },
+          {
+            "role": "qa",
+            "acceptance_checklist": [
+              "设计文档含假设与失效条件",
+              "设计文档含 expected_annual_return_range 与 minimum_acceptable_annual_return",
+              "假设经 Alphalens/Causal 风格验证",
+              "因子经 EasyQuant 挖掘 + QuantOracle 认证",
+              "因子多空周收益(带杠杆)≥3%",
+              "二次 Alphalens 筛选通过",
+              "Backtrader 极端场景 + 红队攻击通过",
+              "收益硬度：周收益代理≥8%、收益/回撤≥1.0",
+              "无策略退化（暴露/单笔/窗内收益）",
+              "初评胜率≥50%",
+              "交付 strategy_code / params / risk_report 草稿",
+              "不触及、不改写现有 ADA5 复核代码路径"
+            ],
+            "forbidden": [
+              "宣称已过复核",
+              "自动挂载实盘",
+              "用通用模型估算风险数字",
+              "用虚高夏普掩盖近零绝对收益"
+            ]
+          }
+        ],
+        "built_at": "2026-07-30 19:33:18",
+        "tooling": {
+          "ok": true,
+          "provider": "metagpt_autogen_lite_v1",
+          "backends": {
+            "metagpt": false,
+            "autogen": false
+          },
+          "roles": [
+            "product_manager",
+            "architect",
+            "risk_officer",
+            "qa"
+          ],
+          "notes": [
+            "Local multi-role design doc; optional GLM enrichment.",
+            "Meta-think always applies divergence: 3 microstructure lenses then deepen one."
+          ],
+          "divergence_instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，并估算每种视角在当前环境下可承载的最大年化净收益（max_annual_net_estimate），然后选择一种视角深入推演。禁止选择预期年化净收益低于 6% 的视角（除非三种都不足，则选容量最高者并标注风险）。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。最终策略必须赚钱：1周收益率代理不得低于 8%（带杠杆后的账户权益），收益回撤比不得低于 1.0；禁止产出守财奴式近零收益策略。",
+          "probed_at": "2026-07-30 19:33:18"
+        },
+        "glm_enrichment": {
+          "enriched": false,
+          "reason": "skip_llm",
+          "divergence_instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，并估算每种视角在当前环境下可承载的最大年化净收益（max_annual_net_estimate），然后选择一种视角深入推演。禁止选择预期年化净收益低于 6% 的视角（除非三种都不足，则选容量最高者并标注风险）。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。最终策略必须赚钱：1周收益率代理不得低于 8%（带杠杆后的账户权益），收益回撤比不得低于 1.0；禁止产出守财奴式近零收益策略。"
+        },
+        "knowledge_cards_brief": [
+          {
+            "id": "card_funding_basis_crowding",
+            "title_zh": "资金费率拥挤与均值回归衰减",
+            "truth_zh": "极端资金费率拥挤后的反向，在高换手时段常被抢跑；裸费率信号扣除成本后边缘变薄。"
+          },
+          {
+            "id": "card_liq_sweep_toxicity",
+            "title_zh": "流动性扫荡毒性上升",
+            "truth_zh": "假突破/扫止损后的回收在 2024–2026 永续上更常变成趋势加速，单纯 fade 扫荡胜率下降。"
+          },
+          {
+            "id": "card_vol_compression_still_works",
+            "title_zh": "波动压缩后的方向选择仍有结构边缘",
+            "truth_zh": "低波收口后的扩张突破在多币种 5m/15m 上仍反复出现，但需高波分位禁入，否则假突破吃掉收益。"
+          },
+          {
+            "id": "card_pairs_crypto_beta",
+            "title_zh": "加密配对受共同 beta 主导",
+            "truth_zh": "BTC beta 主导下，山寨配对协整在危机日同步断裂；短窗高相关不等于可交易价差边缘。"
+          }
+        ],
+        "mutation_log": [
+          {
+            "at": "2026-07-30 19:33:18",
+            "reason": "knowledge_card_invalidate",
+            "banner": "【外部认知卡片否决】所选微观结构视角在当前市场语境下可能已失效：card_liq_sweep_toxicity。换视角或补失效条件。"
+          },
+          {
+            "at": "2026-07-30 19:33:19",
+            "reason": "hypothesis_fail",
+            "new_hints": [
+              "dist_roll_high",
+              "dist_roll_low",
+              "upper_wick_pct",
+              "lower_wick_pct",
+              "ret_12",
+              "close_z_20",
+              "range_pct",
+              "atr_pct_14"
+            ],
+            "loop": 1
+          },
+          {
+            "at": "2026-07-30 19:33:19",
+            "reason": "hypothesis_fail",
+            "new_hints": [
+              "dist_roll_high",
+              "dist_roll_low",
+              "upper_wick_pct",
+              "lower_wick_pct",
+              "ret_12",
+              "close_z_20",
+              "range_pct",
+              "atr_pct_14"
+            ],
+            "loop": 2
+          },
+          {
+            "at": "2026-07-30 19:33:19",
+            "reason": "hypothesis_fail_switch_direction",
+            "switched": {
+              "mode": "perspective",
+              "id": "P3_vol_regime_breakout",
+              "lens_zh": "波动率状态切换 / 压缩突破"
+            },
+            "loop": 2
+          },
+          {
+            "at": "2026-07-30 19:33:19",
+            "reason": "hypothesis_fail",
+            "new_hints": [
+              "range_pct",
+              "atr_pct_14",
+              "ret_12",
+              "close_z_20",
+              "dist_roll_low",
+              "dist_roll_high"
+            ],
+            "loop": 3
+          },
+          {
+            "at": "2026-07-30 19:33:19",
+            "reason": "hypothesis_fail_switch_direction",
+            "switched": {
+              "mode": "classic",
+              "id": "classic_donchian_breakout",
+              "lens_zh": "经典 Donchian 通道突破变式"
+            },
+            "loop": 3
+          },
+          {
+            "at": "2026-07-30 19:33:20",
+            "reason": "hypothesis_fail",
+            "new_hints": [
+              "dist_roll_high",
+              "dist_roll_low",
+              "ret_12",
+              "atr_pct_14",
+              "close_z_20",
+              "range_pct"
+            ],
+            "loop": 4
+          },
+          {
+            "at": "2026-07-30 19:33:20",
+            "reason": "hypothesis_fail_switch_direction",
+            "switched": {
+              "mode": "classic",
+              "id": "classic_dual_ma_trend",
+              "lens_zh": "经典双均线趋势变式"
+            },
+            "loop": 4
+          },
+          {
+            "at": "2026-07-30 19:33:20",
+            "reason": "hypothesis_fail",
+            "new_hints": [
+              "close_z_20",
+              "ret_12",
+              "atr_pct_14",
+              "range_pct",
+              "dist_roll_low",
+              "dist_roll_high"
+            ],
+            "loop": 5
+          },
+          {
+            "at": "2026-07-30 19:33:20",
+            "reason": "hypothesis_fail_switch_direction",
+            "switched": {
+              "mode": "classic",
+              "id": "classic_bollinger_mean_reversion",
+              "lens_zh": "经典布林带均值回归变式"
+            },
+            "loop": 5
+          }
+        ],
+        "classic_variant": {
+          "id": "classic_bollinger_mean_reversion",
+          "lens_zh": "经典布林带均值回归变式"
+        }
+      },
+      "divergence_instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，并估算每种视角在当前环境下可承载的最大年化净收益（max_annual_net_estimate），然后选择一种视角深入推演。禁止选择预期年化净收益低于 6% 的视角（除非三种都不足，则选容量最高者并标注风险）。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。最终策略必须赚钱：1周收益率代理不得低于 8%（带杠杆后的账户权益），收益回撤比不得低于 1.0；禁止产出守财奴式近零收益策略。",
+      "at": "2026-07-30 19:33:18"
+    },
+    "knowledge_distill": {
+      "ok": true,
+      "schema": "qiyu_knowledge_distill_gate_v1",
+      "passed": true,
+      "reason": null,
+      "n_cards": 4,
+      "invalidating_cards": [],
+      "supporting_cards": [
+        {
+          "id": "card_funding_basis_crowding",
+          "title_zh": "资金费率拥挤与均值回归衰减"
+        },
+        {
+          "id": "card_liq_sweep_toxicity",
+          "title_zh": "流动性扫荡毒性上升"
+        },
+        {
+          "id": "card_pairs_crypto_beta",
+          "title_zh": "加密配对受共同 beta 主导"
+        }
+      ],
+      "cards_brief": [
+        {
+          "id": "card_funding_basis_crowding",
+          "title_zh": "资金费率拥挤与均值回归衰减",
+          "truth_zh": "极端资金费率拥挤后的反向，在高换手时段常被抢跑；裸费率信号扣除成本后边缘变薄。"
+        },
+        {
+          "id": "card_liq_sweep_toxicity",
+          "title_zh": "流动性扫荡毒性上升",
+          "truth_zh": "假突破/扫止损后的回收在 2024–2026 永续上更常变成趋势加速，单纯 fade 扫荡胜率下降。"
+        },
+        {
+          "id": "card_vol_compression_still_works",
+          "title_zh": "波动压缩后的方向选择仍有结构边缘",
+          "truth_zh": "低波收口后的扩张突破在多币种 5m/15m 上仍反复出现，但需高波分位禁入，否则假突破吃掉收益。"
+        },
+        {
+          "id": "card_pairs_crypto_beta",
+          "title_zh": "加密配对受共同 beta 主导",
+          "truth_zh": "BTC beta 主导下，山寨配对协整在危机日同步断裂；短窗高相关不等于可交易价差边缘。"
+        }
+      ],
+      "at": "2026-07-30 19:33:18",
+      "human_banner_zh": null,
+      "note_zh": "创造前必须阅读微观真相卡片，禁止刻舟求剑。"
+    },
+    "socratic": {
+      "ok": true,
+      "schema": "qiyu_socratic_challenger_v1",
+      "passed": true,
+      "n_questions": 5,
+      "n_failed": 0,
+      "glm": {
+        "enriched": false,
+        "reason": "skip_llm"
+      },
+      "probe": {
+        "ok": true,
+        "provider": "socratic_challenger_lite_v1",
+        "backends": {
+          "autogen": false
+        },
+        "role": "questioner_only_not_designer",
+        "at": "2026-07-30 19:33:18"
+      },
+      "at": "2026-07-30 19:33:18",
+      "human_banner_zh": null,
+      "qa": [
+        {
+          "id": "Q_why_mechanism",
+          "severity": "mechanism",
+          "question_zh": "为什么「趋势回撤 / 惯性延续」在 BTC-USDT-SWAP 15m 上应产生可交易边缘，而不是噪声？",
+          "answer_zh": "机制族=trend_pullback；核心逻辑已陈述。",
+          "passed": true
+        },
+        {
+          "id": "Q_premise_gone",
+          "severity": "premise",
+          "question_zh": "若前提「高周期方向确认后的低周期回撤切入，信号来自动量与回撤深度」不成立（或只在 20% 时段成立），策略会怎样失效？失效条件写清楚了吗？",
+          "answer_zh": "已给出失效条件/失败场景。",
+          "passed": true
+        },
+        {
+          "id": "Q_arb_eaten",
+          "severity": "competition",
+          "question_zh": "该收益来源是否已被做市商/高频/资金费率套利吃光？剩余边缘扣除双边成本后还够硬吗？",
+          "answer_zh": "设计约束含周收益/因子多空收益硬度，默认计入成本竞争。",
+          "passed": true
+        },
+        {
+          "id": "Q_regime_shift",
+          "severity": "regime",
+          "question_zh": "波动状态切换或流动性枯竭时，trend_pullback 类逻辑会不会系统性翻车？有无环境过滤？",
+          "answer_zh": "逻辑或失败场景覆盖波动/流动性状态切换。",
+          "passed": true
+        },
+        {
+          "id": "Q_groupthink",
+          "severity": "groupthink",
+          "question_zh": "PM/架构/风控/QA 是否在互相打圆场？有没有独立证据否定这个假设？",
+          "answer_zh": "已强制三视角发散并对照外部认知卡片。",
+          "passed": true
+        }
+      ]
+    },
+    "hypothesis": {
+      "ok": true,
+      "schema": "qiyu_hypothesis_validate_v1",
+      "passed": false,
+      "factors": [
+        {
+          "factor": "close_z_20",
+          "screen": {
+            "ok": true,
+            "name": "close_z_20",
+            "passed": false,
+            "reasons": [
+              "ic_decay_fast"
+            ],
+            "ic": {
+              "ok": true,
+              "ic_mean": -0.14433539380709992,
+              "ir": -0.8196399899674173,
+              "n_windows": 223,
+              "ic_std": 0.17609608556658835,
+              "ic_decay": -0.06236603887382261,
+              "ic_series_tail": [
+                -0.528591275354265,
+                -0.5801055848846901,
+                -0.3778827452070019,
+                -0.04567935537649346,
+                5.5570991942206154e-05,
+                -0.28274520700194494,
+                -0.39038621839399823,
+                -0.2894088669950739
+              ],
+              "source": "alphalens_lite"
+            },
+            "turnover": {
+              "ok": true,
+              "turnover": 0.061312217194569196,
+              "n": 4420,
+              "source": "alphalens_lite",
+              "high_turnover": false
+            },
+            "hygiene": {
+              "winsorize": {
+                "ok": true,
+                "op": "winsorize",
+                "limits": [
+                  0.01,
+                  0.01
+                ],
+                "lo": -2.7691003645237773,
+                "hi": 2.8175645490377605,
+                "n_clip": 88,
+                "n": 4481
+              },
+              "neutralize": {
+                "ok": true,
+                "op": "neutralize",
+                "exposures": [
+                  "mkt",
+                  "vol",
+                  "liq"
+                ],
+                "n_used": 4481,
+                "mode": "ols_residual"
+              },
+              "pipeline": [
+                "winsorize",
+                "neutralize"
+              ]
+            },
+            "thresholds": {
+              "min_abs_ic": 0.02,
+              "min_ir": 0.15,
+              "max_turnover": 0.65,
+              "winsor_limits": [
+                0.01,
+                0.01
+              ]
+            },
+            "at": "2026-07-30 19:33:20"
+          },
+          "causal": {
+            "ok": true,
+            "source": "causalimpact_lite",
+            "treated_mean": -8.300837541448242e-05,
+            "control_mean": 3.336964609192093e-05,
+            "effect": -0.00011637802150640335,
+            "t_stat": -0.8729769216537943,
+            "significant": false,
+            "n_treated": 895,
+            "n_control": 3583,
+            "at": "2026-07-30 19:33:20"
+          },
+          "accepted": false
+        },
+        {
+          "factor": "ret_12",
+          "screen": {
+            "ok": true,
+            "name": "ret_12",
+            "passed": false,
+            "reasons": [
+              "ic_decay_fast"
+            ],
+            "ic": {
+              "ok": true,
+              "ic_mean": -0.14654929964699057,
+              "ir": -0.8026191591550659,
+              "n_windows": 223,
+              "ic_std": 0.1825888380253296,
+              "ic_decay": -0.07738027236468831,
+              "ic_series_tail": [
+                -0.48246735204223384,
+                -0.43017504862461786,
+                -0.310530702973048,
+                -0.018560711308696857,
+                -0.15548763545429284,
+                -0.478466240622395,
+                -0.5487079744373436,
+                -0.41787658802177857
+              ],
+              "source": "alphalens_lite"
+            },
+            "turnover": {
+              "ok": true,
+              "turnover": 0.057751675325651876,
+              "n": 4427,
+              "source": "alphalens_lite",
+              "high_turnover": false
+            },
+            "hygiene": {
+              "winsorize": {
+                "ok": true,
+                "op": "winsorize",
+                "limits": [
+                  0.01,
+                  0.01
+                ],
+                "lo": -0.020788288184011128,
+                "hi": 0.020830980790705222,
+                "n_clip": 88,
+                "n": 4488
+              },
+              "neutralize": {
+                "ok": true,
+                "op": "neutralize",
+                "exposures": [
+                  "mkt",
+                  "vol",
+                  "liq"
+                ],
+                "n_used": 4488,
+                "mode": "ols_residual"
+              },
+              "pipeline": [
+                "winsorize",
+                "neutralize"
+              ]
+            },
+            "thresholds": {
+              "min_abs_ic": 0.02,
+              "min_ir": 0.15,
+              "max_turnover": 0.65,
+              "winsor_limits": [
+                0.01,
+                0.01
+              ]
+            },
+            "at": "2026-07-30 19:33:20"
+          },
+          "causal": {
+            "ok": true,
+            "source": "causalimpact_lite",
+            "treated_mean": -0.0001206474460240218,
+            "control_mean": 4.544419377165892e-05,
+            "effect": -0.00016609163979568073,
+            "t_stat": -1.2472715214657077,
+            "significant": false,
+            "n_treated": 896,
+            "n_control": 3589,
+            "at": "2026-07-30 19:33:20"
+          },
+          "accepted": false
+        },
+        {
+          "factor": "atr_pct_14",
+          "screen": {
+            "ok": true,
+            "name": "atr_pct_14",
+            "passed": false,
+            "reasons": [
+              "ic_not_significant",
+              "ir_too_low"
+            ],
+            "ic": {
+              "ok": true,
+              "ic_mean": 0.018994285536774312,
+              "ir": 0.10122241989527576,
+              "n_windows": 223,
+              "ic_std": 0.1876489966988115,
+              "ic_decay": 0.00648785066983242,
+              "ic_series_tail": [
+                -0.05968324534592941,
+                0.03223117532647957,
+                0.12497916087802165,
+                0.1342595165323701,
+                -0.03623228674631841,
+                0.13653792720200053,
+                -0.0019449847179772155,
+                -0.11155042779362198
+              ],
+              "source": "alphalens_lite"
+            },
+            "turnover": {
+              "ok": true,
+              "turnover": 0.06424160265100107,
+              "n": 4426,
+              "source": "alphalens_lite",
+              "high_turnover": false
+            },
+            "hygiene": {
+              "winsorize": {
+                "ok": true,
+                "op": "winsorize",
+                "limits": [
+                  0.01,
+                  0.01
+                ],
+                "lo": 0.0007492954471991018,
+                "hi": 0.007419479353752623,
+                "n_clip": 88,
+                "n": 4487
+              },
+              "neutralize": {
+                "ok": true,
+                "op": "neutralize",
+                "exposures": [
+                  "mkt",
+                  "vol",
+                  "liq"
+                ],
+                "n_used": 4487,
+                "mode": "ols_residual"
+              },
+              "pipeline": [
+                "winsorize",
+                "neutralize"
+              ]
+            },
+            "thresholds": {
+              "min_abs_ic": 0.02,
+              "min_ir": 0.15,
+              "max_turnover": 0.65,
+              "winsor_limits": [
+                0.01,
+                0.01
+              ]
+            },
+            "at": "2026-07-30 19:33:20"
+          },
+          "causal": {
+            "ok": true,
+            "source": "causalimpact_lite",
+            "treated_mean": -3.052506421545141e-05,
+            "control_mean": 2.258817915773342e-05,
+            "effect": -5.311324337318482e-05,
+            "t_stat": -0.39880618221320185,
+            "significant": false,
+            "n_treated": 896,
+            "n_control": 3588,
+            "at": "2026-07-30 19:33:20"
+          },
+          "accepted": false
+        },
+        {
+          "factor": "range_pct",
+          "screen": {
+            "ok": true,
+            "name": "range_pct",
+            "passed": false,
+            "reasons": [
+              "ic_not_significant",
+              "ir_too_low"
+            ],
+            "ic": {
+              "ok": true,
+              "ic_mean": 0.0016574610235896106,
+              "ir": 0.010488521988639404,
+              "n_windows": 223,
+              "ic_std": 0.15802617617476344,
+              "ic_decay": -0.009670962916079393,
+              "ic_series_tail": [
+                0.20633509308141146,
+                0.008724645734926366,
+                -0.07157543762156153,
+                -0.18705195887746592,
+                -0.1760489024729091,
+                -0.049513753820505685,
+                0.12258960822450678,
+                0.18583095670210006
+              ],
+              "source": "alphalens_lite"
+            },
+            "turnover": {
+              "ok": true,
+              "turnover": 0.05903560162235125,
+              "n": 4438,
+              "source": "alphalens_lite",
+              "high_turnover": false
+            },
+            "hygiene": {
+              "winsorize": {
+                "ok": true,
+                "op": "winsorize",
+                "limits": [
+                  0.01,
+                  0.01
+                ],
+                "lo": 0.0004603637648766375,
+                "hi": 0.010481040911378057,
+                "n_clip": 90,
+                "n": 4500
+              },
+              "neutralize": {
+                "ok": true,
+                "op": "neutralize",
+                "exposures": [
+                  "mkt",
+                  "vol",
+                  "liq"
+                ],
+                "n_used": 4499,
+                "mode": "ols_residual"
+              },
+              "pipeline": [
+                "winsorize",
+                "neutralize"
+              ]
+            },
+            "thresholds": {
+              "min_abs_ic": 0.02,
+              "min_ir": 0.15,
+              "max_turnover": 0.65,
+              "winsor_limits": [
+                0.01,
+                0.01
+              ]
+            },
+            "at": "2026-07-30 19:33:20"
+          },
+          "causal": {
+            "ok": true,
+            "source": "causalimpact_lite",
+            "treated_mean": 0.00013969334746208044,
+            "control_mean": -2.2334322218442798e-05,
+            "effect": 0.00016202766968052325,
+            "t_stat": 1.2197130996363024,
+            "significant": false,
+            "n_treated": 899,
+            "n_control": 3597,
+            "at": "2026-07-30 19:33:20"
+          },
+          "accepted": false
+        }
+      ],
+      "hygiene_baseline": [
+        "winsorize",
+        "neutralize"
+      ],
+      "exposures_used": [
+        "mkt",
+        "vol",
+        "liq"
+      ],
+      "probe": {
+        "ok": true,
+        "provider": "alphalens_causal_lite_v1",
+        "backends": {
+          "alphalens": false,
+          "causalimpact": false
+        },
+        "baseline_ops": [
+          "winsorize",
+          "neutralize"
+        ],
+        "notes": [
+          "Using local IC/IR/turnover + pre/post causal adapter.",
+          "winsorize + neutralize are mandatory baseline factor hygiene.",
+          "Install alphalens/causalimpact later for richer plots; not required."
+        ],
+        "probed_at": "2026-07-30 19:33:20"
+      },
+      "at": "2026-07-30 19:33:20",
+      "note_zh": "假设验证（Alphalens/CausalImpact 风格）：先 winsorize 去极值、再 neutralize 中性化，然后 IC/IR/换手 + 因果显著；仅有高 IC 无因果支撑不得进入因子挖掘。"
+    }
+  },
+  "best_factor": null,
+  "probes": {
+    "meta": {
+      "ok": true,
+      "provider": "metagpt_autogen_lite_v1",
+      "backends": {
+        "metagpt": false,
+        "autogen": false
+      },
+      "roles": [
+        "product_manager",
+        "architect",
+        "risk_officer",
+        "qa"
+      ],
+      "notes": [
+        "Local multi-role design doc; optional GLM enrichment.",
+        "Meta-think always applies divergence: 3 microstructure lenses then deepen one."
+      ],
+      "divergence_instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，并估算每种视角在当前环境下可承载的最大年化净收益（max_annual_net_estimate），然后选择一种视角深入推演。禁止选择预期年化净收益低于 6% 的视角（除非三种都不足，则选容量最高者并标注风险）。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。最终策略必须赚钱：1周收益率代理不得低于 8%（带杠杆后的账户权益），收益回撤比不得低于 1.0；禁止产出守财奴式近零收益策略。",
+      "probed_at": "2026-07-30 19:33:20"
+    },
+    "alphalens": {
+      "ok": true,
+      "provider": "alphalens_causal_lite_v1",
+      "backends": {
+        "alphalens": false,
+        "causalimpact": false
+      },
+      "baseline_ops": [
+        "winsorize",
+        "neutralize"
+      ],
+      "notes": [
+        "Using local IC/IR/turnover + pre/post causal adapter.",
+        "winsorize + neutralize are mandatory baseline factor hygiene.",
+        "Install alphalens/causalimpact later for richer plots; not required."
+      ],
+      "probed_at": "2026-07-30 19:33:20"
+    },
+    "easyquant": {
+      "ok": true,
+      "mode": "mine",
+      "provider": "easyquant_style",
+      "available": true,
+      "backend": "okx_candle_factor_miner_v1",
+      "notes": [
+        "Local OKX candle factor miner active (EasyQuant-style automation).",
+        "eqlib A-share package is optional and not required for crypto swaps.",
+        "Prefer research R2/S3 long history when configured; formal_* remains live short window.",
+        "eqlib_optional_missing: No module named 'eqlib'"
+      ],
+      "probed_at": "2026-07-30 19:33:20",
+      "research_candles": {
+        "ok": true,
+        "mode": "local",
+        "provider": "s3_compatible",
+        "bucket": "qiyu-research-candles",
+        "endpoint_set": false,
+        "keys_set": false,
+        "local_root": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/auto_trade/research_candle_store",
+        "cache_root": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/auto_trade/research_candle_cache",
+        "at": "2026-07-30 11:33:20",
+        "resolved_backend": "local",
+        "note_zh": "本地镜像后端（无云端密钥时用于开发/过渡）。"
+      }
+    },
+    "quantoracle": {
+      "ok": false,
+      "provider": "quantoracle",
+      "base": "https://api.quantoracle.dev",
+      "mode": "on",
+      "sample": {
+        "ok": false,
+        "endpoint": "risk/kelly",
+        "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1002)>",
+        "source": "quantoracle",
+        "at": "2026-07-30 19:33:23"
+      },
+      "probed_at": "2026-07-30 19:33:23"
+    },
+    "stress": {
+      "ok": true,
+      "provider": "backtrader_autogen_stress_lite_v1",
+      "backends": {
+        "backtrader": false,
+        "autogen": false
+      },
+      "notes": [
+        "Local extreme-window equity replay + adversarial shock agents.",
+        "Real backtrader/autogen optional later."
+      ],
+      "probed_at": "2026-07-30 19:33:23"
+    },
+    "research_candles": {
+      "ok": true,
+      "mode": "local",
+      "provider": "s3_compatible",
+      "bucket": "qiyu-research-candles",
+      "endpoint_set": false,
+      "keys_set": false,
+      "local_root": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/auto_trade/research_candle_store",
+      "cache_root": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/auto_trade/research_candle_cache",
+      "at": "2026-07-30 11:33:23",
+      "resolved_backend": "local",
+      "note_zh": "本地镜像后端（无云端密钥时用于开发/过渡）。"
+    },
+    "return_hardness": {
+      "ok": true,
+      "module": "creation_return_hardness"
+    },
+    "causal_counterfactual": {
+      "ok": true,
+      "provider": "causal_counterfactual_lite_v1",
+      "backends": {
+        "causalimpact": false
+      },
+      "note_zh": "反事实：剔除高波/高动量/高range 时段后重测效应是否仍在。",
+      "at": "2026-07-30 19:33:23"
+    },
+    "socratic": {
+      "ok": true,
+      "provider": "socratic_challenger_lite_v1",
+      "backends": {
+        "autogen": false
+      },
+      "role": "questioner_only_not_designer",
+      "at": "2026-07-30 19:33:23"
+    },
+    "knowledge_distill": {
+      "ok": true,
+      "module": "creation_knowledge_distill"
+    },
+    "multiverse": {
+      "ok": true,
+      "provider": "multiverse_montecarlo_lite_v1",
+      "default_paths": 200,
+      "note_zh": "基于实证收益分布的合成路径；逼假设加环境过滤而非极致特化。",
+      "at": "2026-07-30 19:33:23"
+    }
+  },
+  "data": {
+    "n_bars": 4500,
+    "path": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/auto_trade/formal_btc_15m_candles_cache.json",
+    "source": "formal_short_cache",
+    "research": {
+      "ok": false,
+      "backend": "local",
+      "n": null,
+      "error": "not_found",
+      "start_ts": null,
+      "end_ts": null
+    },
+    "note_zh": "使用实盘 formal 短窗；若需 2024YTD 请配置 R2 并运行 research_candles_backfill_r2.py"
+  },
+  "handoff_zh": "初评未通过或熔断：禁止把胜率<50%或近零收益策略当交付展示。",
+  "at": "2026-07-30 19:33:23"
+}

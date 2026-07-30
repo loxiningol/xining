@@ -1,0 +1,26 @@
+{
+  "ok": false,
+  "present": false,
+  "fuses": {
+    "iteration": true,
+    "overfit_drops": 0,
+    "var_rejects": 0,
+    "abort_reason": "hypothesis_loop_exceeded"
+  },
+  "loops": {
+    "hypothesis": 6,
+    "stress": 0
+  },
+  "classic_tried": [
+    "classic_donchian_breakout",
+    "classic_dual_ma_trend",
+    "classic_bollinger_mean_reversion"
+  ],
+  "perspectives_tried": [
+    "P1_trend_pullback",
+    "P3_vol_regime_breakout"
+  ],
+  "hypothesis": false,
+  "causal": null,
+  "handoff": "初评未通过或熔断：禁止把胜率<50%或近零收益策略当交付展示。"
+}

@@ -526,8 +526,13 @@ def validate_hypothesis(factor_matrix, fwd_returns, core_factors=None,
         )
         cleaned, _ = prepare_factor(series, exposures=exp_use, winsor_limits=winsor_limits)
         causal = causal_pre_post(cleaned, fwd_returns)
-        # Prefer BOTH screen + causal; do not accept IC-only correlation illusions
-        row["accepted"] = bool(screen.get("passed")) and bool(causal.get("significant"))
+        row = {
+            "factor": name,
+            "screen": screen,
+            "causal": causal,
+            # Prefer BOTH screen + causal; do not accept IC-only correlation illusions
+            "accepted": bool(screen.get("passed")) and bool(causal.get("significant")),
+        }
         if row["accepted"]:
             any_pass = True
         rows.append(row)

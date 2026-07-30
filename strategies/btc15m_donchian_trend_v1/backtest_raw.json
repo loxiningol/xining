@@ -1,0 +1,336 @@
+{
+  "short": {
+    "n_bars": 1200,
+    "n_trades": 26,
+    "win_rate": 0.6153846153846154,
+    "total_return": -0.009895672882147877,
+    "max_drawdown": -0.012792770556895317,
+    "payoff": 0.5368826572393367,
+    "avg_trades_per_day": 2.081734778982485,
+    "window": {
+      "first_ts": 1784325600000,
+      "last_ts": 1785404700000,
+      "first_iso": "2026-07-17 22:00:00 UTC",
+      "last_iso": "2026-07-30 09:45:00 UTC",
+      "span_days": 12.489583333333334,
+      "n_bars": 1200,
+      "timeframe": "15m",
+      "label_zh": "回测窗口：2026-07-17 22:00:00 UTC → 2026-07-30 09:45:00 UTC（共 12.49 天，1200 根 15m）",
+      "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。"
+    },
+    "prelim": {
+      "ok": true,
+      "schema": "qiyu_creation_prelim_eval_v1",
+      "present_to_human": true,
+      "min_win_rate": 0.5,
+      "win_rate": 0.6153846153846154,
+      "n_trades": 26,
+      "total_return": -0.009895672882147877,
+      "max_drawdown": -0.012792770556895317,
+      "sharpe_ann_proxy": null,
+      "window": {
+        "first_ts": 1784325600000,
+        "last_ts": 1785404700000,
+        "first_iso": "2026-07-17 22:00:00 UTC",
+        "last_iso": "2026-07-30 09:45:00 UTC",
+        "span_days": 12.489583333333334,
+        "n_bars": 1200,
+        "timeframe": "15m",
+        "label_zh": "回测窗口：2026-07-17 22:00:00 UTC → 2026-07-30 09:45:00 UTC（共 12.49 天，1200 根 15m）",
+        "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。"
+      },
+      "reject_reasons": [],
+      "human_banner_zh": null,
+      "metrics_note_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。 回测窗口：2026-07-17 22:00:00 UTC → 2026-07-30 09:45:00 UTC（共 12.49 天，1200 根 15m）"
+    },
+    "return_hardness": {
+      "ok": true,
+      "schema": "qiyu_creation_return_hardness_v1",
+      "passed": false,
+      "present_to_human": false,
+      "reject_reasons": [
+        "weekly_return_below_8pct",
+        "return_mdd_below_floor",
+        "avg_trade_below_1bp",
+        "window_total_return_below_1pct"
+      ],
+      "metrics": {
+        "total_return": -0.009895672882147877,
+        "weekly_return_proxy": -0.005546198646207983,
+        "max_drawdown": -0.012792770556895317,
+        "return_mdd": -0.7735363374288066,
+        "span_days": 12.489583333333334,
+        "n_trades": 26,
+        "n_bars": 1200
+      },
+      "floors": {
+        "minimum_weekly_return": 0.08,
+        "minimum_return_mdd": 1.0,
+        "minimum_acceptable_annual_return": 0.06,
+        "expected_annual_return_range": [
+          0.08,
+          0.2
+        ]
+      },
+      "return_scope_zh": "weekly_return_proxy = 窗内权益总收益 × (7 / span_days)；是带杠杆仓位路径下的账户权益口径，不是无杠杆价格涨幅，也不是整户 OKX 资产。",
+      "human_banner_zh": "【收益硬度未通过·禁止展示】原因: weekly_return_below_8pct,return_mdd_below_floor,avg_trade_below_1bp,window_total_return_below_1pct。周收益代理=-0.55%（门槛≥8%），收益/回撤=-0.77（门槛≥1.0）。系统将换视角/经典变式重做，不做守财奴零收益策略。",
+      "at": "2026-07-30 19:32:29"
+    },
+    "degeneration": {
+      "ok": true,
+      "schema": "qiyu_creation_degeneration_v1",
+      "degenerated": true,
+      "reasons": [
+        "avg_trade_below_1bp",
+        "window_total_return_below_1pct"
+      ],
+      "metrics": {
+        "n_trades": 26,
+        "n_bars": 1200,
+        "hold_bars": 36,
+        "exposure": 0.78,
+        "avg_trade_bp": -4.708098229710326,
+        "total_return": -0.009895672882147877,
+        "span_days": 12.489583333333334
+      },
+      "floors": {
+        "minimum_exposure": 0.1,
+        "minimum_avg_trade_bp": 1.0,
+        "minimum_window_total_return": 0.01
+      },
+      "human_banner_zh": "【策略退化熔断】命中: avg_trade_below_1bp,window_total_return_below_1pct。禁止输出；回溯元思考换微观结构视角。",
+      "at": "2026-07-30 19:32:29"
+    },
+    "multiverse": {
+      "passed": false,
+      "profit_frac": 0.3333333333333333,
+      "median_return": -0.021685465438268214,
+      "n_paths": 120
+    },
+    "final_equity": 9901.043271178522
+  },
+  "long": {
+    "n_bars": 4500,
+    "n_trades": 94,
+    "win_rate": 0.43617021276595747,
+    "total_return": -0.056467339568930575,
+    "max_drawdown": -0.05783267505270939,
+    "payoff": 0.9840125911954253,
+    "avg_trades_per_day": 2.0057790620137808,
+    "window": {
+      "first_ts": 1781361000000,
+      "last_ts": 1785410100000,
+      "first_iso": "2026-06-13 14:30:00 UTC",
+      "last_iso": "2026-07-30 11:15:00 UTC",
+      "span_days": 46.864583333333336,
+      "n_bars": 4500,
+      "timeframe": "15m",
+      "label_zh": "回测窗口：2026-06-13 14:30:00 UTC → 2026-07-30 11:15:00 UTC（共 46.86 天，4500 根 15m）",
+      "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。"
+    },
+    "prelim": {
+      "ok": true,
+      "schema": "qiyu_creation_prelim_eval_v1",
+      "present_to_human": false,
+      "min_win_rate": 0.5,
+      "win_rate": 0.43617021276595747,
+      "n_trades": 94,
+      "total_return": -0.056467339568930575,
+      "max_drawdown": -0.05783267505270939,
+      "sharpe_ann_proxy": null,
+      "window": {
+        "first_ts": 1781361000000,
+        "last_ts": 1785410100000,
+        "first_iso": "2026-06-13 14:30:00 UTC",
+        "last_iso": "2026-07-30 11:15:00 UTC",
+        "span_days": 46.864583333333336,
+        "n_bars": 4500,
+        "timeframe": "15m",
+        "label_zh": "回测窗口：2026-06-13 14:30:00 UTC → 2026-07-30 11:15:00 UTC（共 46.86 天，4500 根 15m）",
+        "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。"
+      },
+      "reject_reasons": [
+        "win_rate_below_50pct"
+      ],
+      "human_banner_zh": "【初评未通过·禁止展示为交付】胜率 43.6% < 50%（或样本不足）。系统将自动换方向 / 套用经典策略变式，不把垃圾包推给人看。",
+      "metrics_note_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。 回测窗口：2026-06-13 14:30:00 UTC → 2026-07-30 11:15:00 UTC（共 46.86 天，4500 根 15m）"
+    },
+    "return_hardness": {
+      "ok": true,
+      "schema": "qiyu_creation_return_hardness_v1",
+      "passed": false,
+      "present_to_human": false,
+      "reject_reasons": [
+        "weekly_return_below_8pct",
+        "return_mdd_below_floor",
+        "avg_trade_below_1bp",
+        "window_total_return_below_1pct"
+      ],
+      "metrics": {
+        "total_return": -0.056467339568930575,
+        "weekly_return_proxy": -0.008434330337924283,
+        "max_drawdown": -0.05783267505270939,
+        "return_mdd": -0.9763916249328872,
+        "span_days": 46.864583333333336,
+        "n_trades": 94,
+        "n_bars": 4500
+      },
+      "floors": {
+        "minimum_weekly_return": 0.08,
+        "minimum_return_mdd": 1.0,
+        "minimum_acceptable_annual_return": 0.06,
+        "expected_annual_return_range": [
+          0.08,
+          0.2
+        ]
+      },
+      "return_scope_zh": "weekly_return_proxy = 窗内权益总收益 × (7 / span_days)；是带杠杆仓位路径下的账户权益口径，不是无杠杆价格涨幅，也不是整户 OKX 资产。",
+      "human_banner_zh": "【收益硬度未通过·禁止展示】原因: weekly_return_below_8pct,return_mdd_below_floor,avg_trade_below_1bp,window_total_return_below_1pct。周收益代理=-0.84%（门槛≥8%），收益/回撤=-0.98（门槛≥1.0）。系统将换视角/经典变式重做，不做守财奴零收益策略。",
+      "at": "2026-07-30 19:32:29"
+    },
+    "degeneration": {
+      "ok": true,
+      "schema": "qiyu_creation_degeneration_v1",
+      "degenerated": true,
+      "reasons": [
+        "avg_trade_below_1bp",
+        "window_total_return_below_1pct"
+      ],
+      "metrics": {
+        "n_trades": 94,
+        "n_bars": 4500,
+        "hold_bars": 36,
+        "exposure": 0.752,
+        "avg_trade_bp": -10.721060993100194,
+        "total_return": -0.056467339568930575,
+        "span_days": 46.864583333333336
+      },
+      "floors": {
+        "minimum_exposure": 0.1,
+        "minimum_avg_trade_bp": 1.0,
+        "minimum_window_total_return": 0.01
+      },
+      "human_banner_zh": "【策略退化熔断】命中: avg_trade_below_1bp,window_total_return_below_1pct。禁止输出；回溯元思考换微观结构视角。",
+      "at": "2026-07-30 19:32:29"
+    },
+    "multiverse": {
+      "passed": false,
+      "profit_frac": 0.14166666666666666,
+      "median_return": -0.08839033643313654,
+      "n_paths": 120
+    },
+    "final_equity": 9435.326604310694
+  },
+  "short_on_long": {
+    "n_bars": 4500,
+    "n_trades": 108,
+    "win_rate": 0.42592592592592593,
+    "total_return": -0.08101531960961128,
+    "max_drawdown": -0.08788143169200202,
+    "payoff": 0.9261818907584681,
+    "avg_trades_per_day": 2.3045121138030673,
+    "window": {
+      "first_ts": 1781361000000,
+      "last_ts": 1785410100000,
+      "first_iso": "2026-06-13 14:30:00 UTC",
+      "last_iso": "2026-07-30 11:15:00 UTC",
+      "span_days": 46.864583333333336,
+      "n_bars": 4500,
+      "timeframe": "15m",
+      "label_zh": "回测窗口：2026-06-13 14:30:00 UTC → 2026-07-30 11:15:00 UTC（共 46.86 天，4500 根 15m）",
+      "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。"
+    },
+    "prelim": {
+      "ok": true,
+      "schema": "qiyu_creation_prelim_eval_v1",
+      "present_to_human": false,
+      "min_win_rate": 0.5,
+      "win_rate": 0.42592592592592593,
+      "n_trades": 108,
+      "total_return": -0.08101531960961128,
+      "max_drawdown": -0.08788143169200202,
+      "sharpe_ann_proxy": null,
+      "window": {
+        "first_ts": 1781361000000,
+        "last_ts": 1785410100000,
+        "first_iso": "2026-06-13 14:30:00 UTC",
+        "last_iso": "2026-07-30 11:15:00 UTC",
+        "span_days": 46.864583333333336,
+        "n_bars": 4500,
+        "timeframe": "15m",
+        "label_zh": "回测窗口：2026-06-13 14:30:00 UTC → 2026-07-30 11:15:00 UTC（共 46.86 天，4500 根 15m）",
+        "return_scope_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。"
+      },
+      "reject_reasons": [
+        "win_rate_below_50pct"
+      ],
+      "human_banner_zh": "【初评未通过·禁止展示为交付】胜率 42.6% < 50%（或样本不足）。系统将自动换方向 / 套用经典策略变式，不把垃圾包推给人看。",
+      "metrics_note_zh": "下列「总收益」仅为该日历窗口的累计权益变化，不是单日收益，也不是年化收益。 回测窗口：2026-06-13 14:30:00 UTC → 2026-07-30 11:15:00 UTC（共 46.86 天，4500 根 15m）"
+    },
+    "return_hardness": {
+      "ok": true,
+      "schema": "qiyu_creation_return_hardness_v1",
+      "passed": false,
+      "present_to_human": false,
+      "reject_reasons": [
+        "weekly_return_below_8pct",
+        "return_mdd_below_floor",
+        "avg_trade_below_1bp",
+        "window_total_return_below_1pct"
+      ],
+      "metrics": {
+        "total_return": -0.08101531960961128,
+        "weekly_return_proxy": -0.012100976834331803,
+        "max_drawdown": -0.08788143169200202,
+        "return_mdd": -0.9218707302532986,
+        "span_days": 46.864583333333336,
+        "n_trades": 108,
+        "n_bars": 4500
+      },
+      "floors": {
+        "minimum_weekly_return": 0.08,
+        "minimum_return_mdd": 1.0,
+        "minimum_acceptable_annual_return": 0.06,
+        "expected_annual_return_range": [
+          0.08,
+          0.2
+        ]
+      },
+      "return_scope_zh": "weekly_return_proxy = 窗内权益总收益 × (7 / span_days)；是带杠杆仓位路径下的账户权益口径，不是无杠杆价格涨幅，也不是整户 OKX 资产。",
+      "human_banner_zh": "【收益硬度未通过·禁止展示】原因: weekly_return_below_8pct,return_mdd_below_floor,avg_trade_below_1bp,window_total_return_below_1pct。周收益代理=-1.21%（门槛≥8%），收益/回撤=-0.92（门槛≥1.0）。系统将换视角/经典变式重做，不做守财奴零收益策略。",
+      "at": "2026-07-30 19:32:29"
+    },
+    "degeneration": {
+      "ok": true,
+      "schema": "qiyu_creation_degeneration_v1",
+      "degenerated": true,
+      "reasons": [
+        "avg_trade_below_1bp",
+        "window_total_return_below_1pct"
+      ],
+      "metrics": {
+        "n_trades": 108,
+        "n_bars": 4500,
+        "hold_bars": 36,
+        "exposure": 0.864,
+        "avg_trade_bp": -14.93310483754824,
+        "total_return": -0.08101531960961128,
+        "span_days": 46.864583333333336
+      },
+      "floors": {
+        "minimum_exposure": 0.1,
+        "minimum_avg_trade_bp": 1.0,
+        "minimum_window_total_return": 0.01
+      },
+      "human_banner_zh": "【策略退化熔断】命中: avg_trade_below_1bp,window_total_return_below_1pct。禁止输出；回溯元思考换微观结构视角。",
+      "at": "2026-07-30 19:32:29"
+    },
+    "multiverse": {
+      "passed": false,
+      "profit_frac": 0.06666666666666667,
+      "median_return": -0.13541997964439145,
+      "n_paths": 120
+    },
+    "final_equity": 9189.846803903887
+  }
+}

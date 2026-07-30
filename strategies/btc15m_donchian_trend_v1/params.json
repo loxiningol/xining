@@ -1,0 +1,52 @@
+{
+  "schema": "qiyu_strategy_params_v1",
+  "strategy_id": "btc15m_donchian_trend_v1",
+  "title_zh": "[BTC 15m] Donchian通道突破 + EMA趋势过滤",
+  "symbol": "BTC-USDT-SWAP",
+  "timeframe_entry": "15m",
+  "logic": "classic_donchian_breakout",
+  "classic_variant": {
+    "id": "classic_donchian_breakout",
+    "lens_zh": "经典 Donchian 通道突破变式"
+  },
+  "leverage": 20,
+  "protective_sl_pct": 0.009,
+  "slippage_pct": 0.0005,
+  "taker_fee_pct": 0.0005,
+  "targets": {
+    "ann_sharpe_min": 1.5,
+    "max_drawdown_max": 0.15,
+    "trades_per_day_min": 2,
+    "trades_per_day_max": 8,
+    "min_win_rate": 0.5,
+    "minimum_weekly_return": 0.08,
+    "minimum_return_mdd": 1.0
+  },
+  "entry": {
+    "donchian_n": 20,
+    "ema_trend": 55,
+    "abandon_atr_quantile": 0.85
+  },
+  "exit": {
+    "take_profit_r": 2.5,
+    "time_stop_bars": 36,
+    "hard_sl_pct": 0.009
+  },
+  "position_sizing": {
+    "mode": "atr_risk",
+    "atr_period": 14,
+    "risk_fraction_of_equity": 0.0035,
+    "max_equity_fraction": 0.05,
+    "min_equity_fraction": 0.01
+  },
+  "frequency": {
+    "max_trades_per_day": 8,
+    "cooldown_bars_after_exit": 1,
+    "max_concurrent_positions": 1
+  },
+  "backtest": {
+    "initial_equity": 10000.0,
+    "candle_15m_research": "btc_15m_research.json",
+    "candle_15m_formal_short": "formal_btc_15m_short.json"
+  }
+}

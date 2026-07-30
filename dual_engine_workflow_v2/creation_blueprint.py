@@ -502,9 +502,9 @@ def run_creation_blueprint(
         )
         stages["hypothesis"] = hyp
         if not hyp.get("passed"):
-            # mutate: broaden / shift hints then retry
+            # mutate: broaden / shift hints then retry; after 2 fails switch lens
             core_hints = list(dict.fromkeys(
-                core_hints + ["ret_12", "close_z_20", "range_pct", "dist_roll_low", "atr_pct_14"]
+                core_hints + ["ret_12", "close_z_20", "range_pct", "dist_roll_low", "atr_pct_14", "dist_roll_high"]
             ))
             design.setdefault("mutation_log", []).append({
                 "at": _now(),
@@ -512,6 +512,22 @@ def run_creation_blueprint(
                 "new_hints": core_hints,
                 "loop": loops["hypothesis"],
             })
+            if loops["hypothesis"] >= 2:
+                design, hints, switched = _switch_direction(
+                    design, classic_tried, perspectives_tried,
+                )
+                if switched is None:
+                    fuses["abort_reason"] = "hypothesis_fail_directions_exhausted"
+                    abort = True
+                    break
+                core_hints = hints or core_hints
+                stages["meta"]["design_doc"] = design
+                design.setdefault("mutation_log", []).append({
+                    "at": _now(),
+                    "reason": "hypothesis_fail_switch_direction",
+                    "switched": switched,
+                    "loop": loops["hypothesis"],
+                })
             continue
 
         # ②b Causal counterfactual battery — correlation illusion killer

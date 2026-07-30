@@ -1,0 +1,50 @@
+{
+  "ok": false,
+  "present_to_human": false,
+  "fuses": {
+    "iteration": true,
+    "overfit_drops": 0,
+    "var_rejects": 0,
+    "abort_reason": "hypothesis_loop_exceeded"
+  },
+  "loops": {
+    "hypothesis": 6,
+    "stress": 0
+  },
+  "classic_tried": [],
+  "perspectives_tried": [
+    "P1_trend_pullback"
+  ],
+  "prelim_wr": null,
+  "return_hardness_passed": null,
+  "return_hardness_reasons": null,
+  "socratic": true,
+  "knowledge": true,
+  "causal": null,
+  "multiverse": null,
+  "hypothesis": false,
+  "handoff_zh": "初评未通过或熔断：禁止把胜率<50%或近零收益策略当交付展示。",
+  "deliverables": {
+    "strategy_code": "auto_trade/dual_engine/creation_blueprint/btc_15m_20260730_193116_REJECTED_strategy_code.py",
+    "params": "auto_trade/dual_engine/creation_blueprint/btc_15m_20260730_193116_REJECTED_params.json",
+    "risk_report": "auto_trade/dual_engine/creation_blueprint/btc_15m_20260730_193116_REJECTED_risk_report.md",
+    "blueprint_json": "auto_trade/dual_engine/creation_blueprint/btc_15m_20260730_193116_REJECTED_blueprint.json"
+  },
+  "data": {
+    "n_bars": 4500,
+    "path": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/auto_trade/formal_btc_15m_candles_cache.json",
+    "source": "formal_short_cache",
+    "research": {
+      "ok": false,
+      "backend": "local",
+      "n": null,
+      "error": "not_found",
+      "start_ts": null,
+      "end_ts": null
+    },
+    "note_zh": "使用实盘 formal 短窗；若需 2024YTD 请配置 R2 并运行 research_candles_backfill_r2.py"
+  },
+  "selected": null,
+  "mechanism": "trend_pullback",
+  "lens": "趋势回撤 / 惯性延续"
+}
