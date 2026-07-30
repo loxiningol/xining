@@ -33,7 +33,8 @@ HUMAN_TRANSLATION_MAP = {
     "insufficient_evidence": "统计证据不足（未达到显著性要求）",
     "kb_blocked": "触发 Failure KB 负面指纹拦截",
     "repair_exhausted_or_drift": "第三次复核未过：修补耗尽或逻辑漂移",
-    "gate2_3_fail": "第三次复核未过：适应度 / 矩阵门禁",
+    "gate2_3_fail": "第三次复核未过：适应度 / 矩阵门禁（旧路径）",
+    "review2_evidence_fail": "第二次复核未过：样本/胜率/净值证据不足",
     "pretest_quality_fail": "第一次复核未过：预检契约失败（SHIT_TRANSLATION）",
     "exception": "执行异常，已安全回滚",
     # Mid-run phases

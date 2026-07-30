@@ -22,6 +22,7 @@ STAGE_TO_REVIEW = {
     "funnel_l0_cull": 1,
     "l0_sparse_limit": 1,
     "reset_required": 1,
+    "review2_evidence_fail": 2,
     "l1": 2,
     "seed": 2,
     "funnel_l1_fail": 2,

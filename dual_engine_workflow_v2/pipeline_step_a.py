@@ -87,6 +87,60 @@ _JOB = {"running": False, "kind": None, "started_at": None, "error": None}
 _JOB_LOCK = threading.Lock()
 
 
+def _admission_profile():
+    """Reconstructed post-creation review profile.
+
+    Default ada_t3_calibrated_v1: legacy L0/L1/Gate2–6 are advisory; blocking
+    admission is review_admission_v2 (safety + evidence + AI/human).
+    Set STEP_A_ADMISSION_PROFILE=legacy_funnel to restore old hard floors.
+    """
+    import os
+    return str(os.environ.get("STEP_A_ADMISSION_PROFILE") or "ada_t3_calibrated_v1").strip()
+
+
+def _admission_v2_enabled():
+    return _admission_profile() in (
+        "ada_t3_calibrated_v1", "ada_t3", "1", "true", "on", "reconstructed",
+    )
+
+
+def _soft_skip_legacy(task, stage, detail=None):
+    """Record a legacy hard-gate skip under reconstructed admission."""
+    task.setdefault("admission_v2", {})
+    task["admission_v2"]["profile"] = _admission_profile()
+    skips = task["admission_v2"].setdefault("legacy_soft_skips", [])
+    skips.append({
+        "stage": stage,
+        "at": _now(),
+        "detail": detail or {},
+        "advisory_only": True,
+        "blocking": False,
+    })
+    print(
+        "[pipeline_step_a] admission_v2 soft-skip legacy stage=%s (advisory only)"
+        % stage,
+        flush=True,
+    )
+    return True
+
+
+def _evidence_metrics_from_bt(base_m, trades):
+    from .review_admission_v2 import metrics_from_backtest_result
+    # Prefer explicit base metrics; fall back to trade list.
+    m = dict(base_m or {})
+    if m.get("trades") is None and trades is not None:
+        m["trades"] = len(trades or [])
+    if m.get("win_rate") is None and m.get("win_rate_pct") is not None:
+        m["win_rate"] = m.get("win_rate_pct")
+    if m.get("win_rate") is None and m.get("win_rate_percent") is not None:
+        m["win_rate"] = m.get("win_rate_percent")
+    if m.get("mean_net") is None and trades:
+        synth, _ = metrics_from_backtest_result({"trades": trades})
+        for k, v in synth.items():
+            m.setdefault(k, v)
+    return m
+
+
 def _ai_json(provider, system_prompt, user_payload, max_tokens=2200, temperature=0.35):
     import auto_trade_dual_engine_factory as dual
     return dual._ai_json(provider, system_prompt, user_payload,
@@ -1157,32 +1211,42 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         flush=True,
     )
     if not l0.get("pass"):
-        task["stage"] = "archived"
-        task["phase3_funnel"]["rejected_at"] = "funnel_l0_density"
-        task["phase3_funnel"]["reject_reasons"] = list(l0.get("reject_reasons") or [])
-        task["gate_results"] = assemble_gate_results(task["gates"], tid)
-        save_gate_results(tid, task["gate_results"])
-        _archive_step_a(
-            task, stage="funnel_l0_density",
-            failed_tests=["density_precheck"],
-            reason="L0 density reject: %s" % ",".join(l0.get("reject_reasons") or ["l0_fail"]),
-            verdict="funnel_l0_cull",
-            is_mech_absent=False,
-        )
-        record_pipeline_rejection(
-            task_id=tid, stage="funnel_l0_density",
-            failed_tests=["density_precheck"],
-            reject_reasons=l0.get("reject_reasons") or ["REJECT_TOO_RARE"],
-            dsl=book.get("dsl"), symbol=sym, timeframe=tf,
-        )
-        dual.save_task(task)
-        store.save_task_meta(task)
-        return {
-            "ok": False, "task_id": tid, "reason": "funnel_l0_fail",
-            "phase3_funnel": task["phase3_funnel"],
-            "gate_results": task["gate_results"],
-            "matrix_eval": task.get("matrix_eval"),
-        }
+        if _admission_v2_enabled():
+            _soft_skip_legacy(task, "funnel_l0_density", {
+                "reject_reasons": list(l0.get("reject_reasons") or []),
+                "metrics": l0.get("metrics"),
+            })
+            task["phase3_funnel"]["l0_advisory_fail"] = True
+            task["phase3_funnel"]["reject_reasons_advisory"] = list(
+                l0.get("reject_reasons") or []
+            )
+        else:
+            task["stage"] = "archived"
+            task["phase3_funnel"]["rejected_at"] = "funnel_l0_density"
+            task["phase3_funnel"]["reject_reasons"] = list(l0.get("reject_reasons") or [])
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(
+                task, stage="funnel_l0_density",
+                failed_tests=["density_precheck"],
+                reason="L0 density reject: %s" % ",".join(l0.get("reject_reasons") or ["l0_fail"]),
+                verdict="funnel_l0_cull",
+                is_mech_absent=False,
+            )
+            record_pipeline_rejection(
+                task_id=tid, stage="funnel_l0_density",
+                failed_tests=["density_precheck"],
+                reject_reasons=l0.get("reject_reasons") or ["REJECT_TOO_RARE"],
+                dsl=book.get("dsl"), symbol=sym, timeframe=tf,
+            )
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {
+                "ok": False, "task_id": tid, "reason": "funnel_l0_fail",
+                "phase3_funnel": task["phase3_funnel"],
+                "gate_results": task["gate_results"],
+                "matrix_eval": task.get("matrix_eval"),
+            }
 
     l1_seed = hash(tid) % (2 ** 31) if tid else 42
     task["stage"] = "funnel_l1_micro_screen"
@@ -1263,35 +1327,45 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     task["phase3_funnel"]["l1_micro_screen"] = l1
     task["phase3_funnel"]["matrix_symbols"] = list(matrix_syms) if enable_multi_symbol_matrix else [sym]
     if not l1.get("pass"):
-        task["stage"] = "archived"
-        task["phase3_funnel"]["rejected_at"] = "funnel_l1_micro_screen"
-        task["phase3_funnel"]["reject_reasons"] = list(l1.get("reject_reasons") or [])
-        task["gate_results"] = assemble_gate_results(task["gates"], tid)
-        save_gate_results(tid, task["gate_results"])
-        _archive_step_a(
-            task, stage="funnel_l1_micro_screen",
-            failed_tests=["micro_screen"],
-            reason="L1 micro-screen reject: %s" % ",".join(
-                l1.get("reject_reasons") or ["l1_fail"]),
-            verdict="funnel_l1_cull",
-            # Sample-slice cull is NOT proof of mechanism absence — do not
-            # family-block via failure KB (would poison later calibrated retries).
-            is_mech_absent=False,
-        )
-        record_pipeline_rejection(
-            task_id=tid, stage="funnel_l1_micro_screen",
-            failed_tests=["micro_screen"],
-            reject_reasons=l1.get("reject_reasons") or ["l1_fail"],
-            dsl=book.get("dsl"), symbol=sym, timeframe=tf,
-        )
-        dual.save_task(task)
-        store.save_task_meta(task)
-        return {
-            "ok": False, "task_id": tid, "reason": "funnel_l1_fail",
-            "phase3_funnel": task["phase3_funnel"],
-            "gate_results": task["gate_results"],
-            "matrix_eval": task.get("matrix_eval"),
-        }
+        if _admission_v2_enabled():
+            _soft_skip_legacy(task, "funnel_l1_micro_screen", {
+                "reject_reasons": list(l1.get("reject_reasons") or []),
+                "metrics": l1.get("metrics"),
+            })
+            task["phase3_funnel"]["l1_advisory_fail"] = True
+            task["phase3_funnel"]["reject_reasons_advisory"] = list(
+                task["phase3_funnel"].get("reject_reasons_advisory") or []
+            ) + list(l1.get("reject_reasons") or [])
+        else:
+            task["stage"] = "archived"
+            task["phase3_funnel"]["rejected_at"] = "funnel_l1_micro_screen"
+            task["phase3_funnel"]["reject_reasons"] = list(l1.get("reject_reasons") or [])
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(
+                task, stage="funnel_l1_micro_screen",
+                failed_tests=["micro_screen"],
+                reason="L1 micro-screen reject: %s" % ",".join(
+                    l1.get("reject_reasons") or ["l1_fail"]),
+                verdict="funnel_l1_cull",
+                # Sample-slice cull is NOT proof of mechanism absence — do not
+                # family-block via failure KB (would poison later calibrated retries).
+                is_mech_absent=False,
+            )
+            record_pipeline_rejection(
+                task_id=tid, stage="funnel_l1_micro_screen",
+                failed_tests=["micro_screen"],
+                reject_reasons=l1.get("reject_reasons") or ["l1_fail"],
+                dsl=book.get("dsl"), symbol=sym, timeframe=tf,
+            )
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {
+                "ok": False, "task_id": tid, "reason": "funnel_l1_fail",
+                "phase3_funnel": task["phase3_funnel"],
+                "gate_results": task["gate_results"],
+                "matrix_eval": task.get("matrix_eval"),
+            }
 
     # Full-history BT + Phase-3 WF windows (Calmar≥1.0 + positive expectancy)
     # WF stays on primary seed; Gate2 fitness uses pooled matrix trades when enabled.
@@ -1429,32 +1503,38 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             "rejected_at": incubator.get("rejected_at"),
         }
         if not incubator.get("pass"):
-            task["stage"] = "archived"
-            task["gate_results"] = assemble_gate_results(task["gates"], tid)
-            save_gate_results(tid, task["gate_results"])
-            _archive_step_a(
-                task, stage="phase4_incubator",
-                failed_tests=["incubator"],
-                reason="Phase4 incubator reject: %s" % ",".join(
-                    incubator.get("reject_reasons") or ["incubator_fail"]),
-                verdict="phase4_incubator_reject",
-                is_mech_absent=True,
-            )
-            record_pipeline_rejection(
-                task_id=tid, stage="phase4_incubator",
-                failed_tests=["incubator"],
-                reject_reasons=incubator.get("reject_reasons") or ["incubator_fail"],
-                dsl=definition, symbol=sym, timeframe=tf,
-            )
-            dual.save_task(task)
-            store.save_task_meta(task)
-            return {
-                "ok": False, "task_id": tid, "reason": "phase4_incubator_fail",
-                "phase4_incubator": incubator,
-                "phase3_funnel": task["phase3_funnel"],
-                "gate_results": task["gate_results"],
-                "production_mounted": False,
-            }
+            if _admission_v2_enabled():
+                _soft_skip_legacy(task, "phase4_incubator", {
+                    "reject_reasons": list(incubator.get("reject_reasons") or []),
+                    "cross_asset_score": incubator.get("cross_asset_score"),
+                })
+            else:
+                task["stage"] = "archived"
+                task["gate_results"] = assemble_gate_results(task["gates"], tid)
+                save_gate_results(tid, task["gate_results"])
+                _archive_step_a(
+                    task, stage="phase4_incubator",
+                    failed_tests=["incubator"],
+                    reason="Phase4 incubator reject: %s" % ",".join(
+                        incubator.get("reject_reasons") or ["incubator_fail"]),
+                    verdict="phase4_incubator_reject",
+                    is_mech_absent=True,
+                )
+                record_pipeline_rejection(
+                    task_id=tid, stage="phase4_incubator",
+                    failed_tests=["incubator"],
+                    reject_reasons=incubator.get("reject_reasons") or ["incubator_fail"],
+                    dsl=definition, symbol=sym, timeframe=tf,
+                )
+                dual.save_task(task)
+                store.save_task_meta(task)
+                return {
+                    "ok": False, "task_id": tid, "reason": "phase4_incubator_fail",
+                    "phase4_incubator": incubator,
+                    "phase3_funnel": task["phase3_funnel"],
+                    "gate_results": task["gate_results"],
+                    "production_mounted": False,
+                }
 
     g3 = evaluate_gate3(wf, trades=trades, base_metrics=base_m, null_hypothesis=l3)
     task["gates"].extend([g2, g3])
@@ -1486,6 +1566,15 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     task["repair_log"] = repair_log
     prior_fidelity = fidelity
     need_repair = (not g2["pass"]) or (not g3["pass"])
+    # Reconstructed admission: Gate2/3 fitness is advisory — do NOT burn
+    # viability-archive repair rounds that would reject ADA-T3-class strategies.
+    if need_repair and _admission_v2_enabled():
+        _soft_skip_legacy(task, "gate2_3_repair_loop", {
+            "g2_pass": bool(g2.get("pass")),
+            "g3_pass": bool(g3.get("pass")),
+            "note": "skip_viability_archive_under_admission_v2",
+        })
+        need_repair = False
     archived_by_repair = False
     if need_repair:
         for ri, rtype in enumerate(REPAIR_ROUND_TYPES):
@@ -1596,16 +1685,57 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
                 "gate_results": task.get("gate_results")}
 
     if not g2["pass"] or not g3["pass"]:
-        task["stage"] = "archived"
-        task["gate_results"] = assemble_gate_results(task["gates"], tid)
-        save_gate_results(tid, task["gate_results"])
-        _archive_step_a(task, stage="gate2_3", failed_tests=["backtest_or_wf"],
-                        reason="gate2/3 still failing", verdict="backtest_wf_fail",
-                        is_mech_absent=not g3["pass"])
-        dual.save_task(task)
-        store.save_task_meta(task)
-        return {"ok": False, "task_id": tid, "reason": "gate2_3_fail",
-                "gate_results": task["gate_results"]}
+        if _admission_v2_enabled():
+            from .review_admission_v2 import review2_evidence
+            ev = _evidence_metrics_from_bt(base_m, trades)
+            r2 = review2_evidence(metrics=ev, trades=trades)
+            task.setdefault("admission_v2", {})
+            task["admission_v2"]["review2"] = r2
+            task["admission_v2"]["legacy_gate2"] = {
+                "pass": bool(g2.get("pass")),
+                "evidence": g2.get("evidence"),
+            }
+            task["admission_v2"]["legacy_gate3"] = {
+                "pass": bool(g3.get("pass")),
+                "evidence": g3.get("evidence") if isinstance(g3, dict) else {},
+            }
+            if r2.get("pass"):
+                _soft_skip_legacy(task, "gate2_3", {
+                    "g2_pass": bool(g2.get("pass")),
+                    "g3_pass": bool(g3.get("pass")),
+                    "review2_pass": True,
+                    "review2_metrics": r2.get("metrics"),
+                })
+            else:
+                task["stage"] = "archived"
+                task["gate_results"] = assemble_gate_results(task["gates"], tid)
+                save_gate_results(tid, task["gate_results"])
+                _archive_step_a(
+                    task, stage="review2_evidence",
+                    failed_tests=list(r2.get("reject_reasons") or ["evidence_fail"]),
+                    reason="admission_v2 review2 fail: %s" % ",".join(
+                        r2.get("reject_reasons") or []),
+                    verdict="review2_evidence_fail",
+                )
+                dual.save_task(task)
+                store.save_task_meta(task)
+                return {
+                    "ok": False, "task_id": tid,
+                    "reason": "review2_evidence_fail",
+                    "admission_v2": task.get("admission_v2"),
+                    "gate_results": task["gate_results"],
+                }
+        else:
+            task["stage"] = "archived"
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(task, stage="gate2_3", failed_tests=["backtest_or_wf"],
+                            reason="gate2/3 still failing", verdict="backtest_wf_fail",
+                            is_mech_absent=not g3["pass"])
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {"ok": False, "task_id": tid, "reason": "gate2_3_fail",
+                    "gate_results": task["gate_results"]}
 
     # ---- Gate4: 20 split tests ----
     task["stage"] = "gate4_split_tests"
@@ -1632,20 +1762,25 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     g4 = evaluate_gate4(split_summary)
     task["gates"].append(g4)
     if not g4["pass"]:
-        task["stage"] = "archived"
-        task["gate_results"] = assemble_gate_results(task["gates"], tid)
-        save_gate_results(tid, task["gate_results"])
-        _archive_step_a(
-            task, stage="gate4", failed_tests=split_summary.get("gate4_hard_fail_ids") or ["split"],
-            reason="mechanism_failure in split tests",
-            verdict="split_destruction_mechanism_fail",
-            is_mech_absent=True,
-            counterexamples=["hard_fail:%s" % x for x in (split_summary.get("gate4_hard_fail_ids") or [])],
-        )
-        dual.save_task(task)
-        store.save_task_meta(task)
-        return {"ok": False, "task_id": tid, "reason": "gate4_fail",
-                "gate_results": task["gate_results"]}
+        if _admission_v2_enabled():
+            _soft_skip_legacy(task, "gate4_split_tests", {
+                "hard_fail_ids": split_summary.get("gate4_hard_fail_ids"),
+            })
+        else:
+            task["stage"] = "archived"
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(
+                task, stage="gate4", failed_tests=split_summary.get("gate4_hard_fail_ids") or ["split"],
+                reason="mechanism_failure in split tests",
+                verdict="split_destruction_mechanism_fail",
+                is_mech_absent=True,
+                counterexamples=["hard_fail:%s" % x for x in (split_summary.get("gate4_hard_fail_ids") or [])],
+            )
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {"ok": False, "task_id": tid, "reason": "gate4_fail",
+                    "gate_results": task["gate_results"]}
 
     # ---- Gate5 MC + friction ----
     task["stage"] = "gate5_mc_friction"
@@ -1663,16 +1798,19 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     task["gates"].append(g5)
     task["friction"] = fr
     if not g5["pass"]:
-        task["stage"] = "archived"
-        task["gate_results"] = assemble_gate_results(task["gates"], tid)
-        save_gate_results(tid, task["gate_results"])
-        _archive_step_a(task, stage="gate5", failed_tests=["mc_friction"],
-                        reason="mc/friction fail", verdict="cost_or_robustness_fail",
-                        is_cost=True)
-        dual.save_task(task)
-        store.save_task_meta(task)
-        return {"ok": False, "task_id": tid, "reason": "gate5_fail",
-                "gate_results": task["gate_results"]}
+        if _admission_v2_enabled():
+            _soft_skip_legacy(task, "gate5_mc_friction", {"friction": fr, "mc": mc_summary})
+        else:
+            task["stage"] = "archived"
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(task, stage="gate5", failed_tests=["mc_friction"],
+                            reason="mc/friction fail", verdict="cost_or_robustness_fail",
+                            is_cost=True)
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {"ok": False, "task_id": tid, "reason": "gate5_fail",
+                    "gate_results": task["gate_results"]}
 
     # ---- Gate6 multi-AI (separate, not averaged) ----
     task["stage"] = "gate6_multi_ai"
@@ -1689,23 +1827,30 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     g6 = evaluate_gate6(reviews)
     task["gates"].append(g6)
     if not g6["pass"]:
-        task["stage"] = "archived"
-        task["gate_results"] = assemble_gate_results(task["gates"], tid)
-        save_gate_results(tid, task["gate_results"])
-        _archive_step_a(task, stage="gate6", failed_tests=["multi_ai"],
-                        reason="one or more separate AI reviews failed",
-                        verdict="multi_ai_review_fail",
-                        counterexamples=(reviews.get("deepseek_logic") or {}).get("counterexamples") or [])
-        record_pipeline_rejection(
-            task_id=tid, stage="gate6_multi_ai",
-            failed_tests=["multi_ai_review"],
-            reject_reasons=["gate6_ai_review_fail"],
-            dsl=book.get("dsl"), symbol=sym, timeframe=tf,
-        )
-        dual.save_task(task)
-        store.save_task_meta(task)
-        return {"ok": False, "task_id": tid, "reason": "gate6_fail",
-                "gate_results": task["gate_results"]}
+        if _admission_v2_enabled():
+            _soft_skip_legacy(task, "gate6_multi_ai", {
+                "reviews": {
+                    k: bool((v or {}).get("pass")) for k, v in (reviews or {}).items()
+                },
+            })
+        else:
+            task["stage"] = "archived"
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(task, stage="gate6", failed_tests=["multi_ai"],
+                            reason="one or more separate AI reviews failed",
+                            verdict="multi_ai_review_fail",
+                            counterexamples=(reviews.get("deepseek_logic") or {}).get("counterexamples") or [])
+            record_pipeline_rejection(
+                task_id=tid, stage="gate6_multi_ai",
+                failed_tests=["multi_ai_review"],
+                reject_reasons=["gate6_ai_review_fail"],
+                dsl=book.get("dsl"), symbol=sym, timeframe=tf,
+            )
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {"ok": False, "task_id": tid, "reason": "gate6_fail",
+                    "gate_results": task["gate_results"]}
 
     # ---- Phase 5: 3-party AI unanimous consensus ----
     task["stage"] = "phase5_3party_consensus"
@@ -1751,35 +1896,41 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     _save_artifact(tid, "phase5_consensus", task["phase5_consensus"])
 
     if not p5_result.get("approved"):
-        task["stage"] = "archived"
-        task["gate_results"] = assemble_gate_results(task["gates"], tid)
-        save_gate_results(tid, task["gate_results"])
-        _archive_step_a(
-            task, stage="phase5_3party_consensus",
-            failed_tests=["phase5_unanimous"],
-            reason="Phase5 3-party AI consensus rejected: %s" % ", ".join(
-                p5_result.get("fail_reasons") or ["consensus_fail"]),
-            verdict="phase5_consensus_reject",
-            counterexamples=[
-                "%s:%s" % (r.get("dimension"), r.get("reason") or "")
-                for r in (p5_result.get("reviews") or [])
-                if r.get("decision") != "APPROVE"
-            ][:5],
-        )
-        record_pipeline_rejection(
-            task_id=tid, stage="phase5_3party_consensus",
-            failed_tests=["phase5_unanimous"],
-            reject_reasons=p5_result.get("fail_reasons") or ["consensus_fail"],
-            dsl=definition, symbol=sym, timeframe=tf,
-        )
-        dual.save_task(task)
-        store.save_task_meta(task)
-        return {
-            "ok": False, "task_id": tid, "reason": "phase5_consensus_fail",
-            "phase5_consensus": task["phase5_consensus"],
-            "gate_results": task["gate_results"],
-            "production_mounted": False,
-        }
+        if _admission_v2_enabled():
+            _soft_skip_legacy(task, "phase5_3party_consensus", {
+                "fail_reasons": p5_result.get("fail_reasons"),
+                "fatal_any": p5_result.get("fatal_any"),
+            })
+        else:
+            task["stage"] = "archived"
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(
+                task, stage="phase5_3party_consensus",
+                failed_tests=["phase5_unanimous"],
+                reason="Phase5 3-party AI consensus rejected: %s" % ", ".join(
+                    p5_result.get("fail_reasons") or ["consensus_fail"]),
+                verdict="phase5_consensus_reject",
+                counterexamples=[
+                    "%s:%s" % (r.get("dimension"), r.get("reason") or "")
+                    for r in (p5_result.get("reviews") or [])
+                    if r.get("decision") != "APPROVE"
+                ][:5],
+            )
+            record_pipeline_rejection(
+                task_id=tid, stage="phase5_3party_consensus",
+                failed_tests=["phase5_unanimous"],
+                reject_reasons=p5_result.get("fail_reasons") or ["consensus_fail"],
+                dsl=definition, symbol=sym, timeframe=tf,
+            )
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {
+                "ok": False, "task_id": tid, "reason": "phase5_consensus_fail",
+                "phase5_consensus": task["phase5_consensus"],
+                "gate_results": task["gate_results"],
+                "production_mounted": False,
+            }
 
     # Split scores
     wr = base_m.get("win_rate_pct")
@@ -1808,19 +1959,46 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     task["stage"] = "gate7_human_confirm"
     import auto_trade_human_confirm_pipeline as pipeline
     from .incubator import metrics_from_trades as _inc_metrics_g7
+    from .review_admission_v2 import evaluate_admission, review1_safety, review2_evidence
     incub = task.get("phase4_incubator") or {}
     incub_m = incub.get("baseline_metrics") or _inc_metrics_g7(trades)
+    ev_m = _evidence_metrics_from_bt(base_m, trades)
+    # Ensure review2 recorded even when legacy Gate2 passed
+    if not (task.get("admission_v2") or {}).get("review2"):
+        task.setdefault("admission_v2", {})
+        task["admission_v2"]["review2"] = review2_evidence(metrics=ev_m, trades=trades)
+    r2 = (task.get("admission_v2") or {}).get("review2") or {}
+    if _admission_v2_enabled() and not r2.get("pass"):
+        task["stage"] = "archived"
+        task["gate_results"] = assemble_gate_results(task["gates"], tid)
+        save_gate_results(tid, task["gate_results"])
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": False, "task_id": tid, "reason": "review2_evidence_fail",
+            "admission_v2": task.get("admission_v2"),
+            "gate_results": task["gate_results"],
+            "production_mounted": False,
+        }
     ai_review = {
         "approved": True,
-        "policy": "step_a_gates_0_6_pass_phase4_incubator",
+        "policy": (
+            "admission_v2_ada_t3_calibrated"
+            if _admission_v2_enabled()
+            else "step_a_gates_0_6_pass_phase4_incubator"
+        ),
         "ai_theoretical_wr_avg": task["split_scores"].get("ai_logic_wr", {}).get("win_rate_pct"),
         "natural_language": (
+            "三复核（ADA-T3校准）通过：安全结构 + 证据稳定性 + AI；"
+            "已接入原 WxPusher 人工确认通道。production_mounted=False。"
+            if _admission_v2_enabled() else
             "STEP A gates0-6 + Phase3 funnel + Phase4 incubator pass; "
             "awaiting human confirm. NOT live-ready. production_mounted=False."
         ),
         "split_scores": task["split_scores"],
         "step_a": True,
         "phase4_incubator": True,
+        "admission_v2": bool(_admission_v2_enabled()),
         "calmar": incub.get("calmar") or incub_m.get("calmar") or base_m.get("calmar"),
         "payoff": incub.get("payoff_ratio") or incub_m.get("payoff_ratio") or base_m.get("payoff_ratio"),
         "cross_asset_score": incub.get("cross_asset_score"),
@@ -1833,10 +2011,28 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
          "live_enabled": False, "auto_trade_eligible": False,
          "production_mounted": False,
          "phase4_incubator": incub},
-        source="dual_engine_step_a",
+        source="dual_engine_step_a_admission_v2" if _admission_v2_enabled() else "dual_engine_step_a",
         ai_review=ai_review,
         require_ai_review=True,
     )
+    adm = evaluate_admission(
+        definition=definition,
+        lookahead_ok=True,
+        death_reason=None,
+        metrics=ev_m,
+        trades=trades,
+        ai_review=ai_review,
+        pending_ok=bool(push.get("ok")),
+        l0=(task.get("phase3_funnel") or {}).get("l0_density"),
+        l1=l1,
+        gate2_fitness=(g2.get("evidence") or {}).get("fitness") if isinstance(g2, dict) else None,
+    )
+    task.setdefault("admission_v2", {})
+    task["admission_v2"].update({
+        "final": adm,
+        "review1": review1_safety(definition, lookahead_ok=True),
+        "review3_pending": bool(push.get("ok")),
+    })
     human_state = {
         "pending_ok": bool(push.get("ok")),
         "awaiting_human": bool(push.get("ok")),
@@ -1844,6 +2040,8 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         "auto_open_mounted": False,
         "real_size_granted": False,
         "push": {"ok": push.get("ok"), "key": push.get("key"), "reason": push.get("reason")},
+        "admission_v2": True,
+        "admission_profile": _admission_profile(),
     }
     task["human_confirm_state"] = human_state
     g7 = evaluate_gate7(human_state)
