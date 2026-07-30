@@ -648,11 +648,24 @@ def build_slots_board(vector_root=None, display_history=5):
     # Pull enough history to prune completed correctly (keep newest 2 of ≥3).
     recent = _recent_run_payloads(str(root), limit=max(display_history + 6, 12))
     recent = [_normalize_payload_running(p, is_global_live=False) for p in recent]
+    # Enrich sparse historical snapshots so prune/state see real cull stage
+    enriched = []
+    for p in [current] + recent:
+        if not isinstance(p, dict):
+            continue
+        pp = dict(p)
+        diag = pp.get("diagnostic") or {}
+        if not diag.get("ok") or not diag.get("stage"):
+            try:
+                pp["diagnostic"] = _ensure_diagnostic(pp)
+            except Exception:
+                pass
+        enriched.append(pp)
 
     seen = set()
     seen_family_running = set()
     ordered = []
-    for payload in [current] + recent:
+    for payload in enriched:
         if not isinstance(payload, dict):
             continue
         strat = payload.get("strategy") or {}
