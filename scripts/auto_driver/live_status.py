@@ -34,6 +34,9 @@ def humanize_mechanism_title(symbol, timeframe, family=None, mechanism_name=None
     catalog = {
         "session_vol_squeeze_expansion": ("亚盘狭幅压缩突破", "Session Volatility Squeeze"),
         "session_vol_squeeze_expansion_v1": ("亚盘狭幅压缩突破", "Session Volatility Squeeze"),
+        "asia_sweep_fade": ("亚盘极值扫单反手", "Asia Sweep Fade"),
+        "asia_sweep_fade_v1": ("亚盘极值扫单反手", "Asia Sweep Fade"),
+        "asia_range_sweep_fade": ("亚盘极值扫单反手", "Asia Sweep Fade"),
         "session_liq_engulf_displace_matrix": ("会话流动性吞没置换", "Session Liq Engulf"),
         "macro_sfp_displacement": ("宏观流动性扫荡回收", "Macro SFP Displacement"),
         "compression_release_structural_breakout": ("波动压缩后结构突破", "Compression Release Breakout"),

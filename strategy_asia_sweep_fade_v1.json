@@ -1,0 +1,178 @@
+{
+  "ok": true,
+  "errors": [],
+  "schema": "qiyu_step_a_v1",
+  "artifact": "strategy_candidate_pack",
+  "call_id": "prebuilt_asia_sweep_fade_v1",
+  "attempts": 0,
+  "meta": {
+    "symbol": "ETH-USDT-SWAP",
+    "timeframe": "15m",
+    "direction": "long",
+    "title": "[38标的] 亚盘极值扫单反手",
+    "title_zh": "[38标的] 亚盘极值扫单反手 (Asia Sweep Fade)",
+    "thesis": "Invert archived session_vol_squeeze (false Asia breakouts / Calmar<-1). EU/US window (08–18 UTC) wick-sweeps asia_high/asia_low then reclaims inside the Asia box with vol_z20>1.5 displacement body. Fade the sweep: long after asia_low sweep+reclaim; short after asia_high sweep+reclaim. Trail 3.5×ATR_14; logical stop ≈ sweep wick via swing_extreme(2); outer protective SL 0.9% immutable.",
+    "source": "handcraft_workflow_v2_asia_sweep_fade_v1",
+    "primary_submit": "ETH-USDT-SWAP 15m long",
+    "replaces_archived_family": "session_vol_squeeze_expansion_v1"
+  },
+  "mechanism_spec": {
+    "mechanism_id": "mech_asia_sweep_fade_v1_eth15m",
+    "mechanism_name": "asia_sweep_fade_v1",
+    "mechanism_family": "asia_sweep_fade_v1",
+    "display_title_zh": "[38标的] 亚盘极值扫单反手",
+    "market_inefficiency": "EU/US session often hunts resting Asia-box stops beyond asia_high/asia_low, then rejects as liquidity is absorbed. Breakout chasers who chase the wick become forced inventory for the fade.",
+    "counterparty_source": "Asia-range breakout chasers and stop-runners who enter on the wick beyond asia_high/asia_low and are forced to unwind when price reclaims inside the Asia box.",
+    "why_edge_exists": "Asia High/Low is a completed discrete UTC [00:00,08:00) liquidity box. Wick pierce + close reclaim + vol_z20>1.5 selects institutional sweep-and-reject (not true expansion). Opposite of archived session_vol_squeeze which required close acceptance beyond the extreme.",
+    "edge_decay_conditions": "True session expansion days (close holds beyond Asia extreme); thin holiday Asia boxes; correlated cascade where reclaim fails immediately; overcrowded SFP bots on same levels.",
+    "required_market_regime": "Two-way crypto/commodity 15m with defined Asia box then EU/US liquidity hunt. Features: hour_utc, asia_high/low/mid, high/low/open/close, vol_z20. No EMA/CCI/RSI core.",
+    "entry_logic": "LONG ALL: (1) 8<=hour_utc<18; (2) low < asia_low (wick sweep); (3) close > asia_low (reclaim inside); (4) close < asia_high (still inside box); (5) vol_z20 > 1.5; (6) close > open (bull displacement). SHORT mirror: high > asia_high; close < asia_high; close > asia_low; vol_z20>1.5; close < open.",
+    "exit_logic": "atr_trailing n_atr=3.5 ATR_14 take_profit (harvest mean-revert toward asia_mid / opposite Asia bound). swing_extreme lookback=5 invalidation (DSL min; proxy for recent sweep-wick extreme + buffer). Outer protective SL 0.9% immutable. max_hold_bars=40. No fixed % TP.",
+    "stop_logic": "Logical invalidation near sweep wick via swing_extreme(5) (DSL lookback floor [5,60]; approximates wick extreme + buffer). Outer protective SL 0.9% immutable — never widen.",
+    "take_profit_logic": "No fixed % TP. atr_trailing 3.5×ATR_14 only.",
+    "invalidation_logic": "swing_extreme lookback=5; max_hold_bars=40; failed reclaim / acceptance beyond Asia extreme.",
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "no_ema_cci_rsi_as_core_edge",
+      "must_keep_asia_box_sweep_and_reclaim",
+      "must_keep_eu_us_window_hour_utc_8_18",
+      "must_keep_vol_z20_gt_1_5",
+      "must_keep_displacement_body",
+      "must_use_atr_trailing",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm",
+      "not_rename_into_session_vol_squeeze_or_session_liq_engulf_families",
+      "never_lower_gate2_floors"
+    ],
+    "tunable_parameters": [
+      "vol_z20_min",
+      "atr_trail_n",
+      "swing_lookback",
+      "max_hold_bars",
+      "hour_utc_window_end"
+    ],
+    "forbidden_transformations": [
+      "rename_into_session_vol_squeeze_expansion_or_session_liq_engulf",
+      "convert_to_close_acceptance_breakout_beyond_asia_extreme",
+      "swap_asia_box_to_rolling_donchian_only",
+      "inject_ema_cci_rsi_as_core_filter",
+      "add_fixed_micro_tp_below_2pct",
+      "remove_sweep_or_reclaim_leg",
+      "weaken_or_widen_0.9_protective_sl",
+      "auto_mount_or_confirm_without_human",
+      "lower_gate2_floors"
+    ],
+    "expected_trade_frequency_class": "selective_0.3_to_1_5_per_day_15m_matrix",
+    "expected_holding_period": "2_to_40_bars_15m",
+    "suitable_symbols": [
+      "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP", "DOGE-USDT-SWAP",
+      "BNB-USDT-SWAP", "ADA-USDT-SWAP", "LTC-USDT-SWAP", "LINK-USDT-SWAP", "AVAX-USDT-SWAP",
+      "SUI-USDT-SWAP", "PEPE-USDT-SWAP", "BONK-USDT-SWAP", "WIF-USDT-SWAP", "NEAR-USDT-SWAP",
+      "APT-USDT-SWAP", "ARB-USDT-SWAP", "OP-USDT-SWAP", "INJ-USDT-SWAP", "SEI-USDT-SWAP",
+      "TIA-USDT-SWAP", "DOT-USDT-SWAP", "ATOM-USDT-SWAP", "UNI-USDT-SWAP", "AAVE-USDT-SWAP",
+      "FIL-USDT-SWAP", "ICP-USDT-SWAP", "RENDER-USDT-SWAP", "ONDO-USDT-SWAP", "JUP-USDT-SWAP",
+      "ORDI-USDT-SWAP", "WLD-USDT-SWAP", "TRX-USDT-SWAP", "BCH-USDT-SWAP", "ETC-USDT-SWAP",
+      "XAU-USDT-SWAP", "XAG-USDT-SWAP", "CL-USDT-SWAP"
+    ],
+    "suitable_timeframes": ["15m"]
+  },
+  "dsl": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "asia_sweep_fade_v1_eth15m_long",
+    "name": "[38标的] 亚盘极值扫单反手",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": ["ETH-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {"id": "e_eu_us_ge", "left": {"feature": "hour_utc"}, "op": "gte", "right": {"value": 8.0}},
+        {"id": "e_eu_us_lt", "left": {"feature": "hour_utc"}, "op": "lt", "right": {"value": 18.0}},
+        {"id": "e_sweep_asia_low", "left": {"feature": "low"}, "op": "lt", "right": {"feature": "asia_low"}},
+        {"id": "e_reclaim_asia_low", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "asia_low"}},
+        {"id": "e_inside_box_lt_high", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "asia_high"}},
+        {"id": "e_vol_displace", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.5}},
+        {"id": "e_bull_body", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}}
+      ]
+    },
+    "exit": {
+      "any": [
+        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.5, "atr_period": 14, "role": "take_profit"},
+        {"id": "x_sw_wick", "exit_op": "swing_extreme", "lookback": 5, "role": "invalidation"}
+      ]
+    },
+    "max_hold_bars": 40,
+    "description": "step_a|asia_sweep_fade_v1|hour8_18|sweep_asia_low|reclaim_inside|volz1.5|body|atr_trail3.5|sw5|sl0.9",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "asia_sweep_fade_v1_eth15m_long",
+    "name": "[38标的] 亚盘极值扫单反手",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": ["ETH-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {"id": "e_eu_us_ge", "left": {"feature": "hour_utc"}, "op": "gte", "right": {"value": 8.0}},
+        {"id": "e_eu_us_lt", "left": {"feature": "hour_utc"}, "op": "lt", "right": {"value": 18.0}},
+        {"id": "e_sweep_asia_low", "left": {"feature": "low"}, "op": "lt", "right": {"feature": "asia_low"}},
+        {"id": "e_reclaim_asia_low", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "asia_low"}},
+        {"id": "e_inside_box_lt_high", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "asia_high"}},
+        {"id": "e_vol_displace", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.5}},
+        {"id": "e_bull_body", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}}
+      ]
+    },
+    "exit": {
+      "any": [
+        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.5, "atr_period": 14, "role": "take_profit"},
+        {"id": "x_sw_wick", "exit_op": "swing_extreme", "lookback": 5, "role": "invalidation"}
+      ]
+    },
+    "max_hold_bars": 40,
+    "description": "step_a|asia_sweep_fade_v1|hour8_18|sweep_asia_low|reclaim_inside|volz1.5|body|atr_trail3.5|sw5|sl0.9",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "asia_sweep_fade_v1_eth15m_short",
+    "name": "[38标的] 亚盘极值扫单反手·空",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": ["ETH-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {"id": "e_eu_us_ge", "left": {"feature": "hour_utc"}, "op": "gte", "right": {"value": 8.0}},
+        {"id": "e_eu_us_lt", "left": {"feature": "hour_utc"}, "op": "lt", "right": {"value": 18.0}},
+        {"id": "e_sweep_asia_high", "left": {"feature": "high"}, "op": "gt", "right": {"feature": "asia_high"}},
+        {"id": "e_reclaim_asia_high", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "asia_high"}},
+        {"id": "e_inside_box_gt_low", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "asia_low"}},
+        {"id": "e_vol_displace", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.5}},
+        {"id": "e_bear_body", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "open"}}
+      ]
+    },
+    "exit": {
+      "any": [
+        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.5, "atr_period": 14, "role": "take_profit"},
+        {"id": "x_sw_wick", "exit_op": "swing_extreme", "lookback": 5, "role": "invalidation"}
+      ]
+    },
+    "max_hold_bars": 40,
+    "description": "step_a|asia_sweep_fade_v1|short|hour8_18|sweep_asia_high|reclaim_inside|volz1.5|body|atr_trail3.5|sw5|sl0.9",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "pipeline_readiness": {
+    "prebuilt": true,
+    "human_confirm_required_for_mount": true,
+    "auto_mount": false
+  }
+}
