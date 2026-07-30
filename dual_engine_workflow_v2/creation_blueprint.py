@@ -474,9 +474,12 @@ def run_creation_blueprint(
         "stress_passed": (stages.get("stress") or {}).get("passed"),
         "fuses": fuses,
         "instructions_zh": (
-            "你是总指挥。下列结果来自创造蓝图 ①元思考→②假设验证→③挖掘+QuantOracle→"
-            "④Alphalens筛选→⑤压力/红队。请据此写 mechanism_spec；"
-            "禁止与 QuantOracle certified 数字冲突；禁止声称已过复核。"
+            "【发散强制】请先列举 3 种完全不同的市场微观结构视角来解释当前指令，"
+            "然后再选择其中一种深入推演——禁止一上来直接写策略。"
+            "你是总指挥。下列结果来自创造蓝图 ①元思考→②假设验证(含winsorize/neutralize)"
+            "→③挖掘+QuantOracle→④Alphalens筛选→⑤压力/红队。"
+            "请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突；"
+            "禁止声称已过复核。"
         ),
         "built_at": _now(),
     }

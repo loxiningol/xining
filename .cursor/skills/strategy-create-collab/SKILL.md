@@ -18,13 +18,19 @@ description: >-
 
 | 阶段 | 工具/角色 | 任务 |
 |---|---|---|
-| ① 元思考 | MetaGPT/AutoGen 风格多角色 | 策略设计文档：逻辑/假设/风险边界/失效场景 |
-| ② 假设验证 | Alphalens / CausalImpact 风格 | IC/IR/换手 + 因果效应，剔除伪相关 |
+| ① 元思考 | MetaGPT/AutoGen 风格多角色 | **先强制发散**：列举 3 种完全不同微观结构视角，再择一深入；然后出设计文档 |
+| ② 假设验证 | Alphalens / CausalImpact 风格 | **winsorize 去极值 + neutralize 中性化** → IC/IR/换手 + 因果 |
 | ③ 因子挖掘 | EasyQuant + DeepSeek + QuantOracle | 挖因子并用确定性计算认证 |
-| ④ 快速筛选 | Alphalens 风格再筛 | IC/IR/换手；过拟合熔断 |
+| ④ 快速筛选 | Alphalens 风格再筛 | 再次 winsorize/neutralize 后 IC/IR/换手；过拟合熔断 |
 | ⑤ 压力测试 | Backtrader 极端 + AutoGen 红队 | 危机窗口与对抗冲击 |
 
 之后才进入**现有** ADA5 四复核（本 skill 不改复核代码）。
+
+## 铁律（创造时必须遵守）
+
+1. **元思考发散**：GLM 提示词开头强制「先列举 3 种完全不同的市场微观结构视角，再择一深入」——用 Prompt 弥补辩论缺失。
+2. **Alphalens 底线**：轻量适配器必须保留并执行 `winsorize`（去极值）与 `neutralize`（对市值/行业或加密代理暴露中性化），不可省略。
+3. 数字以 QuantOracle 为准；蓝图不含复核，不改 ADA5 路径。
 
 ## 熔断
 

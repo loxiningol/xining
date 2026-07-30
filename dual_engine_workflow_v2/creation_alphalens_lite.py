@@ -5,6 +5,10 @@ Provides IC / IR / turnover screening and a light causal check so stages
 ② and ④ of the creation blueprint run on the VPS without installing
 alphalens / causalimpact (memory-hostile on 764MB hosts).
 
+Baseline Alphalens hygiene (MUST NOT be omitted):
+  - winsorize: clip extreme factor values at configurable quantiles
+  - neutralize: residualize factor vs exposure columns (mkt/sector proxies)
+
 When real packages are present, probe() reports them; math stays local
 and reproducible so QuantOracle remains the risk authority.
 """
@@ -23,8 +27,10 @@ def probe():
         "ok": True,
         "provider": "alphalens_causal_lite_v1",
         "backends": {"alphalens": False, "causalimpact": False},
+        "baseline_ops": ["winsorize", "neutralize"],
         "notes": [
             "Using local IC/IR/turnover + pre/post causal adapter.",
+            "winsorize + neutralize are mandatory baseline factor hygiene.",
             "Install alphalens/causalimpact later for richer plots; not required.",
         ],
         "probed_at": _now(),
@@ -36,6 +42,264 @@ def probe():
         except Exception:
             pass
     return out
+
+
+def winsorize(values, limits=(0.01, 0.01)):
+    """Alphalens-style winsorize — clip extremes at lower/upper quantiles.
+
+    limits: (lower_frac, upper_frac), e.g. (0.01, 0.01) → clip to [1%, 99%].
+    None entries preserved. This is a retained baseline — do not omit.
+    """
+    if limits is None:
+        limits = (0.01, 0.01)
+    lo_f, hi_f = float(limits[0]), float(limits[1])
+    finite = []
+    for v in values or []:
+        if v is None:
+            continue
+        try:
+            fv = float(v)
+        except Exception:
+            continue
+        if math.isnan(fv) or math.isinf(fv):
+            continue
+        finite.append(fv)
+    if len(finite) < 10:
+        return list(values or []), {"ok": False, "reason": "insufficient", "n": len(finite)}
+    ordered = sorted(finite)
+    n = len(ordered)
+    lo_i = max(0, int(math.floor(n * lo_f)))
+    hi_i = min(n - 1, int(math.ceil(n * (1.0 - hi_f)) - 1))
+    if hi_i < lo_i:
+        hi_i = lo_i
+    lo_v = ordered[lo_i]
+    hi_v = ordered[hi_i]
+    out = []
+    n_clip = 0
+    for v in values or []:
+        if v is None:
+            out.append(None)
+            continue
+        try:
+            fv = float(v)
+        except Exception:
+            out.append(None)
+            continue
+        if math.isnan(fv) or math.isinf(fv):
+            out.append(None)
+            continue
+        if fv < lo_v:
+            out.append(lo_v)
+            n_clip += 1
+        elif fv > hi_v:
+            out.append(hi_v)
+            n_clip += 1
+        else:
+            out.append(fv)
+    return out, {
+        "ok": True,
+        "op": "winsorize",
+        "limits": [lo_f, hi_f],
+        "lo": lo_v,
+        "hi": hi_v,
+        "n_clip": n_clip,
+        "n": n,
+    }
+
+
+def _ols_residual(y, x_cols):
+    """Multi-exposure OLS residual via normal equations (no numpy required).
+
+    y: list[float], x_cols: list[list[float]] same length, each exposure series.
+    Returns residuals list (aligned) or None on failure.
+    """
+    n = len(y)
+    if n < 10:
+        return None
+    # Design matrix columns: intercept + exposures
+    k = 1 + len(x_cols)
+    # Build X'X and X'y
+    xtx = [[0.0] * k for _ in range(k)]
+    xty = [0.0] * k
+    for i in range(n):
+        row = [1.0] + [float(col[i]) for col in x_cols]
+        yi = float(y[i])
+        for a in range(k):
+            xty[a] += row[a] * yi
+            for b in range(k):
+                xtx[a][b] += row[a] * row[b]
+    # Gaussian elimination
+    aug = [xtx[r][:] + [xty[r]] for r in range(k)]
+    for col in range(k):
+        pivot = col
+        for r in range(col + 1, k):
+            if abs(aug[r][col]) > abs(aug[pivot][col]):
+                pivot = r
+        if abs(aug[pivot][col]) < 1e-12:
+            return None
+        if pivot != col:
+            aug[col], aug[pivot] = aug[pivot], aug[col]
+        div = aug[col][col]
+        for j in range(col, k + 1):
+            aug[col][j] /= div
+        for r in range(k):
+            if r == col:
+                continue
+            factor = aug[r][col]
+            for j in range(col, k + 1):
+                aug[r][j] -= factor * aug[col][j]
+    beta = [aug[r][k] for r in range(k)]
+    resid = []
+    for i in range(n):
+        pred = beta[0]
+        for j, col in enumerate(x_cols):
+            pred += beta[j + 1] * float(col[i])
+        resid.append(float(y[i]) - pred)
+    return resid
+
+
+def neutralize(factor_values, exposures=None, exposure_names=None):
+    """Alphalens-style neutralize — residualize factor vs exposures.
+
+    Classic equity usage: neutralize vs market-cap + industry dummies.
+    Crypto / single-swap fallback exposures (when exposures is None/empty):
+      - ones drift already in intercept
+      - ret_1 market proxy (pass via exposures dict key 'mkt' / 'ret_1')
+      - abs_ret_1 or atr as 'vol' proxy
+      - range_pct as 'liquidity_proxy'
+
+    This is a retained baseline — do not omit from the adapter.
+    """
+    n = len(factor_values or [])
+    if n == 0:
+        return list(factor_values or []), {"ok": False, "reason": "empty", "op": "neutralize"}
+
+    # Build exposure columns aligned to factor; drop rows with any None
+    exp_map = {}
+    if isinstance(exposures, dict):
+        exp_map = exposures
+    elif isinstance(exposures, (list, tuple)) and exposures and isinstance(exposures[0], (list, tuple)):
+        names = exposure_names or ["e%d" % i for i in range(len(exposures))]
+        exp_map = {names[i]: exposures[i] for i in range(len(exposures))}
+
+    names = list(exp_map.keys())
+    y_idx = []
+    y = []
+    cols = [[] for _ in names]
+    for i, v in enumerate(factor_values or []):
+        if v is None:
+            continue
+        try:
+            fv = float(v)
+        except Exception:
+            continue
+        if math.isnan(fv) or math.isinf(fv):
+            continue
+        row_ok = True
+        row_x = []
+        for name in names:
+            series = exp_map[name]
+            if i >= len(series) or series[i] is None:
+                row_ok = False
+                break
+            try:
+                xv = float(series[i])
+            except Exception:
+                row_ok = False
+                break
+            if math.isnan(xv) or math.isinf(xv):
+                row_ok = False
+                break
+            row_x.append(xv)
+        if not row_ok:
+            continue
+        y_idx.append(i)
+        y.append(fv)
+        for j, xv in enumerate(row_x):
+            cols[j].append(xv)
+
+    out = [None] * n
+    meta = {
+        "ok": False,
+        "op": "neutralize",
+        "exposures": names,
+        "n_used": len(y),
+    }
+    if not names:
+        # No exposures: demean only (intercept-only neutralize)
+        finite = [float(v) for v in (factor_values or []) if v is not None]
+        if len(finite) < 10:
+            meta["reason"] = "insufficient_no_exposure"
+            return list(factor_values or []), meta
+        mu = sum(finite) / float(len(finite))
+        for i, v in enumerate(factor_values or []):
+            if v is None:
+                continue
+            try:
+                out[i] = float(v) - mu
+            except Exception:
+                out[i] = None
+        meta["ok"] = True
+        meta["mode"] = "demean_only"
+        meta["n_used"] = len(finite)
+        return out, meta
+
+    if len(y) < max(20, 5 * (1 + len(names))):
+        meta["reason"] = "insufficient_rows"
+        # fall back to demean on available y
+        if len(y) >= 10:
+            mu = sum(y) / float(len(y))
+            for i, yi in zip(y_idx, y):
+                out[i] = yi - mu
+            meta["ok"] = True
+            meta["mode"] = "demean_fallback"
+            return out, meta
+        return list(factor_values or []), meta
+
+    resid = _ols_residual(y, cols)
+    if resid is None:
+        meta["reason"] = "ols_fail"
+        return list(factor_values or []), meta
+    for i, r in zip(y_idx, resid):
+        out[i] = r
+    meta["ok"] = True
+    meta["mode"] = "ols_residual"
+    return out, meta
+
+
+def prepare_factor(factor_values, exposures=None, winsor_limits=(0.01, 0.01)):
+    """Mandatory hygiene pipeline: winsorize → neutralize.
+
+    Returns cleaned series + audit dict. Call before IC/IR screening.
+    """
+    w_vals, w_meta = winsorize(factor_values, limits=winsor_limits)
+    n_vals, n_meta = neutralize(w_vals, exposures=exposures)
+    return n_vals, {
+        "winsorize": w_meta,
+        "neutralize": n_meta,
+        "pipeline": ["winsorize", "neutralize"],
+    }
+
+
+def default_crypto_exposures(factor_matrix):
+    """Build neutralize exposures from OKX factor matrix proxies.
+
+    Equity Alphalens uses mkt-cap + industry; here:
+      mkt   ← ret_1 (market/own-return proxy)
+      vol   ← abs_ret_1 or atr_pct_14
+      liq   ← range_pct
+    """
+    fm = factor_matrix or {}
+    exp = {}
+    if fm.get("ret_1"):
+        exp["mkt"] = fm["ret_1"]
+    if fm.get("abs_ret_1"):
+        exp["vol"] = fm["abs_ret_1"]
+    elif fm.get("atr_pct_14"):
+        exp["vol"] = fm["atr_pct_14"]
+    if fm.get("range_pct"):
+        exp["liq"] = fm["range_pct"]
+    return exp
 
 
 def _rank(xs):
@@ -150,10 +414,18 @@ def quantile_turnover(factor_values, q=0.8, lookback=1):
 
 
 def screen_factor(factor_values, fwd_returns, name="factor",
-                 min_abs_ic=0.02, min_ir=0.15, max_turnover=0.65):
-    """Stage ②/④ gate on one factor series."""
-    ic_pack = rolling_ic(factor_values, fwd_returns)
-    turn_pack = quantile_turnover(factor_values)
+                 min_abs_ic=0.02, min_ir=0.15, max_turnover=0.65,
+                 exposures=None, winsor_limits=(0.01, 0.01),
+                 apply_hygiene=True):
+    """Stage ②/④ gate on one factor series (winsorize+neutralize first)."""
+    hygiene = None
+    series = factor_values
+    if apply_hygiene:
+        series, hygiene = prepare_factor(
+            factor_values, exposures=exposures, winsor_limits=winsor_limits,
+        )
+    ic_pack = rolling_ic(series, fwd_returns)
+    turn_pack = quantile_turnover(series)
     ic_mean = ic_pack.get("ic_mean")
     ir = ic_pack.get("ir")
     turn = turn_pack.get("turnover")
@@ -184,10 +456,12 @@ def screen_factor(factor_values, fwd_returns, name="factor",
         "reasons": reasons,
         "ic": ic_pack,
         "turnover": turn_pack,
+        "hygiene": hygiene,
         "thresholds": {
             "min_abs_ic": min_abs_ic,
             "min_ir": min_ir,
             "max_turnover": max_turnover,
+            "winsor_limits": list(winsor_limits) if winsor_limits else None,
         },
         "at": _now(),
     }
@@ -230,15 +504,28 @@ def causal_pre_post(factor_values, fwd_returns, q=0.8):
     }
 
 
-def validate_hypothesis(factor_matrix, fwd_returns, core_factors=None):
-    """Stage ②: screen core hypothesis factors + causal check."""
+def validate_hypothesis(factor_matrix, fwd_returns, core_factors=None,
+                        exposures=None, winsor_limits=(0.01, 0.01)):
+    """Stage ②: winsorize+neutralize → screen core factors + causal check."""
     core_factors = list(core_factors or []) or list((factor_matrix or {}).keys())[:4]
+    if exposures is None:
+        exposures = default_crypto_exposures(factor_matrix)
     rows = []
     any_pass = False
     for name in core_factors:
         series = (factor_matrix or {}).get(name) or []
-        screen = screen_factor(series, fwd_returns, name=name)
-        causal = causal_pre_post(series, fwd_returns)
+        # Exclude self-exposure when factor equals an exposure column
+        exp_use = {k: v for k, v in (exposures or {}).items() if k != name and name not in (k,)}
+        # Also drop exposure series that is identical key to factor name variants
+        if name in exp_use:
+            exp_use = dict(exp_use)
+            exp_use.pop(name, None)
+        screen = screen_factor(
+            series, fwd_returns, name=name,
+            exposures=exp_use, winsor_limits=winsor_limits,
+        )
+        cleaned, _ = prepare_factor(series, exposures=exp_use, winsor_limits=winsor_limits)
+        causal = causal_pre_post(cleaned, fwd_returns)
         row = {
             "factor": name,
             "screen": screen,
@@ -256,23 +543,33 @@ def validate_hypothesis(factor_matrix, fwd_returns, core_factors=None):
         "schema": "qiyu_hypothesis_validate_v1",
         "passed": any_pass,
         "factors": rows,
+        "hygiene_baseline": ["winsorize", "neutralize"],
+        "exposures_used": list((exposures or {}).keys()),
         "probe": probe(),
         "at": _now(),
         "note_zh": (
             "假设验证（Alphalens/CausalImpact 风格）："
-            "IC/IR/换手 + 分位因果效应；未通过则不得进入因子海量挖掘。"
+            "先 winsorize 去极值、再 neutralize 中性化，然后 IC/IR/换手 + 分位因果；"
+            "未通过则不得进入因子海量挖掘。"
         ),
     }
 
 
-def rescreen_candidates(candidates, factor_matrix, fwd_returns):
-    """Stage ④: re-screen mined candidates with IC/IR/turnover."""
+def rescreen_candidates(candidates, factor_matrix, fwd_returns,
+                        exposures=None, winsor_limits=(0.01, 0.01)):
+    """Stage ④: re-screen mined candidates with winsorize+neutralize → IC/IR/turnover."""
+    if exposures is None:
+        exposures = default_crypto_exposures(factor_matrix)
     kept = []
     dropped = []
     for cand in candidates or []:
         name = cand.get("factor")
         series = (factor_matrix or {}).get(name) or []
-        screen = screen_factor(series, fwd_returns, name=name or "unknown")
+        exp_use = {k: v for k, v in (exposures or {}).items() if k != name}
+        screen = screen_factor(
+            series, fwd_returns, name=name or "unknown",
+            exposures=exp_use, winsor_limits=winsor_limits,
+        )
         # overfitting fuse: high turnover or fast IC decay
         fuse_overfit = (
             "turnover_too_high" in (screen.get("reasons") or [])
@@ -293,5 +590,6 @@ def rescreen_candidates(candidates, factor_matrix, fwd_returns):
         "dropped": dropped,
         "n_kept": len(kept),
         "n_dropped": len(dropped),
+        "hygiene_baseline": ["winsorize", "neutralize"],
         "at": _now(),
     }

@@ -25,14 +25,14 @@ flowchart TD
 
 | 阶段 | 模块 | 说明 |
 |---|---|---|
-| ① | `creation_meta_think.py` | 四角色设计文档；可选 GLM  enrichment |
-| ② | `creation_alphalens_lite.py` | IC/IR/换手 + 因果 pre/post |
+| ① | `creation_meta_think.py` | 强制发散：3 种微观结构视角 → 择一；四角色设计文档；可选 GLM enrichment |
+| ② | `creation_alphalens_lite.py` | **winsorize + neutralize** → IC/IR/换手 + 因果 pre/post |
 | ③ | `easyquant_bridge.py` + `creation_deepseek_factors.py` + `quantoracle_bridge.py` | 挖因子 + 确定性认证 |
-| ④ | `creation_alphalens_lite.rescreen_candidates` | 过拟合熔断 |
+| ④ | `creation_alphalens_lite.rescreen_candidates` | 再次 winsorize/neutralize；过拟合熔断 |
 | ⑤ | `creation_stress_lite.py` | 危机窗口回放 + 对抗冲击 |
 | 编排 | `creation_blueprint.py` | 熔断与交付物 |
 
-VPS 未装 alphalens/metagpt/backtrader/autogen 时使用 `*_lite` 可复现适配器；探针会报告真实包是否可用。
+VPS 未装 alphalens/metagpt/backtrader/autogen 时使用 `*_lite` 可复现适配器；探针会报告真实包是否可用。`winsorize` / `neutralize` 为 Alphalens 有效性底线，轻量适配器中**不得省略**。
 
 ## 熔断
 
