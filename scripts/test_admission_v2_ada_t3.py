@@ -20,11 +20,19 @@ class GoldenAdaT3Tests(unittest.TestCase):
         self.assertTrue(out["reviews"]["r1"]["pass"])
         self.assertTrue(out["reviews"]["r2"]["pass"])
         self.assertTrue(out["reviews"]["r3"]["pass"])
+        self.assertTrue(out["reviews"]["r4"]["pass"])
+        self.assertEqual(out["reviews"]["r4"]["review_scope"], "三AI理论复核")
+        self.assertTrue(out["human_confirm"]["pass"])
+        self.assertTrue(out["human_confirm"]["awaiting_human"])
         # Legacy floors remain failed but advisory
         self.assertFalse(out["legacy_advisory"]["legacy_l0_pass"])
         self.assertFalse(out["legacy_advisory"]["legacy_l1_pass"])
         self.assertFalse(out["legacy_advisory"]["legacy_gate2_pass"])
         self.assertFalse(out["legacy_advisory"]["blocking"])
+        self.assertTrue(out["reviews"]["r3"].get("soft_passed"))
+        stages = out.get("stages_zh") or []
+        self.assertEqual(len(stages), 5)
+        self.assertIn("三AI", stages[3])
 
     def test_review2_rejects_empty(self):
         r2 = adm.review2_evidence(metrics={"trades": 3, "win_rate": 80.0, "mean_net": 0.01})
@@ -48,8 +56,23 @@ class GoldenAdaT3Tests(unittest.TestCase):
         })
         self.assertTrue(r2["pass"], r2)
 
+    def test_review4_rejects_unapproved_ai(self):
+        r4 = adm.review4_three_ai(ai_review={"approved": False})
+        self.assertFalse(r4["pass"])
+        self.assertIn("ai_theoretical_review_required", r4["reject_reasons"])
+
+    def test_review3_title_is_matrix_not_ai(self):
+        r3 = adm.review3_matrix_outlier(
+            gate2_fitness={"pass": False, "failed_checks": ["payoff_ge_2_5"]},
+            soft_pass=True,
+        )
+        self.assertTrue(r3["pass"])
+        self.assertTrue(r3["soft_passed"])
+        self.assertIn("矩阵", r3["review_scope"])
+        self.assertNotIn("三AI", r3["review_scope"])
+
     def test_legacy_payoff_would_fail_but_not_blocking(self):
-        # Document: payoff 0.70 fails L1/Gate2; admission still passes via review2
+        # Document: payoff 0.70 fails L1/Gate2; admission still passes via R2+R3-soft+R4
         out = adm.evaluate_admission(
             definition={"key": "x", "entry": {}, "exit": {}},
             lookahead_ok=True,
@@ -61,6 +84,9 @@ class GoldenAdaT3Tests(unittest.TestCase):
         )
         self.assertTrue(out["pass"])
         self.assertIn("sample_payoff_le_1.2", out["legacy_advisory"]["legacy_l1_reasons"])
+        self.assertTrue(out["reviews"]["r4"]["pass"])
+        self.assertEqual(out["reviews"]["r3"]["name"], "review3_matrix_outlier")
+        self.assertEqual(out["reviews"]["r4"]["name"], "review4_three_ai")
 
 
 if __name__ == "__main__":

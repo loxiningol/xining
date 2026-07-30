@@ -91,7 +91,8 @@ def _admission_profile():
     """Reconstructed post-creation review profile.
 
     Default ada_t3_calibrated_v1: legacy L0/L1/Gate2–6 are advisory; blocking
-    admission is review_admission_v2 (safety + evidence + AI/human).
+    admission is review_admission_v2 (R1 syntax/density + R2 stability +
+    R3 matrix/outlier soft + R4 三AI + human confirm ready).
     Set STEP_A_ADMISSION_PROFILE=legacy_funnel to restore old hard floors.
     """
     import os
@@ -1686,11 +1687,20 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
 
     if not g2["pass"] or not g3["pass"]:
         if _admission_v2_enabled():
-            from .review_admission_v2 import review2_evidence
+            from .review_admission_v2 import (
+                review2_single_symbol_stability,
+                review3_matrix_outlier,
+            )
             ev = _evidence_metrics_from_bt(base_m, trades)
-            r2 = review2_evidence(metrics=ev, trades=trades)
+            r2 = review2_single_symbol_stability(metrics=ev, trades=trades)
+            r3 = review3_matrix_outlier(
+                gate2_fitness=(g2.get("evidence") or {}).get("fitness")
+                if isinstance(g2, dict) else None,
+                soft_pass=True,
+            )
             task.setdefault("admission_v2", {})
             task["admission_v2"]["review2"] = r2
+            task["admission_v2"]["review3"] = r3
             task["admission_v2"]["legacy_gate2"] = {
                 "pass": bool(g2.get("pass")),
                 "evidence": g2.get("evidence"),
@@ -1700,10 +1710,12 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
                 "evidence": g3.get("evidence") if isinstance(g3, dict) else {},
             }
             if r2.get("pass"):
+                # R2 hard-pass; R3 soft-pass under ADA-T3 → continue (no hard block)
                 _soft_skip_legacy(task, "gate2_3", {
                     "g2_pass": bool(g2.get("pass")),
                     "g3_pass": bool(g3.get("pass")),
                     "review2_pass": True,
+                    "review3_soft_passed": bool(r3.get("soft_passed")),
                     "review2_metrics": r2.get("metrics"),
                 })
             else:
@@ -1711,8 +1723,8 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
                 task["gate_results"] = assemble_gate_results(task["gates"], tid)
                 save_gate_results(tid, task["gate_results"])
                 _archive_step_a(
-                    task, stage="review2_evidence",
-                    failed_tests=list(r2.get("reject_reasons") or ["evidence_fail"]),
+                    task, stage="review2_single_symbol",
+                    failed_tests=list(r2.get("reject_reasons") or ["stability_fail"]),
                     reason="admission_v2 review2 fail: %s" % ",".join(
                         r2.get("reject_reasons") or []),
                     verdict="review2_evidence_fail",
@@ -1955,19 +1967,39 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     # AI clarity may be 0-100; still not live ready
     _save_artifact(tid, "split_scores", task["split_scores"])
 
-    # ---- Gate7 human confirm (no auto mount) ----
-    task["stage"] = "gate7_human_confirm"
+    # ---- 第四次复核（三AI）+ 人工确认签发（no auto mount）----
+    task["stage"] = "review4_three_ai"
     import auto_trade_human_confirm_pipeline as pipeline
     from .incubator import metrics_from_trades as _inc_metrics_g7
-    from .review_admission_v2 import evaluate_admission, review1_safety, review2_evidence
+    from .review_admission_v2 import (
+        evaluate_admission,
+        review1_syntax_assert_density,
+        review2_single_symbol_stability,
+        review3_matrix_outlier,
+        review4_three_ai,
+        human_confirm_gate,
+    )
     incub = task.get("phase4_incubator") or {}
     incub_m = incub.get("baseline_metrics") or _inc_metrics_g7(trades)
     ev_m = _evidence_metrics_from_bt(base_m, trades)
-    # Ensure review2 recorded even when legacy Gate2 passed
-    if not (task.get("admission_v2") or {}).get("review2"):
-        task.setdefault("admission_v2", {})
-        task["admission_v2"]["review2"] = review2_evidence(metrics=ev_m, trades=trades)
-    r2 = (task.get("admission_v2") or {}).get("review2") or {}
+    l0_ev = (task.get("phase3_funnel") or {}).get("l0_density")
+    g2_fit = (g2.get("evidence") or {}).get("fitness") if isinstance(g2, dict) else None
+    task.setdefault("admission_v2", {})
+    if not task["admission_v2"].get("review1"):
+        task["admission_v2"]["review1"] = review1_syntax_assert_density(
+            definition, lookahead_ok=True, l0=l0_ev, require_density=False,
+        )
+    if not task["admission_v2"].get("review2"):
+        task["admission_v2"]["review2"] = review2_single_symbol_stability(
+            metrics=ev_m, trades=trades,
+        )
+    if not task["admission_v2"].get("review3"):
+        task["admission_v2"]["review3"] = review3_matrix_outlier(
+            gate2_fitness=g2_fit, soft_pass=_admission_v2_enabled(),
+        )
+    r1 = task["admission_v2"].get("review1") or {}
+    r2 = task["admission_v2"].get("review2") or {}
+    r3 = task["admission_v2"].get("review3") or {}
     if _admission_v2_enabled() and not r2.get("pass"):
         task["stage"] = "archived"
         task["gate_results"] = assemble_gate_results(task["gates"], tid)
@@ -1976,6 +2008,18 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         store.save_task_meta(task)
         return {
             "ok": False, "task_id": tid, "reason": "review2_evidence_fail",
+            "admission_v2": task.get("admission_v2"),
+            "gate_results": task["gate_results"],
+            "production_mounted": False,
+        }
+    if _admission_v2_enabled() and (not r1.get("pass") or not r3.get("pass")):
+        task["stage"] = "archived"
+        task["gate_results"] = assemble_gate_results(task["gates"], tid)
+        save_gate_results(tid, task["gate_results"])
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": False, "task_id": tid, "reason": "admission_v2_fail",
             "admission_v2": task.get("admission_v2"),
             "gate_results": task["gate_results"],
             "production_mounted": False,
@@ -1989,7 +2033,8 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         ),
         "ai_theoretical_wr_avg": task["split_scores"].get("ai_logic_wr", {}).get("win_rate_pct"),
         "natural_language": (
-            "三复核（ADA-T3校准）通过：安全结构 + 证据稳定性 + AI；"
+            "四复核（ADA-T3校准）通过：第一次语法/断言/密度 + 第二次单标的稳定性 + "
+            "第三次矩阵/抗离群 + 第四次三AI理论复核；"
             "已接入原 WxPusher 人工确认通道。production_mounted=False。"
             if _admission_v2_enabled() else
             "STEP A gates0-6 + Phase3 funnel + Phase4 incubator pass; "
@@ -2004,6 +2049,21 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         "cross_asset_score": incub.get("cross_asset_score"),
         "mean_mae": incub.get("mean_mae") or incub_m.get("mean_mae"),
     }
+    r4 = review4_three_ai(ai_review=ai_review)
+    task["admission_v2"]["review4"] = r4
+    if _admission_v2_enabled() and not r4.get("pass"):
+        task["stage"] = "archived"
+        task["gate_results"] = assemble_gate_results(task["gates"], tid)
+        save_gate_results(tid, task["gate_results"])
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": False, "task_id": tid, "reason": "review4_ai_fail",
+            "admission_v2": task.get("admission_v2"),
+            "gate_results": task["gate_results"],
+            "production_mounted": False,
+        }
+    task["stage"] = "pending_human_confirm"
     push = pipeline.ingest_and_screen(
         {"dsl": definition, "symbol": sym, "timeframe": tf,
          "thesis": book.get("thesis"), "mechanism_spec": spec,
@@ -2015,6 +2075,8 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         ai_review=ai_review,
         require_ai_review=True,
     )
+    hc = human_confirm_gate(pending_ok=bool(push.get("ok")), human_confirmed=False)
+    task["admission_v2"]["human_confirm"] = hc
     adm = evaluate_admission(
         definition=definition,
         lookahead_ok=True,
@@ -2023,15 +2085,17 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         trades=trades,
         ai_review=ai_review,
         pending_ok=bool(push.get("ok")),
-        l0=(task.get("phase3_funnel") or {}).get("l0_density"),
+        l0=l0_ev,
         l1=l1,
-        gate2_fitness=(g2.get("evidence") or {}).get("fitness") if isinstance(g2, dict) else None,
+        gate2_fitness=g2_fit,
     )
-    task.setdefault("admission_v2", {})
     task["admission_v2"].update({
         "final": adm,
-        "review1": review1_safety(definition, lookahead_ok=True),
-        "review3_pending": bool(push.get("ok")),
+        "review1": adm.get("reviews", {}).get("r1") or r1,
+        "review2": adm.get("reviews", {}).get("r2") or r2,
+        "review3": adm.get("reviews", {}).get("r3") or r3,
+        "review4": adm.get("reviews", {}).get("r4") or r4,
+        "human_confirm": adm.get("human_confirm") or hc,
     })
     human_state = {
         "pending_ok": bool(push.get("ok")),

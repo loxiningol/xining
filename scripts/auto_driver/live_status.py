@@ -103,14 +103,15 @@ def humanize_causal_blurb(mechanism_spec=None, fallback=None):
     )
 
 
-def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
-    """Build pipeline checklist for UI (user-facing: 第一/二/三次复核)."""
+def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None, admission=None):
+    """Build pipeline checklist for UI: R1–R4 + 人工确认签发."""
     from . import review_lexicon as lex
 
     reason = str(reason or "")
     l1 = l1 or {}
     l0 = l0 or {}
     g2 = g2 or {}
+    admission = admission or {}
     by_id = {}
     for g in gates or []:
         if isinstance(g, dict) and g.get("gate_id"):
@@ -130,21 +131,44 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
 
     is_l0_fail = reason in ("funnel_l0_fail", "funnel_l0_cull")
     is_l1_fail = reason in ("funnel_l1_fail", "funnel_l1_cull")
-    reached_l0 = is_l0_fail or is_l1_fail or reason in (
-        "repair_exhausted_or_drift", "gate2_3_fail", "ok", "success",
-    ) or bool(l0) or bool(l1)
-    # Review-1 upstream of density; if density/stability verdict exists they passed
+    is_r2_fail = reason in ("review2_evidence_fail", "review2_fail")
+    is_r3_fail = reason in ("repair_exhausted_or_drift", "gate2_3_fail", "review3_fail")
+    is_r4_fail = reason in ("review4_ai_fail", "ai_theoretical_review_required", "gate6_fail")
+    is_success = reason in ("ok", "success", "awaiting_human", "pending_confirm")
+    reached_l0 = is_l0_fail or is_l1_fail or is_r2_fail or is_r3_fail or is_r4_fail or is_success or bool(l0) or bool(l1)
     reached_gates = reached_l0 or reason not in ("", "exception", "kb_blocked")
     l0_pass = bool(l0.get("pass")) or (reached_l0 and not is_l0_fail and (
-        is_l1_fail or reason in ("repair_exhausted_or_drift", "gate2_3_fail", "ok", "success")
+        is_l1_fail or is_r2_fail or is_r3_fail or is_r4_fail or is_success
     ))
     l0_m = l0.get("metrics") or {}
-    reached_l1 = is_l1_fail or reason in ("repair_exhausted_or_drift", "gate2_3_fail", "ok", "success") or (
+    reached_l1 = is_l1_fail or is_r2_fail or is_r3_fail or is_r4_fail or is_success or (
         bool(l1) and not is_l0_fail
     )
-    l1_pass = bool(l1.get("pass")) or reason in ("repair_exhausted_or_drift", "gate2_3_fail")
+    l1_pass = bool(l1.get("pass")) or reason in (
+        "repair_exhausted_or_drift", "gate2_3_fail", "review4_ai_fail", "ok", "success",
+        "awaiting_human", "pending_confirm",
+    ) or (is_r3_fail or is_r4_fail)
+    # Prefer admission_v2 review2 if present
+    r2_adm = (admission.get("review2") or (admission.get("reviews") or {}).get("r2")
+              or (admission.get("final") or {}).get("reviews", {}).get("r2") or {})
+    if r2_adm:
+        l1_pass = bool(r2_adm.get("pass"))
     g2_running = reason in ("repair_exhausted_or_drift", "gate2_3_fail")
     g2_pass = bool(g2.get("pass") or g2.get("gate_pass"))
+    r3_adm = (admission.get("review3") or (admission.get("reviews") or {}).get("r3")
+              or (admission.get("final") or {}).get("reviews", {}).get("r3") or {})
+    if r3_adm:
+        g2_pass = bool(r3_adm.get("pass"))
+    elif is_success or is_r4_fail:
+        g2_pass = True  # soft-pass path reached R4 / human
+
+    r4_adm = (admission.get("review4") or (admission.get("reviews") or {}).get("r4")
+              or (admission.get("final") or {}).get("reviews", {}).get("r4") or {})
+    hc_adm = (admission.get("human_confirm")
+              or (admission.get("final") or {}).get("human_confirm") or {})
+    r4_pass = bool(r4_adm.get("pass")) or (is_success and not is_r4_fail)
+    hc_ready = bool(hc_adm.get("pass")) if hc_adm else is_success
+    hc_confirmed = bool(hc_adm.get("checks", {}).get("human_confirmed")) if hc_adm else False
 
     rows = [
         {
@@ -185,7 +209,7 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
             "label": lex.pipe_label("l1"),
             "status": (
                 "done" if l1_pass else (
-                    "fail" if is_l1_fail or (reached_l1 and not l1_pass) else (
+                    "fail" if is_l1_fail or is_r2_fail or (reached_l1 and not l1_pass) else (
                         "pending" if is_l0_fail or not reached_l1 else "pending"
                     )
                 )
@@ -203,21 +227,62 @@ def _gate_rows_from_reason(reason, l1=None, g2=None, gates=None, l0=None):
         {
             "id": "gate2",
             "label": lex.pipe_label("gate2"),
-            "status": "done" if g2_pass else ("fail" if (g2_running or reason in ("repair_exhausted_or_drift", "gate2_3_fail")) else "pending"),
+            "status": (
+                "done" if g2_pass else (
+                    "fail" if (g2_running or is_r3_fail) else "pending"
+                )
+            ),
             "detail": (
-                "Calmar=%s, Payoff=%s, w5=%s" % (
+                "Calmar=%s, Payoff=%s, w5=%s%s" % (
                     ("%.2f" % float(g2["calmar"])) if g2.get("calmar") is not None else "—",
                     ("%.2f" % float(g2["payoff_ratio"])) if g2.get("payoff_ratio") is not None else "—",
                     ("%.2f" % float(g2["worst5_loss_share"])) if g2.get("worst5_loss_share") is not None else "—",
+                    " · soft-pass" if (r3_adm.get("soft_passed") and g2_pass) else "",
                 )
-                if (g2_running or g2_pass or g2.get("payoff_ratio") is not None) else "待执行"
+                if (g2_running or g2_pass or g2.get("payoff_ratio") is not None or r3_adm) else "待执行"
             ),
         },
         {
             "id": "audit4d",
             "label": lex.pipe_label("audit4d"),
             "status": "done" if g2_pass else "pending",
-            "detail": "未进入（第三次复核未过）" if not g2_pass else "进入四维攻击（因果 / 博弈 / 回测诚信 / 执行摩擦）",
+            "detail": "未进入（第三次复核未过）" if not g2_pass else "抗风险离群 / 四维攻击（因果 / 博弈 / 回测诚信 / 执行摩擦）",
+        },
+        {
+            "id": "ai3",
+            "label": lex.pipe_label("ai3"),
+            "status": (
+                "done" if r4_pass else (
+                    "fail" if is_r4_fail else (
+                        "pending" if not g2_pass else "running"
+                    )
+                )
+            ),
+            "detail": (
+                "三AI理论复核通过" if r4_pass else (
+                    "三AI理论复核未过" if is_r4_fail else (
+                        "未进入（第三次复核未过）" if not g2_pass else "待三AI投票"
+                    )
+                )
+            ),
+        },
+        {
+            "id": "human",
+            "label": lex.pipe_label("human"),
+            "status": (
+                "done" if hc_confirmed else (
+                    "running" if (hc_ready and r4_pass and not hc_confirmed) else (
+                        "pending" if not r4_pass else "pending"
+                    )
+                )
+            ),
+            "detail": (
+                "已人工 --confirm" if hc_confirmed else (
+                    "Wx 待人工确认签发（永不自动上线）" if (hc_ready and r4_pass) else (
+                        "未进入（第四次复核未过）" if not r4_pass else "待推送"
+                    )
+                )
+            ),
         },
     ]
     return rows
@@ -295,6 +360,7 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
     l1 = last.get("l1") or {}
     l0 = last.get("l0") or {}
     g2 = last.get("gate2") or {}
+    admission = last.get("admission_v2") or {}
     if isinstance(result, dict):
         try:
             from . import metrics as metrics_mod
@@ -308,12 +374,14 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
             ph = (result.get("phase3_funnel") or {})
             if ph.get("l0_density"):
                 l0 = ph.get("l0_density") or l0
+            admission = result.get("admission_v2") or admission
         except Exception:
             gates = []
             try:
                 ph = (result.get("phase3_funnel") or {})
                 if ph.get("l0_density"):
                     l0 = ph.get("l0_density") or l0
+                admission = result.get("admission_v2") or admission
             except Exception:
                 pass
     else:
@@ -393,7 +461,7 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
         "engine": {
             "name": "真挚之语 (True Words) 自主量化演进引擎",
             "version": "v2.5",
-            "roles": "GLM-5.2 总设计师 · Codex 总工程师 · 三复核 + 人工确认",
+            "roles": "GLM-5.2 总设计师 · Codex 总工程师 · 四复核（含三AI）+ 人工确认",
         },
         "strategy": {
             "title_zh": title,
@@ -416,7 +484,9 @@ def publish_live_status(cfg, state, pack, *, phase="running", result=None,
             "seed_idx": seed_idx,
             "seed_max": seed_max,
         },
-        "pipeline": _gate_rows_from_reason(reason, l1=l1, g2=g2, gates=gates, l0=l0),
+        "pipeline": _gate_rows_from_reason(
+            reason, l1=l1, g2=g2, gates=gates, l0=l0, admission=admission,
+        ),
         "diagnostic": diagnostic,
         "metrics": {
             "composite_score": last.get("composite_score"),

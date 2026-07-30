@@ -310,7 +310,7 @@ def run_driver(cfg):
         % (workdir, pack_path, dry_run, max_ai_optimize),
         flush=True,
     )
-    _pub(cfg, state, pack, phase="running", message="Auto-Driver 启动 · 三复核流水线")
+    _pub(cfg, state, pack, phase="running", message="Auto-Driver 启动 · 四复核流水线（含三AI）")
 
     for iteration in range(1, max_iter + 1):
         state["n_iterations"] = iteration

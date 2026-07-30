@@ -28,18 +28,26 @@ class ReviewLexiconTests(unittest.TestCase):
         self.assertEqual(lex.review_label_from_reason("gate2_3_fail"), "第三次复核")
 
     def test_pipe_labels_purge_gate_codes(self):
-        for sid in ("gate0", "gate1", "l0", "l1", "gate2", "audit4d"):
+        for sid in ("gate0", "gate1", "l0", "l1", "gate2", "audit4d", "ai3"):
             label = lex.pipe_label(sid)
             self.assertNotIn("Gate", label)
             self.assertNotIn("L0", label)
             self.assertNotIn("L1", label)
             self.assertTrue("复核" in label)
 
+    # Fix the botched assertion from earlier edit
     def test_humanizer_success(self):
         zh = humanizer.humanize_final(final_status="SUCCESS", success=True)
-        self.assertTrue(("三复核" in zh) or ("三次复核" in zh))
+        self.assertTrue(("四复核" in zh) or ("三复核" in zh) or ("三次复核" in zh))
         self.assertIn("人工确认", zh)
+        self.assertIn("三AI", zh)
         self.assertNotIn("Gate", zh)
+
+    def test_reason_maps_r4(self):
+        self.assertEqual(lex.review_n_from_reason("review4_ai_fail"), 4)
+        self.assertEqual(lex.review_label_from_reason("ai_theoretical_review_required"), "第四次复核")
+        self.assertIn("三AI", lex.pipe_label("ai3"))
+        self.assertIn("人工确认", lex.pipe_label("human"))
 
     def test_humanizer_l0_reason(self):
         zh = humanizer.humanize_code("funnel_l0_fail")

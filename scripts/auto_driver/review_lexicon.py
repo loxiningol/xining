@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Re-export canonical 三复核 lexicon for the auto_driver package."""
+"""Re-export canonical 四复核 lexicon for the auto_driver package."""
 from __future__ import print_function
 
 import sys

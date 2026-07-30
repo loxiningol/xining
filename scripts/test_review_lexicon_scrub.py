@@ -11,8 +11,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from dual_engine_workflow_v2.review_lexicon import (  # noqa: E402
-    REVIEW_1, REVIEW_2, REVIEW_3, REVIEW_1_FULL, REVIEW_2_FULL, REVIEW_3_FULL,
-    scrub, pipe_label,
+    REVIEW_1, REVIEW_2, REVIEW_3, REVIEW_4, REVIEW_1_FULL, REVIEW_2_FULL, REVIEW_3_FULL, REVIEW_4_FULL,
+    scrub, pipe_label, pipeline_stage_list, HUMAN_CONFIRM_GATE,
 )
 from auto_driver import status_humanizer as humanizer  # noqa: E402
 
@@ -22,6 +22,13 @@ class LexiconContractTests(unittest.TestCase):
         self.assertIn("基础语法", REVIEW_1_FULL)
         self.assertIn("单标的历史回测", REVIEW_2_FULL)
         self.assertIn("多标的矩阵", REVIEW_3_FULL)
+        self.assertIn("三AI", REVIEW_4_FULL)
+
+    def test_pipeline_stage_list_includes_ai_and_human(self):
+        stages = pipeline_stage_list()
+        self.assertEqual(len(stages), 5)
+        self.assertIn(REVIEW_4, stages[3])
+        self.assertEqual(stages[4], HUMAN_CONFIRM_GATE)
 
     def test_scrub_gate_l(self):
         s = scrub("Gate0/Gate1/L0 then L1 then Gate2/L2/L3")
@@ -45,12 +52,15 @@ class LexiconContractTests(unittest.TestCase):
             self.assertNotIn("L1", zh)
 
     def test_pipe_labels(self):
-        for sid in ("gate0", "gate1", "l0", "l1", "gate2", "audit4d"):
+        for sid in ("gate0", "gate1", "l0", "l1", "gate2", "audit4d", "ai3", "human"):
             lab = pipe_label(sid)
             self.assertNotIn("Gate", lab)
             self.assertNotIn("L0", lab)
             self.assertNotIn("L1", lab)
-            self.assertIn("复核", lab)
+            if sid == "human":
+                self.assertIn("人工确认", lab)
+            else:
+                self.assertIn("复核", lab)
 
 
 if __name__ == "__main__":

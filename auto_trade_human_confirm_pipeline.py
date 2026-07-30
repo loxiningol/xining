@@ -677,7 +677,7 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
     cross_txt = ("%.2f" % float(cross_score)) if cross_score is not None else "-"
     mae_txt = ("%.4f" % float(mean_mae)) if mean_mae is not None else "-"
     msg = (
-        "【三复核通过·待人工确认签发】\n"
+        "【四复核通过·待人工确认签发】\n"
         "名称: {name}\n"
         "标的/周期: {symbol} / {timeframe}\n"
         "方向: {direction}\n"

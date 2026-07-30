@@ -738,7 +738,7 @@ def build_slots_board(vector_root=None, display_history=5):
         "engine": {
             "name": "真挚之语 (True Words) 并发演进阵列",
             "version": "v2.5",
-            "roles": "GLM-5.2 总设计师 · Codex 总工程师 · 三复核 + 人工确认",
+            "roles": "GLM-5.2 总设计师 · Codex 总工程师 · 四复核（含三AI）+ 人工确认",
         },
         "ram": {
             "total_mb": total_mb,
@@ -754,10 +754,11 @@ def build_slots_board(vector_root=None, display_history=5):
         "slots": slots,
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "note_zh": (
-            "创立后三复核："
+            "创立后四复核："
             "【第一次复核】（基础语法、逻辑断言、开仓密度预检）→"
             "【第二次复核】（单标的历史回测与样本收益稳定性）→"
-            "【第三次复核】（多标的矩阵验证与抗风险离群测试）；"
+            "【第三次复核】（多标的矩阵验证与抗风险离群测试）→"
+            "【第四次复核】（三AI理论复核）；"
             "通过后进入人工确认签发（Wx），永不自动上线。"
             "本机可用内存约 %dMB / 总量 %dMB，并发卡槽容量 %d。"
             "已完成(100%%)卡槽最多展示 %d 个；累计≥3 时自动归档最旧记录，不再显示。"
@@ -765,13 +766,15 @@ def build_slots_board(vector_root=None, display_history=5):
             % (avail_mb, total_mb, capacity, MAX_COMPLETED_VISIBLE)
         ),
         "funnel": {
-            "name": "three_review_v2",
+            "name": "four_review_v2",
             "stages": [
                 "第一次复核（基础语法、逻辑断言、开仓密度预检）",
                 "第二次复核（单标的历史回测与样本收益稳定性）",
                 "第三次复核（多标的矩阵验证与抗风险离群测试）",
+                "第四次复核（三AI理论复核）",
+                "人工确认签发",
             ],
-            "stages_compact": ["R1", "R2", "R3"],
+            "stages_compact": ["R1", "R2", "R3", "R4", "HC"],
             "blocking_profile": "ada_t3_calibrated_v1",
             "legacy_codes_forbidden_in_ui": True,
             "max_ai_optimize": 3,
