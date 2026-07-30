@@ -25,13 +25,16 @@ flowchart TD
 
 | 阶段 | 模块 | 说明 |
 |---|---|---|
-| ① | `creation_meta_think.py` | 强制发散：3 种微观结构视角 → 择一；四角色设计文档；可选 GLM enrichment |
-| ② | `creation_alphalens_lite.py` | **winsorize + neutralize** → IC/IR/换手 + 因果 pre/post |
-| ③ | `easyquant_bridge.py` + `creation_deepseek_factors.py` + `quantoracle_bridge.py` | 挖因子 + 确定性认证 |
-| ④ | `creation_alphalens_lite.rescreen_candidates` | 再次 winsorize/neutralize；过拟合熔断 |
-| ⑤ | `creation_stress_lite.py` | 危机窗口回放 + 对抗冲击 |
-| ⑤b/c | `creation_prelim_eval.py` + `creation_return_hardness.py` | 胜率≥50%；周收益代理≥8%；收益/回撤≥1.0；退化熔断 |
-| 编排 | `creation_blueprint.py` | 熔断与交付物 |
+| ① | `creation_meta_think.py` | 强制发散 + 年化容量；四角色设计文档 |
+| ①b | `creation_knowledge_distill.py` | 外部微观真相卡片（RAG/蒸馏） |
+| ①c | `creation_socratic_agent.py` | AutoGen 风格苏格拉底质询 |
+| ② | `creation_alphalens_lite.py` | **winsorize + neutralize** → IC/IR/换手 + 因果显著 |
+| ②b | `creation_causal_counterfactual.py` | 反事实剔除混杂时段，相关性错觉熔断 |
+| ③ | EasyQuant + DeepSeek + QuantOracle | 挖因子 + 确定性认证 |
+| ④ | Alphalens 再筛 | winsorize/neutralize；过拟合熔断 |
+| ④b | `creation_multiverse.py` | 蒙特卡洛多宇宙生存测试 |
+| ⑤ | `creation_stress_lite.py` | 危机窗口 + 红队 |
+| ⑤b/c | prelim + return_hardness | 胜率≥50%；周收益≥8%；退化熔断 |
 
 VPS 未装 alphalens/metagpt/backtrader/autogen 时使用 `*_lite` 可复现适配器；探针会报告真实包是否可用。`winsorize` / `neutralize` 为 Alphalens 有效性底线，轻量适配器中**不得省略**。
 

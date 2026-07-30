@@ -526,15 +526,8 @@ def validate_hypothesis(factor_matrix, fwd_returns, core_factors=None,
         )
         cleaned, _ = prepare_factor(series, exposures=exp_use, winsor_limits=winsor_limits)
         causal = causal_pre_post(cleaned, fwd_returns)
-        row = {
-            "factor": name,
-            "screen": screen,
-            "causal": causal,
-            "accepted": bool(screen.get("passed")) and bool(causal.get("significant") or screen.get("passed")),
-        }
-        # Prefer both; allow screen-pass alone if causal weak but IC strong
-        if screen.get("passed") and abs(float((screen.get("ic") or {}).get("ic_mean") or 0)) >= 0.03:
-            row["accepted"] = True
+        # Prefer BOTH screen + causal; do not accept IC-only correlation illusions
+        row["accepted"] = bool(screen.get("passed")) and bool(causal.get("significant"))
         if row["accepted"]:
             any_pass = True
         rows.append(row)
@@ -549,8 +542,8 @@ def validate_hypothesis(factor_matrix, fwd_returns, core_factors=None,
         "at": _now(),
         "note_zh": (
             "假设验证（Alphalens/CausalImpact 风格）："
-            "先 winsorize 去极值、再 neutralize 中性化，然后 IC/IR/换手 + 分位因果；"
-            "未通过则不得进入因子海量挖掘。"
+            "先 winsorize 去极值、再 neutralize 中性化，然后 IC/IR/换手 + 因果显著；"
+            "仅有高 IC 无因果支撑不得进入因子挖掘。"
         ),
     }
 

@@ -28,10 +28,14 @@ from datetime import datetime
 from pathlib import Path
 
 from . import creation_alphalens_lite as al
+from . import creation_causal_counterfactual as causal_cf
 from . import creation_deepseek_factors as dsf
+from . import creation_knowledge_distill as kd
 from . import creation_meta_think as meta
+from . import creation_multiverse as multiverse
 from . import creation_prelim_eval as prelim
 from . import creation_return_hardness as rh
+from . import creation_socratic_agent as socratic
 from . import creation_stress_lite as stress
 from . import easyquant_bridge as eq
 from . import quantoracle_bridge as qo
@@ -402,6 +406,66 @@ def run_creation_blueprint(
     max_dd = -abs(float(constraints.get("max_drawdown") or 0.18))
     max_daily = float(constraints.get("max_daily_loss") or 0.05)
 
+    # ①b External knowledge cards — must read before deepening
+    knowledge = kd.assess_lens_against_cards(design)
+    stages["knowledge_distill"] = knowledge
+    design["knowledge_cards_brief"] = knowledge.get("cards_brief")
+    if not knowledge.get("passed"):
+        # switch lens immediately if cards invalidate current choice
+        design.setdefault("mutation_log", []).append({
+            "at": _now(),
+            "reason": "knowledge_card_invalidate",
+            "banner": knowledge.get("human_banner_zh"),
+        })
+        # try next perspective capacity-aware
+        from .creation_return_hardness import select_perspective_by_return_capacity
+        pers = ((design.get("divergence") or {}).get("perspectives") or [])
+        tried = [((design.get("divergence") or {}).get("selected_id"))]
+        alt, annotated = None, pers
+        remaining = [p for p in pers if p.get("id") not in tried]
+        if remaining:
+            alt, annotated = select_perspective_by_return_capacity(remaining)
+        if alt:
+            design["mechanism_family"] = alt.get("family") or design.get("mechanism_family")
+            design["core_logic_zh"] = alt.get("thesis_zh") or design.get("core_logic_zh")
+            div = dict(design.get("divergence") or {})
+            div["perspectives"] = annotated or pers
+            div["selected_id"] = alt.get("id")
+            div["selected_lens_zh"] = alt.get("lens_zh")
+            div["selection_reason_zh"] = "外部认知卡片否决原视角后切换"
+            design["divergence"] = div
+            knowledge = kd.assess_lens_against_cards(design)
+            stages["knowledge_distill"] = knowledge
+
+    # ①c Socratic challenger (AutoGen-lite) — groupthink breaker
+    soc = socratic.challenge_design(
+        design, knowledge_cards=knowledge.get("cards_brief") or knowledge.get("invalidating_cards"),
+        skip_llm=skip_llm,
+    )
+    stages["socratic"] = {k: v for k, v in soc.items() if k != "qa"}
+    stages["socratic"]["qa"] = soc.get("qa")
+    if not soc.get("passed"):
+        # attach answers as pressure; force invalidation enrichment then continue
+        design.setdefault("mutation_log", []).append({
+            "at": _now(),
+            "reason": "socratic_challenge_fail",
+            "n_failed": soc.get("n_failed"),
+            "banner": soc.get("human_banner_zh"),
+        })
+        # Auto-patch weak spots where possible
+        if not design.get("invalidation_zh"):
+            design["invalidation_zh"] = "苏格拉底追问强制补全：前提消失或状态切换后停止开仓"
+        soc = socratic.challenge_design(
+            design,
+            knowledge_cards=knowledge.get("cards_brief"),
+            skip_llm=True,
+        )
+        stages["socratic"] = {k: v for k, v in soc.items() if k != "qa"}
+        stages["socratic"]["qa"] = soc.get("qa")
+        stages["socratic"]["recheck_after_patch"] = True
+
+    stages["meta"]["design_doc"] = design
+
     # Core factor hints from design
     core_hints = []
     for h in design.get("hypotheses") or []:
@@ -448,6 +512,45 @@ def run_creation_blueprint(
                 "new_hints": core_hints,
                 "loop": loops["hypothesis"],
             })
+            continue
+
+        # ②b Causal counterfactual battery — correlation illusion killer
+        accepted_factors = [
+            r["factor"] for r in (hyp.get("factors") or []) if r.get("accepted")
+        ] or core_hints
+        cf = causal_cf.run_counterfactual_battery(
+            data["matrix"], data["fwd"], core_factors=accepted_factors[:4],
+        )
+        stages["causal_counterfactual"] = {
+            "passed": cf.get("passed"),
+            "human_banner_zh": cf.get("human_banner_zh"),
+            "factors": [
+                {
+                    "factor": r.get("factor"),
+                    "passed": r.get("passed"),
+                    "reason": r.get("reason"),
+                    "survived": r.get("survived"),
+                    "wiped": r.get("wiped"),
+                }
+                for r in (cf.get("factors") or [])
+            ],
+        }
+        if not cf.get("passed"):
+            design.setdefault("mutation_log", []).append({
+                "at": _now(),
+                "reason": "causal_counterfactual_fail",
+                "banner": cf.get("human_banner_zh"),
+                "loop": loops["hypothesis"],
+            })
+            design, hints, switched = _switch_direction(
+                design, classic_tried, perspectives_tried,
+            )
+            if switched is None:
+                fuses["abort_reason"] = "causal_counterfactual_directions_exhausted"
+                abort = True
+                break
+            core_hints = hints or core_hints
+            stages["meta"]["design_doc"] = design
             continue
 
         # ③ Mine + QuantOracle
@@ -620,6 +723,35 @@ def run_creation_blueprint(
             "stats": best.get("stats"),
             "quantoracle": best.get("quantoracle"),
         }
+
+        # ④b Multi-universe survival (Monte Carlo) — before expensive stress
+        mv = multiverse.survival_test(trade_returns)
+        stages["multiverse"] = mv
+        if not mv.get("passed"):
+            design.setdefault("mutation_log", []).append({
+                "at": _now(),
+                "reason": "multiverse_survival_fail",
+                "profit_frac": mv.get("profit_frac"),
+                "need_regime_filter": mv.get("need_regime_filter"),
+                "banner": mv.get("human_banner_zh"),
+                "loop": loops["hypothesis"],
+            })
+            # Prefer mutating toward regime filter factors rather than instant abort
+            core_hints = list(dict.fromkeys(
+                ["range_pct", "atr_pct_14"] + list(core_hints or [])
+            ))
+            if mv.get("need_regime_filter") and loops["hypothesis"] < int(max_loops):
+                continue
+            design, hints, switched = _switch_direction(
+                design, classic_tried, perspectives_tried,
+            )
+            if switched is None:
+                fuses["abort_reason"] = "multiverse_directions_exhausted"
+                abort = True
+                break
+            core_hints = hints or core_hints
+            stages["meta"]["design_doc"] = design
+            continue
 
         # ⑤ Stress
         loops["stress"] += 1
@@ -797,6 +929,10 @@ def run_creation_blueprint(
             "stress": stress.probe(),
             "research_candles": rcs.probe(),
             "return_hardness": {"ok": True, "module": "creation_return_hardness"},
+            "causal_counterfactual": causal_cf.probe(),
+            "socratic": socratic.probe(),
+            "knowledge_distill": {"ok": True, "module": "creation_knowledge_distill"},
+            "multiverse": multiverse.probe(),
         },
         "data": stages.get("data"),
         "handoff_zh": (

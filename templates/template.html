@@ -67,13 +67,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 .market-monitor-foot{margin-top:9px;color:var(--soft);font-size:11px}
 .market-monitor-state{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;border:1px solid rgba(155,191,154,.28);color:var(--gain);background:rgba(155,191,154,.08);font-size:12px}
 .market-monitor-state.error{color:var(--loss);border-color:rgba(197,143,132,.32);background:rgba(197,143,132,.08)}
-.system-goal-panel{padding:28px 30px}
-.system-goal-intro{max-width:1050px;color:var(--muted);font-size:13px;line-height:1.8;margin:-4px 0 18px}
-.system-goal-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.system-goal-item{padding:16px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.022)}
-.system-goal-label{font-size:11px;color:var(--muted);letter-spacing:.08em;margin-bottom:9px}
-.system-goal-value{font-size:17px;color:var(--focus);line-height:1.45}
-.system-goal-foot{margin-top:14px;padding:12px 14px;border-left:3px solid var(--gain);background:rgba(155,191,154,.055);border-radius:4px 12px 12px 4px;color:var(--muted);font-size:12px;line-height:1.7}
 .system-timeline{position:relative;margin-top:2px;padding-left:20px}
 .system-timeline:before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:1px;background:var(--line)}
 .system-timeline-item{position:relative;display:grid;grid-template-columns:120px 1fr;gap:18px;padding:0 0 22px}
@@ -83,8 +76,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 .system-timeline-event{color:var(--text);font-size:13px;line-height:1.6}
 @media(max-width:900px){.grid{grid-template-columns:1fr}.param-row{grid-template-columns:1fr}}
 @media(max-width:1100px){.market-monitor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:900px){.system-goal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:620px){.market-monitor{padding:22px}.market-monitor-head{display:block}.market-monitor-time{margin-top:10px}.market-monitor-grid{grid-template-columns:1fr}.system-goal-grid{grid-template-columns:1fr}.system-timeline-item{grid-template-columns:1fr;gap:5px}}
+@media(max-width:620px){.market-monitor{padding:22px}.market-monitor-head{display:block}.market-monitor-time{margin-top:10px}.market-monitor-grid{grid-template-columns:1fr}.system-timeline-item{grid-template-columns:1fr;gap:5px}}
 .site-health-head-v7{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
 .site-health-summary-v7{font-size:15px;color:var(--focus);letter-spacing:.06em}
 .site-health-meta-v7{margin-top:6px;color:var(--muted);font-size:12px}
@@ -109,17 +101,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 <div class="subtitle">量化工作台</div>
 
 <div class="grid">
-  <div class="panel full system-goal-panel">
-    <div class="title">系统总目标</div>
-    <div class="system-goal-intro">以可验证的正期望为前提，在资金曲线安全与策略生命周期有效的条件下，提高有效交易频率，让稳定优势通过足够的交易次数形成资金量变。</div>
-    <div class="system-goal-grid">
-      <div class="system-goal-item"><div class="system-goal-label">目标胜率</div><div class="system-goal-value">约 75%</div></div>
-      <div class="system-goal-item"><div class="system-goal-label">单笔盈利目标</div><div class="system-goal-value">约 20% 及以上</div></div>
-      <div class="system-goal-item"><div class="system-goal-label">核心风险基准</div><div class="system-goal-value">20×｜0.9% 止损</div></div>
-      <div class="system-goal-item"><div class="system-goal-label">频率原则</div><div class="system-goal-value">安全优先，再求高频</div></div>
-    </div>
-    <div class="system-goal-foot">20×杠杆下，标的价格反向0.9%约对应保证金亏损18%，手续费另计。策略评价以含手续费净收益、回撤、止损簇、样本数量及近期市场环境共同判断，不以单一高胜率替代资金曲线安全。</div>
-  </div>
   <div class="panel full market-monitor">
     <div class="market-monitor-head">
       <div>

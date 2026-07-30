@@ -512,6 +512,11 @@ def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True):
             "minimum_acceptable_annual_return"
         ),
         "failure_scenarios_zh": roles[2]["failure_scenarios_zh"],
+        "invalidation_zh": (
+            "；".join(roles[2]["failure_scenarios_zh"][:2])
+            if roles[2].get("failure_scenarios_zh") else
+            "信号在波动状态切换或流动性枯竭后失效"
+        ),
         "risk_bounds": roles[2]["hard_bounds"],
         "roles": roles,
         "built_at": _now(),
