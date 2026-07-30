@@ -626,6 +626,11 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
     wr_avg = ai_review.get("ai_theoretical_wr_avg")
     if wr_avg is None:
         wr_avg = metrics.get("ai_theoretical_wr_avg")
+    mean_net_map = (ai_review.get("ai_theoretical_mean_net_by_provider")
+                    or metrics.get("ai_theoretical_mean_net_by_provider") or {})
+    mean_net_avg = ai_review.get("ai_theoretical_mean_net_avg")
+    if mean_net_avg is None:
+        mean_net_avg = metrics.get("ai_theoretical_mean_net_avg")
     risk_map = (ai_review.get("ai_stop_cluster_risk_by_provider")
                 or metrics.get("ai_stop_cluster_risk_by_provider") or {})
     # Phase-4 incubator card fields
@@ -659,6 +664,8 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         "logic_brief": _logic_brief(dsl),
         "ai_theoretical_wr_by_provider": wr_map,
         "ai_theoretical_wr_avg": wr_avg,
+        "ai_theoretical_mean_net_by_provider": mean_net_map,
+        "ai_theoretical_mean_net_avg": mean_net_avg,
         "ai_stop_cluster_risk_by_provider": risk_map,
         "ai_review_natural_language": ai_review.get("natural_language"),
         "calmar": calmar,
@@ -672,6 +679,9 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
     pending["items"].append(item)
     save_pending(pending)
     avg_txt = ("%.1f%%" % float(wr_avg)) if wr_avg is not None else "-"
+    mean_net_txt = (
+        ("%.3f%%" % float(mean_net_avg)) if mean_net_avg is not None else "-"
+    )
     calmar_txt = ("%.2f" % float(calmar)) if calmar is not None else "-"
     payoff_txt = ("%.2f" % float(payoff)) if payoff is not None else "-"
     cross_txt = ("%.2f" % float(cross_score)) if cross_score is not None else "-"
@@ -685,7 +695,9 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         "Calmar: {calmar} · Payoff: {payoff}\n"
         "Cross-asset score: {cross} · Mean MAE: {mae}\n"
         "三AI理论胜率均值: {avg}\n"
-        "分项: DS {ds} / Qwen {qw} / GLM {gpt}\n"
+        "三AI理论单笔盈利率均值: {mean_net}\n"
+        "分项胜率: DS {ds} / Qwen {qw} / GLM {gpt}\n"
+        "分项单笔盈利率: DS {ds_mn} / Qwen {qw_mn} / GLM {gpt_mn}\n"
         "回测证据(仅参考): 净均值 {mean} · 样本 {n} · 机器胜率 {wr}\n"
         "production_mounted=False（需人工 --confirm 才上 B级30%/20x/SL0.9%）\n"
         "确认指令: python3 auto_trade_human_confirm_pipeline.py --confirm {key}\n"
@@ -696,9 +708,11 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         symbol=item["symbol"], timeframe=item["timeframe"],
         direction=item["direction"], logic=item["logic_brief"],
         calmar=calmar_txt, payoff=payoff_txt, cross=cross_txt, mae=mae_txt,
-        avg=avg_txt,
+        avg=avg_txt, mean_net=mean_net_txt,
         ds=wr_map.get("deepseek"), qw=wr_map.get("qwen"),
         gpt=wr_map.get("glm", wr_map.get("chatgpt")),
+        ds_mn=mean_net_map.get("deepseek"), qw_mn=mean_net_map.get("qwen"),
+        gpt_mn=mean_net_map.get("glm", mean_net_map.get("chatgpt")),
         mean=metrics.get("mean_net"),
         n=int(metrics.get("trades") or 0),
         wr=metrics.get("win_rate"),
@@ -706,6 +720,7 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
     )
     _wx(msg, kind="strategy_pending_confirm", meta={"key": key,
                                                     "ai_theoretical_wr_avg": wr_avg,
+                                                    "ai_theoretical_mean_net_avg": mean_net_avg,
                                                     "calmar": calmar,
                                                     "payoff": payoff,
                                                     "cross_asset_score": cross_score,
@@ -768,6 +783,10 @@ def ingest_and_screen(cand, source="creator", ai_review=None, require_ai_review=
         metrics["ai_theoretical_wr_by_provider"] = ai_review.get(
             "ai_theoretical_wr_by_provider")
         metrics["ai_theoretical_wr_avg"] = ai_review.get("ai_theoretical_wr_avg")
+        metrics["ai_theoretical_mean_net_by_provider"] = ai_review.get(
+            "ai_theoretical_mean_net_by_provider")
+        metrics["ai_theoretical_mean_net_avg"] = ai_review.get(
+            "ai_theoretical_mean_net_avg")
         metrics["ai_stop_cluster_risk_by_provider"] = ai_review.get(
             "ai_stop_cluster_risk_by_provider")
         for k in ("calmar", "payoff", "cross_asset_score", "mean_mae"):
@@ -839,6 +858,9 @@ def confirm(key, confirmed_by="codex_human"):
         "mass_engine": False,
         "ai_theoretical_wr_by_provider": item.get("ai_theoretical_wr_by_provider"),
         "ai_theoretical_wr_avg": item.get("ai_theoretical_wr_avg"),
+        "ai_theoretical_mean_net_by_provider": item.get(
+            "ai_theoretical_mean_net_by_provider"),
+        "ai_theoretical_mean_net_avg": item.get("ai_theoretical_mean_net_avg"),
         "ai_stop_cluster_risk_by_provider": item.get(
             "ai_stop_cluster_risk_by_provider"),
         "environment_boundary": row.get("environment_boundary") or {

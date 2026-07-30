@@ -239,6 +239,7 @@ def _normalize_grade_label(grade):
 def format_live_strategy_card(strategy_key, strategy_name=None, grade=None,
                               max_position_ratio=None,
                               ai_theoretical_wr_avg=None,
+                              ai_theoretical_mean_net_avg=None,
                               actual_single_trade_pnl_pct=None):
     """Natural annotated block for live/runtime roster (Wx + UI text).
 
@@ -247,9 +248,7 @@ def format_live_strategy_card(strategy_key, strategy_name=None, grade=None,
       B
       仓位 30%
       三AI理论胜率 74.3%
-
-    Optional actual_single_trade_pnl_pct is kept for callers that still want
-    it (trade tables remain the primary place for 实际单笔盈利率).
+      三AI理论单笔盈利率 +3.2%
     """
     title = short_strategy_title(strategy_key, strategy_name)
     lines = [title or str(strategy_key or "未命名策略")]
@@ -263,6 +262,14 @@ def format_live_strategy_card(strategy_key, strategy_name=None, grade=None,
     try:
         if ai_theoretical_wr_avg is not None and ai_theoretical_wr_avg != "":
             lines.append("三AI理论胜率 %.1f%%" % float(ai_theoretical_wr_avg))
+    except Exception:
+        pass
+    try:
+        if (ai_theoretical_mean_net_avg is not None
+                and ai_theoretical_mean_net_avg != ""):
+            lines.append(
+                "三AI理论单笔盈利率 %+.3f%%" % float(ai_theoretical_mean_net_avg)
+            )
     except Exception:
         pass
     try:
@@ -288,6 +295,7 @@ def format_live_roster_text(rows, heading="【运行中策略】"):
             or row.get("max_grade"),
             max_position_ratio=row.get("max_position_ratio"),
             ai_theoretical_wr_avg=row.get("ai_theoretical_wr_avg"),
+            ai_theoretical_mean_net_avg=row.get("ai_theoretical_mean_net_avg"),
             actual_single_trade_pnl_pct=row.get("actual_single_trade_pnl_pct"),
         ))
     if not blocks:

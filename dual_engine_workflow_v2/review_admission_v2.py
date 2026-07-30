@@ -230,6 +230,8 @@ def review4_three_ai(ai_review=None):
     wr_map = ai.get("ai_theoretical_wr_by_provider") or {}
     providers = [k for k, v in wr_map.items() if v is not None]
     wr_avg = ai.get("ai_theoretical_wr_avg")
+    mean_net_map = ai.get("ai_theoretical_mean_net_by_provider") or {}
+    mean_net_avg = ai.get("ai_theoretical_mean_net_avg")
     checks = {
         "ai_theoretical_approved": approved,
         "has_provider_votes_or_avg": bool(providers) or wr_avg is not None or approved,
@@ -249,6 +251,8 @@ def review4_three_ai(ai_review=None):
         "reject_reasons": reasons,
         "ai_theoretical_wr_avg": wr_avg,
         "ai_theoretical_wr_by_provider": wr_map,
+        "ai_theoretical_mean_net_avg": mean_net_avg,
+        "ai_theoretical_mean_net_by_provider": mean_net_map,
         "providers_voted": providers,
         "profile": PROFILE,
         "calibrated_to": GOLDEN_KEY,
