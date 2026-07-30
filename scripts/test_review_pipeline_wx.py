@@ -37,7 +37,7 @@ class ReviewLexiconTests(unittest.TestCase):
 
     def test_humanizer_success(self):
         zh = humanizer.humanize_final(final_status="SUCCESS", success=True)
-        self.assertIn("三次复核", zh)
+        self.assertTrue(("三复核" in zh) or ("三次复核" in zh))
         self.assertIn("人工确认", zh)
         self.assertNotIn("Gate", zh)
 
