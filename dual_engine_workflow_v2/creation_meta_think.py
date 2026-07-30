@@ -124,13 +124,70 @@ def _diverge_then_select(brief, symbol, timeframe):
     """Always list 3 distinct microstructure lenses, then pick one to deepen.
 
     Prompt-technique substitute for missing multi-agent debate.
+    If the brief explicitly lists A/B/C creation menus, those become the
+    three perspectives (preferred over generic defaults).
     """
-    text = (brief or "").lower()
+    text = (brief or "")
+    text_l = text.lower()
+
+    # Explicit A/B/C menu from human creation orders
+    has_abc = (
+        ("动量突破" in text or "多时间框架" in text or "A." in text or "A、" in text or "逻辑方向" in text)
+        and ("压缩" in text or "均值回归" in text or "B." in text or "B、" in text)
+        and ("配对" in text or "协整" in text or "C." in text or "C、" in text)
+    )
+    if has_abc:
+        perspectives = [
+            {
+                "id": "A_mtf_momentum_breakout",
+                "lens_zh": "多时间框架动量突破（15m确认 + 1h定方向）",
+                "thesis_zh": "高周期定方向，低周期动量/突破确认后顺势切入",
+                "family": "trend_pullback",
+                "factor_hints": ["ret_12", "ret_3", "dist_roll_high", "atr_pct_14"],
+            },
+            {
+                "id": "B_vol_squeeze_mean_reversion",
+                "lens_zh": "波动率压缩-扩张均值回归",
+                "thesis_zh": "低波压缩后的扩张边缘或分位回归，ATR/range 状态切换",
+                "family": "vol_squeeze_break",
+                "factor_hints": ["range_pct", "atr_pct_14", "close_z_20"],
+            },
+            {
+                "id": "C_pairs_cointegration",
+                "lens_zh": "多标的配对（协整 + 价差回归）",
+                "thesis_zh": "协整对价差偏离阈值后回归，需双标的与配对检验",
+                "family": "pairs_cointegration",
+                "factor_hints": ["close_z_20", "ret_12"],
+            },
+        ]
+        # Prefer A when MTF keywords / BTC-like; B when squeeze; C when pairs
+        selected_idx = 0
+        if any(k in text for k in ("配对", "协整", "价差")) and "优先" not in text:
+            selected_idx = 2
+        if any(k in text for k in ("压缩-扩张", "压缩", "均值回归")) and "动量突破" not in text:
+            selected_idx = 1
+        if any(k in text for k in ("多时间框架", "动量突破", "15min", "15m", "1h定方向")):
+            selected_idx = 0
+        # If brief says 优先考虑以下逻辑之一 and lists A first with MTF available intent
+        if "优先考虑以下逻辑之一" in text or "自主选择最优" in text:
+            # Optimal default for single liquid MTF symbol: A
+            selected_idx = 0
+            if "配对" in text and "必须配对" in text:
+                selected_idx = 2
+        chosen = perspectives[selected_idx]
+        return {
+            "divergence_instruction": GLM_META_DIVERGENCE_INSTRUCTION,
+            "perspectives": perspectives,
+            "selected_id": chosen["id"],
+            "selected_lens_zh": chosen["lens_zh"],
+            "selection_reason_zh": "人类指令含 A/B/C 菜单；按流动性/MTF 可得性择优深入（默认 A）",
+            "chosen": chosen,
+        }
+
     perspectives = [dict(p) for p in _DEFAULT_PERSPECTIVES]
 
-    # Optional 4th lens swap-in when brief clearly asks trend (keep list length 3
-    # by replacing P1 only if trend keywords dominate and not already covered)
-    if any(k in text for k in ("突破", "breakout", "趋势", "momentum", "顺势", "pullback", "回撤切入")):
+    # Optional swap when brief clearly asks trend
+    if any(k in text_l for k in ("突破", "breakout", "趋势", "momentum", "顺势", "pullback", "回撤切入")):
         perspectives[0] = {
             "id": "P1_trend_pullback",
             "lens_zh": "趋势回撤 / 惯性延续",
@@ -139,18 +196,15 @@ def _diverge_then_select(brief, symbol, timeframe):
             "factor_hints": ["ret_12", "ret_3", "close_z_20", "dist_roll_low"],
         }
 
-    # Selection rule: keyword match → else default P1
     selected_idx = 0
-    if any(k in text for k in ("扫荡", "liquidity", "流动性", "sfp", "止损")):
+    # Avoid treating 止损/硬性止损 as liquidity-sweep intent
+    sweep_hit = any(k in text for k in ("扫荡", "liquidity", "流动性猎杀", "sfp", "止损猎杀", "假突破"))
+    if sweep_hit:
         selected_idx = 1
-    elif any(k in text for k in ("压缩", "squeeze", "波动扩张", "波动率", "低波")):
+    elif any(k in text for k in ("压缩", "squeeze", "波动扩张", "低波")):
         selected_idx = 2
-    elif any(k in text for k in ("突破", "breakout", "趋势", "momentum", "顺势", "pullback")):
+    elif any(k in text_l for k in ("突破", "breakout", "趋势", "momentum", "顺势", "pullback")):
         selected_idx = 0
-        # if P1 was swapped to trend_pullback, idx 0 is correct; else prefer ret momentum
-        if perspectives[0].get("family") != "trend_pullback":
-            # keep inventory MR unless trend words present — already handled above
-            selected_idx = 0
 
     chosen = perspectives[selected_idx]
     return {

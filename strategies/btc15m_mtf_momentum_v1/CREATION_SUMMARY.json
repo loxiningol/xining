@@ -1,0 +1,183 @@
+{
+  "ok": true,
+  "schema": "qiyu_creation_delivery_v1",
+  "strategy_id": "btc15m_mtf_momentum_v1",
+  "symbol_screen": {
+    "picked": [
+      {
+        "sym": "BTC-USDT-SWAP",
+        "tf": "15m",
+        "reason": "最高分：流动性好+具备15m/1h MTF"
+      }
+    ],
+    "alternates": [
+      "CL-USDT-SWAP",
+      "LTC-USDT-SWAP"
+    ],
+    "method": "ann_vol + med_range + MTF bonus"
+  },
+  "divergence_instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，然后再选择其中一种深入推演。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。",
+  "divergence": {
+    "instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，然后再选择其中一种深入推演。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。",
+    "perspectives": [
+      {
+        "id": "A_mtf_momentum_breakout",
+        "lens_zh": "多时间框架动量突破（15m确认 + 1h定方向）",
+        "thesis_zh": "高周期定方向，低周期动量/突破确认后顺势切入",
+        "family": "trend_pullback",
+        "factor_hints": [
+          "ret_12",
+          "ret_3",
+          "dist_roll_high",
+          "atr_pct_14"
+        ]
+      },
+      {
+        "id": "B_vol_squeeze_mean_reversion",
+        "lens_zh": "波动率压缩-扩张均值回归",
+        "thesis_zh": "低波压缩后的扩张边缘或分位回归，ATR/range 状态切换",
+        "family": "vol_squeeze_break",
+        "factor_hints": [
+          "range_pct",
+          "atr_pct_14",
+          "close_z_20"
+        ]
+      },
+      {
+        "id": "C_pairs_cointegration",
+        "lens_zh": "多标的配对（协整 + 价差回归）",
+        "thesis_zh": "协整对价差偏离阈值后回归，需双标的与配对检验",
+        "family": "pairs_cointegration",
+        "factor_hints": [
+          "close_z_20",
+          "ret_12"
+        ]
+      }
+    ],
+    "selected_id": "A_mtf_momentum_breakout",
+    "selected_lens_zh": "多时间框架动量突破（15m确认 + 1h定方向）",
+    "selection_reason_zh": "人类指令含 A/B/C 菜单；按流动性/MTF 可得性择优深入（默认 A）"
+  },
+  "logic_selected": "A_mtf_momentum_breakout",
+  "backtest": {
+    "ok": true,
+    "strategy_id": "btc15m_mtf_momentum_v1",
+    "symbol": "BTC-USDT-SWAP",
+    "n_bars": 1200,
+    "n_trades": 21,
+    "total_return": -0.020371001917778964,
+    "final_equity": 9796.28998082221,
+    "sharpe_ann_proxy": -9.24774706232213,
+    "max_drawdown": -0.020371001917778964,
+    "win_rate": 0.2857142857142857,
+    "payoff": 1.0020318796686636,
+    "avg_trades_per_day": 1.6153846153846154,
+    "day_trade_counts": {
+      "2026-07-18": 0,
+      "2026-07-19": 0,
+      "2026-07-20": 0,
+      "2026-07-21": 0,
+      "2026-07-22": 0,
+      "2026-07-23": 1,
+      "2026-07-24": 3,
+      "2026-07-25": 3,
+      "2026-07-26": 3,
+      "2026-07-27": 4,
+      "2026-07-28": 2,
+      "2026-07-29": 3,
+      "2026-07-30": 2
+    },
+    "targets": {
+      "ann_sharpe_min": 1.5,
+      "max_drawdown_max": 0.15
+    },
+    "costs": {
+      "slippage_pct": 0.0005,
+      "taker_fee_pct": 0.0005
+    },
+    "hard_sl_pct": 0.009,
+    "leverage": 20,
+    "data_window": {
+      "first_ts": 1784324700000,
+      "last_ts": 1785403800000,
+      "note_zh": "受本地 formal_* 缓存长度限制；非完整 2024YTD。"
+    }
+  },
+  "target_hit_short_window": {
+    "sharpe": false,
+    "mdd": true,
+    "freq": false
+  },
+  "quantoracle": {
+    "ok": true,
+    "source": "local_fallback",
+    "certified": {
+      "sharpe_ratio": -1.7106591533185855,
+      "sortino": null,
+      "calmar": null,
+      "win_rate": 0.2857142857142857,
+      "profit_factor": null,
+      "ann_vol": null,
+      "kelly_quarter": null,
+      "kelly_recommended": null,
+      "max_drawdown": null,
+      "hurst": null
+    }
+  },
+  "stress": {
+    "passed": true,
+    "backtrader": {
+      "ok": true,
+      "source": "backtrader_lite",
+      "passed": true,
+      "windows": [
+        {
+          "start_idx": 0,
+          "n": 20,
+          "cum_return": -0.048396256203118715,
+          "max_drawdown": -0.048396256203118715,
+          "pass": true
+        }
+      ],
+      "at": "2026-07-30 18:01:11",
+      "full_max_drawdown": -0.05025328963122411,
+      "full_total_return": -0.05025328963122411,
+      "max_dd_limit": -0.15
+    },
+    "red_team": {
+      "ok": true,
+      "source": "autogen_redteam_lite",
+      "passed": true,
+      "attacks": [
+        {
+          "name": "adverse_slippage_3bp",
+          "max_drawdown": -0.04765218571441532,
+          "total_return": -0.04765218571441532,
+          "pass": true
+        },
+        {
+          "name": "periodic_gap_loss",
+          "max_drawdown": -0.07846814935741864,
+          "total_return": -0.07846814935741864,
+          "pass": true
+        },
+        {
+          "name": "liquidity_drought",
+          "max_drawdown": -0.09948228588911634,
+          "total_return": -0.09948228588911634,
+          "pass": true
+        }
+      ],
+      "n_pass": 3,
+      "at": "2026-07-30 18:01:11",
+      "note_zh": "攻击 Agent：滑点 / 跳空 / 流动性枯竭；不达标则回溯修正逻辑。"
+    }
+  },
+  "deliverables": {
+    "strategy_code": "strategy_code.py",
+    "params": "params.json",
+    "backtest_report": "backtest_report.md",
+    "risk_report": "risk_report.md"
+  },
+  "handoff_zh": "创造完成；未改复核。进入 ADA5 前需更长样本复验。"
+}
