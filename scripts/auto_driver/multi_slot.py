@@ -383,11 +383,20 @@ def _is_completed_100(payload):
     """True when campaign finished (archived/success ≈100%) and should count toward prune."""
     if not isinstance(payload, dict):
         return False
-    if payload.get("running"):
-        return False
+    if payload.get("running") and _driver_process_alive():
+        # only true-live running escapes completed classification
+        src = str(payload.get("source") or "")
+        if src in ("", "live") or src.startswith("live"):
+            return False
     state = _infer_slot_state(payload)
-    if state not in ("archived", "success"):
-        return False
+    if state in ("archived", "success"):
+        return True
+    diag = payload.get("diagnostic") or {}
+    if diag.get("stage") in ("l0", "l1", "gate2", "kb", "spec"):
+        return True
+    status = str(payload.get("status_label") or diag.get("terminal_zh") or "")
+    if "已归档" in status:
+        return True
     prog = payload.get("progress") or {}
     try:
         pct = float(prog.get("percent") or 0)
@@ -398,8 +407,7 @@ def _is_completed_100(payload):
         return True
     if final.get("status") or final.get("stop_code") or payload.get("success") or final.get("success"):
         return True
-    # Terminal archived/success without explicit percent still counts as done.
-    return True
+    return False
 
 
 def _append_display_archive(vector_root, hidden_payloads, reason="completed_overflow_gt_2"):
