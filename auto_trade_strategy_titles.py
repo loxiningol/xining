@@ -38,7 +38,7 @@ _FALLBACK = {
     "ada5_z20_t60_prev_h14_0724k": "ADA 5分钟 H1趋势回踩续涨",
     "codex0725_ada5_trendpb_r42_z2p0_h14": "ADA5趋势回踩·0725GLM",
     "codex0725t2_ada5m_trendpb_r42_z2p2_h14": "ADA5顺势回升·0725T2",
-    "codex0725t3_ada5m_trendpb_r42_z2p3_h14": "ADA5顺势回升·0725T3",
+    "codex0725t3_ada5m_trendpb_r42_z2p3_h14": "ADA5顺势回升",
     "xau15_h1_breakout_long_ai": "XAU 15分钟顺势放量突破（AI创造）",
     "frost_xrp_rescue_h20_t45": "[XRP 15m] 动量衰竭反转 (Exhaustion Fade)",
     "frost3_btc1h_xrpport_exhaustion_fade_slope": "[BTC 1h] 动量衰竭反转 (Exhaustion Fade)",
@@ -103,18 +103,30 @@ def strategy_title_map():
     return names
 
 
+def _strip_train_suffix(title):
+    """Drop train/version tails like ·0725T3 / ·0725GLM for user-facing text."""
+    title = str(title or "").strip()
+    if not title:
+        return title
+    title = re.sub(r"[·・]0725\w*$", "", title).strip()
+    title = re.sub(r"[·・]train\d+\w*$", "", title, flags=re.I).strip()
+    title = re.sub(r"[·・]?0?7\.?\d{2}[A-Za-z0-9]*$", "", title).strip()
+    title = re.sub(r"（AI创造）\s*$", "", title).strip()
+    return title
+
+
 def strategy_display_name(strategy_key, fallback_name=None):
     key = str(strategy_key or "").strip()
     if not key:
-        return str(fallback_name or "").strip() or ""
+        return _strip_train_suffix(fallback_name) or ""
     title = strategy_title_map().get(key)
     if title and title != key:
-        return title
+        return _strip_train_suffix(title) or title
     fb = str(fallback_name or "").strip()
     if fb and fb != key:
-        return fb
+        return _strip_train_suffix(fb) or fb
     if title:
-        return title
+        return _strip_train_suffix(title) or title
     return key
 
 
@@ -126,22 +138,19 @@ def resolve_strategy_name(strategy_key, strategy_name=None):
         titled = strategy_display_name(key, name)
     else:
         titled = strategy_display_name(key, None)
+    titled = _strip_train_suffix(titled) if titled else titled
     if titled and titled != key:
         return titled
     if name and name != key:
-        return name
-    return titled or name or key or "未命名策略"
+        return _strip_train_suffix(name) or name
+    return titled or _strip_train_suffix(name) or key or "未命名策略"
 
 
 def short_strategy_title(strategy_key, strategy_name=None):
     """Wx-friendly short title: drop train/version suffixes like ·0725GLM."""
     title = resolve_strategy_name(strategy_key, strategy_name)
-    # Strip common train/version tails for cleaner Wx lines.
-    title = re.sub(r"[·・]0725\w*$", "", title).strip()
-    title = re.sub(r"[·・]train\d+\w*$", "", title, flags=re.I).strip()
-    title = re.sub(r"[·・]?0?7\.?\d{2}[A-Za-z0-9]*$", "", title).strip()
-    title = re.sub(r"（AI创造）\s*$", "", title).strip()
-    return title or resolve_strategy_name(strategy_key, strategy_name)
+    cleaned = _strip_train_suffix(title)
+    return cleaned or resolve_strategy_name(strategy_key, strategy_name)
 
 
 def _looks_like_raw_code(text):
@@ -345,12 +354,18 @@ def rewrite_strategy_keys_in_text(text):
     )
 
     for key in sorted(mapping.keys(), key=len, reverse=True):
-        title = mapping.get(key) or ""
+        title = short_strategy_title(key, mapping.get(key) or key)
         if not key or not title or title == key:
             continue
-        if key not in message:
-            continue
-        message = message.replace(key, title)
+        if key in message:
+            message = message.replace(key, title)
+        # Also scrub legacy long Chinese titles still carrying ·0725T*
+        long_title = mapping.get(key) or ""
+        if long_title and long_title != title and long_title in message:
+            message = message.replace(long_title, title)
+        # Hard scrub known legacy ADA T3 long form
+        if key == "codex0725t3_ada5m_trendpb_r42_z2p3_h14":
+            message = message.replace("ADA5顺势回升·0725T3", title)
 
     for idx, raw in enumerate(protected):
         message = message.replace("\x00WXKEY%d\x00" % idx, raw)

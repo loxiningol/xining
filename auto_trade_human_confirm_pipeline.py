@@ -659,6 +659,14 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
     for row in pending["items"]:
         if row.get("key") == key and row.get("status") == "awaiting_confirm":
             return {"ok": True, "duplicate": True, "key": key}
+    try:
+        import auto_trade_strategy_titles as titles
+        display_name = titles.short_strategy_title(
+            key, metrics.get("name") or dsl.get("name") or key)
+    except Exception:
+        display_name = metrics.get("name") or dsl.get("name") or key
+        if isinstance(display_name, str) and "·0725" in display_name:
+            display_name = display_name.split("·0725")[0]
     item = {
         "key": key,
         "status": "awaiting_confirm",
@@ -667,7 +675,7 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         "symbol": metrics.get("symbol") or cand.get("symbol"),
         "timeframe": metrics.get("timeframe") or cand.get("timeframe"),
         "direction": metrics.get("direction") or dsl.get("direction"),
-        "name": metrics.get("name") or dsl.get("name") or key,
+        "name": display_name,
         "dsl": dsl,
         "metrics": metrics,
         "logic_brief": _logic_brief(dsl),

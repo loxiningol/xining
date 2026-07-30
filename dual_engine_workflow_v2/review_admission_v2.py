@@ -20,7 +20,7 @@ from .review_lexicon import (
 
 PROFILE = "ada_t3_calibrated_v1"
 GOLDEN_KEY = "codex0725t3_ada5m_trendpb_r42_z2p3_h14"
-GOLDEN_TITLE = "ADA5顺势回升·0725T3"
+GOLDEN_TITLE = "ADA5顺势回升"
 
 MIN_TRADES = 10
 MIN_WIN_RATE_PCT = 50.0
