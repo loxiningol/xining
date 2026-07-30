@@ -3,7 +3,7 @@
   "errors": [],
   "schema": "qiyu_step_a_v1",
   "artifact": "strategy_candidate_pack",
-  "call_id": "prebuilt_rolling_4h_sweep_5m_v1",
+  "call_id": "prebuilt_rolling_4h_sweep_5m_v1_clean",
   "attempts": 0,
   "meta": {
     "symbol": "ETH-USDT-SWAP",
@@ -11,11 +11,12 @@
     "direction": "long",
     "title": "[BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡",
     "title_zh": "[BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡 (Rolling 4H Sweep Fade)",
-    "thesis": "Replace once-per-day Asia-box 15m packs that starved L0 (n<30). Anchor = rolling prior 48×5m highs/lows (prev_high48/prev_low48 ≈ past 4h). Fade liquidity sweeps: wick beyond box then same-bar reclaim, with mild volume confirm vol_ma20_ratio>1.15 (NOT vol_z>1.8). Logical stop ≈ swing_extreme(5) wick proxy; trail 3.2×ATR_14 toward mean-revert / midline harvest. Outer protective SL 0.9% immutable. Lightweight funnel: L0 density → BTC/ETH/SOL anchor L1 → RAM-budgeted matrix.",
-    "source": "handcraft_workflow_v2_rolling_4h_sweep_5m_v1",
+    "thesis": "Rolling prior 48×5m box sweep+reclaim with mild vol_ma20_ratio>1.15. Stop = entry_wick_buffer 0.08% on signal-bar extreme. Initial TP = prev_mid48; trail = atr_trailing 3.2×ATR_14. Outer SL 0.9% immutable. Pack reset under pretest_quality contract (no swing_extreme wick proxy).",
+    "source": "handcraft_pretest_quality_reset_v1",
     "primary_submit": "ETH-USDT-SWAP 5m long",
     "anchor_symbols": ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"],
-    "replaces_starved_lineages": ["asia_sweep_fade_v1", "macro_sfp_unblocked_v1"]
+    "contract_id": "rolling_4h_sweep_5m_v1",
+    "pretest_quality_required": true
   },
   "mechanism_spec": {
     "mechanism_id": "mech_rolling_4h_sweep_5m_v1",
@@ -24,14 +25,14 @@
     "display_title_zh": "[BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡",
     "market_inefficiency": "滚动 4 小时高低点持续聚集止损单；5m 影线刺穿后收回，把追突破者锁在盒外，形成高频可重复的流动性回收。",
     "counterparty_source": "在滚动 4h 极值外追突破/止损被扫的订单；收回盒内后被迫反向平仓。",
-    "why_edge_exists": "48×5m 滚动盒每天提供多次更新的流动性边界，远高于单日亚盘盒。温和放量确认参与，避免 z>1.8 极端过滤把样本饿死。",
-    "edge_decay_conditions": "True 4h expansion days (close holds beyond box); correlated cascade; overcrowded sweep bots; holiday thin books.",
+    "why_edge_exists": "48×5m 滚动盒每天提供多次更新的流动性边界。温和放量确认参与，避免 z>1.8 极端过滤。",
+    "edge_decay_conditions": "True 4h expansion days; correlated cascade; overcrowded sweep bots; holiday thin books.",
     "required_market_regime": "Two-way 5m crypto majors. Features: prev_high48/prev_low48/prev_mid48, high/low/open/close, vol_ma20_ratio. No EMA/CCI/RSI core.",
-    "entry_logic": "LONG ALL: (1) low < prev_low48 (sweep); (2) close > prev_low48 (reclaim); (3) close < prev_high48 (still inside box); (4) vol_ma20_ratio > 1.15. SHORT mirror on prev_high48.",
-    "exit_logic": "atr_trailing n_atr=3.2 ATR_14 (toward 4h midline / mean-revert harvest). swing_extreme lookback=5 invalidation (DSL floor; proxy for sweep-wick + ~0.08% buffer). Outer protective SL 0.9% immutable. max_hold_bars=72. No fixed % TP.",
-    "stop_logic": "Logical invalidation near sweep wick via swing_extreme(5). Outer protective SL 0.9% immutable — never widen.",
-    "take_profit_logic": "No fixed % TP. atr_trailing 3.2×ATR_14 only (payoff-oriented trail).",
-    "invalidation_logic": "swing_extreme lookback=5; max_hold_bars=72; acceptance beyond rolling box.",
+    "entry_logic": "LONG ALL: (1) low < prev_low48; (2) close > prev_low48; (3) close < prev_high48; (4) vol_ma20_ratio > 1.15. SHORT mirror.",
+    "exit_logic": "Initial TP: close >= prev_mid48. Trail: atr_trailing 3.2×ATR_14. Invalidation: entry_wick_buffer buffer_pct=0.0008. Outer SL 0.9%. max_hold_bars=72. No fixed % TP. No swing_extreme wick proxy.",
+    "stop_logic": "entry_wick_buffer 0.0008 on signal-bar extreme. Outer protective SL 0.9% immutable.",
+    "take_profit_logic": "prev_mid48 feature TP + atr_trailing 3.2×ATR_14. No fixed % TP.",
+    "invalidation_logic": "entry_wick_buffer; max_hold_bars=72; acceptance beyond rolling box.",
     "non_negotiable_rules": [
       "protective_sl_0.9_pct_immutable",
       "no_fixed_pct_take_profit",
@@ -39,8 +40,11 @@
       "must_keep_rolling_48bar_box_sweep_and_reclaim",
       "must_use_5m_timeframe",
       "must_keep_mild_vol_ma20_ratio_gt_1_15",
+      "must_use_entry_wick_buffer_0_0008",
+      "must_use_prev_mid48_initial_tp",
       "must_use_atr_trailing",
       "no_extreme_vol_z_gt_1_8_as_core_filter",
+      "no_swing_extreme_as_wick_proxy",
       "no_martingale_grid_pyramiding",
       "no_live_mount_without_human_confirm",
       "never_lower_gate2_floors",
@@ -49,7 +53,6 @@
     "tunable_parameters": [
       "vol_ma20_ratio_min",
       "atr_trail_n",
-      "swing_lookback",
       "max_hold_bars"
     ],
     "forbidden_transformations": [
@@ -59,9 +62,12 @@
       "raise_vol_filter_to_vol_z20_gt_1_8",
       "add_fixed_micro_tp_below_2pct",
       "remove_sweep_or_reclaim_leg",
+      "replace_entry_wick_buffer_with_swing_extreme_proxy",
+      "remove_prev_mid48_tp",
       "weaken_or_widen_0.9_protective_sl",
       "auto_mount_or_confirm_without_human",
-      "lower_gate2_floors"
+      "lower_gate2_floors",
+      "additive_optimize_before_pretest_pass"
     ],
     "expected_trade_frequency_class": "high_freq_2_to_12_per_day_5m_anchor",
     "expected_holding_period": "3_to_72_bars_5m",
@@ -94,14 +100,15 @@
     },
     "exit": {
       "any": [
+        {"id": "x_mid48_tp", "left": {"feature": "close"}, "op": "gte", "right": {"feature": "prev_mid48"}, "role": "take_profit"},
         {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.2, "atr_period": 14, "role": "take_profit"},
-        {"id": "x_sw_inv", "exit_op": "swing_extreme", "lookback": 5, "role": "invalidation"}
+        {"id": "x_wick_sl", "exit_op": "entry_wick_buffer", "buffer_pct": 0.0008, "role": "invalidation"}
       ]
     },
     "max_hold_bars": 72,
-    "description": "step_a|rolling_4h_sweep_5m_v1|prev_low48_sweep_reclaim|vol_ma20_gt_1.15|trail3.2|sw5|sl0.9|eth5m_long",
-    "origin": "step_a_prebuilt_dsl",
-    "version": 1,
+    "description": "step_a|rolling_4h_sweep_5m_v1|prev_low48_sweep_reclaim|vol_ma20_gt_1.15|mid48_tp|trail3.2|wick0.08|sl0.9|eth5m_long",
+    "origin": "pretest_quality_reset",
+    "version": 2,
     "live_enabled": false,
     "auto_trade_eligible": false
   },
@@ -122,14 +129,15 @@
     },
     "exit": {
       "any": [
+        {"id": "x_mid48_tp", "left": {"feature": "close"}, "op": "gte", "right": {"feature": "prev_mid48"}, "role": "take_profit"},
         {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.2, "atr_period": 14, "role": "take_profit"},
-        {"id": "x_sw_inv", "exit_op": "swing_extreme", "lookback": 5, "role": "invalidation"}
+        {"id": "x_wick_sl", "exit_op": "entry_wick_buffer", "buffer_pct": 0.0008, "role": "invalidation"}
       ]
     },
     "max_hold_bars": 72,
-    "description": "step_a|rolling_4h_sweep_5m_v1|prev_low48_sweep_reclaim|vol_ma20_gt_1.15|trail3.2|sw5|sl0.9|eth5m_long",
-    "origin": "step_a_prebuilt_dsl",
-    "version": 1,
+    "description": "step_a|rolling_4h_sweep_5m_v1|prev_low48_sweep_reclaim|vol_ma20_gt_1.15|mid48_tp|trail3.2|wick0.08|sl0.9|eth5m_long",
+    "origin": "pretest_quality_reset",
+    "version": 2,
     "live_enabled": false,
     "auto_trade_eligible": false
   },
@@ -150,24 +158,24 @@
     },
     "exit": {
       "any": [
+        {"id": "x_mid48_tp", "left": {"feature": "close"}, "op": "lte", "right": {"feature": "prev_mid48"}, "role": "take_profit"},
         {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.2, "atr_period": 14, "role": "take_profit"},
-        {"id": "x_sw_inv", "exit_op": "swing_extreme", "lookback": 5, "role": "invalidation"}
+        {"id": "x_wick_sl", "exit_op": "entry_wick_buffer", "buffer_pct": 0.0008, "role": "invalidation"}
       ]
     },
     "max_hold_bars": 72,
-    "description": "step_a|rolling_4h_sweep_5m_v1|prev_high48_sweep_reclaim|vol_ma20_gt_1.15|trail3.2|sw5|sl0.9|eth5m_short",
-    "origin": "step_a_prebuilt_dsl",
-    "version": 1,
+    "description": "step_a|rolling_4h_sweep_5m_v1|prev_high48_sweep_reclaim|vol_ma20_gt_1.15|mid48_tp|trail3.2|wick0.08|sl0.9|eth5m_short",
+    "origin": "pretest_quality_reset",
+    "version": 2,
     "live_enabled": false,
     "auto_trade_eligible": false
   },
   "pipeline_readiness": {
     "gate0_ready": true,
     "mechanism_spec_complete": true,
-    "mechanism_spec_fields": 20,
     "protective_sl": 0.009,
     "no_fixed_pct_tp": true,
-    "calibration_gate2ish": true,
-    "l1_pass_rate_probe": "rolling48_5m_mild_vol_anchor3"
+    "pretest_quality_required": true,
+    "contract_id": "rolling_4h_sweep_5m_v1"
   }
 }

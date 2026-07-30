@@ -1,0 +1,65 @@
+{
+  "schema": "qiyu_invariants_contract_v1",
+  "contract_id": "rolling_4h_sweep_5m_v1",
+  "title_zh": "[BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡",
+  "assert_suite": "rolling_4h_sweep_5m_v1",
+  "require_sanity_asserts": true,
+  "must_timeframe": "5m",
+  "ban_swing_as_wick_proxy": true,
+  "mechanism_pseudocode": {
+    "box": "prev_high48/prev_low48 = max/min of prior 48×5m bars (rolling 4H)",
+    "long_entry": "low < prev_low48 AND close > prev_low48 AND close < prev_high48 AND vol_ma20_ratio > 1.15",
+    "short_entry": "high > prev_high48 AND close < prev_high48 AND close > prev_low48 AND vol_ma20_ratio > 1.15",
+    "stop": "entry_wick_buffer buffer_pct=0.0008 on signal-bar extreme (NOT swing_extreme proxy)",
+    "tp_primary": "feature exit to prev_mid48 (4H midline)",
+    "tp_trail": "atr_trailing n_atr=3.2 atr_period=14 after / alongside midline harvest",
+    "outer_sl": "protective 0.9% immutable (engine-level, not DSL exit_op)"
+  },
+  "required_entry_feature_cmps": [
+    {"left": "low", "op": "lt", "right": "prev_low48"},
+    {"left": "close", "op": "gt", "right": "prev_low48"},
+    {"left": "close", "op": "lt", "right": "prev_high48"}
+  ],
+  "required_entry_feature_cmps_short": [
+    {"left": "high", "op": "gt", "right": "prev_high48"},
+    {"left": "close", "op": "lt", "right": "prev_high48"},
+    {"left": "close", "op": "gt", "right": "prev_low48"}
+  ],
+  "required_entry_value_cmps": [
+    {"left": "vol_ma20_ratio", "op": "gt", "value": 1.15}
+  ],
+  "required_exit_ops": [
+    {"exit_op": "entry_wick_buffer", "buffer_pct": 0.0008, "role": "invalidation"},
+    {"exit_op": "atr_trailing", "n_atr": 3.2, "atr_period": 14, "role": "take_profit"}
+  ],
+  "required_exit_feature_cmps": [
+    {"left": "close", "op": "gte", "right": "prev_mid48"}
+  ],
+  "required_exit_feature_cmps_short": [
+    {"left": "close", "op": "lte", "right": "prev_mid48"}
+  ],
+  "forbidden_features": [
+    "asia_high", "asia_low", "asia_mid", "asia_range", "asia_range_atr_ratio",
+    "pdh", "pdl", "pdc", "h4_high24", "h4_low24",
+    "ema6", "ema21", "ema53", "cci", "rsi14"
+  ],
+  "forbidden_exit_ops": ["fixed_pct_tp"],
+  "non_negotiable_rules": [
+    "protective_sl_0.9_pct_immutable",
+    "no_fixed_pct_take_profit",
+    "must_keep_rolling_48bar_box_sweep_and_reclaim",
+    "must_use_5m_timeframe",
+    "must_keep_mild_vol_ma20_ratio_gt_1_15",
+    "must_use_entry_wick_buffer_0_0008",
+    "must_use_prev_mid48_initial_tp",
+    "must_use_atr_trailing",
+    "no_extreme_vol_z_gt_1_8_as_core_filter",
+    "no_swing_extreme_as_wick_proxy",
+    "never_lower_gate2_floors"
+  ],
+  "prune_audit_instructions_zh": [
+    "对比本契约与 DSL：只列多余假设、未授权硬编码、逻辑偏离。",
+    "只允许删除或清零重译；禁止加分支/加过滤/加 EMA。",
+    "若无法在不新增契约外逻辑的情况下修好 → decision=RESET。"
+  ]
+}

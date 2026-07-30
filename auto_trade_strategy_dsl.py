@@ -54,7 +54,10 @@ MAX_LOOKBACK = 240
 
 # ---- Phase-2 structured exits (opt-in; fail-closed on misuse) ----
 # Protective production SL (0.9%) is NOT an exit_op and is never banned here.
-EXIT_OPS = {"atr_trailing", "swing_extreme", "fixed_pct_tp", "partial_tp_atr"}
+EXIT_OPS = {
+    "atr_trailing", "swing_extreme", "fixed_pct_tp", "partial_tp_atr",
+    "entry_wick_buffer",
+}
 ATR_TRAIL_N_MIN = 2.5
 ATR_TRAIL_N_MAX = 5.0  # allow Macro SFP 3.5–5.0× ATR_14 harvest window
 ATR_TRAIL_PERIOD_DEFAULT = 14
@@ -65,6 +68,9 @@ PARTIAL_TP_RATIO_MIN = 0.1
 PARTIAL_TP_RATIO_MAX = 0.9
 SWING_LOOKBACK_MIN = 5
 SWING_LOOKBACK_MAX = 60
+# Signal-bar wick stop + buffer (e.g. 0.08% = 0.0008). Not a fixed-% take-profit.
+ENTRY_WICK_BUFFER_MIN = 0.0003
+ENTRY_WICK_BUFFER_MAX = 0.003
 
 # ---- Phase-4 dynamic volatility sizing (RESEARCH / incubator BT only) ----
 # Position Size = (Equity * Risk_Pct) / (ATR_14 * Target_Multiplier)
@@ -355,7 +361,7 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
             raise DSLValidationError("exit_op is only valid on exit conditions")
         allowed_exit = {
             "id", "exit_op", "role", "n_atr", "atr_period", "lookback",
-            "pct", "price_pct", "partial_tp_ratio", "params",
+            "pct", "price_pct", "partial_tp_ratio", "buffer_pct", "params",
         }
         if set(node) - allowed_exit:
             raise DSLValidationError("exit_op node contains unknown fields")
@@ -408,6 +414,18 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
                 raise DSLValidationError(
                     "swing_extreme lookback must be in [%d, %d]"
                     % (SWING_LOOKBACK_MIN, SWING_LOOKBACK_MAX)
+                )
+        elif exit_op == "entry_wick_buffer":
+            # Logical stop at signal-bar extreme ± buffer. Not fixed-% TP.
+            if role is not None and role != "invalidation":
+                raise DSLValidationError(
+                    "entry_wick_buffer role must be invalidation (got %s)" % role
+                )
+            buf = _number(node.get("buffer_pct", 0.0008))
+            if buf < ENTRY_WICK_BUFFER_MIN or buf > ENTRY_WICK_BUFFER_MAX:
+                raise DSLValidationError(
+                    "entry_wick_buffer buffer_pct must be in [%.4f, %.4f] (got %s)"
+                    % (ENTRY_WICK_BUFFER_MIN, ENTRY_WICK_BUFFER_MAX, buf)
                 )
         elif exit_op == "fixed_pct_tp":
             # Hard ban tiny fixed TP — refuse-compile / refuse-validate, no convert
@@ -709,6 +727,28 @@ def evaluate_exit_op(frame, index, node, position, direction, explain=False):
                 "lookback": lookback,
                 "swing_high": swing_high,
                 "swing_low": swing_low,
+            })
+        elif exit_op == "entry_wick_buffer":
+            buf = float(node.get("buffer_pct") or 0.0008)
+            entry_low = float(position.get("entry_bar_low")
+                              or position.get("peak_low")
+                              or entry_price)
+            entry_high = float(position.get("entry_bar_high")
+                               or position.get("peak_high")
+                               or entry_price)
+            if direction == "long":
+                stop_px = entry_low * (1.0 - buf)
+                passed = low <= stop_px
+                exit_price = stop_px if passed else close
+            else:
+                stop_px = entry_high * (1.0 + buf)
+                passed = high >= stop_px
+                exit_price = stop_px if passed else close
+            detail.update({
+                "buffer_pct": buf,
+                "entry_bar_low": entry_low,
+                "entry_bar_high": entry_high,
+                "stop": stop_px,
             })
         elif exit_op == "fixed_pct_tp":
             pct = refuse_fixed_tiny_tp(
@@ -1093,6 +1133,9 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
                     "conditions": details,
                     "peak_high": float(frame["high"].iloc[index]),
                     "peak_low": float(frame["low"].iloc[index]),
+                    # Frozen signal-bar extremes for entry_wick_buffer stops.
+                    "entry_bar_high": float(frame["high"].iloc[index]),
+                    "entry_bar_low": float(frame["low"].iloc[index]),
                     "mae_price_pct": 0.0,
                     "size_meta": size_meta,
                 }

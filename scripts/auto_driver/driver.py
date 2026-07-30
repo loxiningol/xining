@@ -89,6 +89,36 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1,
     dsl["timeframe"] = timeframe
     dsl_mod.validate_strategy(dsl)
 
+    # Local pretest before spending RAM on funnel (fail closed).
+    try:
+        from dual_engine_workflow_v2.pretest_quality import run_pretest_quality
+        pretest = run_pretest_quality(pack, direction=direction)
+        if not pretest.get("pass"):
+            print(
+                "[auto_driver] pretest_quality FAIL quality=%s verdict=%s → refuse funnel"
+                % (pretest.get("quality"), pretest.get("verdict")),
+                flush=True,
+            )
+            return {
+                "ok": False,
+                "reason": "pretest_quality_fail",
+                "pretest_quality": pretest,
+                "task_id": None,
+            }, 0.0
+    except Exception as exc:
+        print("[auto_driver] pretest_quality exception (fail-closed): %s" % exc, flush=True)
+        return {
+            "ok": False,
+            "reason": "pretest_quality_fail",
+            "pretest_quality": {
+                "pass": False,
+                "quality": "SHIT_TRANSLATION",
+                "verdict": "RESET_REQUIRED",
+                "reason": "pretest_exception:%s" % exc,
+            },
+            "task_id": None,
+        }, 0.0
+
     matrix_n = len((spec or {}).get("suitable_symbols") or [])
     budget = memory_guard.matrix_budget()
     print(
@@ -409,10 +439,30 @@ def run_driver(cfg):
                  message=state["ai_abort_reason"])
             break
 
-        # PATCH
-        if ai_decision == "PATCH":
+        if ai_decision == "RESET":
+            # Semantic drift / shit translation — refuse additive decorate.
+            state["ai_limit_reached"] = True
+            state["ai_limit_reason"] = (
+                merged.get("rationale")
+                or "RESET_REQUIRED: translation drifted; retranslate from contract"
+            )
+            state["stop_code"] = "RESET_REQUIRED"
+            state["iterations"].append(_iter_record(
+                iteration, result, ctx, elapsed,
+                ai_decision="RESET", applied=[],
+                ai_rationale=state["ai_limit_reason"],
+                limit_reason=state["ai_limit_reason"],
+            ))
+            _dump_json(iter_dir / "pack.after.json", pack)
+            _pub(cfg, state, pack, phase="reset_required", result=result,
+                 message=state["ai_limit_reason"])
+            print("[auto_driver] RESET — refuse shit-decorate; stop loop", flush=True)
+            break
+
+        # PRUNE (legacy PATCH alias) — subtractive / contract-restore only
+        if ai_decision in ("PRUNE", "PATCH"):
             _pub(cfg, state, pack, phase="patch", result=result,
-                 message="应用补丁并 DSL 校验")
+                 message="剪枝/契约恢复并 DSL 校验")
             # Gate2-after-L1: drop entry mutations; then clamp DSL hard bounds.
             patches = patch_apply.filter_patches_for_reason(
                 merged.get("patches") or [], reason,
@@ -421,7 +471,7 @@ def run_driver(cfg):
             applied = []
             apply_errors = []
             if not patches:
-                print("[auto_driver] no usable patches after Gate2 entry-filter/sanitize; skip apply", flush=True)
+                print("[auto_driver] no usable prune patches after filter/sanitize; skip apply", flush=True)
                 apply_errors = [{"error": "no_usable_patches_after_filter"}]
                 _dump_json(iter_dir / "patches.applied.json", {
                     "applied": [], "errors": apply_errors, "filtered": True,
@@ -435,19 +485,25 @@ def run_driver(cfg):
                     print("[auto_driver] all patches failed; rollback", flush=True)
                     pack = patch_apply.restore_pack(snap)
                 else:
-                    # DSL validate; rollback if invalid
+                    # DSL validate + pretest; rollback if invalid / shit
                     try:
                         import auto_trade_strategy_dsl as dsl_mod
+                        from dual_engine_workflow_v2.pretest_quality import run_pretest_quality
                         dsl = _select_dsl(new_pack, cfg["direction"])
                         dsl = dict(dsl or {})
                         dsl["supported_instruments"] = [cfg["symbol"]]
                         dsl["timeframe"] = cfg["timeframe"]
                         dsl_mod.validate_strategy(dsl)
+                        pretest2 = run_pretest_quality(new_pack, direction=cfg["direction"])
+                        if not pretest2.get("pass"):
+                            raise RuntimeError(
+                                "pretest_after_prune_failed:%s" % pretest2.get("reason")
+                            )
                         pack = new_pack
                     except Exception as exc:
-                        print("[auto_driver] DSL validate failed after patch: %s; rollback" % exc, flush=True)
+                        print("[auto_driver] validate/pretest failed after prune: %s; rollback" % exc, flush=True)
                         pack = patch_apply.restore_pack(snap)
-                        apply_errors.append({"error": "dsl_validate_failed", "detail": str(exc)})
+                        apply_errors.append({"error": "dsl_or_pretest_failed", "detail": str(exc)})
                         applied = []
         else:
             print("[auto_driver] unexpected ai_decision=%s" % ai_decision, flush=True)

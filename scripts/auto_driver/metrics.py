@@ -114,7 +114,18 @@ def build_failure_context(result, pack, iteration, symbol, timeframe, direction,
         "dsl_summary": summarize_dsl(dsl),
         "dsl": copy.deepcopy(dsl) if isinstance(dsl, dict) else {},
         "mechanism_spec": copy.deepcopy(spec) if isinstance(spec, dict) else {},
+        "pretest_quality": copy.deepcopy((result or {}).get("pretest_quality") or {}),
     }
+    try:
+        from dual_engine_workflow_v2 import invariants_contract as inv
+        contract, src = inv.resolve_contract_for_pack(pack)
+        ctx["invariants_contract"] = contract
+        ctx["invariants_contract_source"] = src
+        if not ctx.get("pretest_quality"):
+            from dual_engine_workflow_v2.pretest_quality import run_pretest_quality
+            ctx["pretest_quality"] = run_pretest_quality(pack, direction=direction)
+    except Exception as exc:
+        ctx["invariants_contract_error"] = str(exc)
     try:
         from . import diagnostic as diagnostic_mod
         ctx["diagnostic"] = diagnostic_mod.build_diagnostic(

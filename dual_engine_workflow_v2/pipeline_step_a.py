@@ -1036,6 +1036,64 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         dual.save_task(task)
         return {"ok": False, "task_id": tid, "reason": "validate_fail"}
 
+    # ---- Pretest quality: contract + sanity asserts BEFORE L0 (anti-屎上雕花) ----
+    task["stage"] = "pretest_quality"
+    try:
+        from .pretest_quality import run_pretest_quality
+        pretest_pack = {
+            "meta": book if isinstance(book, dict) else {},
+            "mechanism_spec": spec,
+            "dsl": definition,
+            "dsl_long": (prebuilt_spec_pack or {}).get("dsl_long") if isinstance(prebuilt_spec_pack, dict) else None,
+            "dsl_short": (prebuilt_spec_pack or {}).get("dsl_short") if isinstance(prebuilt_spec_pack, dict) else None,
+        }
+        # Prefer embedded / family contract from prebuilt pack meta
+        if isinstance(prebuilt_spec_pack, dict):
+            pretest_pack["meta"] = dict(prebuilt_spec_pack.get("meta") or {})
+            pretest_pack["meta"].setdefault("direction", book.get("direction") or "long")
+            pretest_pack["meta"].setdefault("timeframe", book.get("timeframe"))
+            if prebuilt_spec_pack.get("invariants_contract"):
+                pretest_pack["invariants_contract"] = prebuilt_spec_pack.get("invariants_contract")
+        pretest = run_pretest_quality(
+            pretest_pack,
+            direction=book.get("direction") or "long",
+        )
+    except Exception as exc:
+        pretest = {
+            "pass": False,
+            "stage": "pretest_quality",
+            "quality": "SHIT_TRANSLATION",
+            "verdict": "RESET_REQUIRED",
+            "reason": "pretest_exception:%s" % exc,
+            "message_zh": "预检异常，fail-closed",
+        }
+    task["pretest_quality"] = pretest
+    print(
+        "[pipeline_step_a] pretest_quality pass=%s quality=%s verdict=%s reason=%s"
+        % (pretest.get("pass"), pretest.get("quality"), pretest.get("verdict"), pretest.get("reason")),
+        flush=True,
+    )
+    if not pretest.get("pass"):
+        task["stage"] = "archived"
+        task["gate_results"] = assemble_gate_results(task["gates"], tid)
+        save_gate_results(tid, task["gate_results"])
+        _archive_step_a(
+            task, stage="pretest_quality",
+            failed_tests=["invariants_or_sanity"],
+            reason=pretest.get("message_zh") or pretest.get("reason") or "pretest_fail",
+            verdict="shit_translation_reset",
+            is_eng=True,
+        )
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": False,
+            "task_id": tid,
+            "reason": "pretest_quality_fail",
+            "pretest_quality": pretest,
+            "gate_results": task["gate_results"],
+        }
+
     sym = book.get("symbol") or focus.get("symbol")
     tf = book.get("timeframe") or focus.get("timeframe")
     matrix_syms_full = _resolve_matrix_symbols(
