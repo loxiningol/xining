@@ -465,6 +465,11 @@ def precompute_indicators(df, timeframe="1h"):
     df["z20"] = (c-mean20)/std20.replace(0,np.nan)
     df["prev_high20"] = h.shift(1).rolling(20,min_periods=20).max()
     df["prev_low20"] = l.shift(1).rolling(20,min_periods=20).min()
+    # Rolling N-bar box (no lookahead): prior completed bars only.
+    # On 5m, N=48 ⇒ past 4 hours — Rolling 4H Sweep Fade anchor.
+    df["prev_high48"] = h.shift(1).rolling(48, min_periods=48).max()
+    df["prev_low48"] = l.shift(1).rolling(48, min_periods=48).min()
+    df["prev_mid48"] = (df["prev_high48"] + df["prev_low48"]) / 2.0
 
     # vol_z20: true volume z-score when volume present; else bar-range z-score
     # proxy (documented as range_vol_proxy — participation/expansion stand-in).
@@ -475,6 +480,8 @@ def precompute_indicators(df, timeframe="1h"):
     vol_mean = vol.rolling(20, min_periods=20).mean()
     vol_std = vol.rolling(20, min_periods=20).std()
     df["vol_z20"] = (vol - vol_mean) / vol_std.replace(0, np.nan)
+    # Mild volume confirm: volume / MA20 (1.15 = +15% vs average)
+    df["vol_ma20_ratio"] = vol / vol_mean.replace(0, np.nan)
 
     # Prior-day high/low/close (PDH/PDL/PDC): completed UTC day only.
     # daily.shift(1) + ffill ⇒ intraday bars on day D see only day D-1 (no lookahead).
@@ -630,8 +637,9 @@ def _build_kwargs(df):
     for col in [
         "k","d","j","cci","macd_stick","open","high","low","close",
         "atr14","h1_ema19","h1_ema53","h1_atr14",
-        "rsi14","z20","prev_high20","prev_low20","h1_slope4",
-        "vol_z20","pdh","pdl","pdc","h4_high24","h4_low24",
+        "rsi14","z20","prev_high20","prev_low20","prev_high48","prev_low48","prev_mid48",
+        "h1_slope4",
+        "vol_z20","vol_ma20_ratio","pdh","pdl","pdc","h4_high24","h4_low24",
         "hour_utc","asia_high","asia_low","asia_mid","asia_range",
         "asia_range_atr_ratio",
     ]:

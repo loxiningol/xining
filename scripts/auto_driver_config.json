@@ -1,9 +1,9 @@
 {
-  "pack_path": "/root/strategy_macro_sfp_unblocked_v1.json",
+  "pack_path": "/root/strategy_rolling_4h_sweep_5m_v1.json",
   "symbol": "ETH-USDT-SWAP",
-  "timeframe": "15m",
+  "timeframe": "5m",
   "direction": "long",
-  "tag": "auto_driver_macro_sfp_unblocked_v1",
+  "tag": "auto_driver_rolling_4h_sweep_5m_v1",
   "max_iterations": 6,
   "l1_seed_retries": 4,
   "ai_providers": ["deepseek", "qwen", "glm"],
@@ -16,25 +16,24 @@
   "auto_bump_family_after_gate2": true,
   "enable_multi_symbol_matrix": true,
   "report_name": "delivery_report.md",
-  "report_copy_to": "/root/delivery_report_macro_sfp_unblocked_v1.md",
+  "report_copy_to": "/root/delivery_report_rolling_4h_sweep_5m_v1.md",
   "workdir": null,
   "vector_root": "/root",
   "dry_run": false,
   "optimize_goals": [
-    "family=macro_sfp_unblocked_v1 — lightweight funnel v3: L0 density → BTC/ETH/SOL anchor L1 → RAM-budgeted matrix",
-    "NEVER rename into exact blocked family macro_sfp_displacement (KB exact match)",
-    "keep Macro SFP core: low<pdl & close>pdl (long); high>pdh & close<pdh (short); displacement body close vs open",
-    "vol_z20 floor for THIS family is 0.8 — may tune in [0.5, 1.2]; do NOT stack extra AND filters that zero L0 density",
-    "If L0 REJECT_TOO_RARE: relax non-causal filters first (vol_z), never delete PDL/PDH sweep+reclaim core",
-    "Matrix width is RAM-adaptive on this host — do not demand full 38 if soft-kill/calmar budding fails",
-    "Soft budding guidance (payoff≥1.3 / calmar≥0.8) is for AI progress only; formal Gate2 floors stay absolute",
-    "exit: keep scale-out partial_tp_atr≈0.5@2.0ATR + atr_trailing≈4.5; swing_extreme lookback≥5; no fixed % TP",
-    "never_lower_gate2_floors: payoff≥2.5 / calmar≥1.5 / WF≥7/10 / worst5 floors stay absolute",
+    "family=rolling_4h_sweep_5m_v1 — NEW high-freq Rolling 4H Sweep Fade on 5m; display [BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡",
+    "NEVER rename into asia_sweep_fade* / macro_sfp_displacement / session_liq_engulf* / session_vol_squeeze*",
+    "keep rolling box: prev_low48/prev_high48 (48×5m ≈ 4h) sweep+reclaim; keep inside-box close vs opposite extreme",
+    "volume filter is vol_ma20_ratio>1.15 (mild). NEVER raise to vol_z20>1.8; tunable in [1.05, 1.35]",
+    "timeframe MUST stay 5m",
+    "exit: atr_trailing n_atr≈3.2 (∈[2.5,5.0]); swing_extreme lookback≥5 wick-stop proxy; no fixed % TP",
+    "lightweight funnel: L0 density → BTC/ETH/SOL anchor L1 → RAM-budgeted matrix only if budding",
+    "never_lower_gate2_floors: payoff≥2.5 / calmar≥1.5 / WF≥7/10 absolute",
     "never mount / human confirm; success only enters pending queue"
   ],
   "notes": [
-    "Lightweight funnel v3: memory guard + L0 density + anchor L1 before any wide matrix.",
-    "Formal Gate2 floors unchanged. Soft incubation bands are guidance only.",
-    "764MB host: matrix auto-degrades to primary/anchor when avail RAM is low to protect qiyu-web."
+    "Replaces L0-starved Asia-box 15m / Macro SFP packs with rolling 4h micro structure on 5m.",
+    "Features prev_high48/prev_low48/vol_ma20_ratio added to DSL + precompute_indicators.",
+    "Formal Gate2 floors unchanged. Memory guard keeps matrix width adaptive on 764MB host."
   ]
 }

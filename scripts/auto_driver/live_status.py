@@ -44,6 +44,8 @@ def humanize_mechanism_title(symbol, timeframe, family=None, mechanism_name=None
         "macro_sfp_displacement": ("宏观流动性扫荡回收", "Macro SFP Displacement"),
         "macro_sfp_unblocked_v1": ("宏观流动性扫荡回收 · 解封", "Macro SFP Unblocked"),
         "macro_sfp_unblocked": ("宏观流动性扫荡回收 · 解封", "Macro SFP Unblocked"),
+        "rolling_4h_sweep_5m_v1": ("滚动4小时极值流动性扫荡", "Rolling 4H Sweep Fade"),
+        "rolling_4h_sweep_5m": ("滚动4小时极值流动性扫荡", "Rolling 4H Sweep Fade"),
         "compression_release_structural_breakout": ("波动压缩后结构突破", "Compression Release Breakout"),
         "htf_slope_aligned_micro_pullback": ("高周期顺势回踩续涨", "HTF Slope Pullback"),
         "stop_hunt_range_reclaim": ("假突破扫损回收", "Stop Hunt Reclaim"),

@@ -19,6 +19,8 @@ FEATURES = {
     "ema17", "ema19", "ema21", "ema23", "ema32", "ema38", "ema53",
     "ema75", "ema95", "ema200", "k", "d", "j", "cci", "macd_stick",
     "atr14", "rsi14", "z20", "vol_z20", "prev_high20", "prev_low20",
+    # Rolling 4H-on-5m (48×5m) liquidity box + mild volume ratio
+    "prev_high48", "prev_low48", "prev_mid48", "vol_ma20_ratio",
     "h1_ema19", "h1_ema53", "h1_atr14", "h1_slope4",
     # Macro SFP anchors (research, no lookahead): prior-day + 4h swing24
     "pdh", "pdl", "pdc", "h4_high24", "h4_low24",
@@ -872,6 +874,7 @@ def mutate_strategy(strategy, threshold_step=1.0, additions=None, limit=24):
                 "h1_slope4": 0.0005,
                 "z20": 0.1,
                 "vol_z20": 0.1,
+                "vol_ma20_ratio": 0.05,
                 "cci": 5.0,
                 "macd_stick": 5.0,
                 "atr14": 1.0,

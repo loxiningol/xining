@@ -216,4 +216,89 @@ def run_micro_screen(definition=None, frame=None, backtest_fn=None,
     verdict["under_target"] = elapsed_ms < 100.0
     verdict["fail_closed"] = True
     verdict["n_trades_sample"] = len(used_trades or [])
+    verdict["trades_sample"] = list(used_trades or [])
+    return verdict
+
+
+def run_micro_screen_matrix(definition=None, frames_by_symbol=None, backtest_fn=None,
+                            fraction=SAMPLE_FRACTION_DEFAULT, seed=None,
+                            n_slices=N_SLICES_DEFAULT, min_bars=400,
+                            stop_loss_pct=0.009):
+    """L1 across a multi-symbol matrix: aggregate sample fills, do not lower floors.
+
+    frames_by_symbol: ordered dict/list of (symbol, frame) pairs.
+    Each symbol is micro-screened independently; trades are pooled for the
+    sample_filled_entries / payoff / MAE hard rules (thresholds unchanged).
+    """
+    t0 = time.perf_counter()
+    frames_by_symbol = frames_by_symbol or []
+    if isinstance(frames_by_symbol, dict):
+        frames_by_symbol = list(frames_by_symbol.items())
+
+    pooled = []
+    per_symbol = []
+    base_seed = int(seed) if seed is not None else 42
+    for i, item in enumerate(frames_by_symbol):
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            sym, frame = item[0], item[1]
+        else:
+            continue
+        if frame is None:
+            per_symbol.append({
+                "symbol": sym, "pass": False, "filled_entries": 0,
+                "reject_reasons": ["no_frame"],
+            })
+            continue
+        one = run_micro_screen(
+            definition=definition,
+            frame=frame,
+            backtest_fn=backtest_fn,
+            fraction=fraction,
+            seed=base_seed + i * 9973,
+            n_slices=n_slices,
+            min_bars=min_bars,
+            stop_loss_pct=stop_loss_pct,
+        )
+        trades = list(one.get("trades_sample") or [])
+        for t in trades:
+            if isinstance(t, dict):
+                tt = dict(t)
+                tt.setdefault("matrix_symbol", sym)
+                pooled.append(tt)
+            else:
+                pooled.append(t)
+        m = (one.get("metrics") or {})
+        per_symbol.append({
+            "symbol": sym,
+            "pass": bool(one.get("pass")),
+            "filled_entries": int(m.get("filled_entries") or len(trades)),
+            "payoff_ratio": m.get("payoff_ratio"),
+            "reject_reasons": list(one.get("reject_reasons") or []),
+            "wall_time_ms": one.get("wall_time_ms"),
+            "sample_meta": one.get("sample_meta"),
+        })
+
+    verdict = evaluate_micro_screen_trades(pooled)
+    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+    if not frames_by_symbol:
+        verdict["pass"] = False
+        verdict["reject_reasons"] = list(verdict.get("reject_reasons") or []) + [
+            "empty_matrix_frames"
+        ]
+    verdict["sample_meta"] = {
+        "mode": "multi_symbol_matrix",
+        "n_symbols_requested": len(frames_by_symbol),
+        "n_symbols_with_frame": sum(
+            1 for r in per_symbol if "no_frame" not in (r.get("reject_reasons") or [])
+        ),
+        "per_symbol": per_symbol,
+        "seed": base_seed,
+    }
+    verdict["wall_time_ms"] = round(elapsed_ms, 3)
+    verdict["target_wall_time_ms"] = 100.0
+    verdict["under_target"] = elapsed_ms < 100.0
+    verdict["fail_closed"] = True
+    verdict["n_trades_sample"] = len(pooled)
+    verdict["trades_sample"] = pooled
+    verdict["matrix_enabled"] = True
     return verdict
