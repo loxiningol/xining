@@ -97,14 +97,21 @@ def _infer_slot_state(payload):
         or ""
     )
     diag = payload.get("diagnostic") or {}
+    status_label = str(payload.get("status_label") or diag.get("terminal_zh") or "")
+    if "已归档" in status_label or diag.get("stage") in ("l0", "l1", "gate2", "kb", "spec"):
+        if payload.get("success") or (payload.get("final") or {}).get("success"):
+            return "success"
+        # Even if a stale running=True leaked, terminal cull wins for display
+        if not payload.get("running") or "已归档" in status_label or diag.get("stage") in ("l0", "l1", "gate2", "kb", "spec"):
+            if reason or diag.get("stage") or "已归档" in status_label:
+                return "archived"
     if diag.get("stage") in ("l0", "l1", "gate2", "kb", "spec") and not payload.get("running"):
         if payload.get("success") or (payload.get("final") or {}).get("success"):
             return "success"
         return "archived"
     if reason in ("funnel_l0_fail", "funnel_l0_cull", "funnel_l1_fail", "funnel_l1_cull",
                   "repair_exhausted_or_drift", "gate2_3_fail", "kb_blocked", "immutable_spec_error"):
-        if not payload.get("running"):
-            return "archived"
+        return "archived"
     if payload.get("success") or (payload.get("final") or {}).get("success"):
         return "success"
     final = (payload.get("final") or {}).get("status") or payload.get("final_status")
