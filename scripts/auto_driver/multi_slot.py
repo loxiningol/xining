@@ -140,35 +140,12 @@ def _slot_from_live_payload(payload, slot_id):
     prog = payload.get("progress") or {}
     final = payload.get("final") or {}
     diag = payload.get("diagnostic") or {}
-    state = _infer_slot_state(payload)
     status = payload.get("status_label") or ""
-    # ensure humanized
-    if diag.get("terminal_zh") and state in ("archived", "success"):
-        status = diag.get("terminal_zh")
-    elif final.get("status") or final.get("stop_code"):
-        status = humanizer.humanize_final(
-            final.get("status"), final.get("stop_code"), success=bool(final.get("success")),
-        )
-        if diag.get("terminal_zh"):
-            status = diag.get("terminal_zh")
-    elif status and re_is_raw(status):
-        status = humanizer.humanize_status_label(
-            phase=payload.get("phase"),
-            reason=(payload.get("metrics") or {}).get("pipeline_reason"),
-            final_status=final.get("status"),
-            stop_code=final.get("stop_code"),
-            success=bool(final.get("success")),
-        )
     # Rebuild diagnostic if missing but we have metrics / can load failure_context
     if not diag.get("ok"):
         diag = _ensure_diagnostic(payload)
-        if diag.get("terminal_zh") and state == "archived":
-            status = diag.get("terminal_zh")
-    pct = float(prog.get("percent") or 0)
-    eta = prog.get("eta_sec")
-    elapsed = prog.get("elapsed_sec")
+    # Rebuild pipe if legacy snapshot lacks L0 stage — BEFORE state inference
     pipeline = payload.get("pipeline") or []
-    # Rebuild pipe if legacy snapshot lacks L0 stage
     if not any((r or {}).get("id") == "l0" for r in pipeline):
         try:
             reason = (
@@ -195,8 +172,34 @@ def _slot_from_live_payload(payload, slot_id):
             )
         except Exception:
             pass
+    # Attach rebuilt pipeline for state inference
+    payload = dict(payload)
+    payload["pipeline"] = pipeline
+    if diag:
+        payload["diagnostic"] = diag
+    state = _infer_slot_state(payload)
+    # ensure humanized status
     if diag.get("terminal_zh") and state in ("archived", "success"):
         status = diag.get("terminal_zh")
+    elif final.get("status") or final.get("stop_code"):
+        status = humanizer.humanize_final(
+            final.get("status"), final.get("stop_code"), success=bool(final.get("success")),
+        )
+        if diag.get("terminal_zh"):
+            status = diag.get("terminal_zh")
+    elif status and re_is_raw(status):
+        status = humanizer.humanize_status_label(
+            phase=payload.get("phase"),
+            reason=(payload.get("metrics") or {}).get("pipeline_reason"),
+            final_status=final.get("status"),
+            stop_code=final.get("stop_code"),
+            success=bool(final.get("success")),
+        )
+    if diag.get("terminal_zh") and state in ("archived", "success"):
+        status = diag.get("terminal_zh")
+    pct = float(prog.get("percent") or 0)
+    eta = prog.get("eta_sec")
+    elapsed = prog.get("elapsed_sec")
     return {
         "slot_id": slot_id,
         "state": state,
