@@ -1,9 +1,9 @@
 {
-  "ok": true,
-  "present_to_human": true,
+  "ok": false,
+  "present_to_human": false,
   "schema": "qiyu_creation_delivery_v1",
   "strategy_id": "ada5m_dual_ma_classic_v1",
-  "status": "PRELIM_PASS_WR50",
+  "status": "SUPERSEDED_BY_RETURN_HARDNESS",
   "replaced": "ada5m_mom_vol_filter_v1",
   "classic_variant": {
     "id": "classic_dual_ma_trend",
@@ -104,5 +104,6 @@
     "params": "params.json",
     "backtest_report": "backtest_report.md",
     "risk_report": "risk_report.md"
-  }
+  },
+  "return_hardness_note_zh": "2026-07-30 追加收益硬度门禁后：周收益代理≈1.58% < 8%，本包不再视为可交付；仅作 WR≥50% 过渡样本。需换方向或拉长样本重做。"
 }

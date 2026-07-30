@@ -21,8 +21,12 @@ def _now():
 # Must lead every GLM meta-think prompt; also applied in local heuristic path.
 GLM_META_DIVERGENCE_INSTRUCTION = (
     "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，"
-    "然后再选择其中一种深入推演。"
+    "并估算每种视角在当前环境下可承载的最大年化净收益（max_annual_net_estimate），"
+    "然后选择一种视角深入推演。"
+    "禁止选择预期年化净收益低于 6% 的视角（除非三种都不足，则选容量最高者并标注风险）。"
     "禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。"
+    "最终策略必须赚钱：1周收益率代理不得低于 8%（带杠杆后的账户权益），"
+    "收益回撤比不得低于 1.0；禁止产出守财奴式近零收益策略。"
 )
 
 # Default three orthogonal microstructure lenses (local path when LLM skipped)
@@ -74,6 +78,8 @@ def probe():
 
 
 def _parse_constraints(brief):
+    from . import creation_return_hardness as rh
+
     text = str(brief or "")
     out = {
         "max_ann_vol": None,
@@ -93,17 +99,28 @@ def _parse_constraints(brief):
     m = re.search(r"单日[^0-9]{0,8}(\d+(?:\.\d+)?)\s*%", text)
     if m:
         out["max_daily_loss"] = float(m.group(1)) / 100.0
+    # Return hardness from brief (optional overrides)
+    m = re.search(r"1\s*周[^0-9]{0,8}(\d+(?:\.\d+)?)\s*%", text)
+    if m:
+        out["minimum_weekly_return"] = float(m.group(1)) / 100.0
+        out["raw_hints"].append("min_weekly_from_brief")
+    m = re.search(r"周收益[^0-9]{0,8}(\d+(?:\.\d+)?)\s*%", text)
+    if m and "minimum_weekly_return" not in out:
+        out["minimum_weekly_return"] = float(m.group(1)) / 100.0
+        out["raw_hints"].append("min_weekly_from_brief")
     if out["max_ann_vol"] is None:
         out["max_ann_vol"] = 0.35
     if out["max_drawdown"] is None:
         out["max_drawdown"] = 0.18
+    # Always merge return-hardness floors (Improvement 1)
+    out = rh.merge_constraints(out)
     return out
 
 
 def _role_pm(brief, symbol, timeframe, direction, constraints):
     return {
         "role": "product_manager",
-        "goal_zh": "把人类意图翻译成可验证的策略产品需求",
+        "goal_zh": "把人类意图翻译成可验证的策略产品需求（必须赚钱，不只避险）",
         "user_intent": brief or "（未口述：在空白利基上找可复现边缘）",
         "target": {"symbol": symbol, "timeframe": timeframe, "direction": direction},
         "success_metrics": {
@@ -111,11 +128,16 @@ def _role_pm(brief, symbol, timeframe, direction, constraints):
             "max_drawdown": constraints["max_drawdown"],
             "protective_sl": constraints["protective_sl"],
             "max_daily_loss_var": constraints["max_daily_loss"],
+            "expected_annual_return_range": constraints.get("expected_annual_return_range"),
+            "minimum_acceptable_annual_return": constraints.get("minimum_acceptable_annual_return"),
+            "minimum_weekly_return": constraints.get("minimum_weekly_return"),
+            "minimum_return_mdd": constraints.get("minimum_return_mdd"),
         },
         "non_goals": [
             "跳过假设验证直接挖因子",
             "用 LLM 口算夏普/Kelly",
             "绕过后续 ADA5 四复核",
+            "用极低仓位刷低回撤/虚高夏普而收益归零",
         ],
     }
 
@@ -174,13 +196,23 @@ def _diverge_then_select(brief, symbol, timeframe):
             selected_idx = 0
             if "配对" in text and "必须配对" in text:
                 selected_idx = 2
-        chosen = perspectives[selected_idx]
+        from . import creation_return_hardness as rh
+        preferred = perspectives[selected_idx]["id"]
+        chosen, perspectives = rh.select_perspective_by_return_capacity(
+            perspectives, preferred_id=preferred,
+        )
         return {
             "divergence_instruction": GLM_META_DIVERGENCE_INSTRUCTION,
             "perspectives": perspectives,
             "selected_id": chosen["id"],
             "selected_lens_zh": chosen["lens_zh"],
-            "selection_reason_zh": "人类指令含 A/B/C 菜单；按流动性/MTF 可得性择优深入（默认 A）",
+            "selection_reason_zh": (
+                "人类指令含 A/B/C 菜单；按流动性/MTF 可得性择优，"
+                "并按收益适配性（年化容量>=6%）校正；选中 {id}（容量≈{cap:.0f}%）"
+            ).format(
+                id=chosen["id"],
+                cap=100 * float(chosen.get("max_annual_net_estimate") or 0),
+            ),
             "chosen": chosen,
         }
 
@@ -216,13 +248,22 @@ def _diverge_then_select(brief, symbol, timeframe):
         selected_idx = 0  # default D1; orchestrator may override after empirical compare
         if "配对" in text and "放弃动量" in text:
             selected_idx = 1
-        chosen = perspectives[selected_idx]
+        from . import creation_return_hardness as rh
+        preferred = perspectives[selected_idx]["id"]
+        chosen, perspectives = rh.select_perspective_by_return_capacity(
+            perspectives, preferred_id=preferred,
+        )
         return {
             "divergence_instruction": GLM_META_DIVERGENCE_INSTRUCTION,
             "perspectives": perspectives,
             "selected_id": chosen["id"],
             "selected_lens_zh": chosen["lens_zh"],
-            "selection_reason_zh": "人类换方向菜单 D1/D2；默认先推 D1，实证对比后可改选 D2",
+            "selection_reason_zh": (
+                "人类换方向菜单 D1/D2；默认 D1，并按收益适配性校正；选中 {id}（容量≈{cap:.0f}%）"
+            ).format(
+                id=chosen["id"],
+                cap=100 * float(chosen.get("max_annual_net_estimate") or 0),
+            ),
             "chosen": chosen,
         }
 
@@ -248,13 +289,23 @@ def _diverge_then_select(brief, symbol, timeframe):
     elif any(k in text_l for k in ("突破", "breakout", "趋势", "momentum", "顺势", "pullback")):
         selected_idx = 0
 
-    chosen = perspectives[selected_idx]
+    from . import creation_return_hardness as rh
+    preferred = perspectives[selected_idx]["id"]
+    chosen, perspectives = rh.select_perspective_by_return_capacity(
+        perspectives, preferred_id=preferred,
+    )
     return {
         "divergence_instruction": GLM_META_DIVERGENCE_INSTRUCTION,
         "perspectives": perspectives,
         "selected_id": chosen["id"],
         "selected_lens_zh": chosen["lens_zh"],
-        "selection_reason_zh": "根据人类指令关键词在三视角中择一深入（非辩论缺失时的 Prompt 强制发散）",
+        "selection_reason_zh": (
+            "根据人类指令关键词在三视角中择一，并按收益适配性（年化容量>=6%）校正；"
+            "选中 {id}（容量≈{cap:.0f}%）"
+        ).format(
+            id=chosen["id"],
+            cap=100 * float(chosen.get("max_annual_net_estimate") or 0),
+        ),
         "chosen": chosen,
     }
 
@@ -305,17 +356,27 @@ def _role_risk(constraints):
             "max_drawdown": constraints["max_drawdown"],
             "max_daily_var": constraints["max_daily_loss"],
             "require_quantoracle": True,
+            "minimum_weekly_return": constraints.get("minimum_weekly_return"),
+            "minimum_return_mdd": constraints.get("minimum_return_mdd"),
+            "minimum_acceptable_annual_return": constraints.get(
+                "minimum_acceptable_annual_return"
+            ),
+            "expected_annual_return_range": constraints.get("expected_annual_return_range"),
         },
         "failure_scenarios_zh": [
             "政策/指数跳空导致止损缺口扩大",
             "流动性枯竭使滑点吞没理论边缘",
             "波动率状态切换使均值回归失效",
             "单边趋势日反复触发回归信号",
+            "过度避险把仓位压没导致收益归零（策略退化）",
         ],
         "kill_switches_zh": [
             "QuantOracle VaR 超阈值立即否决",
             "Alphalens 换手过高/IC 衰减过快丢弃因子",
             "压力测试回撤超界后迭代不超过 5 次",
+            "周收益代理<8% 或 收益/回撤<1.0 → 收益硬度熔断",
+            "暴露<10% / 单笔<1bp / 窗内总收益<1% → 策略退化熔断并换视角",
+            "因子多空周收益(带杠杆)<3% → 丢弃（即使 IC 显著）",
         ],
     }
 
@@ -325,10 +386,15 @@ def _role_qa():
         "role": "qa",
         "acceptance_checklist": [
             "设计文档含假设与失效条件",
+            "设计文档含 expected_annual_return_range 与 minimum_acceptable_annual_return",
             "假设经 Alphalens/Causal 风格验证",
             "因子经 EasyQuant 挖掘 + QuantOracle 认证",
+            "因子多空周收益(带杠杆)≥3%",
             "二次 Alphalens 筛选通过",
             "Backtrader 极端场景 + 红队攻击通过",
+            "收益硬度：周收益代理≥8%、收益/回撤≥1.0",
+            "无策略退化（暴露/单笔/窗内收益）",
+            "初评胜率≥50%",
             "交付 strategy_code / params / risk_report 草稿",
             "不触及、不改写现有 ADA5 复核代码路径",
         ],
@@ -336,6 +402,7 @@ def _role_qa():
             "宣称已过复核",
             "自动挂载实盘",
             "用通用模型估算风险数字",
+            "用虚高夏普掩盖近零绝对收益",
         ],
     }
 
@@ -348,19 +415,26 @@ def glm_meta_think_system_prompt():
         "你是策略总指挥（元思考）。完成三视角列举与择一深入后，再根据多角色设计草稿输出 JSON：\n"
         "{\n"
         "  \"perspectives\":[\n"
-        "    {\"id\":\"P1\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\"},\n"
-        "    {\"id\":\"P2\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\"},\n"
-        "    {\"id\":\"P3\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\"}\n"
+        "    {\"id\":\"P1\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\","
+        "\"max_annual_net_estimate\":0.12},\n"
+        "    {\"id\":\"P2\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\","
+        "\"max_annual_net_estimate\":0.08},\n"
+        "    {\"id\":\"P3\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\","
+        "\"max_annual_net_estimate\":0.15}\n"
         "  ],\n"
         "  \"selected_id\":\"P?\",\n"
         "  \"selection_reason_zh\":\"...\",\n"
+        "  \"expected_annual_return_range\":[0.08,0.20],\n"
+        "  \"minimum_acceptable_annual_return\":0.06,\n"
         "  \"refined_logic_zh\":\"...\",\n"
         "  \"refined_hypotheses\":[...],\n"
         "  \"counterparty_zh\":\"...\",\n"
         "  \"invalidation_zh\":\"...\"\n"
         "}\n"
         "三种视角必须来自不同微观结构机制（库存回归 / 流动性sweep / 波动状态切换 / 趋势回撤等），"
-        "不得彼此只改参数。禁止编造夏普/胜率数字。禁止声称已过复核。"
+        "不得彼此只改参数。每个视角必须给出 max_annual_net_estimate。"
+        "禁止编造夏普/胜率数字。禁止声称已过复核。"
+        "禁止设计靠极低仓位刷低回撤、总收益近零的策略。"
     )
 
 
@@ -433,6 +507,10 @@ def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True):
         "core_logic_zh": architect["core_logic_zh"],
         "hypotheses": architect["core_hypotheses"],
         "constraints": constraints,
+        "expected_annual_return_range": constraints.get("expected_annual_return_range"),
+        "minimum_acceptable_annual_return": constraints.get(
+            "minimum_acceptable_annual_return"
+        ),
         "failure_scenarios_zh": roles[2]["failure_scenarios_zh"],
         "risk_bounds": roles[2]["hard_bounds"],
         "roles": roles,
@@ -454,6 +532,18 @@ def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True):
             design["core_logic_zh"] = g["refined_logic_zh"]
         if g.get("refined_hypotheses"):
             design["hypotheses"] = g["refined_hypotheses"]
+        if g.get("expected_annual_return_range"):
+            design["expected_annual_return_range"] = g["expected_annual_return_range"]
+            design["constraints"]["expected_annual_return_range"] = g[
+                "expected_annual_return_range"
+            ]
+        if g.get("minimum_acceptable_annual_return") is not None:
+            design["minimum_acceptable_annual_return"] = g[
+                "minimum_acceptable_annual_return"
+            ]
+            design["constraints"]["minimum_acceptable_annual_return"] = g[
+                "minimum_acceptable_annual_return"
+            ]
         design["counterparty_zh"] = g.get("counterparty_zh")
         design["invalidation_zh"] = g.get("invalidation_zh")
     return {

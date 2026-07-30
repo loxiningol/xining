@@ -97,22 +97,36 @@ def main():
                   "wr", prelim.get("win_rate"),
                   "window", ((prelim.get("window") or {}).get("label_zh")),
                   flush=True)
+        hardness = (blueprint or {}).get("return_hardness") or {}
+        if hardness:
+            print(
+                "RETURN_HARDNESS",
+                "passed", hardness.get("passed"),
+                "weekly", ((hardness.get("metrics") or {}).get("weekly_return_proxy")),
+                "ret_mdd", ((hardness.get("metrics") or {}).get("return_mdd")),
+                "reasons", hardness.get("reject_reasons"),
+                flush=True,
+            )
         if not (blueprint or {}).get("present_to_human"):
-            print("BLOCKED_NOT_PRESENTABLE_WR_GATE", flush=True)
+            print("BLOCKED_NOT_PRESENTABLE_CREATION_GATE", flush=True)
             out = {
                 "ok": False,
                 "present_to_human": False,
-                "stage": "prelim_wr_gate",
+                "stage": "creation_gate",
                 "blueprint": {
                     "ok": False,
                     "present_to_human": False,
                     "prelim": prelim,
+                    "return_hardness": hardness,
                     "classic_tried": (blueprint or {}).get("classic_tried"),
+                    "perspectives_tried": (blueprint or {}).get("perspectives_tried"),
                     "fuses": (blueprint or {}).get("fuses"),
                     "deliverables": (blueprint or {}).get("deliverables"),
                     "handoff_zh": (blueprint or {}).get("handoff_zh"),
                 },
-                "errors": ["win_rate_below_50pct_or_prelim_failed"],
+                "errors": [
+                    "win_rate_or_return_hardness_or_degeneration_failed"
+                ],
             }
             out_dir = ROOT / "auto_trade" / "dual_engine" / "collab_packs"
             out_dir.mkdir(parents=True, exist_ok=True)

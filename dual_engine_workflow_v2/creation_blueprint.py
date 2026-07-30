@@ -14,6 +14,9 @@ Hard fuses:
   1) max 5 retries on stage② / stage⑤ failure loops
   2) overfit fuse: fast IC decay / high turnover → drop factor
   3) VaR fuse: exceed human daily-loss bound → reject before stress
+  4) return-hardness fuse: weekly proxy <8% or return/MDD <1.0 → switch lens
+  5) degeneration fuse: low exposure / tiny avg trade / window total <1%
+  6) factor LS weekly (levered) <3% → drop even if IC looks fine
 
 Does NOT import or modify review_admission_v2 / four-review gates.
 """
@@ -28,6 +31,7 @@ from . import creation_alphalens_lite as al
 from . import creation_deepseek_factors as dsf
 from . import creation_meta_think as meta
 from . import creation_prelim_eval as prelim
+from . import creation_return_hardness as rh
 from . import creation_stress_lite as stress
 from . import easyquant_bridge as eq
 from . import quantoracle_bridge as qo
@@ -36,6 +40,54 @@ from . import research_candle_store as rcs
 
 MAX_LOOP = 5
 MIN_PRESENT_WR = prelim.MIN_WIN_RATE
+
+
+def _switch_direction(design, classic_tried, perspectives_tried):
+    """On return-hardness / degeneration fail: try unused lens, else classic variant."""
+    div = dict(design.get("divergence") or {})
+    pers = list(div.get("perspectives") or [])
+    for p in pers:
+        pid = p.get("id")
+        if not pid or pid in perspectives_tried:
+            continue
+        if p.get("return_capacity_ok") is False:
+            continue
+        perspectives_tried.append(pid)
+        design = dict(design)
+        design["mechanism_family"] = p.get("family") or design.get("mechanism_family")
+        design["core_logic_zh"] = p.get("thesis_zh") or design.get("core_logic_zh")
+        design["hypotheses"] = [
+            {
+                "id": "H1_switched_lens",
+                "statement_zh": p.get("thesis_zh"),
+                "testable_factor_hints": list(p.get("factor_hints") or []),
+            },
+            {
+                "id": "H2_return_hardness",
+                "statement_zh": "周收益代理≥8%且收益/回撤≥1.0，禁止近零收益退化",
+                "testable_factor_hints": list(p.get("factor_hints") or [])[:3],
+            },
+        ]
+        div["selected_id"] = pid
+        div["selected_lens_zh"] = p.get("lens_zh")
+        div["selection_reason_zh"] = "收益硬度/退化熔断后切换未用微观结构视角"
+        design["divergence"] = div
+        return design, list(p.get("factor_hints") or []), {
+            "mode": "perspective",
+            "id": pid,
+            "lens_zh": p.get("lens_zh"),
+        }
+
+    variant = prelim.next_classic_variant(classic_tried)
+    if variant is None:
+        return design, None, None
+    classic_tried.append(variant["id"])
+    design = prelim.apply_variant_to_design(design, variant)
+    return design, list(variant.get("factor_hints") or []), {
+        "mode": "classic",
+        "id": variant.get("id"),
+        "lens_zh": variant.get("lens_zh"),
+    }
 
 
 def _now():
@@ -162,11 +214,15 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
     base = "%s_%s_%s" % (symbol.split("-")[0].lower(), timeframe, stamp)
 
     presentable = bool((blueprint.get("prelim") or {}).get("present_to_human"))
+    hardness_ok = (blueprint.get("return_hardness") or {}).get("passed")
+    if hardness_ok is False:
+        presentable = False
     design = ((blueprint.get("stages") or {}).get("meta") or {}).get("design_doc") or {}
     best = blueprint.get("best_factor") or {}
     stress_pack = ((blueprint.get("stages") or {}).get("stress") or {})
     prelim_pack = blueprint.get("prelim") or {}
     window = (prelim_pack.get("window") or {})
+    hardness = blueprint.get("return_hardness") or {}
 
     params = {
         "symbol": symbol,
@@ -180,6 +236,11 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
         "blueprint_schema": "qiyu_creation_blueprint_v1",
         "present_to_human": presentable,
         "prelim_win_rate": prelim_pack.get("win_rate"),
+        "return_hardness": {
+            "passed": hardness.get("passed"),
+            "metrics": hardness.get("metrics"),
+            "reject_reasons": hardness.get("reject_reasons"),
+        },
         "window": window,
     }
 
@@ -187,15 +248,19 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
         risk_lines = [
             "# 【初评未通过·禁止展示为交付】",
             "",
-            (prelim_pack.get("human_banner_zh") or "胜率门禁未过。"),
+            (hardness.get("human_banner_zh")
+             or prelim_pack.get("human_banner_zh")
+             or "胜率/收益硬度门禁未过。"),
             "",
             "- %s" % (window.get("label_zh") or ""),
             "- %s" % (window.get("return_scope_zh") or ""),
             "- 胜率: %s（门槛 ≥50%%）" % prelim_pack.get("win_rate"),
+            "- 收益硬度拒绝: %s" % ",".join(hardness.get("reject_reasons") or []),
             "- 拒绝原因: %s" % ",".join(prelim_pack.get("reject_reasons") or []),
             "- 已尝试经典变式: %s" % (blueprint.get("classic_tried") or []),
+            "- 已尝试视角: %s" % (blueprint.get("perspectives_tried") or []),
             "",
-            "不会把胜率<50%的垃圾策略包装成「创造成功」给人看。",
+            "不会把胜率<50% 或 近零收益/虚高夏普 的垃圾策略包装成「创造成功」给人看。",
             "请换方向、拉长样本，或继续自动经典变式迭代。",
             "",
         ]
@@ -229,6 +294,18 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
         "- 初评胜率: %s（≥50%% 门禁已过）" % prelim_pack.get("win_rate"),
         "- %s" % (window.get("label_zh") or ""),
         "- %s" % (window.get("return_scope_zh") or ""),
+        "- 收益硬度: %s" % json.dumps(
+            {
+                "passed": (blueprint.get("return_hardness") or {}).get("passed"),
+                "weekly_proxy": ((blueprint.get("return_hardness") or {}).get("metrics") or {}).get(
+                    "weekly_return_proxy"
+                ),
+                "return_mdd": ((blueprint.get("return_hardness") or {}).get("metrics") or {}).get(
+                    "return_mdd"
+                ),
+            },
+            ensure_ascii=False,
+        ),
         "- 熔断触发: %s" % json.dumps(blueprint.get("fuses") or {}, ensure_ascii=False),
         "",
         "## 失效场景",
@@ -337,8 +414,15 @@ def run_creation_blueprint(
     trade_returns = []
     abort = False
     classic_tried = []
+    perspectives_tried = []
     prelim_pack = None
+    hardness_pack = None
     presentable = False
+
+    # seed perspectives_tried with currently selected lens
+    sel0 = ((design.get("divergence") or {}).get("selected_id"))
+    if sel0:
+        perspectives_tried.append(sel0)
 
     while True:
         # ② Hypothesis validation
@@ -413,6 +497,57 @@ def run_creation_blueprint(
             })
             continue
 
+        # ③b Factor LS weekly-return filter (levered, cost-aware) — Improvement 2
+        candles = data.get("candles") or []
+        span = rh.span_days_from_ts(
+            candles[0]["ts"] if candles else None,
+            candles[-1]["ts"] if candles else None,
+        )
+        ls_kept = []
+        ls_dropped = []
+        for row in survivors:
+            ok_ls, packed = rh.filter_factor_by_ls_weekly(
+                row, span, constraints=constraints,
+            )
+            if ok_ls:
+                ls_kept.append(packed)
+            else:
+                ls_dropped.append(packed)
+        stages["ls_weekly_filter"] = {
+            "n_in": len(survivors),
+            "n_kept": len(ls_kept),
+            "n_dropped": len(ls_dropped),
+            "floor": (constraints or {}).get("minimum_factor_weekly_lev"),
+            "dropped_sample": [
+                {
+                    "factor": d.get("factor"),
+                    "reason": d.get("ls_weekly_reason"),
+                    "weekly_lev": ((d.get("ls_weekly") or {}).get("weekly_lev")),
+                }
+                for d in ls_dropped[:8]
+            ],
+        }
+        if ls_kept:
+            survivors = ls_kept
+        else:
+            # all factors washed to near-zero absolute return — switch lens
+            design.setdefault("mutation_log", []).append({
+                "at": _now(),
+                "reason": "all_factors_ls_weekly_below_floor",
+                "loop": loops["hypothesis"],
+                "n_dropped": len(ls_dropped),
+            })
+            design, hints, switched = _switch_direction(
+                design, classic_tried, perspectives_tried,
+            )
+            if switched is None:
+                fuses["abort_reason"] = "ls_weekly_floor_and_directions_exhausted"
+                abort = True
+                break
+            core_hints = hints or core_hints
+            stages["meta"]["design_doc"] = design
+            continue
+
         # ④ Alphalens rescreen
         rescreen = al.rescreen_candidates(survivors, data["matrix"], data["fwd"])
         fuses["overfit_drops"] += len([
@@ -459,19 +594,19 @@ def run_creation_blueprint(
             }
 
         if not kept:
-            # switch classic variant immediately
-            variant = prelim.next_classic_variant(classic_tried)
-            if variant is None:
-                fuses["abort_reason"] = "no_wr50_candidate_and_classic_exhausted"
+            # switch classic / perspective immediately
+            design, hints, switched = _switch_direction(
+                design, classic_tried, perspectives_tried,
+            )
+            if switched is None:
+                fuses["abort_reason"] = "no_wr50_candidate_and_directions_exhausted"
                 abort = True
                 break
-            classic_tried.append(variant["id"])
-            design = prelim.apply_variant_to_design(design, variant)
-            core_hints = list(variant.get("factor_hints") or [])
+            core_hints = hints or core_hints
             design.setdefault("mutation_log", []).append({
                 "at": _now(),
-                "reason": "wr50_gate_switch_classic",
-                "variant": variant.get("id"),
+                "reason": "wr50_gate_switch_direction",
+                "switched": switched,
                 "loop": loops["hypothesis"],
             })
             stages["meta"]["design_doc"] = design
@@ -535,26 +670,63 @@ def run_creation_blueprint(
             min_trades=8,
         )
         stages["prelim"] = prelim_pack
-        if prelim_pack.get("present_to_human"):
+        if not prelim_pack.get("present_to_human"):
+            # WR gate failed after stress — switch direction
+            design.setdefault("mutation_log", []).append({
+                "at": _now(),
+                "reason": "prelim_wr_gate_fail",
+                "win_rate": prelim_pack.get("win_rate"),
+                "banner": prelim_pack.get("human_banner_zh"),
+            })
+            design, hints, switched = _switch_direction(
+                design, classic_tried, perspectives_tried,
+            )
+            if switched is None:
+                fuses["abort_reason"] = "prelim_wr_below_50_directions_exhausted"
+                abort = True
+                break
+            core_hints = hints or core_hints
+            stages["meta"]["design_doc"] = design
+            best = None
+            presentable = False
+            continue
+
+        # ⑤c Return hardness + degeneration (Improvement 3/5) — after WR pass
+        total_ret = rh.equity_total_return(trade_returns)
+        mdd_bt = (st.get("backtrader") or {}).get("full_max_drawdown")
+        hardness_pack = rh.evaluate_return_hardness(
+            trade_returns=trade_returns,
+            total_return=total_ret,
+            max_drawdown=mdd_bt if mdd_bt is not None else rh.max_drawdown_from_returns(trade_returns),
+            first_ts=first_ts,
+            last_ts=last_ts,
+            n_bars=data.get("n_bars"),
+            hold_bars=max(int(horizon), 3),
+            constraints=constraints,
+        )
+        stages["return_hardness"] = {
+            k: v for k, v in hardness_pack.items() if k != "degeneration"
+        }
+        stages["degeneration"] = hardness_pack.get("degeneration")
+        if hardness_pack.get("passed"):
             presentable = True
             break
 
-        # WR gate failed after stress — switch classic variant
-        variant = prelim.next_classic_variant(classic_tried)
         design.setdefault("mutation_log", []).append({
             "at": _now(),
-            "reason": "prelim_wr_gate_fail",
-            "win_rate": prelim_pack.get("win_rate"),
-            "banner": prelim_pack.get("human_banner_zh"),
-            "next_variant": (variant or {}).get("id"),
+            "reason": "return_hardness_or_degeneration_fail",
+            "reject_reasons": hardness_pack.get("reject_reasons"),
+            "metrics": hardness_pack.get("metrics"),
+            "banner": hardness_pack.get("human_banner_zh"),
         })
-        if variant is None:
-            fuses["abort_reason"] = "prelim_wr_below_50_classic_exhausted"
+        design, hints, switched = _switch_direction(
+            design, classic_tried, perspectives_tried,
+        )
+        if switched is None:
+            fuses["abort_reason"] = "return_hardness_directions_exhausted"
             abort = True
             break
-        classic_tried.append(variant["id"])
-        design = prelim.apply_variant_to_design(design, variant)
-        core_hints = list(variant.get("factor_hints") or [])
+        core_hints = hints or core_hints
         stages["meta"]["design_doc"] = design
         best = None
         presentable = False
@@ -565,11 +737,15 @@ def run_creation_blueprint(
         and best is not None
         and bool((stages.get("stress") or {}).get("passed"))
         and presentable
+        and bool((hardness_pack or {}).get("passed"))
     )
     if abort and not fuses.get("abort_reason"):
         fuses["abort_reason"] = "aborted"
     if best is not None and not presentable and not fuses.get("abort_reason"):
-        fuses["abort_reason"] = "prelim_wr_below_50_not_presentable"
+        if hardness_pack and not hardness_pack.get("passed"):
+            fuses["abort_reason"] = "return_hardness_not_presentable"
+        else:
+            fuses["abort_reason"] = "prelim_wr_below_50_not_presentable"
 
     # ensure prelim exists even on abort
     if prelim_pack is None and best is not None:
@@ -585,12 +761,15 @@ def run_creation_blueprint(
             n_bars=data.get("n_bars"),
             timeframe=timeframe,
         )
-        presentable = bool(prelim_pack.get("present_to_human"))
+        presentable = False
         stages["prelim"] = prelim_pack
 
     # deliverables
     if out_dir is None:
         out_dir = _root() / "auto_trade" / "dual_engine" / "creation_blueprint"
+    # presentable requires BOTH wr gate and return hardness
+    if presentable and hardness_pack and not hardness_pack.get("passed"):
+        presentable = False
     blueprint = {
         "ok": ok,
         "present_to_human": presentable,
@@ -602,7 +781,9 @@ def run_creation_blueprint(
         "loops": loops,
         "fuses": fuses,
         "classic_tried": classic_tried,
+        "perspectives_tried": perspectives_tried,
         "prelim": prelim_pack,
+        "return_hardness": hardness_pack,
         "stages": stages,
         "best_factor": (
             {k: v for k, v in (best or {}).items() if k != "returns"}
@@ -615,14 +796,16 @@ def run_creation_blueprint(
             "quantoracle": qo.probe(),
             "stress": stress.probe(),
             "research_candles": rcs.probe(),
+            "return_hardness": {"ok": True, "module": "creation_return_hardness"},
         },
         "data": stages.get("data"),
         "handoff_zh": (
             (
-                "创造蓝图通过初评（胜率≥50%）并可进入后续 ADA5 复核；本编排器不改复核代码。"
+                "创造蓝图通过初评（胜率≥50% + 收益硬度）并可进入后续 ADA5 复核；本编排器不改复核代码。"
                 if presentable and ok else
-                (prelim_pack or {}).get("human_banner_zh")
-                or "初评未通过或熔断：禁止把胜率<50%策略当交付展示。"
+                (hardness_pack or {}).get("human_banner_zh")
+                or (prelim_pack or {}).get("human_banner_zh")
+                or "初评未通过或熔断：禁止把胜率<50%或近零收益策略当交付展示。"
             )
         ),
         "at": _now(),
@@ -655,11 +838,12 @@ def run_creation_blueprint(
             "prelim": prelim_pack,
             "fuses": fuses,
             "instructions_zh": (
-                "【发散强制】请先列举 3 种完全不同的市场微观结构视角来解释当前指令，"
-                "然后再选择其中一种深入推演——禁止一上来直接写策略。"
-                "你是总指挥。下列结果来自创造蓝图且初评胜率≥50%。"
+                "【发散强制】请先列举 3 种完全不同的市场微观结构视角，"
+                "并估算每种可承载的最大年化净收益，再择一深入——"
+                "禁止一上来直接写策略。"
+                "你是总指挥。下列结果来自创造蓝图且已过胜率≥50%与收益硬度门禁。"
                 "请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突；"
-                "禁止声称已过复核。"
+                "禁止声称已过复核；禁止设计近零收益守财奴策略。"
             ),
             "built_at": _now(),
         }
@@ -669,10 +853,13 @@ def run_creation_blueprint(
             "blocked": True,
             "present_to_human": False,
             "prelim": prelim_pack,
+            "return_hardness": hardness_pack,
             "classic_tried": classic_tried,
+            "perspectives_tried": perspectives_tried,
             "instructions_zh": (
-                "初评胜率门禁未过（或熔断）。禁止向人类展示本候选为成功交付。"
-                "请换方向或继续经典变式，不要美化胜率<50%的结果。"
+                "初评门禁未过（胜率<50% 或 收益硬度/策略退化熔断）。"
+                "禁止向人类展示本候选为成功交付。"
+                "请换方向或继续经典变式；不要美化虚高夏普+近零收益。"
             ),
             "built_at": _now(),
         }

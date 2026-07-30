@@ -30,6 +30,7 @@ flowchart TD
 | ③ | `easyquant_bridge.py` + `creation_deepseek_factors.py` + `quantoracle_bridge.py` | 挖因子 + 确定性认证 |
 | ④ | `creation_alphalens_lite.rescreen_candidates` | 再次 winsorize/neutralize；过拟合熔断 |
 | ⑤ | `creation_stress_lite.py` | 危机窗口回放 + 对抗冲击 |
+| ⑤b/c | `creation_prelim_eval.py` + `creation_return_hardness.py` | 胜率≥50%；周收益代理≥8%；收益/回撤≥1.0；退化熔断 |
 | 编排 | `creation_blueprint.py` | 熔断与交付物 |
 
 VPS 未装 alphalens/metagpt/backtrader/autogen 时使用 `*_lite` 可复现适配器；探针会报告真实包是否可用。`winsorize` / `neutralize` 为 Alphalens 有效性底线，轻量适配器中**不得省略**。
@@ -38,7 +39,13 @@ VPS 未装 alphalens/metagpt/backtrader/autogen 时使用 `*_lite` 可复现适�
 
 1. 迭代次数：②/⑤ 回溯 > 5 → 终止并报告无法构建  
 2. 过拟合：IC 衰减过快或换手过高 → 丢弃  
-3. 风险：VaR/日损超人类阈值 → 否决，不进压力测试  
+3. VaR 超日损阈值 → 否决  
+4. 胜率 < 50% → 禁止展示，换方向/经典变式  
+5. **收益硬度**：周收益代理（窗内权益总收益×7/span_days，带杠杆仓位路径）< 8%，或收益/|MDD| < 1.0 → 换视角  
+6. **策略退化**：暴露 < 10% / 单笔 < 1bp / 窗内总收益 < 1% → 换视角  
+7. **因子多空周收益（带杠杆、扣双边成本）< 3%** → 丢弃（即使 IC 显著）  
+
+设计文档强制字段：`expected_annual_return_range`、`minimum_acceptable_annual_return`；发散视角须带 `max_annual_net_estimate`。
 
 ## 入口
 
