@@ -1,0 +1,318 @@
+{
+  "ok": true,
+  "strategy_id": "ada5m_mom_vol_filter_v1",
+  "symbol": "ADA-USDT-SWAP",
+  "logic": "D1_momentum_vol_dual_filter",
+  "n_bars": 1400,
+  "n_trades": 18,
+  "total_return": 0.00021431532006666032,
+  "final_equity": 10002.143153200666,
+  "sharpe_ann_proxy": 1.8061918463502338,
+  "max_drawdown": -0.014509092576220795,
+  "win_rate": 0.4444444444444444,
+  "payoff": 1.41993762750807,
+  "avg_trades_per_day": 3.1666666666666665,
+  "day_trade_counts": {
+    "2026-07-25": 0,
+    "2026-07-26": 4,
+    "2026-07-27": 4,
+    "2026-07-28": 4,
+    "2026-07-29": 5,
+    "2026-07-30": 2
+  },
+  "targets": {
+    "ann_sharpe_min": 1.5,
+    "max_drawdown_max": 0.15,
+    "trades_per_day_min": 2,
+    "trades_per_day_max": 8
+  },
+  "rejected_logic": {
+    "id": "D2_pairs_mean_reversion",
+    "pair_candidates": [
+      "BTC-ADA",
+      "BTC-LTC"
+    ],
+    "reason_zh": "短窗回测夏普显著为负，日均频率可达但风险收益失衡；本次择优放弃。"
+  },
+  "costs": {
+    "slippage_pct": 0.0005,
+    "taker_fee_pct": 0.0005
+  },
+  "trades_tail": [
+    {
+      "side": "long",
+      "entry_ts": 1785100800000,
+      "exit_ts": 1785112800000,
+      "entry_px": 0.16478235,
+      "exit_px": 0.16501745,
+      "ret": 0.0009267304720438911,
+      "pnl": 3.5703087076071736,
+      "reason": "time_stop",
+      "equity_after": 9908.293356136192,
+      "vol_meta": {
+        "bw": 0.003781081336238209,
+        "thr": 0.003289874568088208,
+        "hi": 0.008258236927025113,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785124800000,
+      "exit_ts": 1785136800000,
+      "entry_px": 0.16558275,
+      "exit_px": 0.165917,
+      "ret": 0.0015186281481615609,
+      "pnl": 5.851616240894124,
+      "reason": "time_stop",
+      "equity_after": 9912.21835978006,
+      "vol_meta": {
+        "bw": 0.0062630689967547405,
+        "thr": 0.00508483934229183,
+        "hi": 0.009736381579903256,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785144600000,
+      "exit_ts": 1785154500000,
+      "entry_px": 0.16538265,
+      "exit_px": 0.163812259046925,
+      "ret": -0.00999549999999988,
+      "pnl": -38.530169461459046,
+      "reason": "hard_sl",
+      "equity_after": 9871.76081452642,
+      "vol_meta": {
+        "bw": 0.0038572439500402086,
+        "thr": 0.0062630689967547405,
+        "hi": 0.011932664153842037,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785177300000,
+      "exit_ts": 1785189300000,
+      "entry_px": 0.1581209,
+      "exit_px": 0.15857925,
+      "ret": -0.0033903529307900966,
+      "pnl": -13.0156262481733,
+      "reason": "time_stop",
+      "equity_after": 9856.825679230977,
+      "vol_meta": {
+        "bw": 0.007036288090882904,
+        "thr": 0.01054437024817431,
+        "hi": 0.03643270830768552,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785189600000,
+      "exit_ts": 1785192900000,
+      "entry_px": 0.1577211,
+      "exit_px": 0.15439148140212,
+      "ret": 0.021066077141314865,
+      "pnl": 80.7506972716784,
+      "reason": "take_profit",
+      "equity_after": 9935.65977150947,
+      "vol_meta": {
+        "bw": 0.006887656176395235,
+        "thr": 0.0054962650785418165,
+        "hi": 0.010977895059354724,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785228000000,
+      "exit_ts": 1785240000000,
+      "entry_px": 0.1572786,
+      "exit_px": 0.15712140000000002,
+      "ret": -0.0014995002498748296,
+      "pnl": -5.793870565019345,
+      "reason": "time_stop",
+      "equity_after": 9927.93396709999,
+      "vol_meta": {
+        "bw": 0.005257683942861662,
+        "thr": 0.004967191857857335,
+        "hi": 0.010431799875730733,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785241200000,
+      "exit_ts": 1785245400000,
+      "entry_px": 0.15757875,
+      "exit_px": 0.15608246097937498,
+      "ret": -0.009995500000000102,
+      "pnl": -38.591258209835715,
+      "reason": "hard_sl",
+      "equity_after": 9887.41227728544,
+      "vol_meta": {
+        "bw": 0.00743564756047399,
+        "thr": 0.00628696907420068,
+        "hi": 0.00895911058315276,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785252000000,
+      "exit_ts": 1785264000000,
+      "entry_px": 0.158079,
+      "exit_px": 0.15842075,
+      "ret": 0.0016618937366760793,
+      "pnl": 6.3901555416046625,
+      "reason": "time_stop",
+      "equity_after": 9891.879880439796,
+      "vol_meta": {
+        "bw": 0.011019649176896277,
+        "thr": 0.006560286547808911,
+        "hi": 0.012881044707565419,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785269400000,
+      "exit_ts": 1785276900000,
+      "entry_px": 0.15937964999999998,
+      "exit_px": 0.16274083931477998,
+      "ret": 0.02058920000000003,
+      "pnl": 79.20340292446997,
+      "reason": "take_profit",
+      "equity_after": 9969.159862276401,
+      "vol_meta": {
+        "bw": 0.006702146679574477,
+        "thr": 0.006572604819359868,
+        "hi": 0.02169438172641894,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785291600000,
+      "exit_ts": 1785292800000,
+      "entry_px": 0.16298144999999997,
+      "exit_px": 0.16641859839533998,
+      "ret": 0.02058920000000003,
+      "pnl": 79.82217686970395,
+      "reason": "take_profit",
+      "equity_after": 10047.043591395108,
+      "vol_meta": {
+        "bw": 0.00799140448755638,
+        "thr": 0.009145296156898903,
+        "hi": 0.02151647787729266,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785303300000,
+      "exit_ts": 1785315300000,
+      "entry_px": 0.16378185,
+      "exit_px": 0.16401795,
+      "ret": 0.0009415516737660283,
+      "pnl": 3.678815276063788,
+      "reason": "time_stop",
+      "equity_after": 10048.768814861734,
+      "vol_meta": {
+        "bw": 0.01108513860476944,
+        "thr": 0.012629786310284401,
+        "hi": 0.02666975492235647,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785331800000,
+      "exit_ts": 1785334200000,
+      "entry_px": 0.16478235,
+      "exit_px": 0.163217659195575,
+      "ret": -0.00999549999999999,
+      "pnl": -39.06096004570293,
+      "reason": "hard_sl",
+      "equity_after": 10007.753927546475,
+      "vol_meta": {
+        "bw": 0.00789776554602195,
+        "thr": 0.007217881783311212,
+        "hi": 0.010672604075939302,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785341400000,
+      "exit_ts": 1785350700000,
+      "entry_px": 0.16338165,
+      "exit_px": 0.16682723829318,
+      "ret": 0.02058920000000003,
+      "pnl": 80.13119611973785,
+      "reason": "take_profit",
+      "equity_after": 10085.939171513633,
+      "vol_meta": {
+        "bw": 0.00704010869737002,
+        "thr": 0.00715762910544129,
+        "hi": 0.0132320278463543,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "short",
+      "entry_ts": 1785366300000,
+      "exit_ts": 1785373500000,
+      "entry_px": 0.16161915000000002,
+      "exit_px": 0.163155259211175,
+      "ret": -0.009915014990027171,
+      "pnl": -38.8897592510233,
+      "reason": "hard_sl",
+      "equity_after": 10045.088257423704,
+      "vol_meta": {
+        "bw": 0.010154042285862681,
+        "thr": 0.012771797927795134,
+        "hi": 0.032107221053367954,
+        "was_compressed": true,
+        "expanding": true
+      }
+    },
+    {
+      "side": "long",
+      "entry_ts": 1785374700000,
+      "exit_ts": 1785384900000,
+      "entry_px": 0.16338165,
+      "exit_px": 0.161830259542425,
+      "ret": -0.00999549999999999,
+      "pnl": -39.04665320775277,
+      "reason": "hard_sl",
+      "equity_after": 10004.08839261034,
+      "vol_meta": {
+        "bw": 0.011274110432219491,
+        "thr": 0.00930818672672597,
+        "hi": 0.032107221053367954,
+        "was_compressed": true,
+        "expanding": true
+      }
+    }
+  ],
+  "data_window": {
+    "first_ts": 1784985900000,
+    "last_ts": 1785405600000,
+    "note_zh": "受 formal_* 缓存长度限制；非完整 2024YTD。"
+  }
+}

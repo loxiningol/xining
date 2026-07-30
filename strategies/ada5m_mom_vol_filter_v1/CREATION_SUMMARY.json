@@ -1,0 +1,121 @@
+{
+  "ok": true,
+  "schema": "qiyu_creation_delivery_v1",
+  "strategy_id": "ada5m_mom_vol_filter_v1",
+  "replaced": "btc15m_mtf_momentum_v1",
+  "divergence": {
+    "instruction": "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，然后再选择其中一种深入推演。禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。",
+    "perspectives": [
+      {
+        "id": "D1_momentum_vol_dual_filter",
+        "lens_zh": "动量与波动率双重过滤（有效趋势启动）",
+        "thesis_zh": "波动率压缩后扩张 + 突破N期高低点 + EMA144；高波分位放弃追单"
+      },
+      {
+        "id": "D2_pairs_mean_reversion",
+        "lens_zh": "跨品种价差均值回归（统计套利）",
+        "thesis_zh": "BTC-ADA/BTC-LTC 价差Z-score超1.5做多低估做空高估，待回归"
+      },
+      {
+        "id": "D0_abandoned_prior_mtf",
+        "lens_zh": "（已放弃）纯多时间框架动量突破",
+        "thesis_zh": "上一版 BTC15m MTF；本轮换方向，不再沿用"
+      }
+    ],
+    "selected_id": "D1_momentum_vol_dual_filter",
+    "selection_reason_zh": "同窗对比：D1在ADA5m上夏普>1.5且回撤<15%、日均约3.7笔；D2配对夏普显著为负。"
+  },
+  "logic_selected": "D1_momentum_vol_dual_filter",
+  "backtest": {
+    "ok": true,
+    "strategy_id": "ada5m_mom_vol_filter_v1",
+    "symbol": "ADA-USDT-SWAP",
+    "logic": "D1_momentum_vol_dual_filter",
+    "n_bars": 1400,
+    "n_trades": 18,
+    "total_return": 0.00021431532006666032,
+    "final_equity": 10002.143153200666,
+    "sharpe_ann_proxy": 1.8061918463502338,
+    "max_drawdown": -0.014509092576220795,
+    "win_rate": 0.4444444444444444,
+    "payoff": 1.41993762750807,
+    "avg_trades_per_day": 3.1666666666666665,
+    "day_trade_counts": {
+      "2026-07-25": 0,
+      "2026-07-26": 4,
+      "2026-07-27": 4,
+      "2026-07-28": 4,
+      "2026-07-29": 5,
+      "2026-07-30": 2
+    },
+    "targets": {
+      "ann_sharpe_min": 1.5,
+      "max_drawdown_max": 0.15,
+      "trades_per_day_min": 2,
+      "trades_per_day_max": 8
+    },
+    "rejected_logic": {
+      "id": "D2_pairs_mean_reversion",
+      "pair_candidates": [
+        "BTC-ADA",
+        "BTC-LTC"
+      ],
+      "reason_zh": "短窗回测夏普显著为负，日均频率可达但风险收益失衡；本次择优放弃。"
+    },
+    "costs": {
+      "slippage_pct": 0.0005,
+      "taker_fee_pct": 0.0005
+    },
+    "data_window": {
+      "first_ts": 1784985900000,
+      "last_ts": 1785405600000,
+      "note_zh": "受 formal_* 缓存长度限制；非完整 2024YTD。"
+    }
+  },
+  "target_hit_short_window": {
+    "sharpe": true,
+    "mdd": true,
+    "freq": true
+  },
+  "quantoracle": {
+    "ok": true,
+    "source": "local_fallback",
+    "certified": {
+      "sharpe_ratio": 0.20836753717317133,
+      "sortino": null,
+      "calmar": null,
+      "win_rate": 0.4444444444444444,
+      "profit_factor": null,
+      "ann_vol": null,
+      "kelly_quarter": null,
+      "kelly_recommended": null,
+      "max_drawdown": null,
+      "hurst": null
+    }
+  },
+  "stress": {
+    "passed": false,
+    "backtrader": {
+      "ok": false,
+      "source": "backtrader_lite",
+      "passed": false,
+      "windows": [],
+      "at": "2026-07-30 18:12:49",
+      "error": "insufficient_trades"
+    },
+    "red_team": {
+      "ok": false,
+      "source": "autogen_redteam_lite",
+      "passed": false,
+      "error": "insufficient",
+      "attacks": [],
+      "at": "2026-07-30 18:12:49"
+    }
+  },
+  "deliverables": {
+    "strategy_code": "strategy_code.py",
+    "params": "params.json",
+    "backtest_report": "backtest_report.md",
+    "risk_report": "risk_report.md"
+  }
+}

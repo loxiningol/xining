@@ -184,6 +184,48 @@ def _diverge_then_select(brief, symbol, timeframe):
             "chosen": chosen,
         }
 
+    # Explicit dual-direction recreation menu (mom×vol vs pairs)
+    has_d12 = (
+        ("波动率" in text or "布林" in text or "压缩" in text or "动量" in text)
+        and ("价差" in text or "配对" in text or "统计套利" in text or "Z-score" in text or "Z分数" in text or "跨品种" in text)
+    )
+    if has_d12 and not has_abc:
+        perspectives = [
+            {
+                "id": "D1_momentum_vol_dual_filter",
+                "lens_zh": "动量与波动率双重过滤（有效趋势启动）",
+                "thesis_zh": "波动率压缩后扩张且突破关键阻力时确认趋势；高波分位放弃追单",
+                "family": "mom_vol_filter",
+                "factor_hints": ["range_pct", "atr_pct_14", "ret_12", "dist_roll_high"],
+            },
+            {
+                "id": "D2_pairs_mean_reversion",
+                "lens_zh": "跨品种价差均值回归（统计套利）",
+                "thesis_zh": "相关合约价差/比价 Z-score 偏离后多低估空高估，待回归",
+                "family": "pairs_cointegration",
+                "factor_hints": ["close_z_20", "ret_12"],
+            },
+            {
+                "id": "D3_contrast_liquidity",
+                "lens_zh": "对照：流动性sweep假突破",
+                "thesis_zh": "作为发散第三视角，防止只在趋势/套利两极摇摆",
+                "family": "liquidity_sweep",
+                "factor_hints": ["dist_roll_low", "upper_wick_pct", "lower_wick_pct"],
+            },
+        ]
+        selected_idx = 0  # default D1; orchestrator may override after empirical compare
+        if "配对" in text and "放弃动量" in text:
+            selected_idx = 1
+        chosen = perspectives[selected_idx]
+        return {
+            "divergence_instruction": GLM_META_DIVERGENCE_INSTRUCTION,
+            "perspectives": perspectives,
+            "selected_id": chosen["id"],
+            "selected_lens_zh": chosen["lens_zh"],
+            "selection_reason_zh": "人类换方向菜单 D1/D2；默认先推 D1，实证对比后可改选 D2",
+            "chosen": chosen,
+        }
+
     perspectives = [dict(p) for p in _DEFAULT_PERSPECTIVES]
 
     # Optional swap when brief clearly asks trend

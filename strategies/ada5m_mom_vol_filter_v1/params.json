@@ -1,0 +1,63 @@
+{
+  "schema": "qiyu_strategy_params_v1",
+  "strategy_id": "ada5m_mom_vol_filter_v1",
+  "title_zh": "[ADA 5m] 动量×波动率双重过滤突破",
+  "symbol": "ADA-USDT-SWAP",
+  "timeframe_entry": "5m",
+  "logic": "D1_momentum_vol_dual_filter",
+  "rejected_logic": {
+    "id": "D2_pairs_mean_reversion",
+    "pair_candidates": ["BTC-ADA", "BTC-LTC"],
+    "reason_zh": "短窗回测夏普显著为负，日均频率可达但风险收益失衡；本次择优放弃。"
+  },
+  "leverage": 20,
+  "protective_sl_pct": 0.009,
+  "max_equity_per_trade": 0.05,
+  "slippage_pct": 0.0005,
+  "taker_fee_pct": 0.0005,
+  "targets": {
+    "ann_sharpe_min": 1.5,
+    "max_drawdown_max": 0.15,
+    "trades_per_day_min": 2,
+    "trades_per_day_max": 8
+  },
+  "trend_filter": {
+    "ema_period": 144,
+    "mode": "price_vs_ema"
+  },
+  "vol_filter": {
+    "bb_period": 20,
+    "bb_k": 2.0,
+    "lookback_for_quantile": 80,
+    "compress_quantile": 0.25,
+    "expand_mult": 1.05,
+    "abandon_high_vol_quantile": 0.80,
+    "note_zh": "波动率处于历史高分位时禁止追单；仅在压缩后扩张时允许突破。"
+  },
+  "entry": {
+    "breakout_lookback": 8,
+    "require_ema_align": true
+  },
+  "exit": {
+    "take_profit_r": 2.4,
+    "time_stop_bars": 40,
+    "hard_sl_pct": 0.009
+  },
+  "position_sizing": {
+    "mode": "atr_risk",
+    "atr_period": 14,
+    "risk_fraction_of_equity": 0.0035,
+    "max_equity_fraction": 0.05,
+    "min_equity_fraction": 0.01
+  },
+  "frequency": {
+    "max_trades_per_day": 8,
+    "cooldown_bars_after_exit": 1,
+    "max_concurrent_positions": 1
+  },
+  "backtest": {
+    "initial_equity": 10000.0,
+    "candle_5m": "formal_ada_5m_candles_cache.json",
+    "note_zh": "仅使用实盘可获取 OKX K 线；无未来函数。"
+  }
+}
