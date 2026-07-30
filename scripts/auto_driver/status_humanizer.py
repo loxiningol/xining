@@ -18,6 +18,8 @@ HUMAN_TRANSLATION_MAP = {
     "UNKNOWN_STOPPED": "进程已停止（状态未完整落盘）",
     "STOPPED": "已停止",
     # Pipeline reasons
+    "funnel_l0_cull": "开仓密度预检过滤（触发过稀，拒绝全量回测）",
+    "funnel_l0_fail": "开仓密度预检未过（逻辑过稀 / AND 堵塞）",
     "funnel_l1_cull": "微观筛选过滤（样本量或期望不足）",
     "funnel_l1_fail": "微观筛选未过（样本或收益期望不足）",
     "insufficient_evidence": "统计证据不足（未达到显著性要求）",

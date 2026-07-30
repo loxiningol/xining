@@ -289,6 +289,22 @@ def _remove_daemon_key(symbol, timeframe, key):
 # ─── Screening ────────────────────────────────────────────────────────
 
 _FRAME_CACHE = {}
+_FRAME_CACHE_MAX = 6  # low-RAM: never retain full 38-symbol frames
+
+
+def trim_frame_cache(max_entries=None):
+    """Evict oldest frame-cache entries to bound RAM."""
+    max_entries = int(max_entries if max_entries is not None else _FRAME_CACHE_MAX)
+    if max_entries < 1:
+        _FRAME_CACHE.clear()
+        return 0
+    while len(_FRAME_CACHE) > max_entries:
+        try:
+            _FRAME_CACHE.pop(next(iter(_FRAME_CACHE)))
+        except Exception:
+            _FRAME_CACHE.clear()
+            break
+    return len(_FRAME_CACHE)
 
 
 def _frame(symbol, timeframe):
@@ -310,6 +326,13 @@ def _frame(symbol, timeframe):
         pass
     import auto_trade_strategy_ecosystem as eco
     frame = eco._load_research_frame(symbol, timeframe)
+    # Truncate BEFORE caching — critical for 764MB hosts / 38-symbol matrix.
+    try:
+        if hasattr(frame, "iloc") and len(frame) > 12000:
+            frame = frame.iloc[-12000:].copy()
+    except Exception:
+        pass
+    trim_frame_cache(_FRAME_CACHE_MAX - 1)
     _FRAME_CACHE[key] = frame
     return frame
 

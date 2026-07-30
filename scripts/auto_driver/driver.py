@@ -67,8 +67,22 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1,
     import auto_trade_strategy_dsl as dsl_mod
     import auto_trade_human_confirm_pipeline as pipe
     from dual_engine_workflow_v2.pipeline_step_a import run_creation_pipeline_step_a
+    from . import memory_guard
 
-    pipe._FRAME_CACHE.clear()
+    # Do NOT clear the whole frame cache every seed — that forced 38× reload.
+    # Only trim under memory pressure.
+    try:
+        head = memory_guard.ensure_headroom(min_avail_mb=140, label="pre_seed")
+        if not head.get("ok"):
+            pipe.trim_frame_cache(2)
+        else:
+            pipe.trim_frame_cache(6)
+    except Exception:
+        try:
+            pipe.trim_frame_cache(4)
+        except Exception:
+            pass
+
     spec = pack["mechanism_spec"]
     dsl = dict(_select_dsl(pack, direction) or {})
     dsl["supported_instruments"] = [symbol]
@@ -76,9 +90,14 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1,
     dsl_mod.validate_strategy(dsl)
 
     matrix_n = len((spec or {}).get("suitable_symbols") or [])
+    budget = memory_guard.matrix_budget()
     print(
-        "[auto_driver] pipeline enable_multi_symbol_matrix=%s suitable_symbols=%d primary=%s"
-        % (bool(enable_multi_symbol_matrix), matrix_n, symbol),
+        "[auto_driver] pipeline enable_multi_symbol_matrix=%s suitable_symbols=%d "
+        "primary=%s ram_mode=%s max_syms=%s avail=%sMB"
+        % (
+            bool(enable_multi_symbol_matrix), matrix_n, symbol,
+            budget.get("mode"), budget.get("max_symbols"), budget.get("avail_mb"),
+        ),
         flush=True,
     )
 
@@ -114,6 +133,10 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1,
         enable_multi_symbol_matrix=bool(enable_multi_symbol_matrix),
     )
     elapsed = round(time.time() - t0, 2)
+    try:
+        memory_guard.force_release("post_seed")
+    except Exception:
+        pass
     return result, elapsed
 
 
@@ -159,6 +182,9 @@ def _l1_seed_retries(pack, cfg, workdir, iteration, state=None):
         reason = str((result or {}).get("reason") or "")
         if (result or {}).get("ok"):
             return result, "success"
+        # L0 density reject is deterministic for a pack — no seed retry burn
+        if reason == "funnel_l0_fail":
+            return result, "non_l1"
         if reason != "funnel_l1_fail":
             return result, "non_l1"
         # else continue seeding
@@ -169,6 +195,22 @@ def run_driver(cfg):
     """Main autonomous loop. cfg is a dict (see auto_driver_config.example.json)."""
     t_start = time.time()
     root = _bootstrap_root(cfg.get("vector_root"))
+
+    # Memory guard first — protect web on ≤1GB hosts
+    try:
+        from . import memory_guard
+        lim = memory_guard.install_soft_rlimit()
+        budget = memory_guard.matrix_budget()
+        print(
+            "[auto_driver] memory_guard soft_rss≈%sMB install=%s ram_mode=%s avail=%sMB"
+            % (
+                lim.get("soft_rss_mb"), lim.get("ok"),
+                budget.get("mode"), budget.get("avail_mb"),
+            ),
+            flush=True,
+        )
+    except Exception as exc:
+        print("[auto_driver] memory_guard init failed: %s" % exc, flush=True)
 
     pack_path = Path(cfg["pack_path"])
     if not pack_path.is_absolute():

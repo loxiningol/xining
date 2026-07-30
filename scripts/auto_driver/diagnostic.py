@@ -96,6 +96,8 @@ def _vol_z_hint(conds):
 
 def _primary_fail_stage(reason, l1, g2):
     reason = str(reason or "")
+    if reason in ("funnel_l0_fail", "funnel_l0_cull"):
+        return "l0"
     if reason in ("funnel_l1_fail", "funnel_l1_cull") or (
         l1 and l1.get("pass") is False and reason not in ("repair_exhausted_or_drift", "gate2_3_fail")
     ):
@@ -117,6 +119,17 @@ def _primary_fail_stage(reason, l1, g2):
     if l1 and l1.get("pass") is False:
         return "l1"
     return "unknown"
+
+
+def _main_cause_l0(l0):
+    rejects = list((l0 or {}).get("reject_reasons") or [])
+    m = (l0 or {}).get("metrics") or {}
+    return {
+        "code": "REJECT_TOO_RARE" if "REJECT_TOO_RARE" in rejects else (rejects[0] if rejects else "l0_fail"),
+        "title_zh": "开仓密度过稀 (L0 Density Cull)",
+        "detail_zh": "历史触发 %s/%s；拒绝进入矩阵回测以节省算力"
+        % (m.get("triggers"), m.get("evaluated_bars")),
+    }
 
 
 def _main_cause_l1(l1):
@@ -282,6 +295,7 @@ def build_diagnostic(ctx=None, result=None, pack=None, title_zh=None,
 
         reason = ctx.get("pipeline_reason") or (result or {}).get("reason")
         l1 = dict(ctx.get("l1") or {})
+        l0 = dict(ctx.get("l0") or {})
         g2 = dict(ctx.get("gate2_fitness") or ctx.get("gate2") or {})
         if result and not l1.get("reject_reasons") and not l1.get("filled_entries"):
             try:
@@ -289,6 +303,10 @@ def build_diagnostic(ctx=None, result=None, pack=None, title_zh=None,
                 l1 = metrics_mod.extract_l1(result) or l1
                 if not g2.get("failed_checks") and g2.get("payoff_ratio") is None:
                     g2 = metrics_mod.extract_gate2_fitness(result) or g2
+                # pull L0 from phase3 funnel if present
+                if not l0:
+                    ph = (result.get("phase3_funnel") or {})
+                    l0 = dict(ph.get("l0_density") or {})
             except Exception:
                 pass
 
@@ -299,7 +317,10 @@ def build_diagnostic(ctx=None, result=None, pack=None, title_zh=None,
         stage = _primary_fail_stage(reason, l1, g2)
         conds = _entry_conditions(dsl)
 
-        if stage == "l1":
+        if stage == "l0":
+            cause = _main_cause_l0(l0)
+            culled_at = "L0 开仓密度预检"
+        elif stage == "l1":
             cause = _main_cause_l1(l1)
             culled_at = "L1 微观筛选器"
         elif stage == "gate2":

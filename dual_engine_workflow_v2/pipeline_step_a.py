@@ -452,6 +452,107 @@ def codex_implement_from_spec(spec_pack):
     return book
 
 
+def _resolve_matrix_symbols(spec=None, meta=None, primary=None, enable=False):
+    """Whitelist for multi-symbol matrix eval. Primary stays first (seed focus)."""
+    primary = primary or None
+    if not enable:
+        return [primary] if primary else []
+    spec = spec or {}
+    meta = meta or {}
+    raw = list(spec.get("suitable_symbols") or [])
+    if not raw:
+        raw = list(meta.get("matrix_generalization") or [])
+    if not raw and primary:
+        raw = [primary]
+    out = []
+    seen = set()
+    if primary:
+        out.append(primary)
+        seen.add(str(primary))
+    for s in raw:
+        s = str(s or "").strip()
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+
+def _load_matrix_frames(symbols, timeframe, dual_mod, chunk_gc_every=4):
+    """Load frames for matrix symbols; skip missing; GC periodically for low RAM."""
+    frames = []
+    errors = []
+    _mg = None
+    try:
+        from auto_driver import memory_guard as _mg  # noqa: N814
+    except Exception:
+        _mg = None
+    for i, sym in enumerate(symbols or []):
+        try:
+            if _mg is not None:
+                total, avail = _mg.read_meminfo_mb()
+                if avail < 100:
+                    _mg.force_release("matrix_load_abort")
+                    errors.append({"symbol": sym, "error": "ram_abort_avail_%d" % avail})
+                    break
+            frm = dual_mod._frame(sym, timeframe)
+            if frm is None or (hasattr(frm, "__len__") and len(frm) == 0):
+                errors.append({"symbol": sym, "error": "empty_frame"})
+                continue
+            frames.append((sym, frm))
+            if chunk_gc_every and (i + 1) % int(chunk_gc_every) == 0:
+                import gc
+                gc.collect()
+        except Exception as exc:
+            errors.append({"symbol": sym, "error": str(exc)})
+    return frames, errors
+
+
+def _matrix_pool_backtest(definition, symbols, timeframe, dual_mod, friction="observed_base"):
+    """Full-history BT across matrix; pool trades. Primary (first) errors are fatal."""
+    all_trades = []
+    per = []
+    primary_err = None
+    for i, sym in enumerate(symbols or []):
+        try:
+            # Bail out early if RAM collapses mid-pool
+            try:
+                from auto_driver import memory_guard as _mg
+                _, avail = _mg.read_meminfo_mb()
+                if avail < 90 and i > 0:
+                    per.append({"symbol": sym, "n_trades": 0, "ok": False, "error": "ram_abort"})
+                    _mg.force_release("matrix_pool_abort")
+                    break
+            except Exception:
+                pass
+            r = dual_mod._backtest(definition, sym, timeframe, friction)
+            trades = list((r or {}).get("trades") or [])
+            for t in trades:
+                if isinstance(t, dict):
+                    tt = dict(t)
+                    tt.setdefault("matrix_symbol", sym)
+                    all_trades.append(tt)
+                else:
+                    all_trades.append(t)
+            per.append({"symbol": sym, "n_trades": len(trades), "ok": True})
+            if (i + 1) % 3 == 0:
+                import gc
+                gc.collect()
+        except Exception as exc:
+            per.append({"symbol": sym, "n_trades": 0, "ok": False, "error": str(exc)})
+            if i == 0:
+                primary_err = str(exc)
+    metrics = dual_mod._metrics_from_trades(all_trades) if all_trades else {}
+    return {
+        "trades": all_trades,
+        "base_metrics": metrics,
+        "per_symbol": per,
+        "primary_error": primary_err,
+        "n_symbols": len(symbols or []),
+        "n_trades": len(all_trades),
+    }
+
+
 def _walk_forward_detail(definition, symbol, timeframe, folds=10):
     """Build ≥10 window detail from dual-engine backtest folds when available.
 
@@ -601,7 +702,7 @@ def _archive_step_a(task, *, stage, failed_tests, reason, verdict, lessons=None,
 
 def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="A",
                                  allow_horizontal_expand=False, prebuilt_spec_pack=None,
-                                 windtalker_tag=None):
+                                 windtalker_tag=None, enable_multi_symbol_matrix=False):
     ensure_dirs()
     ensure_step_a_dirs()
     store.migrate_forward()
@@ -626,6 +727,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         "production_mounted": False,
         "windtalker_phase1": bool(windtalker_tag) or bool(prebuilt_spec_pack),
         "windtalker_tag": windtalker_tag,
+        "enable_multi_symbol_matrix": bool(enable_multi_symbol_matrix),
     }
 
     import auto_trade_dual_engine_factory as dual
@@ -844,9 +946,46 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         fidelity["pass"] = False
         fidelity["notes"] = list(fidelity.get("notes") or []) + ["hard_forbidden_remaining:%s" % hard]
     elif fidelity.get("forbidden_core_features_present"):
-        # strip already attempted; if still present → fail
-        fidelity["pass"] = False
-        fidelity["notes"] = list(fidelity.get("notes") or []) + ["forbidden_core_still_present"]
+        # Statement-named / user-authorized cores (e.g. HTF EMA + CCI pullback)
+        # retained by rule_audit as mechanism_observation are not Codex injects.
+        hits = [str(f).lower() for f in (fidelity.get("forbidden_core_features_present") or [])]
+        retained = {
+            str(c.get("feature") or "").lower()
+            for c in (rule_audit.get("condition_audit") or [])
+            if c.get("classification") in (
+                "mechanism_observation", "mechanism_core", "approved_filter"
+            )
+            and c.get("action") in ("retain", "revise", None)
+        }
+        stmt_blob = " ".join(str((stmt or {}).get(k) or "") for k in (stmt or {})).lower()
+        meta_auth = {
+            str(x).lower()
+            for x in ((spec_pack.get("meta") or {}).get("user_authorized_core_features") or [])
+        }
+        unauthorized = []
+        for h in hits:
+            if h in retained or h in meta_auth or h in stmt_blob:
+                continue
+            toks = [t for t in h.replace("_", " ").split() if len(t) >= 3]
+            if toks and all(t in stmt_blob or t in meta_auth for t in toks):
+                continue
+            unauthorized.append(h)
+        structural_ok = (
+            fidelity.get("dsl_has_entry")
+            and fidelity.get("dsl_has_exit")
+            and fidelity.get("stop_logic_in_spec")
+            and not fidelity.get("non_negotiable_violations")
+        )
+        if unauthorized or rule_audit.get("reject") or not structural_ok:
+            fidelity["pass"] = False
+            fidelity["notes"] = list(fidelity.get("notes") or []) + [
+                "forbidden_core_still_present:%s" % (unauthorized or hits)
+            ]
+        else:
+            fidelity["pass"] = True
+            fidelity["notes"] = list(fidelity.get("notes") or []) + [
+                "pass_via_statement_authorized_cores:%s" % hits
+            ]
     else:
         # Do not fail solely on lexical overlap / soft rule_audit for proxy features
         if fidelity.get("dsl_has_entry") and fidelity.get("dsl_has_exit") and fidelity.get("stop_logic_in_spec"):
@@ -876,12 +1015,18 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         store.save_task_meta(task)
         return {"ok": False, "task_id": tid, "reason": "gate1_fail", "gate_results": task["gate_results"]}
 
-    # ---- Gate2+3 backtest / walk-forward (+ Phase-3 funnel L1→L2→L3) ----
+    # ---- Gate2+3 backtest / walk-forward (+ Phase-3 funnel L0→L1→L2→L3) ----
     task["stage"] = "gate2_gate3_backtest_wf"
     import auto_trade_strategy_dsl as dsl_mod
-    from .funnel_l1_micro_screen import run_micro_screen
+    from .funnel_l0_density import run_l0_density
+    from .funnel_l1_micro_screen import run_micro_screen, run_micro_screen_matrix
     from .funnel_l2_pareto import evaluate_l2_survivor
     from .funnel_l3_null_hypothesis import evaluate_null_hypothesis
+    from . import incubation_soft_gate as soft_gate
+    try:
+        from auto_driver import memory_guard as mem_guard
+    except Exception:
+        mem_guard = None
     try:
         definition = dsl_mod.validate_strategy(book.get("dsl") or {})
     except Exception as exc:
@@ -893,6 +1038,29 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
 
     sym = book.get("symbol") or focus.get("symbol")
     tf = book.get("timeframe") or focus.get("timeframe")
+    matrix_syms_full = _resolve_matrix_symbols(
+        spec=spec,
+        meta=(prebuilt_spec_pack or {}).get("meta") if isinstance(prebuilt_spec_pack, dict) else {},
+        primary=sym,
+        enable=bool(enable_multi_symbol_matrix),
+    )
+    # RAM-adaptive subset: primary / BTC·ETH·SOL anchors / chunked / full
+    if mem_guard is not None and enable_multi_symbol_matrix:
+        matrix_syms, ram_budget = mem_guard.select_matrix_subset(
+            matrix_syms_full, primary=sym, budget=mem_guard.matrix_budget(),
+        )
+    else:
+        matrix_syms, ram_budget = list(matrix_syms_full), {"mode": "legacy", "max_symbols": len(matrix_syms_full)}
+    task["matrix_eval"] = {
+        "enabled": bool(enable_multi_symbol_matrix),
+        "primary": sym,
+        "symbols_full": list(matrix_syms_full),
+        "symbols": list(matrix_syms),
+        "n_symbols": len(matrix_syms),
+        "n_symbols_full": len(matrix_syms_full),
+        "ram_budget": ram_budget,
+        "lightweight_funnel": True,
+    }
 
     # Phase-3 L1: micro-screen on sampled slices BEFORE full-history BT
     task["stage"] = "funnel_l1_micro_screen"
@@ -905,20 +1073,137 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     def _funnel_bt(frm, defn):
         return dsl_mod.backtest_dsl(frm, defn, stop_loss_pct=0.009)
 
-    l1 = run_micro_screen(
-        definition=definition,
-        frame=frame_for_funnel,
-        backtest_fn=_funnel_bt if frame_for_funnel is not None else None,
-        seed=hash(tid) % (2 ** 31) if tid else 42,
-    )
+    # ---- L0 density pre-check (ms) — kill AND-clog before any matrix IO ----
+    task["stage"] = "funnel_l0_density"
+    l0 = run_l0_density(definition=definition, frame=frame_for_funnel)
     task["phase3_funnel"] = {
-        "l1_micro_screen": l1,
+        "l0_density": l0,
+        "l1_micro_screen": None,
         "rejected_at": None,
         "fail_closed": True,
         "protective_sl_pct": 0.009,
         "ada_migrate": False,
         "auto_mount": False,
+        "multi_symbol_matrix": bool(enable_multi_symbol_matrix),
+        "matrix_symbols": list(matrix_syms) if enable_multi_symbol_matrix else [sym],
+        "lightweight_funnel": True,
     }
+    print(
+        "[pipeline_step_a] L0 density pass=%s triggers=%s/%s wall=%.1fms"
+        % (
+            l0.get("pass"),
+            (l0.get("metrics") or {}).get("triggers"),
+            (l0.get("metrics") or {}).get("evaluated_bars"),
+            float(l0.get("wall_time_ms") or 0),
+        ),
+        flush=True,
+    )
+    if not l0.get("pass"):
+        task["stage"] = "archived"
+        task["phase3_funnel"]["rejected_at"] = "funnel_l0_density"
+        task["phase3_funnel"]["reject_reasons"] = list(l0.get("reject_reasons") or [])
+        task["gate_results"] = assemble_gate_results(task["gates"], tid)
+        save_gate_results(tid, task["gate_results"])
+        _archive_step_a(
+            task, stage="funnel_l0_density",
+            failed_tests=["density_precheck"],
+            reason="L0 density reject: %s" % ",".join(l0.get("reject_reasons") or ["l0_fail"]),
+            verdict="funnel_l0_cull",
+            is_mech_absent=False,
+        )
+        record_pipeline_rejection(
+            task_id=tid, stage="funnel_l0_density",
+            failed_tests=["density_precheck"],
+            reject_reasons=l0.get("reject_reasons") or ["REJECT_TOO_RARE"],
+            dsl=book.get("dsl"), symbol=sym, timeframe=tf,
+        )
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": False, "task_id": tid, "reason": "funnel_l0_fail",
+            "phase3_funnel": task["phase3_funnel"],
+            "gate_results": task["gate_results"],
+            "matrix_eval": task.get("matrix_eval"),
+        }
+
+    l1_seed = hash(tid) % (2 ** 31) if tid else 42
+    task["stage"] = "funnel_l1_micro_screen"
+    if enable_multi_symbol_matrix and len(matrix_syms) > 1:
+        # Stage A: anchor L1 (BTC/ETH/SOL ∩ budget) — never jump to 38 cold
+        if mem_guard is not None:
+            anchor_syms = mem_guard.resolve_anchor_symbols(matrix_syms_full, primary=sym)
+        else:
+            anchor_syms = list(matrix_syms[:3])
+        # Respect RAM budget cap
+        max_n = int((ram_budget or {}).get("max_symbols") or len(matrix_syms))
+        stage_syms = list(anchor_syms)[:max(1, min(3, max_n))]
+        # If budget allows more than anchors and L0 passed, expand after anchors pass
+        expand_after_anchor = (
+            bool(enable_multi_symbol_matrix)
+            and max_n > len(stage_syms)
+            and (ram_budget or {}).get("mode") in ("chunked", "full")
+        )
+        matrix_frames, frame_errs = _load_matrix_frames(stage_syms, tf, dual)
+        print(
+            "[pipeline_step_a] lightweight L1-anchor n_syms=%d frames=%d primary=%s mode=%s"
+            % (len(stage_syms), len(matrix_frames), sym, (ram_budget or {}).get("mode")),
+            flush=True,
+        )
+        l1 = run_micro_screen_matrix(
+            definition=definition,
+            frames_by_symbol=matrix_frames,
+            backtest_fn=_funnel_bt if matrix_frames else None,
+            seed=l1_seed,
+        )
+        l1["anchor_symbols"] = list(stage_syms)
+        if frame_errs:
+            sm = dict(l1.get("sample_meta") or {})
+            sm["frame_errors"] = frame_errs[:20]
+            l1["sample_meta"] = sm
+        # Expand to budgeted matrix only if anchors passed
+        if l1.get("pass") and expand_after_anchor:
+            if mem_guard is not None:
+                mem_guard.ensure_headroom(min_avail_mb=160, label="pre_matrix_expand")
+            expand_syms = list(matrix_syms)
+            # drop already-tested anchors from reload set? keep full subset for pool consistency
+            matrix_frames2, frame_errs2 = _load_matrix_frames(expand_syms, tf, dual)
+            print(
+                "[pipeline_step_a] lightweight L1-expand n_syms=%d frames=%d"
+                % (len(expand_syms), len(matrix_frames2)),
+                flush=True,
+            )
+            l1_exp = run_micro_screen_matrix(
+                definition=definition,
+                frames_by_symbol=matrix_frames2,
+                backtest_fn=_funnel_bt if matrix_frames2 else None,
+                seed=l1_seed + 17,
+            )
+            l1_exp["anchor_symbols"] = list(stage_syms)
+            l1_exp["expanded_from_anchor"] = True
+            if frame_errs2:
+                sm = dict(l1_exp.get("sample_meta") or {})
+                sm["frame_errors"] = frame_errs2[:20]
+                l1_exp["sample_meta"] = sm
+            l1 = l1_exp
+            matrix_syms = list(expand_syms)
+            task["matrix_eval"]["symbols"] = list(matrix_syms)
+            task["matrix_eval"]["n_symbols"] = len(matrix_syms)
+        # free frames refs
+        matrix_frames = None
+        try:
+            import gc
+            gc.collect()
+        except Exception:
+            pass
+    else:
+        l1 = run_micro_screen(
+            definition=definition,
+            frame=frame_for_funnel,
+            backtest_fn=_funnel_bt if frame_for_funnel is not None else None,
+            seed=l1_seed,
+        )
+    task["phase3_funnel"]["l1_micro_screen"] = l1
+    task["phase3_funnel"]["matrix_symbols"] = list(matrix_syms) if enable_multi_symbol_matrix else [sym]
     if not l1.get("pass"):
         task["stage"] = "archived"
         task["phase3_funnel"]["rejected_at"] = "funnel_l1_micro_screen"
@@ -947,13 +1232,49 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             "ok": False, "task_id": tid, "reason": "funnel_l1_fail",
             "phase3_funnel": task["phase3_funnel"],
             "gate_results": task["gate_results"],
+            "matrix_eval": task.get("matrix_eval"),
         }
 
     # Full-history BT + Phase-3 WF windows (Calmar≥1.0 + positive expectancy)
+    # WF stays on primary seed; Gate2 fitness uses pooled matrix trades when enabled.
     task["stage"] = "gate2_gate3_backtest_wf"
     wf = _walk_forward_detail(definition, sym, tf, folds=10)
     base_m = wf.get("base_metrics") or {}
     trades = wf.get("trades") or []
+    # Soft cull: if primary Calmar < 0.5, skip expensive matrix pool (formal Gate2 still runs on primary)
+    skip_pool = soft_gate.should_skip_full_matrix(base_m)
+    soft_snap = soft_gate.soft_progress(base_m)
+    task["matrix_eval"]["soft_incubation"] = soft_snap
+    task["matrix_eval"]["skip_full_matrix_pool"] = bool(skip_pool)
+    if enable_multi_symbol_matrix and len(matrix_syms) > 1 and not skip_pool:
+        print(
+            "[pipeline_step_a] multi_symbol_matrix Gate2 pool n_syms=%d primary=%s mode=%s"
+            % (len(matrix_syms), sym, (ram_budget or {}).get("mode")),
+            flush=True,
+        )
+        pooled = _matrix_pool_backtest(definition, matrix_syms, tf, dual)
+        task["matrix_eval"]["gate2_pool"] = {
+            "n_trades": pooled.get("n_trades"),
+            "per_symbol": pooled.get("per_symbol"),
+            "primary_error": pooled.get("primary_error"),
+        }
+        if pooled.get("trades"):
+            trades = pooled["trades"]
+            base_m = pooled.get("base_metrics") or dual._metrics_from_trades(trades)
+            wf = dict(wf)
+            wf["base_metrics"] = base_m
+            wf["trades"] = trades
+            wf["matrix_pooled"] = True
+    elif skip_pool:
+        print(
+            "[pipeline_step_a] skip matrix Gate2 pool (primary calmar soft-kill); formal Gate2 on primary only",
+            flush=True,
+        )
+        task["matrix_eval"]["gate2_pool"] = {
+            "skipped": True,
+            "reason": "primary_calmar_lt_%.2f" % soft_gate.ANCHOR_CALMAR_KILL,
+            "soft_incubation": soft_snap,
+        }
 
     # Phase-3 L2: fitness + Pareto (singleton always on front if fitness passes)
     l2 = evaluate_l2_survivor(trades, base_metrics=base_m, candidate_id=tid)
@@ -1504,7 +1825,8 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
 
 def start_creation_task_step_a(async_mode=True, symbol=None, timeframe=None,
                                exploration_mode="A", allow_horizontal_expand=False,
-                               prebuilt_spec_pack=None, windtalker_tag=None):
+                               prebuilt_spec_pack=None, windtalker_tag=None,
+                               enable_multi_symbol_matrix=False):
     ensure_dirs()
     ensure_step_a_dirs()
     with _JOB_LOCK:
@@ -1522,6 +1844,7 @@ def start_creation_task_step_a(async_mode=True, symbol=None, timeframe=None,
                 allow_horizontal_expand=allow_horizontal_expand,
                 prebuilt_spec_pack=prebuilt_spec_pack,
                 windtalker_tag=windtalker_tag,
+                enable_multi_symbol_matrix=enable_multi_symbol_matrix,
             )
         except Exception as exc:
             _JOB["error"] = str(exc)
@@ -1551,6 +1874,7 @@ def start_creation_task_step_a(async_mode=True, symbol=None, timeframe=None,
         allow_horizontal_expand=allow_horizontal_expand,
         prebuilt_spec_pack=prebuilt_spec_pack,
         windtalker_tag=windtalker_tag,
+        enable_multi_symbol_matrix=enable_multi_symbol_matrix,
     )
 
 
@@ -1696,6 +2020,14 @@ if __name__ == "__main__":
         help="Validate mechanism_spec Gate0 (+ DSL if present); do not run full STEP A",
     )
     parser.add_argument(
+        "--enable_multi_symbol_matrix",
+        action="store_true",
+        help=(
+            "L1/Gate2 eval across mechanism_spec.suitable_symbols (aggregate fills); "
+            "primary --symbol remains seed focus. Does not lower Gate2 floors."
+        ),
+    )
+    parser.add_argument(
         "--async",
         dest="async_mode",
         action="store_true",
@@ -1750,6 +2082,7 @@ if __name__ == "__main__":
             exploration_mode=args.exploration_mode,
             prebuilt_spec_pack=prebuilt,
             windtalker_tag=tag,
+            enable_multi_symbol_matrix=bool(args.enable_multi_symbol_matrix),
         )
     else:
         out = run_creation_pipeline_step_a(
@@ -1758,6 +2091,7 @@ if __name__ == "__main__":
             exploration_mode=args.exploration_mode,
             prebuilt_spec_pack=prebuilt,
             windtalker_tag=tag,
+            enable_multi_symbol_matrix=bool(args.enable_multi_symbol_matrix),
         )
     print(_json.dumps(out, ensure_ascii=False, indent=2, default=str))
     _sys.exit(0 if (out or {}).get("ok") else 1)
