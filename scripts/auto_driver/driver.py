@@ -147,14 +147,19 @@ def run_once_step_a(pack, symbol, timeframe, direction, tag, try_idx=1,
                 "symbol": symbol,
                 "timeframe": timeframe,
                 "direction": direction,
-                "title": spec.get("mechanism_name"),
+                "title": (pack.get("meta") or {}).get("title") or spec.get("mechanism_name"),
+                "title_zh": (pack.get("meta") or {}).get("title_zh"),
                 "source": "auto_driver_wrapper",
+                "contract_id": (pack.get("meta") or {}).get("contract_id")
+                    or "rolling_4h_sweep_5m_v1",
+                "pretest_quality_required": True,
                 "matrix_generalization": list(
                     (pack.get("meta") or {}).get("matrix_generalization")
                     or (spec or {}).get("suitable_symbols")
                     or []
                 ),
             },
+            "invariants_contract": pack.get("invariants_contract"),
             "errors": [],
             "call_id": "auto_driver_%s_%s_%d" % (direction, int(time.time()), try_idx),
             "attempts": 0,
@@ -359,6 +364,28 @@ def run_driver(cfg):
         print("[auto_driver] reason=%s score=%.4f gap=%.4f" % (
             reason, ctx.get("composite_score") or 0, metrics.total_gap(ctx.get("metric_gaps")),
         ), flush=True)
+
+        # pretest fail = SHIT_TRANSLATION → RESET only, never call additive AI
+        if reason == "pretest_quality_fail":
+            pq = (result or {}).get("pretest_quality") or ctx.get("pretest_quality") or {}
+            state["ai_limit_reached"] = True
+            state["stop_code"] = "RESET_REQUIRED"
+            state["ai_limit_reason"] = (
+                pq.get("message_zh")
+                or pq.get("reason")
+                or "pretest_quality_fail → RESET, no shit-decorate"
+            )
+            state["iterations"].append(_iter_record(
+                iteration, result, ctx, elapsed,
+                ai_decision="RESET", applied=[],
+                ai_rationale=state["ai_limit_reason"],
+                limit_reason=state["ai_limit_reason"],
+            ))
+            _dump_json(iter_dir / "pack.after.json", pack)
+            _pub(cfg, state, pack, phase="reset_required", result=result,
+                 message=state["ai_limit_reason"])
+            print("[auto_driver] pretest SHIT_TRANSLATION → RESET stop (no AI decorate)", flush=True)
+            break
 
         # kb_blocked → bump family lineage then continue (still may AI-patch)
         if reason == "kb_blocked":

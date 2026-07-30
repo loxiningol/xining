@@ -1,0 +1,32 @@
+---
+description: Strategy pack translation — translate only, never freestyle or additive decorate
+globs: strategy_*.json,contracts/**/*.json,dual_engine_workflow_v2/sanity_assert.py,dual_engine_workflow_v2/invariants_contract.py,dual_engine_workflow_v2/pretest_quality.py,scripts/auto_driver/**
+alwaysApply: false
+---
+
+# Strategy Translate Invariants (Anti-屎上雕花)
+
+## Quality verdict
+If a pack fails contract / sanity asserts, it is garbage. Do not optimize it. Reset.
+
+## Cursor role = 精密打字员
+- Translate the contract + pseudocode into DSL only.
+- Forbidden: invent filters, raise vol thresholds, swap asia/macro boxes, add EMA/CCI/RSI core, "helpful" branches, unexplained hardcodes.
+- If a required primitive is missing from the DSL, stop and declare gap — do not fake it with a lookalike (e.g. swing_extreme(5) ≠ entry wick + 0.08%).
+
+## GLM role = 逻辑翻译官 / 剪枝审判
+- Build invariants + minimal assertions first.
+- Audit = list deviations; prune = delete only.
+- If fix needs new logic not in the contract → decision RESET (rewrite from contract), never additive PATCH.
+
+## Pipeline order (mandatory)
+1. Invariants contract
+2. Minimal sanity asserts (must pass)
+3. Minimal skeleton DSL
+4. Re-run asserts
+5. Only then L0 / L1 / Gate2
+
+## Hard bans
+- No additive "optimization" before pretest_quality pass
+- No Gate2 floor lowering
+- No live mount / human confirm bypass

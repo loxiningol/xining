@@ -157,16 +157,17 @@ def resolve_contract_for_pack(pack, search_roots=None):
             roots.insert(0, Path(__file__).resolve().parents[1])
         except Exception:
             pass
+    # Also try known contract aliases for clean-family renames.
+    candidates = [family]
+    if "_ad" in family:
+        candidates.append(family.rsplit("_ad", 1)[0])
+    if "rolling_4h_sweep" in family and "rolling_4h_sweep_5m_v1" not in candidates:
+        candidates.append("rolling_4h_sweep_5m_v1")
     for root in roots:
-        cand = Path(root) / "contracts" / ("%s.contract.json" % family)
-        if cand.exists():
-            return load_contract(cand), str(cand)
-        # strip _adN bumps
-        if "_ad" in family:
-            base = family.rsplit("_ad", 1)[0]
-            cand2 = Path(root) / "contracts" / ("%s.contract.json" % base)
-            if cand2.exists():
-                return load_contract(cand2), str(cand2)
+        for cand_name in candidates:
+            cand = Path(root) / "contracts" / ("%s.contract.json" % cand_name)
+            if cand.exists():
+                return load_contract(cand), str(cand)
     return None, "contract_missing:%s" % family
 
 

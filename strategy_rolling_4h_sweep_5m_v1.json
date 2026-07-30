@@ -3,7 +3,7 @@
   "errors": [],
   "schema": "qiyu_step_a_v1",
   "artifact": "strategy_candidate_pack",
-  "call_id": "prebuilt_rolling_4h_sweep_5m_v1_clean",
+  "call_id": "prebuilt_rolling_4h_sweep_fade_clean_v1",
   "attempts": 0,
   "meta": {
     "symbol": "ETH-USDT-SWAP",
@@ -14,14 +14,23 @@
     "thesis": "Rolling prior 48×5m box sweep+reclaim with mild vol_ma20_ratio>1.15. Stop = entry_wick_buffer 0.08% on signal-bar extreme. Initial TP = prev_mid48; trail = atr_trailing 3.2×ATR_14. Outer SL 0.9% immutable. Pack reset under pretest_quality contract (no swing_extreme wick proxy).",
     "source": "handcraft_pretest_quality_reset_v1",
     "primary_submit": "ETH-USDT-SWAP 5m long",
-    "anchor_symbols": ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"],
+    "anchor_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP"
+    ],
     "contract_id": "rolling_4h_sweep_5m_v1",
-    "pretest_quality_required": true
+    "pretest_quality_required": true,
+    "replaces_starved_lineages": [
+      "rolling_4h_sweep_5m_v1",
+      "rolling_4h_sweep_5m_v1_ad2",
+      "asia_sweep_fade_v1"
+    ]
   },
   "mechanism_spec": {
-    "mechanism_id": "mech_rolling_4h_sweep_5m_v1",
-    "mechanism_name": "rolling_4h_sweep_5m_v1",
-    "mechanism_family": "rolling_4h_sweep_5m_v1",
+    "mechanism_id": "mech_rolling_4h_sweep_fade_clean_v1",
+    "mechanism_name": "rolling_4h_sweep_fade_clean_v1",
+    "mechanism_family": "rolling_4h_sweep_fade_clean_v1",
     "display_title_zh": "[BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡",
     "market_inefficiency": "滚动 4 小时高低点持续聚集止损单；5m 影线刺穿后收回，把追突破者锁在盒外，形成高频可重复的流动性回收。",
     "counterparty_source": "在滚动 4h 极值外追突破/止损被扫的订单；收回盒内后被迫反向平仓。",
@@ -72,100 +81,309 @@
     "expected_trade_frequency_class": "high_freq_2_to_12_per_day_5m_anchor",
     "expected_holding_period": "3_to_72_bars_5m",
     "suitable_symbols": [
-      "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP", "DOGE-USDT-SWAP",
-      "BNB-USDT-SWAP", "ADA-USDT-SWAP", "LTC-USDT-SWAP", "LINK-USDT-SWAP", "AVAX-USDT-SWAP",
-      "SUI-USDT-SWAP", "PEPE-USDT-SWAP", "BONK-USDT-SWAP", "WIF-USDT-SWAP", "NEAR-USDT-SWAP",
-      "APT-USDT-SWAP", "ARB-USDT-SWAP", "OP-USDT-SWAP", "INJ-USDT-SWAP", "SEI-USDT-SWAP",
-      "TIA-USDT-SWAP", "DOT-USDT-SWAP", "ATOM-USDT-SWAP", "UNI-USDT-SWAP", "AAVE-USDT-SWAP",
-      "FIL-USDT-SWAP", "ICP-USDT-SWAP", "RENDER-USDT-SWAP", "ONDO-USDT-SWAP", "JUP-USDT-SWAP",
-      "ORDI-USDT-SWAP", "WLD-USDT-SWAP", "TRX-USDT-SWAP", "BCH-USDT-SWAP", "ETC-USDT-SWAP",
-      "XAU-USDT-SWAP", "XAG-USDT-SWAP", "CL-USDT-SWAP"
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "XRP-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "BNB-USDT-SWAP",
+      "ADA-USDT-SWAP",
+      "LTC-USDT-SWAP",
+      "LINK-USDT-SWAP",
+      "AVAX-USDT-SWAP",
+      "SUI-USDT-SWAP",
+      "PEPE-USDT-SWAP",
+      "BONK-USDT-SWAP",
+      "WIF-USDT-SWAP",
+      "NEAR-USDT-SWAP",
+      "APT-USDT-SWAP",
+      "ARB-USDT-SWAP",
+      "OP-USDT-SWAP",
+      "INJ-USDT-SWAP",
+      "SEI-USDT-SWAP",
+      "TIA-USDT-SWAP",
+      "DOT-USDT-SWAP",
+      "ATOM-USDT-SWAP",
+      "UNI-USDT-SWAP",
+      "AAVE-USDT-SWAP",
+      "FIL-USDT-SWAP",
+      "ICP-USDT-SWAP",
+      "RENDER-USDT-SWAP",
+      "ONDO-USDT-SWAP",
+      "JUP-USDT-SWAP",
+      "ORDI-USDT-SWAP",
+      "WLD-USDT-SWAP",
+      "TRX-USDT-SWAP",
+      "BCH-USDT-SWAP",
+      "ETC-USDT-SWAP",
+      "XAU-USDT-SWAP",
+      "XAG-USDT-SWAP",
+      "CL-USDT-SWAP"
     ],
-    "suitable_timeframes": ["5m"]
+    "suitable_timeframes": [
+      "5m"
+    ]
   },
   "dsl": {
     "schema": "qiyu_strategy_dsl_v1",
-    "key": "rolling_4h_sweep_5m_v1_eth_long",
+    "key": "rolling_4h_sweep_fade_clean_v1_eth_long",
     "name": "[BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡",
     "direction": "long",
     "timeframe": "5m",
-    "supported_instruments": ["ETH-USDT-SWAP"],
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
     "entry": {
       "all": [
-        {"id": "e_sweep_low48", "left": {"feature": "low"}, "op": "lt", "right": {"feature": "prev_low48"}},
-        {"id": "e_reclaim_low48", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_low48"}},
-        {"id": "e_inside_box", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_high48"}},
-        {"id": "e_mild_vol", "left": {"feature": "vol_ma20_ratio"}, "op": "gt", "right": {"value": 1.15}}
+        {
+          "id": "e_sweep_low48",
+          "left": {
+            "feature": "low"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "prev_low48"
+          }
+        },
+        {
+          "id": "e_reclaim_low48",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "prev_low48"
+          }
+        },
+        {
+          "id": "e_inside_box",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "prev_high48"
+          }
+        },
+        {
+          "id": "e_mild_vol",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.15
+          }
+        }
       ]
     },
     "exit": {
       "any": [
-        {"id": "x_mid48_tp", "left": {"feature": "close"}, "op": "gte", "right": {"feature": "prev_mid48"}, "role": "take_profit"},
-        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.2, "atr_period": 14, "role": "take_profit"},
-        {"id": "x_wick_sl", "exit_op": "entry_wick_buffer", "buffer_pct": 0.0008, "role": "invalidation"}
+        {
+          "id": "x_mid48_tp",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gte",
+          "right": {
+            "feature": "prev_mid48"
+          },
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.2,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_wick_sl",
+          "exit_op": "entry_wick_buffer",
+          "buffer_pct": 0.0008,
+          "role": "invalidation"
+        }
       ]
     },
     "max_hold_bars": 72,
     "description": "step_a|rolling_4h_sweep_5m_v1|prev_low48_sweep_reclaim|vol_ma20_gt_1.15|mid48_tp|trail3.2|wick0.08|sl0.9|eth5m_long",
-    "origin": "pretest_quality_reset",
+    "origin": "pretest_quality_reset_clean_family",
     "version": 2,
     "live_enabled": false,
     "auto_trade_eligible": false
   },
   "dsl_long": {
     "schema": "qiyu_strategy_dsl_v1",
-    "key": "rolling_4h_sweep_5m_v1_eth_long",
+    "key": "rolling_4h_sweep_fade_clean_v1_eth_long",
     "name": "[BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡",
     "direction": "long",
     "timeframe": "5m",
-    "supported_instruments": ["ETH-USDT-SWAP"],
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
     "entry": {
       "all": [
-        {"id": "e_sweep_low48", "left": {"feature": "low"}, "op": "lt", "right": {"feature": "prev_low48"}},
-        {"id": "e_reclaim_low48", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_low48"}},
-        {"id": "e_inside_box", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_high48"}},
-        {"id": "e_mild_vol", "left": {"feature": "vol_ma20_ratio"}, "op": "gt", "right": {"value": 1.15}}
+        {
+          "id": "e_sweep_low48",
+          "left": {
+            "feature": "low"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "prev_low48"
+          }
+        },
+        {
+          "id": "e_reclaim_low48",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "prev_low48"
+          }
+        },
+        {
+          "id": "e_inside_box",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "prev_high48"
+          }
+        },
+        {
+          "id": "e_mild_vol",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.15
+          }
+        }
       ]
     },
     "exit": {
       "any": [
-        {"id": "x_mid48_tp", "left": {"feature": "close"}, "op": "gte", "right": {"feature": "prev_mid48"}, "role": "take_profit"},
-        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.2, "atr_period": 14, "role": "take_profit"},
-        {"id": "x_wick_sl", "exit_op": "entry_wick_buffer", "buffer_pct": 0.0008, "role": "invalidation"}
+        {
+          "id": "x_mid48_tp",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gte",
+          "right": {
+            "feature": "prev_mid48"
+          },
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.2,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_wick_sl",
+          "exit_op": "entry_wick_buffer",
+          "buffer_pct": 0.0008,
+          "role": "invalidation"
+        }
       ]
     },
     "max_hold_bars": 72,
     "description": "step_a|rolling_4h_sweep_5m_v1|prev_low48_sweep_reclaim|vol_ma20_gt_1.15|mid48_tp|trail3.2|wick0.08|sl0.9|eth5m_long",
-    "origin": "pretest_quality_reset",
+    "origin": "pretest_quality_reset_clean_family",
     "version": 2,
     "live_enabled": false,
     "auto_trade_eligible": false
   },
   "dsl_short": {
     "schema": "qiyu_strategy_dsl_v1",
-    "key": "rolling_4h_sweep_5m_v1_eth_short",
+    "key": "rolling_4h_sweep_fade_clean_v1_eth_short",
     "name": "[BTC/ETH/SOL 5m] 滚动4小时极值流动性扫荡",
     "direction": "short",
     "timeframe": "5m",
-    "supported_instruments": ["ETH-USDT-SWAP"],
+    "supported_instruments": [
+      "ETH-USDT-SWAP"
+    ],
     "entry": {
       "all": [
-        {"id": "e_sweep_high48", "left": {"feature": "high"}, "op": "gt", "right": {"feature": "prev_high48"}},
-        {"id": "e_reclaim_high48", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_high48"}},
-        {"id": "e_inside_box", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_low48"}},
-        {"id": "e_mild_vol", "left": {"feature": "vol_ma20_ratio"}, "op": "gt", "right": {"value": 1.15}}
+        {
+          "id": "e_sweep_high48",
+          "left": {
+            "feature": "high"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "prev_high48"
+          }
+        },
+        {
+          "id": "e_reclaim_high48",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "prev_high48"
+          }
+        },
+        {
+          "id": "e_inside_box",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "prev_low48"
+          }
+        },
+        {
+          "id": "e_mild_vol",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.15
+          }
+        }
       ]
     },
     "exit": {
       "any": [
-        {"id": "x_mid48_tp", "left": {"feature": "close"}, "op": "lte", "right": {"feature": "prev_mid48"}, "role": "take_profit"},
-        {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.2, "atr_period": 14, "role": "take_profit"},
-        {"id": "x_wick_sl", "exit_op": "entry_wick_buffer", "buffer_pct": 0.0008, "role": "invalidation"}
+        {
+          "id": "x_mid48_tp",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lte",
+          "right": {
+            "feature": "prev_mid48"
+          },
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.2,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_wick_sl",
+          "exit_op": "entry_wick_buffer",
+          "buffer_pct": 0.0008,
+          "role": "invalidation"
+        }
       ]
     },
     "max_hold_bars": 72,
     "description": "step_a|rolling_4h_sweep_5m_v1|prev_high48_sweep_reclaim|vol_ma20_gt_1.15|mid48_tp|trail3.2|wick0.08|sl0.9|eth5m_short",
-    "origin": "pretest_quality_reset",
+    "origin": "pretest_quality_reset_clean_family",
     "version": 2,
     "live_enabled": false,
     "auto_trade_eligible": false
