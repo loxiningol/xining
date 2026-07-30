@@ -1,0 +1,35 @@
+{
+  "ok": false,
+  "present_to_human": false,
+  "status": "REJECTED_CREATION_GATES",
+  "schema": "qiyu_creation_delivery_v1",
+  "strategy_id": "donchian_trend_breakout_multi_v1",
+  "review_name_zh": "四阶段复核",
+  "submitted_to_four_review": false,
+  "direction_zh": "Donchian Channel + 趋势过滤中频突破（多标的高流动性）",
+  "universe_zh": ["ETH-USDT-SWAP", "BNB-USDT-SWAP", "SOL-USDT-SWAP", "LTC-USDT-SWAP", "XAU-USDT-SWAP", "XAG-USDT-SWAP", "BTC-USDT-SWAP(既有包)"],
+  "human_banner_zh": "【创造链条完成·禁止交付】多标的唐奇安中频突破族在生产特征帧上未找到 n≥8 且 WR≥50% 且 mean_net>0 的候选；不提交四阶段复核，不挂载。",
+  "gates": {
+    "min_win_rate": 0.5,
+    "require_positive_mean_net": true,
+    "min_trades": 8,
+    "pos_hits": 0
+  },
+  "evidence_paths": [
+    "strategies/_scratch/donchian_diag_v2.json",
+    "strategies/_scratch/donchian_retest_screen_v1.json",
+    "strategies/_scratch/donchian_exit_screen_v1.json",
+    "strategies/_scratch/donchian_multi_screen_v1.json",
+    "strategies/btc15m_donchian_trend_v1/REJECTED.md"
+  ],
+  "best_near_miss": {
+    "sym": "XAU-USDT-SWAP",
+    "tf": "15m",
+    "variant": "structure_confirmed + partial_tp_atr",
+    "trades": 33,
+    "win_rate": 0.5151515151515151,
+    "mean_net": -0.023329665409339992,
+    "note_zh": "唯一逼近 WR≥50% 的结构确认变体，但期望仍为负，不可交付"
+  },
+  "next_step_zh": "若继续突破族，建议改会话箱突破回踩（非纯唐奇安）或更慢通道；需你确认后再开新创造链。"
+}
