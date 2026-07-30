@@ -88,15 +88,27 @@ _JOB_LOCK = threading.Lock()
 
 
 def _admission_profile():
-    """Reconstructed post-creation review profile.
+    """Post-creation review profile — locked to ADA5顺势回升校准档.
 
-    Default ada_t3_calibrated_v1: legacy L0/L1/Gate2–6 are advisory; blocking
-    admission is review_admission_v2 (R1 syntax/density + R2 stability +
-    R3 matrix/outlier soft + R4 三AI + human confirm ready).
-    Set STEP_A_ADMISSION_PROFILE=legacy_funnel to restore old hard floors.
+    Default / only supported production profile: ada_t3_calibrated_v1
+    (R1 syntax/density + R2 stability + R3 matrix soft + R4 三AI + human confirm).
+
+    Legacy hard funnel is disabled unless BOTH are set:
+      STEP_A_ADMISSION_PROFILE=legacy_funnel
+      STEP_A_ALLOW_LEGACY_FUNNEL=1
     """
     import os
-    return str(os.environ.get("STEP_A_ADMISSION_PROFILE") or "ada_t3_calibrated_v1").strip()
+    raw = str(os.environ.get("STEP_A_ADMISSION_PROFILE") or "ada_t3_calibrated_v1").strip()
+    if raw in ("legacy_funnel", "legacy", "old"):
+        if str(os.environ.get("STEP_A_ALLOW_LEGACY_FUNNEL") or "").strip() in ("1", "true", "on", "yes"):
+            return "legacy_funnel"
+        print(
+            "[pipeline_step_a] REFUSING legacy_funnel without STEP_A_ALLOW_LEGACY_FUNNEL=1; "
+            "forcing ada_t3_calibrated_v1 (ADA5顺势回升)",
+            flush=True,
+        )
+        return "ada_t3_calibrated_v1"
+    return raw or "ada_t3_calibrated_v1"
 
 
 def _admission_v2_enabled():
