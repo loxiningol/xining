@@ -133,9 +133,9 @@ def _provider_config(name):
             "https://open.bigmodel.cn/api/paas/v4/chat/completions",
             "glm-5.2",
         ),
-        # Moonshot Kimi K3 — standby only until QIYU_KIMI_ENABLED=1
+        # Kimi K3 via cmkey gateway — standby only until QIYU_KIMI_ENABLED=1
         "kimi": (
-            "https://api.moonshot.ai/v1/chat/completions",
+            "https://cmkey.cn/v1/chat/completions",
             "kimi-k3",
         ),
     }

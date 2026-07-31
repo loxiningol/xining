@@ -32,7 +32,7 @@ fi
     grep '^QIYU_KIMI_API_KEY=' "$target"
   fi
   printf '%s\n' 'QIYU_KIMI_MODEL=kimi-k3'
-  printf '%s\n' 'QIYU_KIMI_URL=https://api.moonshot.ai/v1/chat/completions'
+  printf '%s\n' 'QIYU_KIMI_URL=https://cmkey.cn/v1/chat/completions'
   printf '%s\n' 'QIYU_KIMI_ENABLED=0'
   printf '%s\n' 'QIYU_ECOSYSTEM_VARIANTS=6'
   printf '%s\n' 'QIYU_ECOSYSTEM_BACKTEST_START="2026-01-01 00:00:00"'
