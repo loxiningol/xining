@@ -152,6 +152,42 @@ SEED_MECHANISMS = (
         "factor_hints": ["dist_roll_high", "dist_roll_low", "range_pct", "volume_z"],
     },
     {
+        "mechanism_id": "vol_squeeze_expansion_001",
+        "economic_actor": ["breakout_follower", "option_hedger", "range_trader"],
+        "constraint": ["realized_vol_compression", "gamma_hedging", "range_box"],
+        "forced_trade": "after_vol_squeeze_expansion_forces_hedgers_and_breakout_flow_to_chase",
+        "observable_proxy": [
+            "squeeze_score", "expansion_score", "atr_pct_14", "range_pct", "ret_12", "volume_z",
+        ],
+        "predicted_effect": {
+            "direction": "continuation_after_compression_break",
+            "horizon": "30m-6h",
+            "conditional_on": [
+                "prior_atr_compression",
+                "range_expansion",
+                "volume_confirmation",
+                "not_fake_break_in_chop",
+            ],
+        },
+        "who_pays": "fade_traders_fighting_first_expansion_leg",
+        "alternative_explanations": [
+            "random_walk_after_noise",
+            "session_open_artifact",
+            "news_impulse_unrelated_to_squeeze",
+        ],
+        "capacity_limit": "medium_to_high",
+        "known_failure_modes": [
+            "fake_break_in_chop",
+            "expansion_without_follow_through",
+            "two_sided_whipsaw_after_squeeze",
+        ],
+        "family": "vol_squeeze_break",
+        "factor_hints": [
+            "squeeze_score", "expansion_score", "atr_pct_14", "range_pct",
+            "ret_12", "volume_z", "dist_roll_high", "abs_ret_1",
+        ],
+    },
+    {
         "mechanism_id": "session_open_auction_fade_001",
         "economic_actor": ["auction_participant", "overnight_gap_trader"],
         "constraint": ["open_auction_imbalance", "inventory_reset"],
@@ -380,14 +416,30 @@ def select_for_brief(brief, symbol=None, timeframe=None, limit=12):
         ]).lower()
         for token in (
             "回归", "反转", "mean", "reversion", "库存",
-            "突破", "break", "压缩", "squeeze",
+            "突破", "break", "压缩", "squeeze", "扩张", "收缩", "波动率",
             "清算", "liquid", "资金费", "funding",
             "扫损", "sweep", "止损", "动量", "trend",
+            "衰竭", "超卖", "rsi", "回收", "恐慌", "飞刀", "exhaust",
         ):
             if token in text and token in blob:
                 score += 1.5
             elif token in text:
                 score += 0.2
+        # boost explicit exhaustion mechanism when brief asks for it
+        if any(k in text for k in ("衰竭", "超卖", "rsi", "回收", "恐慌")):
+            if "exhaustion" in str(m.get("mechanism_id") or "") or "exhaustion" in blob:
+                score += 3.0
+            if m.get("family") == "mean_reversion":
+                score += 0.8
+            if m.get("family") == "trend_pullback":
+                score -= 0.5  # opposing family for knife risk
+        if any(k in text for k in ("压缩", "扩张", "squeeze", "波动率收缩", "收缩扩张")):
+            if "squeeze" in str(m.get("mechanism_id") or "") or "squeeze" in blob or "expansion" in blob:
+                score += 3.0
+            if m.get("family") == "vol_squeeze_break":
+                score += 1.2
+            if m.get("family") == "mean_reversion":
+                score -= 0.3  # opposing fade risk after true expansion
         gate = completeness_check(m)
         row = copy.deepcopy(m)
         row["match_score"] = score

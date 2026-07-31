@@ -300,6 +300,32 @@ def _build_factor_matrix(candles):
             + min(3.0, float(lower_wick[i]) * 100.0) * 0.20
         )
 
+    # vol squeeze / expansion: ATR vs its own history + range compression
+    # squeeze_score high = compressed; expansion_score high = breakout energy after compress
+    atr_vals = [float(x) if x is not None else None for x in atr_proxy]
+    squeeze_score = [None] * n
+    expansion_score = [None] * n
+    win_s = 48
+    for i in range(n):
+        if atr_vals[i] is None or i < win_s - 1:
+            continue
+        window = [atr_vals[j] for j in range(i - win_s + 1, i + 1) if atr_vals[j] is not None]
+        if len(window) < win_s // 2:
+            continue
+        ordered = sorted(window)
+        # percentile rank of current ATR in window (0=most compressed)
+        rank = sum(1 for v in ordered if v <= atr_vals[i]) / float(len(ordered))
+        squeeze_score[i] = 1.0 - float(rank)  # high => tight vol
+        # expansion after squeeze: compressed recently AND current range/abs ret elevated
+        recent_sq = [
+            squeeze_score[j] for j in range(max(0, i - 6), i)
+            if squeeze_score[j] is not None
+        ]
+        prior_compress = (sum(recent_sq) / float(len(recent_sq))) if recent_sq else 0.0
+        rng = float(range_pct[i] or 0.0)
+        ar = float(rets_abs[i] or 0.0) if rets_abs[i] is not None else 0.0
+        expansion_score[i] = prior_compress * 0.55 + min(2.0, rng * 80.0) * 0.25 + min(2.0, ar * 80.0) * 0.20
+
     return {
         "ret_1": ret1,
         "ret_3": ret3,
@@ -315,6 +341,8 @@ def _build_factor_matrix(candles):
         "rsi_14": rsi14,
         "volume_z": volume_z,
         "exhaustion_score": exhaustion_score,
+        "squeeze_score": squeeze_score,
+        "expansion_score": expansion_score,
     }
 
 
