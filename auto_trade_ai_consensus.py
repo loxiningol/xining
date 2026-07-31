@@ -453,9 +453,10 @@ THEORETICAL_STRATEGY_REVIEW_PROMPT = """你是栖语策略的独立「理论复�
    - 理论盈利单盈利率 ≥ 5（百分比点）
    - 止损簇风险低（low，或概率≤0.30）
    - 每周理论开仓 theoretical_weekly_opens ≥ 0.5
-     必须以 statistical_weekly_opens.expected_weekly_fills 为锚做有限折价
-     （通常相对折价约 5%-20%，或最多下调 0.3~0.5 次/周；样本很小更保守）。
-     禁止上调超过统计锚点；不得无根据地抬高频率。
+     统计锚点必须来自近2年（约730天，span≥600天）回测成交密度
+     （trades×7/span_days，method=backtest_2y_fill_rate_proxy）；
+     必须以该锚点做有限折价（通常相对折价约 5%-20%，或最多下调 0.3~0.5 次/周）。
+     禁止上调超过统计锚点；不得用短窗 live_14d 替代近2年锚点。
 7) 证据不足、逻辑自相矛盾、明显依赖未来信息或命中已知死因 → REJECT。
 仅输出一个JSON对象：
 {"candidate_hash":"原样复述","decision":"APPROVE或REJECT",
@@ -469,9 +470,11 @@ THEORETICAL_STRATEGY_REVIEW_PROMPT = """你是栖语策略的独立「理论复�
 
 MIN_THEORETICAL_WR = 65.0
 MIN_THEORETICAL_WIN_MEAN_NET_PCT = 5.0
-# 生产口径：统计锚点（live_14d_fill_rate×regime 等）+ 3AI 有限折价。
+# 生产口径（R4）：近2年回测成交密度作统计锚点 + 3AI 有限折价。
 MIN_THEORETICAL_WEEKLY_OPENS = 0.5
-WEEKLY_OPENS_STAT_METHOD = "live_14d_fill_rate"
+WEEKLY_OPENS_LOOKBACK_DAYS = 730
+WEEKLY_OPENS_MIN_SPAN_DAYS = 600  # near-2y sample floor for R4
+WEEKLY_OPENS_STAT_METHOD = "backtest_2y_fill_rate_proxy"
 WEEKLY_OPENS_MAX_REL_DISCOUNT = 0.20
 WEEKLY_OPENS_MAX_ABS_DISCOUNT = 0.50
 MAX_STOP_CLUSTER_PROB = 0.30
@@ -555,14 +558,27 @@ def _weekly_frequency_pack(expected, *, method, source, baseline=None,
 def resolve_statistical_weekly_opens(candidate=None, evidence=None):
     """Weekly opens statistical anchor (AI 可在此锚点上有限折价，不可上调覆盖).
 
-    Priority (ADA5 校准):
-      1) evidence 显式统计字段
-      2) live_14d_fill_rate × regime_factor（auto_trade_expectancy_metrics）
-      3) 无实盘时：回测成交密度代理 trades/span_days×7
-      4) 缺失 → expected=None（门禁失败）
+    R4 / theoretical priority (近2年样本):
+      1) evidence 显式近2年统计字段（method含2y 或 span≥600）
+      2) 回测成交密度代理 trades/span_days×7（span≥600 → backtest_2y_fill_rate_proxy）
+      3) 仅当 weekly_opens_require_2y=False 时才回退 live_14d
+      4) 缺失/短窗 → expected=None 或 sample_insufficient（门禁失败）
     """
     evidence = dict(evidence or {})
     candidate = dict(candidate or {})
+    require_2y = bool(evidence.get("weekly_opens_require_2y", True))
+
+    def _attach_span(pack, span, n_trades=None):
+        if span is not None:
+            pack["span_days"] = float(span)
+            pack["observed_days"] = float(span)
+            pack["lookback_days_target"] = WEEKLY_OPENS_LOOKBACK_DAYS
+        if n_trades is not None:
+            pack["n_trades"] = int(n_trades)
+        pack["sample_2y_ok"] = weekly_opens_2y_sample_ok(pack)
+        return pack
+
+    # 1) Explicit fields — accept only if 2y-contract satisfied when required.
     for key in (
         "statistical_weekly_opens_expected",
         "weekly_opens_expected",
@@ -570,36 +586,99 @@ def resolve_statistical_weekly_opens(candidate=None, evidence=None):
         "baseline_weekly_fills",
     ):
         v = _sf_num(evidence.get(key))
-        if v is not None:
-            return _weekly_frequency_pack(
-                float(v),
-                method=evidence.get("frequency_method")
-                or evidence.get("weekly_opens_method")
-                or "evidence_explicit",
-                source="evidence.%s" % key,
-                baseline=evidence.get("baseline_weekly_fills"),
-                regime_factor=evidence.get("regime_factor"),
-                n_obs=evidence.get("frequency_n_obs") or evidence.get("n_obs"),
-                observed_days=evidence.get("frequency_observed_days"),
-                weekly_interval=evidence.get("weekly_interval"),
-            )
+        if v is None:
+            continue
+        method = (evidence.get("frequency_method")
+                  or evidence.get("weekly_opens_method")
+                  or "evidence_explicit")
+        span = _sf_num(
+            evidence.get("span_days")
+            or evidence.get("frequency_observed_days")
+            or evidence.get("observation_days")
+        )
+        pack = _weekly_frequency_pack(
+            float(v),
+            method=method,
+            source="evidence.%s" % key,
+            baseline=evidence.get("baseline_weekly_fills"),
+            regime_factor=evidence.get("regime_factor"),
+            n_obs=evidence.get("frequency_n_obs") or evidence.get("n_obs"),
+            observed_days=span,
+            weekly_interval=evidence.get("weekly_interval"),
+        )
+        pack = _attach_span(pack, span, evidence.get("trades"))
+        if (not require_2y) or weekly_opens_2y_sample_ok(pack):
+            if weekly_opens_2y_sample_ok(pack) and "2y" not in str(method):
+                pack["method"] = WEEKLY_OPENS_STAT_METHOD
+            return pack
+        # fall through — explicit short-window value cannot satisfy R4
+
     freq_block = evidence.get("frequency") or evidence.get("statistical_frequency") or {}
     if isinstance(freq_block, dict):
         v = _sf_num(freq_block.get("expected_weekly_fills"))
         if v is not None:
-            return _weekly_frequency_pack(
+            span = _sf_num(
+                freq_block.get("span_days")
+                or freq_block.get("observed_days")
+            )
+            pack = _weekly_frequency_pack(
                 float(v),
                 method=freq_block.get("method") or WEEKLY_OPENS_STAT_METHOD,
                 source="evidence.frequency",
                 baseline=freq_block.get("baseline_weekly_fills"),
                 regime_factor=freq_block.get("regime_factor"),
                 n_obs=freq_block.get("n_obs"),
-                observed_days=freq_block.get("observed_days") or 14,
+                observed_days=span,
                 weekly_interval=freq_block.get("weekly_interval"),
                 funnel_14d=freq_block.get("funnel_14d"),
             )
+            pack = _attach_span(pack, span, freq_block.get("n_trades"))
+            if (not require_2y) or weekly_opens_2y_sample_ok(pack):
+                return pack
 
-    # Direct production-count evidence: exactly the ADA5 card calculation.
+    # 2) Near-2y backtest density proxy (R4 primary)
+    sm = evidence.get("safety_metrics") or {}
+    n = int(sm.get("trades") or sm.get("total_trades") or evidence.get("trades") or 0)
+    span = _sf_num(
+        sm.get("span_days")
+        or evidence.get("span_days")
+        or sm.get("observation_days")
+        or evidence.get("observation_days")
+    )
+    if n > 0 and span is not None and span > 1e-9:
+        weekly = float(n) * (7.0 / float(span))
+        method = (
+            WEEKLY_OPENS_STAT_METHOD
+            if float(span) + 1e-9 >= float(WEEKLY_OPENS_MIN_SPAN_DAYS)
+            else "backtest_fill_rate_proxy_short_window"
+        )
+        pack = _weekly_frequency_pack(
+            weekly,
+            method=method,
+            source="evidence.safety_metrics",
+            baseline=weekly,
+            regime_factor=1.0,
+            n_obs=n,
+            observed_days=float(span),
+        )
+        pack = _attach_span(pack, span, n)
+        if (not require_2y) or weekly_opens_2y_sample_ok(pack):
+            return pack
+        # Keep the short-window pack for diagnostics; gate will fail sample_2y.
+        pack["expected_weekly_fills"] = None
+        pack["method"] = "backtest_sample_lt_2y"
+        pack["short_window_weekly_fills"] = weekly
+        return pack
+
+    if require_2y:
+        return _attach_span(
+            _weekly_frequency_pack(
+                None, method="missing_2y_sample", source="unresolved_2y"),
+            span,
+            n if n else None,
+        )
+
+    # 3) Optional legacy live_14d fallback (only when 2y not required)
     live_14d_fills = _sf_num(evidence.get("live_14d_fills"))
     if live_14d_fills is not None:
         days = _sf_num(evidence.get("live_observation_days"), 14.0) or 14.0
@@ -607,7 +686,7 @@ def resolve_statistical_weekly_opens(candidate=None, evidence=None):
         baseline = float(live_14d_fills) * 7.0 / float(days)
         return _weekly_frequency_pack(
             baseline * regime_factor,
-            method=WEEKLY_OPENS_STAT_METHOD,
+            method="live_14d_fill_rate",
             source="evidence.live_14d_fills",
             baseline=baseline,
             regime_factor=regime_factor,
@@ -623,59 +702,25 @@ def resolve_statistical_weekly_opens(candidate=None, evidence=None):
     timeframe = candidate.get("timeframe") or evidence.get("timeframe")
     key = candidate.get("key") or evidence.get("strategy_key")
 
-    live_pack = None
     if symbol and timeframe and key:
         try:
             import auto_trade_expectancy_metrics as exp
             live_pack = exp.statistical_frequency_forecast(
                 symbol, timeframe, key, can_open=True,
             )
-            method = str(live_pack.get("method") or "")
-            if method and method != "weak_prior_new_mount":
-                return _weekly_frequency_pack(
-                    float(live_pack.get("expected_weekly_fills") or 0.0),
-                    method=method,
-                    source="statistical_frequency_forecast",
-                    baseline=live_pack.get("baseline_weekly_fills"),
-                    regime_factor=live_pack.get("regime_factor"),
-                    n_obs=live_pack.get("n_obs"),
-                    observed_days=14,
-                    weekly_interval=live_pack.get("weekly_interval"),
-                    funnel_14d=live_pack.get("funnel_14d"),
-                )
-        except Exception as exc:
-            live_pack = {"error": str(exc)[:160]}
-
-    sm = evidence.get("safety_metrics") or {}
-    n = int(sm.get("trades") or sm.get("total_trades") or evidence.get("trades") or 0)
-    span = _sf_num(sm.get("span_days") or evidence.get("span_days"))
-    if n > 0 and span is not None and span > 1e-9:
-        weekly = float(n) * (7.0 / float(span))
-        pack = _weekly_frequency_pack(
-            weekly,
-            method="backtest_fill_rate_proxy",
-            source="evidence.safety_metrics",
-            baseline=weekly,
-            regime_factor=1.0,
-            n_obs=n,
-            observed_days=float(span),
-        )
-        pack["n_trades"] = n
-        pack["span_days"] = float(span)
-        return pack
-
-    if isinstance(live_pack, dict) and live_pack.get("expected_weekly_fills") is not None:
-        return _weekly_frequency_pack(
-            float(live_pack.get("expected_weekly_fills") or 0.0),
-            method=live_pack.get("method") or "weak_prior_new_mount",
-            source="statistical_frequency_forecast_weak",
-            baseline=live_pack.get("baseline_weekly_fills"),
-            regime_factor=live_pack.get("regime_factor"),
-            n_obs=live_pack.get("n_obs"),
-            observed_days=14,
-            weekly_interval=live_pack.get("weekly_interval"),
-            funnel_14d=live_pack.get("funnel_14d"),
-        )
+            return _weekly_frequency_pack(
+                float(live_pack.get("expected_weekly_fills") or 0.0),
+                method=live_pack.get("method") or "live_14d_fill_rate",
+                source="statistical_frequency_forecast",
+                baseline=live_pack.get("baseline_weekly_fills"),
+                regime_factor=live_pack.get("regime_factor"),
+                n_obs=live_pack.get("n_obs"),
+                observed_days=14,
+                weekly_interval=live_pack.get("weekly_interval"),
+                funnel_14d=live_pack.get("funnel_14d"),
+            )
+        except Exception:
+            pass
 
     return _weekly_frequency_pack(
         None, method="missing", source="unresolved")
@@ -688,6 +733,32 @@ def _sf_num(x, default=None):
         return float(x)
     except Exception:
         return default
+
+
+def weekly_opens_2y_sample_ok(pack):
+    """True when the statistical weekly-open anchor is a near-2y sample."""
+    pack = pack or {}
+    method = str(pack.get("method") or "")
+    bad_methods = (
+        "missing",
+        "missing_2y_sample",
+        "backtest_sample_lt_2y",
+        "backtest_fill_rate_proxy_short_window",
+        "live_14d_fill_rate",
+        "weak_prior_new_mount",
+        "unresolved",
+        "unresolved_2y",
+    )
+    if method in bad_methods or "short" in method.lower() or "lt_2y" in method.lower():
+        return False
+    span = _sf_num(pack.get("span_days"))
+    if span is None:
+        span = _sf_num(pack.get("observed_days"))
+    if span is not None and float(span) + 1e-9 >= float(WEEKLY_OPENS_MIN_SPAN_DAYS):
+        return True
+    if method == WEEKLY_OPENS_STAT_METHOD:
+        return True
+    return False
 
 
 def _normalize_mean_net_pct(raw, empirical_mean_net=None):
@@ -744,6 +815,8 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
     name = _normalize_provider_name(name)
     cfg = _provider_config(name)
     digest = candidate_hash(candidate)
+    evidence = dict(evidence or {})
+    evidence.setdefault("weekly_opens_require_2y", True)
     emp_win_mean_pct = _empirical_win_mean_net_pct(evidence)
     weekly_pack = resolve_statistical_weekly_opens(candidate, evidence)
     stat_weekly = _sf_num(weekly_pack.get("expected_weekly_fills"))
@@ -794,10 +867,15 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
                            if emp_win_mean_pct is not None else "unknown")
                     ),
                     "theoretical_weekly_opens": (
-                        "次/周；统计锚点≈%s；有限折价后门槛≥%.2f；禁止上调超过锚点"
+                        "次/周；近2年回测锚点≈%s（span_days≈%s，method=%s）；"
+                        "有限折价后门槛≥%.2f；禁止上调超过锚点；禁止用短窗替代"
                         % (
                             ("%.4f" % stat_weekly)
                             if stat_weekly is not None else "missing",
+                            weekly_pack.get("span_days")
+                            or weekly_pack.get("observed_days")
+                            or "missing",
+                            weekly_pack.get("method") or "missing",
                             MIN_THEORETICAL_WEEKLY_OPENS,
                         )
                     ),
@@ -931,8 +1009,11 @@ def theoretical_review_all(candidate, evidence):
     Production rule: DeepSeek, Qwen and GLM must all cast a real passing vote.
     Infrastructure failures are retryable failures, never permission to reduce
     the review to two providers.
+    R4 weekly gate: near-2y backtest anchor + AI limited discount ≥ 0.5/week.
     """
     digest = candidate_hash(candidate)
+    evidence = dict(evidence or {})
+    evidence.setdefault("weekly_opens_require_2y", True)
     pool = ThreadPoolExecutor(max_workers=len(PROVIDERS))
     try:
         futures = [pool.submit(theoretical_review_one, name, candidate, evidence)
@@ -1010,15 +1091,31 @@ def theoretical_review_all(candidate, evidence):
         fail_reasons.append("%s:SKIP_INFRA(%s)" % (
             p, str(row.get("reason") or "unavailable")[:80]))
 
-    # Weekly opens: statistical anchor + AI limited discount (gate on AI avg)
+    # Weekly opens: near-2y statistical anchor + AI limited discount (gate on AI avg)
+    evidence = dict(evidence or {})
+    evidence.setdefault("weekly_opens_require_2y", True)
     weekly_pack = resolve_statistical_weekly_opens(candidate, evidence)
     stat_weekly = _sf_num(weekly_pack.get("expected_weekly_fills"))
+    sample_2y_ok = weekly_opens_2y_sample_ok(weekly_pack)
     weekly_ok = (
         weekly_avg is not None
         and float(weekly_avg) >= float(MIN_THEORETICAL_WEEKLY_OPENS) - 1e-9
         and stat_weekly is not None
+        and sample_2y_ok
     )
-    if not weekly_ok:
+    if not sample_2y_ok:
+        approved = False
+        fail_reasons.append(
+            "weekly_2y_sample_required(got_span=%s,method=%s,min_span=%s)"
+            % (
+                weekly_pack.get("span_days")
+                or weekly_pack.get("observed_days")
+                or "missing",
+                weekly_pack.get("method") or "missing",
+                WEEKLY_OPENS_MIN_SPAN_DAYS,
+            )
+        )
+    elif not weekly_ok:
         approved = False
         fail_reasons.append(
             "weekly_opens_lt_%s(got=%s,anchor=%s,method=%s)"
@@ -1063,8 +1160,11 @@ def theoretical_review_all(candidate, evidence):
             "min_theoretical_win_mean_net_pct": MIN_THEORETICAL_WIN_MEAN_NET_PCT,
             "min_theoretical_weekly_opens": MIN_THEORETICAL_WEEKLY_OPENS,
             "weekly_opens_method": WEEKLY_OPENS_STAT_METHOD,
+            "weekly_opens_lookback_days": WEEKLY_OPENS_LOOKBACK_DAYS,
+            "weekly_opens_min_span_days": WEEKLY_OPENS_MIN_SPAN_DAYS,
             "weekly_opens_ai_may_override": False,
             "weekly_opens_ai_may_discount": True,
+            "weekly_opens_require_2y": True,
             "mean_net_scope": "winning_trades_only",
         },
         "ai_theoretical_wr_by_provider": wr_map,
@@ -1076,6 +1176,7 @@ def theoretical_review_all(candidate, evidence):
         "mean_net_scope": "winning_trades_only",
         "statistical_weekly_opens": weekly_pack,
         "statistical_weekly_opens_expected": stat_weekly,
+        "weekly_opens_2y_sample_ok": sample_2y_ok,
         "weekly_opens_gate_ok": weekly_ok,
         "ai_stop_cluster_risk_by_provider": risk_map,
         "reviews": reviews,
@@ -1135,6 +1236,16 @@ def validate_theoretical_review_result(review):
         )
     if stat_weekly is None:
         reasons.append("weekly_statistical_anchor_missing")
+    if not weekly_opens_2y_sample_ok(weekly_pack):
+        reasons.append(
+            "weekly_2y_sample_required(got_span=%s,method=%s)"
+            % (
+                weekly_pack.get("span_days")
+                or weekly_pack.get("observed_days")
+                or "missing",
+                weekly_pack.get("method") or "missing",
+            )
+        )
     if weekly_pack.get("ai_may_override") is not False:
         reasons.append("weekly_override_forbidden_flag_missing")
     if weekly_pack.get("ai_may_discount") is not True:
@@ -1149,6 +1260,7 @@ def validate_theoretical_review_result(review):
         "actual_providers": sorted(actual),
         "statistical_weekly_opens_expected": stat_weekly,
         "ai_theoretical_weekly_opens_avg": theo_weekly,
+        "weekly_opens_2y_sample_ok": weekly_opens_2y_sample_ok(weekly_pack),
         "min_weekly_opens": MIN_THEORETICAL_WEEKLY_OPENS,
     }
 

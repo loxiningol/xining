@@ -50,7 +50,8 @@ class TheoreticalReviewGateTest(unittest.TestCase):
             out = ai.theoretical_review_all(
                 {"key": "x"},
                 {"statistical_weekly_opens_expected": 1.0,
-                 "frequency_method": "live_14d_fill_rate"},
+                 "frequency_method": "backtest_2y_fill_rate_proxy",
+                 "span_days": 730.0, "trades": 104},
             )
             self.assertTrue(out["approved"], out.get("fail_reasons"))
             self.assertAlmostEqual(out["ai_theoretical_wr_avg"], 70.0, places=3)
@@ -58,6 +59,7 @@ class TheoreticalReviewGateTest(unittest.TestCase):
                 out["ai_theoretical_weekly_opens_avg"], 0.9, places=3)
             self.assertEqual(out["voting_providers"], ["deepseek", "qwen", "glm"])
             self.assertTrue(out["weekly_opens_gate_ok"])
+            self.assertTrue(out["weekly_opens_2y_sample_ok"])
         finally:
             ai.theoretical_review_one = orig
 
@@ -78,7 +80,8 @@ class TheoreticalReviewGateTest(unittest.TestCase):
             ai.theoretical_review_one = lambda name, c, e, _retry=True: fixed[name]
             out = ai.theoretical_review_all(
                 {"key": "y"},
-                {"statistical_weekly_opens_expected": 1.0},
+                {"statistical_weekly_opens_expected": 1.0,
+                 "span_days": 730.0, "trades": 104},
             )
             self.assertFalse(out["approved"])
             self.assertEqual(out["skipped_infra_providers"], ["glm"])
@@ -108,7 +111,8 @@ class TheoreticalReviewGateTest(unittest.TestCase):
             ai.theoretical_review_one = lambda name, c, e, _retry=True: fixed[name]
             out = ai.theoretical_review_all(
                 {"key": "z"},
-                {"statistical_weekly_opens_expected": 1.0},
+                {"statistical_weekly_opens_expected": 1.0,
+                 "span_days": 730.0, "trades": 104},
             )
             self.assertFalse(out["approved"])
             self.assertEqual(out["skipped_infra_providers"], ["glm"])
@@ -127,7 +131,8 @@ class TheoreticalReviewGateTest(unittest.TestCase):
             out = ai.theoretical_review_all(
                 {"key": "w"},
                 {"statistical_weekly_opens_expected": 1.0,
-                 "frequency_method": "live_14d_fill_rate"},
+                 "frequency_method": "backtest_2y_fill_rate_proxy",
+                 "span_days": 730.0, "trades": 104},
             )
             self.assertFalse(out["approved"])
             self.assertFalse(out["weekly_opens_gate_ok"])
@@ -137,9 +142,30 @@ class TheoreticalReviewGateTest(unittest.TestCase):
         finally:
             ai.theoretical_review_one = orig
 
+    def test_rejects_short_window_even_if_ai_high(self):
+        fixed = {
+            "deepseek": _ok("deepseek", 70.0, 6.0, 1.0),
+            "qwen": _ok("qwen", 68.0, 5.5, 1.0),
+            "glm": _ok("glm", 72.0, 5.2, 1.0),
+        }
+        orig = ai.theoretical_review_one
+        try:
+            ai.theoretical_review_one = lambda name, c, e, _retry=True: fixed[name]
+            out = ai.theoretical_review_all(
+                {"key": "short"},
+                {"trades": 20, "span_days": 40.0},
+            )
+            self.assertFalse(out["approved"])
+            self.assertFalse(out["weekly_opens_2y_sample_ok"])
+            self.assertTrue(
+                any("weekly_2y_sample_required" in r
+                    for r in (out.get("fail_reasons") or []))
+            )
+        finally:
+            ai.theoretical_review_one = orig
+
     def test_rejects_missing_statistical_anchor_even_if_ai_high(self):
-        # Without anchor, inflation clamp still allows AI number, but aggregate
-        # weekly_ok requires statistical anchor present.
+        # Without near-2y anchor, aggregate weekly gate fails closed.
         fixed = {
             "deepseek": _ok("deepseek", 70.0, 6.0, 1.0),
             "qwen": _ok("qwen", 68.0, 5.5, 1.0),

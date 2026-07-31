@@ -81,10 +81,13 @@
     "theoretical_gates": {
       "ai_may_override_weekly_frequency": false,
       "ai_may_discount_weekly_frequency": true,
+      "weekly_opens_require_2y": true,
+      "weekly_opens_lookback_days": 730,
+      "weekly_opens_min_span_days": 600,
       "min_theoretical_weekly_opens": 0.5,
       "min_win_rate_pct": 65.0,
       "min_winning_trade_mean_net_pct": 5.0,
-      "weekly_frequency_method": "statistical_anchor_plus_ai_limited_discount"
+      "weekly_frequency_method": "backtest_2y_fill_rate_proxy_plus_ai_limited_discount"
     },
     "three_ai_unanimity_required": true
   },

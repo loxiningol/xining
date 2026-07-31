@@ -88,37 +88,41 @@ _JOB_LOCK = threading.Lock()
 
 
 def _admission_profile():
-    """Post-creation review profile — locked to ADA5顺势回升校准档.
-
-    Default / only supported production profile: ada_t3_calibrated_v1
-    (R1 syntax/density + R2 stability + R3 matrix soft + R4 三AI + human confirm).
-
-    Legacy hard funnel is disabled unless BOTH are set:
-      STEP_A_ADMISSION_PROFILE=legacy_funnel
-      STEP_A_ALLOW_LEGACY_FUNNEL=1
-    """
+    """Canonical production profile; no strategy-specific bypasses."""
     import os
-    raw = str(os.environ.get("STEP_A_ADMISSION_PROFILE") or "ada_t3_calibrated_v1").strip()
+    raw = str(os.environ.get("STEP_A_ADMISSION_PROFILE") or "strict_four_review_v2").strip()
     if raw in ("legacy_funnel", "legacy", "old"):
         if str(os.environ.get("STEP_A_ALLOW_LEGACY_FUNNEL") or "").strip() in ("1", "true", "on", "yes"):
             return "legacy_funnel"
         print(
             "[pipeline_step_a] REFUSING legacy_funnel without STEP_A_ALLOW_LEGACY_FUNNEL=1; "
-            "forcing ada_t3_calibrated_v1 (ADA5顺势回升)",
+            "forcing strict_four_review_v2",
             flush=True,
         )
-        return "ada_t3_calibrated_v1"
-    return raw or "ada_t3_calibrated_v1"
+        return "strict_four_review_v2"
+    if raw in ("ada_t3_calibrated_v1", "ada_t3", "reconstructed"):
+        return "strict_four_review_v2"
+    return raw or "strict_four_review_v2"
 
 
 def _admission_v2_enabled():
     return _admission_profile() in (
-        "ada_t3_calibrated_v1", "ada_t3", "1", "true", "on", "reconstructed",
+        "strict_four_review_v2", "1", "true", "on",
+    )
+
+
+def _legacy_soft_pass_enabled():
+    """Emergency migration switch only; disabled by default."""
+    import os
+    return str(os.environ.get("STEP_A_ALLOW_STRATEGY_SPECIFIC_SOFT_PASS") or "").strip().lower() in (
+        "1", "true", "on", "yes",
     )
 
 
 def _soft_skip_legacy(task, stage, detail=None):
-    """Record a legacy hard-gate skip under reconstructed admission."""
+    """Record an explicitly authorized migration-only soft skip."""
+    if not _legacy_soft_pass_enabled():
+        raise RuntimeError("strategy_specific_soft_pass_disabled")
     task.setdefault("admission_v2", {})
     task["admission_v2"]["profile"] = _admission_profile()
     skips = task["admission_v2"].setdefault("legacy_soft_skips", [])
@@ -1224,7 +1228,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         flush=True,
     )
     if not l0.get("pass"):
-        if _admission_v2_enabled():
+        if _legacy_soft_pass_enabled():
             _soft_skip_legacy(task, "funnel_l0_density", {
                 "reject_reasons": list(l0.get("reject_reasons") or []),
                 "metrics": l0.get("metrics"),
@@ -1340,7 +1344,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     task["phase3_funnel"]["l1_micro_screen"] = l1
     task["phase3_funnel"]["matrix_symbols"] = list(matrix_syms) if enable_multi_symbol_matrix else [sym]
     if not l1.get("pass"):
-        if _admission_v2_enabled():
+        if _legacy_soft_pass_enabled():
             _soft_skip_legacy(task, "funnel_l1_micro_screen", {
                 "reject_reasons": list(l1.get("reject_reasons") or []),
                 "metrics": l1.get("metrics"),
@@ -1516,7 +1520,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             "rejected_at": incubator.get("rejected_at"),
         }
         if not incubator.get("pass"):
-            if _admission_v2_enabled():
+            if _legacy_soft_pass_enabled():
                 _soft_skip_legacy(task, "phase4_incubator", {
                     "reject_reasons": list(incubator.get("reject_reasons") or []),
                     "cross_asset_score": incubator.get("cross_asset_score"),
@@ -1581,7 +1585,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     need_repair = (not g2["pass"]) or (not g3["pass"])
     # Reconstructed admission: Gate2/3 fitness is advisory — do NOT burn
     # viability-archive repair rounds that would reject ADA-T3-class strategies.
-    if need_repair and _admission_v2_enabled():
+    if need_repair and _legacy_soft_pass_enabled():
         _soft_skip_legacy(task, "gate2_3_repair_loop", {
             "g2_pass": bool(g2.get("pass")),
             "g3_pass": bool(g3.get("pass")),
@@ -1698,7 +1702,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
                 "gate_results": task.get("gate_results")}
 
     if not g2["pass"] or not g3["pass"]:
-        if _admission_v2_enabled():
+        if _legacy_soft_pass_enabled():
             from .review_admission_v2 import (
                 review2_single_symbol_stability,
                 review3_matrix_outlier,
@@ -1786,7 +1790,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     g4 = evaluate_gate4(split_summary)
     task["gates"].append(g4)
     if not g4["pass"]:
-        if _admission_v2_enabled():
+        if _legacy_soft_pass_enabled():
             _soft_skip_legacy(task, "gate4_split_tests", {
                 "hard_fail_ids": split_summary.get("gate4_hard_fail_ids"),
             })
@@ -1822,7 +1826,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     task["gates"].append(g5)
     task["friction"] = fr
     if not g5["pass"]:
-        if _admission_v2_enabled():
+        if _legacy_soft_pass_enabled():
             _soft_skip_legacy(task, "gate5_mc_friction", {"friction": fr, "mc": mc_summary})
         else:
             task["stage"] = "archived"
@@ -1851,7 +1855,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     g6 = evaluate_gate6(reviews)
     task["gates"].append(g6)
     if not g6["pass"]:
-        if _admission_v2_enabled():
+        if _legacy_soft_pass_enabled():
             _soft_skip_legacy(task, "gate6_multi_ai", {
                 "reviews": {
                     k: bool((v or {}).get("pass")) for k, v in (reviews or {}).items()
@@ -1920,7 +1924,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     _save_artifact(tid, "phase5_consensus", task["phase5_consensus"])
 
     if not p5_result.get("approved"):
-        if _admission_v2_enabled():
+        if _legacy_soft_pass_enabled():
             _soft_skip_legacy(task, "phase5_3party_consensus", {
                 "fail_reasons": p5_result.get("fail_reasons"),
                 "fatal_any": p5_result.get("fatal_any"),
@@ -1999,7 +2003,8 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     task.setdefault("admission_v2", {})
     if not task["admission_v2"].get("review1"):
         task["admission_v2"]["review1"] = review1_syntax_assert_density(
-            definition, lookahead_ok=True, l0=l0_ev, require_density=False,
+            definition, lookahead_ok=True, l0=l0_ev,
+            require_density=not _legacy_soft_pass_enabled(),
         )
     if not task["admission_v2"].get("review2"):
         task["admission_v2"]["review2"] = review2_single_symbol_stability(
@@ -2007,7 +2012,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         )
     if not task["admission_v2"].get("review3"):
         task["admission_v2"]["review3"] = review3_matrix_outlier(
-            gate2_fitness=g2_fit, soft_pass=_admission_v2_enabled(),
+            gate2_fitness=g2_fit, soft_pass=_legacy_soft_pass_enabled(),
         )
     r1 = task["admission_v2"].get("review1") or {}
     r2 = task["admission_v2"].get("review2") or {}
@@ -2036,22 +2041,90 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             "gate_results": task["gate_results"],
             "production_mounted": False,
         }
-    ai_review = {
-        "approved": True,
-        "policy": (
-            "admission_v2_ada_t3_calibrated"
-            if _admission_v2_enabled()
-            else "step_a_gates_0_6_pass_phase4_incubator"
-        ),
-        "ai_theoretical_wr_avg": task["split_scores"].get("ai_logic_wr", {}).get("win_rate_pct"),
-        "natural_language": (
-            "四复核（ADA-T3校准）通过：第一次语法/断言/密度 + 第二次单标的稳定性 + "
-            "第三次矩阵/抗离群 + 第四次三AI理论复核；"
-            "已接入原 WxPusher 人工确认通道。production_mounted=False。"
-            if _admission_v2_enabled() else
-            "STEP A gates0-6 + Phase3 funnel + Phase4 incubator pass; "
-            "awaiting human confirm. NOT live-ready. production_mounted=False."
-        ),
+    # Canonical fourth review: real 3AI calls + near-2y weekly-frequency
+    # discount gate.  split_scores can never substitute for votes.
+    n_trades = int((base_m or {}).get("trades") or len(trades or []) or 0)
+    trade_span_days = None
+    try:
+        from .fitness_engine import _span_days as _fit_span_days
+        trade_span_days = float(_fit_span_days(trades, n_trades or len(trades or [])))
+    except Exception:
+        trade_span_days = None
+    # Prefer the creation lookback / observation window for frequency density.
+    span_days = None
+    try:
+        from .creation_template_policy import EVAL_LOOKBACK_DAYS
+        target_lookback = float(EVAL_LOOKBACK_DAYS)
+    except Exception:
+        target_lookback = 730.0
+    for key in ("observation_days", "span_days", "eval_lookback_days"):
+        try:
+            v = (base_m or {}).get(key)
+            if v is not None:
+                span_days = float(v)
+                break
+        except Exception:
+            pass
+    if span_days is None:
+        bars = (base_m or {}).get("bars_used") or (base_m or {}).get("n_bars")
+        bars_per_day = {"5m": 288.0, "15m": 96.0, "1h": 24.0, "4h": 6.0}.get(
+            str(tf), 24.0)
+        try:
+            if bars is not None:
+                span_days = float(bars) / float(bars_per_day)
+        except Exception:
+            span_days = None
+    if span_days is None:
+        span_days = trade_span_days
+    # If observation window is missing but creation policy lookback is the
+    # intended R4 sample and trade span already covers most of it, use lookback.
+    try:
+        if (
+            span_days is not None
+            and trade_span_days is not None
+            and float(trade_span_days) >= 0.8 * float(target_lookback)
+            and float(span_days) < float(target_lookback)
+        ):
+            span_days = float(target_lookback)
+    except Exception:
+        pass
+    win_only_pct = None
+    try:
+        pnls = [float((t or {}).get("pnl_ratio") or 0.0) for t in (trades or [])]
+        wins = [p for p in pnls if p > 0]
+        if wins:
+            win_only_pct = sum(wins) / float(len(wins)) * 100.0
+    except Exception:
+        pass
+    try:
+        import auto_trade_ai_consensus as ai_cons
+        theo_evidence = {
+            "symbol": sym, "timeframe": tf,
+            "strategy_key": (definition or {}).get("key"),
+            "trades": n_trades, "span_days": span_days,
+            "observation_days": span_days,
+            "weekly_opens_require_2y": True,
+            "frequency_method": "backtest_2y_fill_rate_proxy",
+            "safety_metrics": {
+                "trades": n_trades,
+                "span_days": span_days,
+                "observation_days": span_days,
+                "mean_net": (base_m or {}).get("mean_net"),
+                "win_rate": ((base_m or {}).get("win_rate_pct")
+                             or (base_m or {}).get("win_rate")),
+                "mean_net_win_only_pct": win_only_pct,
+            },
+        }
+        theo = ai_cons.theoretical_review_all(definition, theo_evidence) or {}
+        verification = ai_cons.validate_theoretical_review_result(theo)
+        _save_artifact(tid, "theoretical_review_all", theo)
+    except Exception as exc:
+        theo = {"approved": False, "error": str(exc)[:240]}
+        verification = {"ok": False, "reasons": [str(exc)[:200]]}
+    ai_review = dict(theo)
+    ai_review.update({
+        "approved": bool(verification.get("ok")),
+        "review_verification": verification,
         "split_scores": task["split_scores"],
         "step_a": True,
         "phase4_incubator": True,
@@ -2060,7 +2133,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         "payoff": incub.get("payoff_ratio") or incub_m.get("payoff_ratio") or base_m.get("payoff_ratio"),
         "cross_asset_score": incub.get("cross_asset_score"),
         "mean_mae": incub.get("mean_mae") or incub_m.get("mean_mae"),
-    }
+    })
     r4 = review4_three_ai(ai_review=ai_review)
     task["admission_v2"]["review4"] = r4
     if _admission_v2_enabled() and not r4.get("pass"):

@@ -18,7 +18,9 @@ class GateConstantTests(unittest.TestCase):
         self.assertEqual(ai.MIN_THEORETICAL_WR, 65.0)
         self.assertEqual(ai.MIN_THEORETICAL_WIN_MEAN_NET_PCT, 5.0)
         self.assertEqual(ai.MIN_THEORETICAL_WEEKLY_OPENS, 0.5)
-        self.assertEqual(ai.WEEKLY_OPENS_STAT_METHOD, "live_14d_fill_rate")
+        self.assertEqual(ai.WEEKLY_OPENS_STAT_METHOD, "backtest_2y_fill_rate_proxy")
+        self.assertEqual(ai.WEEKLY_OPENS_LOOKBACK_DAYS, 730)
+        self.assertEqual(ai.WEEKLY_OPENS_MIN_SPAN_DAYS, 600)
         self.assertTrue(hasattr(ai, "WEEKLY_OPENS_MAX_REL_DISCOUNT"))
         self.assertTrue(hasattr(ai, "WEEKLY_OPENS_MAX_ABS_DISCOUNT"))
 
@@ -99,16 +101,15 @@ class EmpiricWinOnlyTests(unittest.TestCase):
 
 
 class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
-    def test_ada5_live_14d_frequency_math_and_interval(self):
+    def test_r4_prefers_near_2y_backtest_density(self):
         pack = ai.resolve_statistical_weekly_opens(
             {"key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14"},
-            {"live_14d_fills": 2, "live_observation_days": 14,
-             "regime_factor": 1.0},
+            {"trades": 104, "span_days": 728.0, "weekly_opens_require_2y": True},
         )
-        self.assertAlmostEqual(pack["expected_daily_fills"], 0.143, places=3)
-        self.assertAlmostEqual(pack["expected_weekly_fills"], 1.0)
-        self.assertEqual(pack["weekly_interval"], [0, 3])
-        self.assertEqual(pack["method"], "live_14d_fill_rate")
+        self.assertAlmostEqual(pack["expected_weekly_fills"], 1.0, places=4)
+        self.assertEqual(pack["method"], "backtest_2y_fill_rate_proxy")
+        self.assertTrue(pack["sample_2y_ok"])
+        self.assertTrue(ai.weekly_opens_2y_sample_ok(pack))
         self.assertEqual(
             pack["calculation"],
             "hybrid:statistical_anchor;three_ai_limited_discount",
@@ -116,16 +117,26 @@ class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
         self.assertFalse(pack["ai_may_override"])
         self.assertTrue(pack["ai_may_discount"])
         self.assertEqual(pack["ai_role"], "limited_discount")
-        self.assertEqual(pack["confidence"], "low")
+
+    def test_live_14d_rejected_when_2y_required(self):
+        pack = ai.resolve_statistical_weekly_opens(
+            {"key": "x"},
+            {"live_14d_fills": 2, "live_observation_days": 14,
+             "regime_factor": 1.0, "weekly_opens_require_2y": True},
+        )
+        self.assertIsNone(pack["expected_weekly_fills"])
+        self.assertFalse(ai.weekly_opens_2y_sample_ok(pack))
+
+    def test_live_14d_allowed_when_2y_not_required(self):
+        pack = ai.resolve_statistical_weekly_opens(
+            {"key": "x"},
+            {"live_14d_fills": 2, "live_observation_days": 14,
+             "regime_factor": 1.0, "weekly_opens_require_2y": False},
+        )
+        self.assertAlmostEqual(pack["expected_weekly_fills"], 1.0)
+        self.assertEqual(pack["method"], "live_14d_fill_rate")
 
     def test_ai_cannot_inflate_above_statistical_anchor(self):
-        pack = ai.resolve_statistical_weekly_opens(
-            {"key": "x", "ai_weekly_opens": 99.0},
-            {"live_14d_fills": 0, "live_observation_days": 14,
-             "regime_factor": 1.0, "ai_soft_mid": 99.0},
-        )
-        self.assertEqual(pack["expected_weekly_fills"], 0.0)
-        self.assertFalse(pack["ai_may_override"])
         # normalize clamps inflation
         self.assertEqual(
             ai._normalize_theoretical_weekly_opens(99.0, statistical_anchor=0.0),
@@ -158,11 +169,13 @@ class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
             out = ai.theoretical_review_all(
                 {"key": "x"},
                 {"statistical_weekly_opens_expected": 1.0,
-                 "frequency_method": "live_14d_fill_rate"},
+                 "frequency_method": "backtest_2y_fill_rate_proxy",
+                 "span_days": 730.0, "trades": 104},
             )
             self.assertTrue(out["approved"], out.get("fail_reasons"))
             self.assertAlmostEqual(out["ai_theoretical_weekly_opens_avg"], 0.9)
             self.assertAlmostEqual(out["statistical_weekly_opens_expected"], 1.0)
+            self.assertTrue(out["weekly_opens_2y_sample_ok"])
             self.assertTrue(ai.validate_theoretical_review_result(out)["ok"])
 
             # AI discounts below floor → fail even if statistical anchor is high
@@ -171,7 +184,8 @@ class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
             low = ai.theoretical_review_all(
                 {"key": "x"},
                 {"statistical_weekly_opens_expected": 1.0,
-                 "frequency_method": "live_14d_fill_rate"},
+                 "frequency_method": "backtest_2y_fill_rate_proxy",
+                 "span_days": 730.0, "trades": 104},
             )
             self.assertFalse(low["approved"])
             self.assertFalse(low["weekly_opens_gate_ok"])
@@ -193,7 +207,8 @@ class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
             out = ai.theoretical_review_all(
                 {"key": "x"},
                 {"statistical_weekly_opens_expected": 1.0,
-                 "frequency_method": "live_14d_fill_rate"},
+                 "frequency_method": "backtest_2y_fill_rate_proxy",
+                 "span_days": 730.0, "trades": 104},
             )
             self.assertFalse(out["approved"])
             self.assertFalse(ai.validate_theoretical_review_result(out)["ok"])

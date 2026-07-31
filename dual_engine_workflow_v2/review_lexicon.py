@@ -22,7 +22,9 @@ REVIEW_4 = "第四次复核"
 REVIEW_1_SCOPE = "基础语法、逻辑断言、开仓密度预检"
 REVIEW_2_SCOPE = "单标的历史回测与样本收益稳定性"
 REVIEW_3_SCOPE = "多标的矩阵验证与抗风险离群测试"
-REVIEW_4_SCOPE = "三AI理论复核（胜率≥65% + 盈利单均值≥5% + 周开仓折价≥0.5）"
+REVIEW_4_SCOPE = (
+    "三AI理论复核（胜率≥65% + 盈利单均值≥5% + 近2年周开仓折价≥0.5）"
+)
 
 REVIEW_1_FULL = "【%s】（%s）" % (REVIEW_1, REVIEW_1_SCOPE)
 REVIEW_2_FULL = "【%s】（%s）" % (REVIEW_2, REVIEW_2_SCOPE)

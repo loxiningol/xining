@@ -22,7 +22,7 @@ class StrictAdmissionTests(unittest.TestCase):
         self.assertTrue(out["reviews"]["r2"]["pass"])
         self.assertTrue(out["reviews"]["r3"]["pass"])
         self.assertTrue(out["reviews"]["r4"]["pass"])
-        self.assertIn("周开仓折价≥0.5", out["reviews"]["r4"]["review_scope"])
+        self.assertIn("近2年周开仓折价≥0.5", out["reviews"]["r4"]["review_scope"])
         self.assertTrue(out["human_confirm"]["pass"])
         self.assertTrue(out["human_confirm"]["awaiting_human"])
         self.assertTrue(out["legacy_advisory"]["legacy_l0_pass"])

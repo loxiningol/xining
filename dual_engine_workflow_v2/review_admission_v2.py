@@ -224,14 +224,25 @@ def review3_matrix_outlier(gate2_fitness=None, matrix_eval=None, l2=None, l3=Non
 
 
 def review4_three_ai(ai_review=None):
-    """【第四次复核】：三AI全票 + 周开仓（统计锚点上有限折价）硬门槛。"""
+    """【第四次复核】：三AI全票 + 近2年周开仓（锚点上有限折价）≥0.5。"""
     ai = ai_review or {}
     approved = bool(ai.get("approved"))
     try:
         import auto_trade_ai_consensus as consensus
         verified = consensus.validate_theoretical_review_result(ai)
+        sample_2y_ok = bool(
+            ai.get("weekly_opens_2y_sample_ok")
+            if ai.get("weekly_opens_2y_sample_ok") is not None
+            else verified.get("weekly_opens_2y_sample_ok")
+            if verified.get("weekly_opens_2y_sample_ok") is not None
+            else consensus.weekly_opens_2y_sample_ok(
+                ai.get("statistical_weekly_opens") or {})
+        )
+        min_span = float(getattr(consensus, "WEEKLY_OPENS_MIN_SPAN_DAYS", 600))
     except Exception as exc:
         verified = {"ok": False, "reasons": ["verification_error:%s" % str(exc)[:160]]}
+        sample_2y_ok = False
+        min_span = 600.0
     wr_map = ai.get("ai_theoretical_wr_by_provider") or {}
     providers = [k for k, v in wr_map.items() if v is not None]
     wr_avg = ai.get("ai_theoretical_wr_avg")
@@ -252,21 +263,43 @@ def review4_three_ai(ai_review=None):
         weekly_anchor = float(weekly_anchor) if weekly_anchor is not None else None
     except Exception:
         weekly_anchor = None
-    weekly_ok = weekly is not None and weekly >= 0.5 - 1e-9
+    weekly_ok = (
+        weekly is not None
+        and weekly >= 0.5 - 1e-9
+        and sample_2y_ok
+    )
     checks = {
         "ai_theoretical_approved": approved,
         "three_ai_result_verified": bool(verified.get("ok")),
         "has_all_provider_votes": len(providers) == 3,
+        "weekly_2y_sample_ok": sample_2y_ok,
+        "weekly_opens_2y_discount_ge_0_5": weekly_ok,
+        # Compat alias used by older dashboards
         "weekly_opens_ge_0_5": weekly_ok,
     }
     reasons = []
     if not approved:
         reasons.append("ai_theoretical_review_required")
     reasons.extend(list(verified.get("reasons") or []))
-    if not weekly_ok:
-        reasons.append("weekly_opens_lt_0.5(got=%s,anchor=%s)" % (
-            "missing" if weekly is None else "%.4f" % weekly,
-            "missing" if weekly_anchor is None else "%.4f" % weekly_anchor))
+    if not sample_2y_ok:
+        reasons.append(
+            "weekly_2y_sample_required(got_span=%s,method=%s,min_span=%s)"
+            % (
+                weekly_pack.get("span_days")
+                or weekly_pack.get("observed_days")
+                or "missing",
+                weekly_pack.get("method") or "missing",
+                int(min_span),
+            )
+        )
+    elif not weekly_ok:
+        reasons.append(
+            "weekly_opens_2y_discount_lt_0.5(got=%s,anchor=%s)"
+            % (
+                "missing" if weekly is None else "%.4f" % weekly,
+                "missing" if weekly_anchor is None else "%.4f" % weekly_anchor,
+            )
+        )
     return {
         "review_n": 4,
         "review_label": REVIEW_4,
@@ -286,7 +319,13 @@ def review4_three_ai(ai_review=None):
             ai.get("ai_theoretical_weekly_opens_by_provider") or {}
         ),
         "statistical_weekly_opens_expected": weekly_anchor,
-        "weekly_opens_method": weekly_pack.get("method") or "live_14d_fill_rate",
+        "weekly_opens_method": (
+            weekly_pack.get("method") or "backtest_2y_fill_rate_proxy"
+        ),
+        "weekly_opens_span_days": (
+            weekly_pack.get("span_days") or weekly_pack.get("observed_days")
+        ),
+        "weekly_opens_2y_sample_ok": sample_2y_ok,
         "review_verification": verified,
         "providers_voted": providers,
         "profile": PROFILE,
@@ -496,17 +535,22 @@ def ada_t3_golden_snapshot():
                 "deepseek": 0.9, "qwen": 0.9, "glm": 0.9,
             },
             "ai_theoretical_weekly_opens_avg": 0.9,
+            "weekly_opens_2y_sample_ok": True,
             "reviews": reviews,
             "voting_providers": ["deepseek", "qwen", "glm"],
             "statistical_weekly_opens_expected": 1.0,
             "statistical_weekly_opens": {
                 "expected_weekly_fills": 1.0,
-                "method": "live_14d_fill_rate",
+                "method": "backtest_2y_fill_rate_proxy",
                 "calculation": "hybrid:statistical_anchor;three_ai_limited_discount",
                 "ai_may_override": False,
                 "ai_may_discount": True,
                 "ai_role": "limited_discount",
                 "statistical_baseline_locked": True,
+                "span_days": 730.0,
+                "observed_days": 730.0,
+                "sample_2y_ok": True,
+                "n_trades": 20,
             },
         },
         "legacy_would_fail": {

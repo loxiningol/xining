@@ -728,7 +728,7 @@ def format_pending_confirm_wx(item, metrics=None):
         "三AI理论盈利单盈利率均值: {mean_net}\n"
         "分项胜率: DS {ds} / Qwen {qw} / GLM {glm}\n"
         "分项盈利单盈利率: DS {ds_mn} / Qwen {qw_mn} / GLM {glm_mn}\n"
-        "周理论开仓（三AI折价）: {weekly} · 统计锚点 {anchor} · "
+        "周理论开仓（近2年·三AI折价）: {weekly} · 统计锚点 {anchor} · "
         "80%区间 {weekly_range} · 门槛≥0.5\n"
         "回测证据(仅参考): 盈利单净均值 {mean_win} · 样本 {n} · 机器胜率 {wr}\n"
         "时间: {t}"
