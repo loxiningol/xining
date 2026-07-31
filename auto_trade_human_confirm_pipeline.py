@@ -226,11 +226,14 @@ def _daemon_config_name(symbol, timeframe):
     mapping = {
         ("BTC-USDT-SWAP", "15m"): "formal_daemon_config_btc_15m.json",
         ("BTC-USDT-SWAP", "5m"): "formal_daemon_config_btc_5m.json",
+        ("BTC-USDT-SWAP", "1h"): "formal_daemon_config.json",
         ("NG-USDT-SWAP", "5m"): "formal_daemon_config_ng_5m.json",
         ("ADA-USDT-SWAP", "5m"): "formal_daemon_config_ada_5m.json",
         ("XAG-USDT-SWAP", "5m"): "formal_daemon_config_xag_5m.json",
         ("XAU-USDT-SWAP", "15m"): "formal_daemon_config_xau_15m.json",
         ("CL-USDT-SWAP", "5m"): "formal_daemon_config_cl_5m.json",
+        ("LTC-USDT-SWAP", "5m"): "formal_daemon_config_ltc_5m.json",
+        ("XRP-USDT-SWAP", "15m"): "formal_daemon_config_xrp_15m.json",
     }
     return mapping.get((symbol, timeframe))
 
@@ -253,6 +256,13 @@ def _ensure_daemon_key(symbol, timeframe, key):
     cfg["gate_authorized_auto_trading"] = True
     _atomic(path, cfg)
     try:
+        import auto_trade_strategy_validity as validity
+        validity.stamp_strategy(
+            symbol, timeframe, key, config_file=str(path),
+        )
+    except Exception:
+        pass
+    try:
         import auto_trade_forecast_closeout as closeout
         closeout.notify_pool_change(
             "strategy_mounted",
@@ -274,6 +284,20 @@ def _remove_daemon_key(symbol, timeframe, key):
     cfg = _read(path, {})
     keys = [k for k in (cfg.get("strategy_keys") or []) if k != key]
     cfg["strategy_keys"] = keys
+    # drop validity annotation for removed key
+    try:
+        vmap = dict(cfg.get("strategy_validity") or {})
+        if key in vmap:
+            vmap.pop(key, None)
+            cfg["strategy_validity"] = vmap
+        if cfg.get("strategy_key") == key:
+            for field in (
+                "validity_days_total", "valid_from", "valid_until",
+                "days_remaining", "validity_countdown_zh",
+            ):
+                cfg.pop(field, None)
+    except Exception:
+        pass
     _atomic(path, cfg)
     try:
         import auto_trade_forecast_closeout as closeout
@@ -620,16 +644,147 @@ def save_pending(data):
     _atomic(PENDING_PATH, data)
 
 
-def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
+def _direction_zh(direction):
+    d = str(direction or "").strip().lower()
+    if d in ("long", "buy", "做多"):
+        return "做多"
+    if d in ("short", "sell", "做空"):
+        return "做空"
+    return str(direction or "-")
+
+
+def _pct_txt(value, digits=1, zero_as_missing=False):
+    if value is None or value == "":
+        return "-"
+    try:
+        f = float(value)
+        if zero_as_missing and abs(f) < 1e-12:
+            return "-"
+        return ("%." + str(int(digits)) + "f%%") % f
+    except Exception:
+        return "-"
+
+
+def _provider_pct(wr_map, mean_map, name, kind="wr"):
+    """Infra-failed providers often land as wr=0 + mean=None — show '-' not 0.0%."""
+    wr_map = wr_map or {}
+    mean_map = mean_map or {}
+    if kind == "wr":
+        wr = wr_map.get(name)
+        mean = mean_map.get(name)
+        if wr is None:
+            return "-"
+        try:
+            if abs(float(wr)) < 1e-12 and mean is None:
+                return "-"
+        except Exception:
+            return "-"
+        return _pct_txt(wr, 1)
+    mean = mean_map.get(name)
+    return _pct_txt(mean, 1)
+
+
+def format_pending_confirm_wx(item, metrics=None):
+    """精简人工确认卡（设计师口径）：不含逻辑/Calmar/指令块。"""
+    metrics = metrics if isinstance(metrics, dict) else (item.get("metrics") or {})
+    wr_map = item.get("ai_theoretical_wr_by_provider") or {}
+    mean_net_map = item.get("ai_theoretical_mean_net_by_provider") or {}
+    wr_avg = item.get("ai_theoretical_wr_avg")
+    mean_net_avg = item.get("ai_theoretical_mean_net_avg")
+    mean_win = metrics.get("mean_net_win_only_pct")
+    if mean_win is None and metrics.get("mean_net_win_only") is not None:
+        try:
+            # ratio → percentage points
+            mw = float(metrics.get("mean_net_win_only"))
+            mean_win = mw * 100.0 if abs(mw) <= 1.5 else mw
+        except Exception:
+            mean_win = None
+    wr = metrics.get("win_rate")
+    if wr is None:
+        wr = metrics.get("win_rate_pct")
+    freq = item.get("statistical_weekly_opens") or {}
+    weekly = item.get("ai_theoretical_weekly_opens_avg")
+    weekly_anchor = item.get("statistical_weekly_opens_expected")
+    if weekly_anchor is None:
+        weekly_anchor = freq.get("expected_weekly_fills")
+    try:
+        weekly_txt = "%.3f" % float(weekly)
+    except Exception:
+        weekly_txt = "-"
+    try:
+        anchor_txt = "%.3f" % float(weekly_anchor)
+    except Exception:
+        anchor_txt = "-"
+    interval = freq.get("weekly_interval")
+    interval_txt = "-"
+    if isinstance(interval, (list, tuple)) and len(interval) == 2:
+        interval_txt = "[%s, %s]" % (interval[0], interval[1])
+    return (
+        "【四复核通过·待人工确认签发】\n"
+        "名称: {name}\n"
+        "标的/周期: {symbol} / {timeframe}\n"
+        "方向:{direction}\n"
+        "三AI理论胜率均值: {avg}\n"
+        "三AI理论盈利单盈利率均值: {mean_net}\n"
+        "分项胜率: DS {ds} / Qwen {qw} / GLM {glm}\n"
+        "分项盈利单盈利率: DS {ds_mn} / Qwen {qw_mn} / GLM {glm_mn}\n"
+        "周理论开仓（三AI折价）: {weekly} · 统计锚点 {anchor} · "
+        "80%区间 {weekly_range} · 门槛≥0.5\n"
+        "回测证据(仅参考): 盈利单净均值 {mean_win} · 样本 {n} · 机器胜率 {wr}\n"
+        "时间: {t}"
+    ).format(
+        name=item.get("name") or item.get("key") or "-",
+        symbol=item.get("symbol") or "-",
+        timeframe=item.get("timeframe") or "-",
+        direction=_direction_zh(item.get("direction")),
+        avg=_pct_txt(wr_avg, 1),
+        mean_net=_pct_txt(mean_net_avg, 1),
+        ds=_provider_pct(wr_map, mean_net_map, "deepseek", "wr"),
+        qw=_provider_pct(wr_map, mean_net_map, "qwen", "wr"),
+        glm=_provider_pct(
+            wr_map, mean_net_map,
+            "glm" if "glm" in wr_map else "chatgpt", "wr",
+        ),
+        ds_mn=_provider_pct(wr_map, mean_net_map, "deepseek", "mean"),
+        qw_mn=_provider_pct(wr_map, mean_net_map, "qwen", "mean"),
+        glm_mn=_provider_pct(
+            wr_map, mean_net_map,
+            "glm" if ("glm" in mean_net_map or "glm" in wr_map) else "chatgpt",
+            "mean",
+        ),
+        weekly=weekly_txt,
+        anchor=anchor_txt,
+        weekly_range=interval_txt,
+        mean_win=_pct_txt(mean_win, 1),
+        n=int(metrics.get("trades") or 0),
+        wr=_pct_txt(wr, 1),
+        t=item.get("created_at") or _now(),
+    )
+
+
+def enqueue_for_human(cand, metrics, source="unknown", ai_review=None,
+                      force_repush=False):
     """After safety+3AI pass: queue + WxPusher notify. Never live.
 
-    Phase-4 Wx card includes Calmar, payoff, cross-asset score, mean MAE when
-    present. production_mounted stays False until CLI --confirm (B 30%/20x).
+    production_mounted stays False until CLI --confirm (B 30%/20x).
     """
     dsl = cand.get("dsl") or cand
     key = (dsl.get("key") or metrics.get("key")
            or cand.get("strategy_key") or "unknown")
     ai_review = ai_review or {}
+    try:
+        import auto_trade_ai_consensus as _consensus
+        review_verification = _consensus.validate_theoretical_review_result(ai_review)
+    except Exception as exc:
+        review_verification = {"ok": False, "reasons": [str(exc)[:160]]}
+    if not review_verification.get("ok"):
+        _append_audit({"time": _now(), "event": "pending_confirm_rejected",
+                       "reason": "verified_three_ai_review_required",
+                       "verification": review_verification,
+                       "source": source, "key": key})
+        return {"ok": False, "reason": "verified_three_ai_review_required",
+                "review_verification": review_verification, "key": key,
+                "production_mounted": False}
     wr_map = (ai_review.get("ai_theoretical_wr_by_provider")
               or metrics.get("ai_theoretical_wr_by_provider") or {})
     wr_avg = ai_review.get("ai_theoretical_wr_avg")
@@ -642,7 +797,7 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         mean_net_avg = metrics.get("ai_theoretical_mean_net_avg")
     risk_map = (ai_review.get("ai_stop_cluster_risk_by_provider")
                 or metrics.get("ai_stop_cluster_risk_by_provider") or {})
-    # Phase-4 incubator card fields
+    # Phase-4 incubator card fields (stored; not shown on精简 Wx)
     calmar = ai_review.get("calmar")
     if calmar is None:
         calmar = metrics.get("calmar")
@@ -656,9 +811,13 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
     if mean_mae is None:
         mean_mae = metrics.get("mean_mae")
     pending = load_pending()
+    existing = None
     for row in pending["items"]:
         if row.get("key") == key and row.get("status") == "awaiting_confirm":
-            return {"ok": True, "duplicate": True, "key": key}
+            existing = row
+            break
+    if existing is not None and not force_repush:
+        return {"ok": True, "duplicate": True, "key": key}
     try:
         import auto_trade_strategy_titles as titles
         display_name = titles.short_strategy_title(
@@ -670,7 +829,7 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
     item = {
         "key": key,
         "status": "awaiting_confirm",
-        "created_at": _now(),
+        "created_at": (existing or {}).get("created_at") or _now(),
         "source": source,
         "symbol": metrics.get("symbol") or cand.get("symbol"),
         "timeframe": metrics.get("timeframe") or cand.get("timeframe"),
@@ -685,6 +844,16 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         "ai_theoretical_mean_net_avg": mean_net_avg,
         "ai_stop_cluster_risk_by_provider": risk_map,
         "ai_review_natural_language": ai_review.get("natural_language"),
+        "ai_review_schema": ai_review.get("schema"),
+        "ai_review_verified": True,
+        "ai_review_verification": review_verification,
+        "statistical_weekly_opens": ai_review.get("statistical_weekly_opens"),
+        "statistical_weekly_opens_expected": ai_review.get(
+            "statistical_weekly_opens_expected"),
+        "ai_theoretical_weekly_opens_by_provider": ai_review.get(
+            "ai_theoretical_weekly_opens_by_provider") or {},
+        "ai_theoretical_weekly_opens_avg": ai_review.get(
+            "ai_theoretical_weekly_opens_avg"),
         "calmar": calmar,
         "payoff": payoff,
         "cross_asset_score": cross_score,
@@ -692,71 +861,192 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None):
         "phase4_incubator": bool(ai_review.get("phase4_incubator")
                                  or cand.get("phase4_incubator")),
         "production_mounted": False,
+        "repushed_at": _now() if force_repush else None,
     }
-    pending["items"].append(item)
+    if existing is not None:
+        existing.clear()
+        existing.update(item)
+    else:
+        pending["items"].append(item)
     save_pending(pending)
-    avg_txt = ("%.1f%%" % float(wr_avg)) if wr_avg is not None else "-"
-    mean_net_txt = (
-        ("%.3f%%" % float(mean_net_avg)) if mean_net_avg is not None else "-"
-    )
-    calmar_txt = ("%.2f" % float(calmar)) if calmar is not None else "-"
-    payoff_txt = ("%.2f" % float(payoff)) if payoff is not None else "-"
-    cross_txt = ("%.2f" % float(cross_score)) if cross_score is not None else "-"
-    mae_txt = ("%.4f" % float(mean_mae)) if mean_mae is not None else "-"
-    msg = (
-        "【四复核通过·待人工确认签发】\n"
-        "名称: {name}\n"
-        "标的/周期: {symbol} / {timeframe}\n"
-        "方向: {direction}\n"
-        "逻辑: {logic}\n"
-        "Calmar: {calmar} · Payoff: {payoff}\n"
-        "Cross-asset score: {cross} · Mean MAE: {mae}\n"
-        "三AI理论胜率均值: {avg}\n"
-        "三AI理论盈利单盈利率均值: {mean_net}\n"
-        "分项胜率: DS {ds} / Qwen {qw} / GLM {gpt}\n"
-        "分项盈利单盈利率: DS {ds_mn} / Qwen {qw_mn} / GLM {gpt_mn}\n"
-        "回测证据(仅参考): 盈利单净均值 {mean_win} · 全体净均值 {mean} · 样本 {n} · 机器胜率 {wr}\n"
-        "production_mounted=False（需人工 --confirm 才上 B级30%/20x/SL0.9%）\n"
-        "确认指令: python3 auto_trade_human_confirm_pipeline.py --confirm {key}\n"
-        "拒绝指令: python3 auto_trade_human_confirm_pipeline.py --reject {key}\n"
-        "时间: {t}"
-    ).format(
-        name=item["name"], key=key,
-        symbol=item["symbol"], timeframe=item["timeframe"],
-        direction=item["direction"], logic=item["logic_brief"],
-        calmar=calmar_txt, payoff=payoff_txt, cross=cross_txt, mae=mae_txt,
-        avg=avg_txt, mean_net=mean_net_txt,
-        ds=wr_map.get("deepseek"), qw=wr_map.get("qwen"),
-        gpt=wr_map.get("glm", wr_map.get("chatgpt")),
-        ds_mn=mean_net_map.get("deepseek"), qw_mn=mean_net_map.get("qwen"),
-        gpt_mn=mean_net_map.get("glm", mean_net_map.get("chatgpt")),
-        mean=metrics.get("mean_net"),
-        mean_win=(
-            metrics.get("mean_net_win_only_pct")
-            if metrics.get("mean_net_win_only_pct") is not None
-            else metrics.get("mean_net_win_only")
-        ),
-        n=int(metrics.get("trades") or 0),
-        wr=metrics.get("win_rate"),
-        t=_now(),
-    )
-    _wx(msg, kind="strategy_pending_confirm", meta={"key": key,
-                                                    "ai_theoretical_wr_avg": wr_avg,
-                                                    "ai_theoretical_mean_net_avg": mean_net_avg,
-                                                    "calmar": calmar,
-                                                    "payoff": payoff,
-                                                    "cross_asset_score": cross_score,
-                                                    "mean_mae": mean_mae,
-                                                    "production_mounted": False})
+    msg = format_pending_confirm_wx(item, metrics=metrics)
+    _wx(msg, kind="strategy_pending_confirm", meta={
+        "key": key,
+        "ai_theoretical_wr_avg": wr_avg,
+        "ai_theoretical_mean_net_avg": mean_net_avg,
+        "ai_theoretical_wr_by_provider": wr_map,
+        "ai_theoretical_mean_net_by_provider": mean_net_map,
+        "production_mounted": False,
+        "force_repush": bool(force_repush),
+    })
     _append_audit({"time": _now(), "event": "pending_confirm", "key": key,
                    "source": source, "metrics": metrics,
                    "ai_theoretical_wr_avg": wr_avg,
-                   "calmar": calmar, "payoff": payoff,
-                   "cross_asset_score": cross_score, "mean_mae": mean_mae,
-                   "production_mounted": False})
+                   "ai_theoretical_mean_net_avg": mean_net_avg,
+                   "ai_theoretical_wr_by_provider": wr_map,
+                   "ai_theoretical_mean_net_by_provider": mean_net_map,
+                   "production_mounted": False,
+                   "force_repush": bool(force_repush)})
     return {"ok": True, "key": key, "pushed": True,
             "ai_theoretical_wr_avg": wr_avg,
-            "production_mounted": False}
+            "ai_theoretical_mean_net_avg": mean_net_avg,
+            "ai_theoretical_wr_by_provider": wr_map,
+            "ai_theoretical_mean_net_by_provider": mean_net_map,
+            "wx_text": msg,
+            "production_mounted": False,
+            "force_repush": bool(force_repush)}
+
+
+def resend_pending_confirm_wx(key):
+    """用当前 pending 字段按精简模板重发（不再调三AI）。"""
+    pending = load_pending()
+    item = None
+    for row in pending["items"]:
+        if row.get("key") == key and row.get("status") == "awaiting_confirm":
+            item = row
+            break
+    if not item:
+        return {"ok": False, "error": "not_awaiting_confirm", "key": key}
+    msg = format_pending_confirm_wx(item, metrics=item.get("metrics") or {})
+    wx = _wx(msg, kind="strategy_pending_confirm", meta={
+        "key": key,
+        "ai_theoretical_wr_avg": item.get("ai_theoretical_wr_avg"),
+        "ai_theoretical_mean_net_avg": item.get("ai_theoretical_mean_net_avg"),
+        "ai_theoretical_wr_by_provider": item.get("ai_theoretical_wr_by_provider"),
+        "ai_theoretical_mean_net_by_provider": item.get(
+            "ai_theoretical_mean_net_by_provider"),
+        "production_mounted": False,
+        "resend_only": True,
+    })
+    _append_audit({
+        "time": _now(), "event": "pending_confirm_resend", "key": key,
+        "wx": wx, "wx_text": msg,
+    })
+    return {"ok": True, "key": key, "pushed": True, "wx": wx, "wx_text": msg}
+
+
+def repush_pending_with_theoretical_ai(key):
+    """对已 pending 的策略补跑三AI理论复核，更新字段并以精简卡重发 Wx。"""
+    import auto_trade_ai_consensus as ai
+    pending = load_pending()
+    item = None
+    for row in pending["items"]:
+        if row.get("key") == key and row.get("status") == "awaiting_confirm":
+            item = row
+            break
+    if not item:
+        return {"ok": False, "error": "not_awaiting_confirm", "key": key}
+    dsl = item.get("dsl") or {}
+    metrics = dict(item.get("metrics") or {})
+    cand = {
+        "dsl": dsl,
+        "symbol": item.get("symbol"),
+        "timeframe": item.get("timeframe"),
+        "key": key,
+        "phase4_incubator": item.get("phase4_incubator"),
+    }
+    evidence = {
+        "symbol": item.get("symbol"),
+        "timeframe": item.get("timeframe"),
+        "strategy_key": key,
+        "trades": metrics.get("trades"),
+        "span_days": metrics.get("span_days") or (
+            (metrics.get("safety_metrics") or {}).get("span_days")
+        ),
+        "safety_metrics": {
+            "trades": metrics.get("trades"),
+            "mean_net": metrics.get("mean_net"),
+            "win_rate": metrics.get("win_rate"),
+            "mean_net_win_only": metrics.get("mean_net_win_only"),
+            "mean_net_win_only_pct": metrics.get("mean_net_win_only_pct"),
+            "span_days": metrics.get("span_days"),
+        },
+        "statistical_weekly_opens_expected": (
+            metrics.get("statistical_weekly_opens_expected")
+            or item.get("statistical_weekly_opens_expected")
+        ),
+        "frequency_method": metrics.get("frequency_method") or "backtest_fill_rate_proxy",
+    }
+    # Prefer fresh safety screen metrics if win-only missing
+    if metrics.get("mean_net_win_only_pct") is None:
+        try:
+            ok, fresh, _reason = safety_screen_candidate(cand)
+            if ok and isinstance(fresh, dict):
+                for k in ("trades", "mean_net", "win_rate", "mean_net_win_only",
+                          "mean_net_win_only_pct", "symbol", "timeframe"):
+                    if fresh.get(k) is not None:
+                        metrics[k] = fresh.get(k)
+                evidence["safety_metrics"].update({
+                    "trades": metrics.get("trades"),
+                    "mean_net": metrics.get("mean_net"),
+                    "win_rate": metrics.get("win_rate"),
+                    "mean_net_win_only": metrics.get("mean_net_win_only"),
+                    "mean_net_win_only_pct": metrics.get("mean_net_win_only_pct"),
+                })
+        except Exception as exc:
+            evidence["safety_screen_error"] = str(exc)[:160]
+    theo = ai.theoretical_review_all(dsl, evidence)
+    verification = ai.validate_theoretical_review_result(theo)
+    if not verification.get("ok"):
+        item["status"] = "ai_rereview_rejected"
+        item["ai_rereview_at"] = _now()
+        item["ai_rereview_fail_reasons"] = list(
+            verification.get("reasons") or theo.get("fail_reasons") or [])
+        save_pending(pending)
+        return {"ok": False, "key": key,
+                "reason": "three_ai_rereview_rejected",
+                "review_verification": verification,
+                "theoretical": theo, "production_mounted": False}
+    ai_review = {
+        "schema": theo.get("schema"),
+        "approved": bool(theo.get("approved")),
+        "policy": theo.get("policy"),
+        "natural_language": theo.get("natural_language"),
+        "ai_theoretical_wr_by_provider": theo.get("ai_theoretical_wr_by_provider") or {},
+        "ai_theoretical_wr_avg": theo.get("ai_theoretical_wr_avg"),
+        "ai_theoretical_mean_net_by_provider": (
+            theo.get("ai_theoretical_mean_net_by_provider") or {}
+        ),
+        "ai_theoretical_mean_net_avg": theo.get("ai_theoretical_mean_net_avg"),
+        "ai_stop_cluster_risk_by_provider": (
+            theo.get("ai_stop_cluster_risk_by_provider") or {}
+        ),
+        "statistical_weekly_opens": theo.get("statistical_weekly_opens"),
+        "statistical_weekly_opens_expected": theo.get(
+            "statistical_weekly_opens_expected"),
+        "ai_theoretical_weekly_opens_by_provider": theo.get(
+            "ai_theoretical_weekly_opens_by_provider") or {},
+        "ai_theoretical_weekly_opens_avg": theo.get(
+            "ai_theoretical_weekly_opens_avg"),
+        "weekly_opens_gate_ok": theo.get("weekly_opens_gate_ok"),
+        "reviews": theo.get("reviews"),
+        "review_verification": verification,
+        "fail_reasons": theo.get("fail_reasons"),
+        "voting_providers": theo.get("voting_providers"),
+        "skipped_infra_providers": theo.get("skipped_infra_providers"),
+        "calmar": item.get("calmar"),
+        "payoff": item.get("payoff"),
+        "cross_asset_score": item.get("cross_asset_score"),
+        "mean_mae": item.get("mean_mae"),
+        "phase4_incubator": bool(item.get("phase4_incubator")),
+        "refreshed_theoretical": True,
+    }
+    out = enqueue_for_human(
+        cand, metrics, source="repush_theoretical_ai",
+        ai_review=ai_review, force_repush=True,
+    )
+    out["theoretical"] = {
+        "approved": theo.get("approved"),
+        "voting_providers": theo.get("voting_providers"),
+        "skipped_infra_providers": theo.get("skipped_infra_providers"),
+        "fail_reasons": theo.get("fail_reasons"),
+        "ai_theoretical_wr_avg": theo.get("ai_theoretical_wr_avg"),
+        "ai_theoretical_mean_net_avg": theo.get("ai_theoretical_mean_net_avg"),
+        "ai_theoretical_wr_by_provider": theo.get("ai_theoretical_wr_by_provider"),
+        "ai_theoretical_mean_net_by_provider": theo.get(
+            "ai_theoretical_mean_net_by_provider"),
+    }
+    return out
 
 
 def _logic_brief(dsl):
@@ -792,11 +1082,19 @@ def ingest_and_screen(cand, source="creator", ai_review=None, require_ai_review=
                        "key": (cand.get("dsl") or cand).get("key")})
         return {"ok": False, "reason": reason, "metrics": metrics,
                 "production_mounted": False}
-    if require_ai_review and not (ai_review and ai_review.get("approved")):
+    verification = {"ok": not require_ai_review, "reasons": []}
+    if require_ai_review:
+        try:
+            import auto_trade_ai_consensus as _consensus
+            verification = _consensus.validate_theoretical_review_result(ai_review or {})
+        except Exception as exc:
+            verification = {"ok": False, "reasons": [str(exc)[:160]]}
+    if require_ai_review and not verification.get("ok"):
         return {
             "ok": False,
-            "reason": "ai_theoretical_review_required",
+            "reason": "verified_three_ai_review_required",
             "metrics": metrics,
+            "review_verification": verification,
             "production_mounted": False,
             "hint": "use auto_trade_codex_strategy_review.py --submit",
         }
@@ -842,6 +1140,21 @@ def confirm(key, confirmed_by="codex_human"):
             break
     if not item:
         return {"ok": False, "error": "not_awaiting_confirm", "key": key}
+    if not item.get("ai_review_verified"):
+        return {"ok": False, "error": "verified_three_ai_review_required",
+                "key": key, "production_mounted": False}
+    weekly = item.get("ai_theoretical_weekly_opens_avg")
+    weekly_anchor = item.get("statistical_weekly_opens_expected")
+    try:
+        weekly_ok = weekly is not None and float(weekly) >= 0.5 - 1e-9
+    except Exception:
+        weekly_ok = False
+    if not weekly_ok:
+        return {"ok": False, "error": "weekly_opens_below_0_5_or_missing",
+                "key": key,
+                "ai_theoretical_weekly_opens_avg": weekly,
+                "statistical_weekly_opens_expected": weekly_anchor,
+                "production_mounted": False}
 
     dsl = item.get("dsl") or {}
     import auto_trade_strategy_dsl as dsl_mod
@@ -1572,6 +1885,10 @@ if __name__ == "__main__":
     parser.add_argument("--freeze-mass", action="store_true")
     parser.add_argument("--confirm", type=str, default="")
     parser.add_argument("--reject", type=str, default="")
+    parser.add_argument("--repush-theoretical", type=str, default="",
+                        help="Refresh 3AI theoretical fields and resend精简确认卡")
+    parser.add_argument("--resend-confirm-wx", type=str, default="",
+                        help="Resend精简确认卡 using current pending fields")
     parser.add_argument("--monitor", action="store_true")
     parser.add_argument("--tick", action="store_true")
     parser.add_argument("--list-pending", action="store_true")
@@ -1582,6 +1899,16 @@ if __name__ == "__main__":
         print(json.dumps(confirm(args.confirm), ensure_ascii=False, indent=2))
     elif args.reject:
         print(json.dumps(reject(args.reject), ensure_ascii=False, indent=2))
+    elif args.repush_theoretical:
+        print(json.dumps(
+            repush_pending_with_theoretical_ai(args.repush_theoretical),
+            ensure_ascii=False, indent=2, default=str,
+        ))
+    elif args.resend_confirm_wx:
+        print(json.dumps(
+            resend_pending_confirm_wx(args.resend_confirm_wx),
+            ensure_ascii=False, indent=2, default=str,
+        ))
     elif args.monitor:
         print(json.dumps(monitor_live_grades(), ensure_ascii=False, indent=2))
     elif args.list_pending:

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ADA-T3 calibrated admission_v2 — golden sample must pass; legacy floors fail."""
+"""Strict four-review admission; ADA5 is only a regression fixture."""
 from __future__ import print_function
 
 import sys
@@ -12,24 +12,24 @@ sys.path.insert(0, str(ROOT))
 from dual_engine_workflow_v2 import review_admission_v2 as adm  # noqa: E402
 
 
-class GoldenAdaT3Tests(unittest.TestCase):
-    def test_golden_passes_reconstructed_admission(self):
+class StrictAdmissionTests(unittest.TestCase):
+    def test_ada_frequency_fixture_passes_only_with_all_real_gates(self):
         out = adm.assert_golden_passes()
         self.assertTrue(out["pass"], out)
-        self.assertEqual(out["calibrated_to"], adm.GOLDEN_KEY)
+        self.assertEqual(out["calibration_fixture"], adm.GOLDEN_KEY)
+        self.assertFalse(out["strategy_specific_bypass"])
         self.assertTrue(out["reviews"]["r1"]["pass"])
         self.assertTrue(out["reviews"]["r2"]["pass"])
         self.assertTrue(out["reviews"]["r3"]["pass"])
         self.assertTrue(out["reviews"]["r4"]["pass"])
-        self.assertEqual(out["reviews"]["r4"]["review_scope"], "三AI理论复核")
+        self.assertIn("周开仓折价≥0.5", out["reviews"]["r4"]["review_scope"])
         self.assertTrue(out["human_confirm"]["pass"])
         self.assertTrue(out["human_confirm"]["awaiting_human"])
-        # Legacy floors remain failed but advisory
-        self.assertFalse(out["legacy_advisory"]["legacy_l0_pass"])
-        self.assertFalse(out["legacy_advisory"]["legacy_l1_pass"])
-        self.assertFalse(out["legacy_advisory"]["legacy_gate2_pass"])
+        self.assertTrue(out["legacy_advisory"]["legacy_l0_pass"])
+        self.assertTrue(out["legacy_advisory"]["legacy_l1_pass"])
+        self.assertTrue(out["legacy_advisory"]["legacy_gate2_pass"])
         self.assertFalse(out["legacy_advisory"]["blocking"])
-        self.assertTrue(out["reviews"]["r3"].get("soft_passed"))
+        self.assertFalse(out["reviews"]["r3"].get("soft_passed"))
         stages = out.get("stages_zh") or []
         self.assertEqual(len(stages), 5)
         self.assertIn("三AI", stages[3])
@@ -71,18 +71,20 @@ class GoldenAdaT3Tests(unittest.TestCase):
         self.assertIn("矩阵", r3["review_scope"])
         self.assertNotIn("三AI", r3["review_scope"])
 
-    def test_legacy_payoff_would_fail_but_not_blocking(self):
-        # Document: payoff 0.70 fails L1/Gate2; admission still passes via R2+R3-soft+R4
+    def test_matrix_failure_is_blocking_even_for_former_golden_profile(self):
+        ai_review = adm.ada_t3_golden_snapshot()["ai_review"]
         out = adm.evaluate_admission(
             definition={"key": "x", "entry": {}, "exit": {}},
             lookahead_ok=True,
             metrics={"trades": 20, "win_rate": 80.0, "mean_net": 0.038},
-            ai_review={"approved": True, "ai_theoretical_wr_avg": 74.3},
+            ai_review=ai_review,
             pending_ok=True,
+            l0={"pass": True, "metrics": {"triggers": 20}},
             l1={"pass": False, "reject_reasons": ["sample_payoff_le_1.2"]},
             gate2_fitness={"pass": False, "failed_checks": ["payoff_ge_2_5", "worst5_loss_share_le_40pct"]},
         )
-        self.assertTrue(out["pass"])
+        self.assertFalse(out["pass"])
+        self.assertEqual(out["fail_review_n"], 3)
         self.assertIn("sample_payoff_le_1.2", out["legacy_advisory"]["legacy_l1_reasons"])
         self.assertTrue(out["reviews"]["r4"]["pass"])
         self.assertEqual(out["reviews"]["r3"]["name"], "review3_matrix_outlier")

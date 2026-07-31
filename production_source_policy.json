@@ -1,0 +1,35 @@
+{
+  "schema": "qiyu_production_source_policy_v1",
+  "canonical_source": "this_repository_deployment_manifest",
+  "runtime_root": "/root",
+  "branch_policy": "record_branch_and_commit_but_verify_content_hashes",
+  "admission_profile": "strict_four_review_v2",
+  "strategy_specific_soft_pass": false,
+  "three_ai_unanimity_required": true,
+  "theoretical_gates": {
+    "min_win_rate_pct": 65.0,
+    "min_winning_trade_mean_net_pct": 5.0,
+    "min_theoretical_weekly_opens": 0.5,
+    "weekly_frequency_method": "statistical_anchor_plus_ai_limited_discount",
+    "ai_may_override_weekly_frequency": false,
+    "ai_may_discount_weekly_frequency": true
+  },
+  "critical_files": [
+    "auto_trade_ai_consensus.py",
+    "auto_trade_expectancy_metrics.py",
+    "auto_trade_human_confirm_pipeline.py",
+    "auto_trade_codex_strategy_review.py",
+    "dual_engine_workflow_v2/pipeline_step_a.py",
+    "dual_engine_workflow_v2/review_admission_v2.py",
+    "dual_engine_workflow_v2/review_lexicon.py",
+    "dual_engine_workflow_v2/creation_template_policy.py",
+    "scripts/auto_driver/review_notify.py"
+  ],
+  "deployment_rules": [
+    "build a manifest from the exact source tree before copying files",
+    "copy the manifest with the critical files",
+    "verify every critical sha256 on the runtime host before restarting services",
+    "never deploy when a required critical file is missing",
+    "a human-confirm item must contain a verified full three-AI result and AI-discounted theoretical weekly opens >= 0.5 (statistical anchor, no inflate)"
+  ]
+}

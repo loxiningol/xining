@@ -1,0 +1,94 @@
+{
+  "content_complete": true,
+  "critical_files": {
+    "auto_trade_ai_consensus.py": {
+      "sha256": "fc86f4d9972006514470e7043ed1e557f5f22feab0fde879dd8b888f127e6528",
+      "size": 133707
+    },
+    "auto_trade_codex_strategy_review.py": {
+      "sha256": "1441807efae89f21ccbdc31df23b8cf65ef300708aebedc2ee80df7054718032",
+      "size": 15843
+    },
+    "auto_trade_expectancy_metrics.py": {
+      "sha256": "346f67cfd68a28bb902d7b7214d2816cde4f3991e0f95ed5eea9cdf369474b6e",
+      "size": 47788
+    },
+    "auto_trade_human_confirm_pipeline.py": {
+      "sha256": "e4288665831b717d59e4613fa546472e0d780df15f8d9d41a317debdf18ad82a",
+      "size": 76308
+    },
+    "dual_engine_workflow_v2/creation_template_policy.py": {
+      "sha256": "b0d5a66803e83a58e4a7f1fbb6a4dd5b9160283bab794a2921e96686afe5b884",
+      "size": 1152
+    },
+    "dual_engine_workflow_v2/pipeline_step_a.py": {
+      "sha256": "f46f1f3a139d07687e54325d950e28d7e416c501a1324ac44ab457a5e3107078",
+      "size": 109113
+    },
+    "dual_engine_workflow_v2/review_admission_v2.py": {
+      "sha256": "a56f5fdf71397a2c7fbb7a750ee7324baa5f33cf2dfb57276528345d823085be",
+      "size": 19955
+    },
+    "dual_engine_workflow_v2/review_lexicon.py": {
+      "sha256": "476c3375a617173d9c3eaa8c17b067d98e825f6863c2d3a03f9e3e5774777182",
+      "size": 7640
+    },
+    "scripts/auto_driver/review_notify.py": {
+      "sha256": "05420f7055f72200d52ec5d05e7114d5290bedb54b03513de3cf305092b25673",
+      "size": 11189
+    }
+  },
+  "dirty_critical_files": [
+    "M auto_trade_ai_consensus.py",
+    " M auto_trade_codex_strategy_review.py",
+    " M auto_trade_human_confirm_pipeline.py",
+    " M dual_engine_workflow_v2/pipeline_step_a.py",
+    " M dual_engine_workflow_v2/review_admission_v2.py",
+    " M dual_engine_workflow_v2/review_lexicon.py",
+    " M scripts/auto_driver/review_notify.py",
+    "?? auto_trade_expectancy_metrics.py",
+    "?? dual_engine_workflow_v2/creation_template_policy.py"
+  ],
+  "generated_at": "2026-07-30T22:53:36+08:00",
+  "git_branch": "cursor/donchian-trend-breakout-create-d7e9",
+  "git_commit": "da1f826bb82bc5c2a2e6c38991cb491044062709",
+  "missing_critical_files": [],
+  "policy": {
+    "admission_profile": "strict_four_review_v2",
+    "branch_policy": "record_branch_and_commit_but_verify_content_hashes",
+    "canonical_source": "this_repository_deployment_manifest",
+    "critical_files": [
+      "auto_trade_ai_consensus.py",
+      "auto_trade_expectancy_metrics.py",
+      "auto_trade_human_confirm_pipeline.py",
+      "auto_trade_codex_strategy_review.py",
+      "dual_engine_workflow_v2/pipeline_step_a.py",
+      "dual_engine_workflow_v2/review_admission_v2.py",
+      "dual_engine_workflow_v2/review_lexicon.py",
+      "dual_engine_workflow_v2/creation_template_policy.py",
+      "scripts/auto_driver/review_notify.py"
+    ],
+    "deployment_rules": [
+      "build a manifest from the exact source tree before copying files",
+      "copy the manifest with the critical files",
+      "verify every critical sha256 on the runtime host before restarting services",
+      "never deploy when a required critical file is missing",
+      "a human-confirm item must contain a verified full three-AI result and AI-discounted theoretical weekly opens >= 0.5 (statistical anchor, no inflate)"
+    ],
+    "runtime_root": "/root",
+    "schema": "qiyu_production_source_policy_v1",
+    "strategy_specific_soft_pass": false,
+    "theoretical_gates": {
+      "ai_may_override_weekly_frequency": false,
+      "ai_may_discount_weekly_frequency": true,
+      "min_theoretical_weekly_opens": 0.5,
+      "min_win_rate_pct": 65.0,
+      "min_winning_trade_mean_net_pct": 5.0,
+      "weekly_frequency_method": "statistical_anchor_plus_ai_limited_discount"
+    },
+    "three_ai_unanimity_required": true
+  },
+  "policy_sha256": "cbbae061ef4474676fd7ffc2516d46e87be164c45f90ad3019ba1983d0219b47",
+  "schema": "qiyu_production_deployment_manifest_v1",
+  "source_root": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720"
+}

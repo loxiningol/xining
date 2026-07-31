@@ -452,11 +452,16 @@ THEORETICAL_STRATEGY_REVIEW_PROMPT = """你是栖语策略的独立「理论复�
    - 理论胜率 ≥ 65
    - 理论盈利单盈利率 ≥ 5（百分比点）
    - 止损簇风险低（low，或概率≤0.30）
+   - 每周理论开仓 theoretical_weekly_opens ≥ 0.5
+     必须以 statistical_weekly_opens.expected_weekly_fills 为锚做有限折价
+     （通常相对折价约 5%-20%，或最多下调 0.3~0.5 次/周；样本很小更保守）。
+     禁止上调超过统计锚点；不得无根据地抬高频率。
 7) 证据不足、逻辑自相矛盾、明显依赖未来信息或命中已知死因 → REJECT。
 仅输出一个JSON对象：
 {"candidate_hash":"原样复述","decision":"APPROVE或REJECT",
  "theoretical_win_rate_pct":0到100,
  "theoretical_mean_net_pct":数字（盈利单平均净盈利率，百分比点）,
+ "theoretical_weekly_opens":数字（周理论开仓，次/周）,
  "stop_cluster_risk":"low或medium或high",
  "stop_cluster_prob":0到1,"confidence":0到1,"reason":"中文简述",
  "failure_modes":["..."]}
@@ -464,7 +469,216 @@ THEORETICAL_STRATEGY_REVIEW_PROMPT = """你是栖语策略的独立「理论复�
 
 MIN_THEORETICAL_WR = 65.0
 MIN_THEORETICAL_WIN_MEAN_NET_PCT = 5.0
+# 生产口径：统计锚点（live_14d_fill_rate×regime 等）+ 3AI 有限折价。
+MIN_THEORETICAL_WEEKLY_OPENS = 0.5
+WEEKLY_OPENS_STAT_METHOD = "live_14d_fill_rate"
+WEEKLY_OPENS_MAX_REL_DISCOUNT = 0.20
+WEEKLY_OPENS_MAX_ABS_DISCOUNT = 0.50
 MAX_STOP_CLUSTER_PROB = 0.30
+
+
+def _negative_binomial_weekly_interval_80(observed_fills, observed_days=14.0):
+    """Gamma-Poisson posterior-predictive 80% interval for next-week fills.
+
+    With 2 fills in 14 days this intentionally yields [0, 3], matching the
+    production ADA5 frequency card.  This is a count uncertainty interval,
+    never an AI estimate.
+    """
+    import math
+
+    n = max(0, int(observed_fills or 0))
+    days = _sf_num(observed_days, 14.0) or 14.0
+    exposure_weeks = max(float(days) / 7.0, 1e-9)
+    # For n=0 use a weak Jeffreys shape only to describe uncertainty.  The
+    # point estimate remains the observed rate (zero), so this cannot pass.
+    shape = float(n) if n > 0 else 0.5
+    p = exposure_weeks / (exposure_weeks + 1.0)
+
+    def _pmf(k):
+        return math.exp(
+            math.lgamma(k + shape) - math.lgamma(shape) - math.lgamma(k + 1)
+            + shape * math.log(p) + k * math.log(1.0 - p)
+        )
+
+    quantiles = []
+    cumulative = 0.0
+    targets = (0.10, 0.90)
+    target_i = 0
+    for k in range(0, 1000):
+        cumulative += _pmf(k)
+        while target_i < len(targets) and cumulative >= targets[target_i] - 1e-15:
+            quantiles.append(k)
+            target_i += 1
+        if target_i >= len(targets):
+            break
+    if len(quantiles) != 2:
+        return [0, max(0, int(round(n / exposure_weeks * 3.0)))]
+    return [int(quantiles[0]), int(quantiles[1])]
+
+
+def _weekly_frequency_pack(expected, *, method, source, baseline=None,
+                           regime_factor=None, n_obs=None, observed_days=None,
+                           weekly_interval=None, funnel_14d=None):
+    expected = _sf_num(expected)
+    daily = None if expected is None else float(expected) / 7.0
+    if weekly_interval is None and n_obs is not None:
+        weekly_interval = _negative_binomial_weekly_interval_80(
+            n_obs, observed_days or 14.0)
+    confidence = "low"
+    if n_obs is not None and int(n_obs) >= 20:
+        confidence = "high"
+    elif n_obs is not None and int(n_obs) >= 8:
+        confidence = "mid"
+    return {
+        "expected_weekly_fills": expected,
+        "expected_daily_fills": None if daily is None else round(daily, 3),
+        "baseline_weekly_fills": baseline,
+        "regime_factor": regime_factor,
+        "weekly_interval": weekly_interval,
+        "interval_level": 0.80 if weekly_interval is not None else None,
+        "method": method,
+        "calculation": "hybrid:statistical_anchor;three_ai_limited_discount",
+        "statistical_baseline_locked": True,
+        "ai_role": "limited_discount",
+        "ai_may_override": False,
+        "ai_may_discount": True,
+        "max_rel_discount": WEEKLY_OPENS_MAX_REL_DISCOUNT,
+        "max_abs_discount": WEEKLY_OPENS_MAX_ABS_DISCOUNT,
+        "source": source,
+        "n_obs": n_obs,
+        "observed_days": observed_days,
+        "confidence": confidence,
+        "funnel_14d": funnel_14d,
+    }
+
+
+def resolve_statistical_weekly_opens(candidate=None, evidence=None):
+    """Weekly opens statistical anchor (AI 可在此锚点上有限折价，不可上调覆盖).
+
+    Priority (ADA5 校准):
+      1) evidence 显式统计字段
+      2) live_14d_fill_rate × regime_factor（auto_trade_expectancy_metrics）
+      3) 无实盘时：回测成交密度代理 trades/span_days×7
+      4) 缺失 → expected=None（门禁失败）
+    """
+    evidence = dict(evidence or {})
+    candidate = dict(candidate or {})
+    for key in (
+        "statistical_weekly_opens_expected",
+        "weekly_opens_expected",
+        "expected_weekly_fills",
+        "baseline_weekly_fills",
+    ):
+        v = _sf_num(evidence.get(key))
+        if v is not None:
+            return _weekly_frequency_pack(
+                float(v),
+                method=evidence.get("frequency_method")
+                or evidence.get("weekly_opens_method")
+                or "evidence_explicit",
+                source="evidence.%s" % key,
+                baseline=evidence.get("baseline_weekly_fills"),
+                regime_factor=evidence.get("regime_factor"),
+                n_obs=evidence.get("frequency_n_obs") or evidence.get("n_obs"),
+                observed_days=evidence.get("frequency_observed_days"),
+                weekly_interval=evidence.get("weekly_interval"),
+            )
+    freq_block = evidence.get("frequency") or evidence.get("statistical_frequency") or {}
+    if isinstance(freq_block, dict):
+        v = _sf_num(freq_block.get("expected_weekly_fills"))
+        if v is not None:
+            return _weekly_frequency_pack(
+                float(v),
+                method=freq_block.get("method") or WEEKLY_OPENS_STAT_METHOD,
+                source="evidence.frequency",
+                baseline=freq_block.get("baseline_weekly_fills"),
+                regime_factor=freq_block.get("regime_factor"),
+                n_obs=freq_block.get("n_obs"),
+                observed_days=freq_block.get("observed_days") or 14,
+                weekly_interval=freq_block.get("weekly_interval"),
+                funnel_14d=freq_block.get("funnel_14d"),
+            )
+
+    # Direct production-count evidence: exactly the ADA5 card calculation.
+    live_14d_fills = _sf_num(evidence.get("live_14d_fills"))
+    if live_14d_fills is not None:
+        days = _sf_num(evidence.get("live_observation_days"), 14.0) or 14.0
+        regime_factor = _sf_num(evidence.get("regime_factor"), 1.0) or 1.0
+        baseline = float(live_14d_fills) * 7.0 / float(days)
+        return _weekly_frequency_pack(
+            baseline * regime_factor,
+            method=WEEKLY_OPENS_STAT_METHOD,
+            source="evidence.live_14d_fills",
+            baseline=baseline,
+            regime_factor=regime_factor,
+            n_obs=int(live_14d_fills),
+            observed_days=days,
+        )
+
+    symbol = candidate.get("symbol") or evidence.get("symbol")
+    instruments = candidate.get("supported_instruments") or evidence.get(
+        "supported_instruments") or []
+    if not symbol and isinstance(instruments, list) and instruments:
+        symbol = instruments[0]
+    timeframe = candidate.get("timeframe") or evidence.get("timeframe")
+    key = candidate.get("key") or evidence.get("strategy_key")
+
+    live_pack = None
+    if symbol and timeframe and key:
+        try:
+            import auto_trade_expectancy_metrics as exp
+            live_pack = exp.statistical_frequency_forecast(
+                symbol, timeframe, key, can_open=True,
+            )
+            method = str(live_pack.get("method") or "")
+            if method and method != "weak_prior_new_mount":
+                return _weekly_frequency_pack(
+                    float(live_pack.get("expected_weekly_fills") or 0.0),
+                    method=method,
+                    source="statistical_frequency_forecast",
+                    baseline=live_pack.get("baseline_weekly_fills"),
+                    regime_factor=live_pack.get("regime_factor"),
+                    n_obs=live_pack.get("n_obs"),
+                    observed_days=14,
+                    weekly_interval=live_pack.get("weekly_interval"),
+                    funnel_14d=live_pack.get("funnel_14d"),
+                )
+        except Exception as exc:
+            live_pack = {"error": str(exc)[:160]}
+
+    sm = evidence.get("safety_metrics") or {}
+    n = int(sm.get("trades") or sm.get("total_trades") or evidence.get("trades") or 0)
+    span = _sf_num(sm.get("span_days") or evidence.get("span_days"))
+    if n > 0 and span is not None and span > 1e-9:
+        weekly = float(n) * (7.0 / float(span))
+        pack = _weekly_frequency_pack(
+            weekly,
+            method="backtest_fill_rate_proxy",
+            source="evidence.safety_metrics",
+            baseline=weekly,
+            regime_factor=1.0,
+            n_obs=n,
+            observed_days=float(span),
+        )
+        pack["n_trades"] = n
+        pack["span_days"] = float(span)
+        return pack
+
+    if isinstance(live_pack, dict) and live_pack.get("expected_weekly_fills") is not None:
+        return _weekly_frequency_pack(
+            float(live_pack.get("expected_weekly_fills") or 0.0),
+            method=live_pack.get("method") or "weak_prior_new_mount",
+            source="statistical_frequency_forecast_weak",
+            baseline=live_pack.get("baseline_weekly_fills"),
+            regime_factor=live_pack.get("regime_factor"),
+            n_obs=live_pack.get("n_obs"),
+            observed_days=14,
+            weekly_interval=live_pack.get("weekly_interval"),
+            funnel_14d=live_pack.get("funnel_14d"),
+        )
+
+    return _weekly_frequency_pack(
+        None, method="missing", source="unresolved")
 
 
 def _sf_num(x, default=None):
@@ -492,6 +706,23 @@ def _normalize_mean_net_pct(raw, empirical_mean_net=None):
     return round(v, 6)
 
 
+def _normalize_theoretical_weekly_opens(raw, statistical_anchor=None):
+    """Normalize AI weekly opens: anchor-discount only, never inflate above anchor.
+
+    Soft guidance band (rel≤20% / abs≤0.5) is prompt-level; code hard-blocks
+    inflation above the statistical anchor. Deeper discount is allowed when the
+    model judges the signal sparse/overfit — the ≥0.5 gate then fail-closes.
+    """
+    v = _sf_num(raw)
+    if v is None:
+        return None
+    v = max(0.0, float(v))
+    anchor = _sf_num(statistical_anchor)
+    if anchor is not None:
+        v = min(v, max(0.0, float(anchor)))
+    return round(v, 6)
+
+
 def _empirical_win_mean_net_pct(evidence):
     """Prefer win-only empirics from safety_metrics."""
     sm = ((evidence or {}).get("safety_metrics") or {})
@@ -509,17 +740,20 @@ def _empirical_win_mean_net_pct(evidence):
 
 
 def theoretical_review_one(name, candidate, evidence, _retry=True):
-    """Per-provider theoretical WR + win-only mean-net + stop-cluster review."""
+    """Per-provider theoretical WR + win-only mean-net + weekly + stop-cluster."""
     name = _normalize_provider_name(name)
     cfg = _provider_config(name)
     digest = candidate_hash(candidate)
     emp_win_mean_pct = _empirical_win_mean_net_pct(evidence)
+    weekly_pack = resolve_statistical_weekly_opens(candidate, evidence)
+    stat_weekly = _sf_num(weekly_pack.get("expected_weekly_fills"))
     consent = external_research_consent_status(name, "final_review")
     if not consent.get("allowed"):
         return {"provider": name, "ok": False, "decision": "REJECT",
                 "candidate_hash": digest,
                 "theoretical_win_rate_pct": 0.0,
                 "theoretical_mean_net_pct": None,
+                "theoretical_weekly_opens": None,
                 "stop_cluster_risk": "high", "stop_cluster_prob": 1.0,
                 "reason": "外部AI研究授权缺失或范围不足",
                 "consent_missing": True}
@@ -528,6 +762,7 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
                 "candidate_hash": digest,
                 "theoretical_win_rate_pct": 0.0,
                 "theoretical_mean_net_pct": None,
+                "theoretical_weekly_opens": None,
                 "stop_cluster_risk": "high", "stop_cluster_prob": 1.0,
                 "reason": "API密钥未配置", "credential_missing": True}
     body = {
@@ -541,6 +776,12 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
                 "gates": {
                     "min_theoretical_win_rate_pct": MIN_THEORETICAL_WR,
                     "min_theoretical_win_mean_net_pct": MIN_THEORETICAL_WIN_MEAN_NET_PCT,
+                    "min_theoretical_weekly_opens": MIN_THEORETICAL_WEEKLY_OPENS,
+                    "weekly_opens_method": WEEKLY_OPENS_STAT_METHOD,
+                    "weekly_opens_ai_may_override": False,
+                    "weekly_opens_ai_may_discount": True,
+                    "weekly_opens_max_rel_discount": WEEKLY_OPENS_MAX_REL_DISCOUNT,
+                    "weekly_opens_max_abs_discount": WEEKLY_OPENS_MAX_ABS_DISCOUNT,
                     "max_stop_cluster_prob": MAX_STOP_CLUSTER_PROB,
                     "mean_net_scope": "winning_trades_only",
                 },
@@ -552,7 +793,16 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
                         % (("%.4f" % emp_win_mean_pct)
                            if emp_win_mean_pct is not None else "unknown")
                     ),
+                    "theoretical_weekly_opens": (
+                        "次/周；统计锚点≈%s；有限折价后门槛≥%.2f；禁止上调超过锚点"
+                        % (
+                            ("%.4f" % stat_weekly)
+                            if stat_weekly is not None else "missing",
+                            MIN_THEORETICAL_WEEKLY_OPENS,
+                        )
+                    ),
                 },
+                "statistical_weekly_opens": weekly_pack,
             })},
         ],
     }
@@ -574,6 +824,10 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
         if not str(content or "").strip() and name == "deepseek":
             content = (((raw.get("choices") or [{}])[0].get("message") or {})
                        .get("reasoning_content") or content)
+        if not str(content or "").strip():
+            # GLM / reasoning models may park JSON in reasoning_content.
+            content = (((raw.get("choices") or [{}])[0].get("message") or {})
+                       .get("reasoning_content") or content)
         parsed = _parse_content_json(content)
         decision = str(parsed.get("decision") or "REJECT").upper()
         if decision not in ("APPROVE", "REJECT"):
@@ -586,6 +840,12 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
             empirical_mean_net=(
                 (emp_win_mean_pct / 100.0) if emp_win_mean_pct is not None else None
             ),
+        )
+        weekly_opens = _normalize_theoretical_weekly_opens(
+            parsed.get("theoretical_weekly_opens",
+                       parsed.get("weekly_opens_expected",
+                                  parsed.get("theoretical_weekly_opens_expected"))),
+            statistical_anchor=stat_weekly,
         )
         risk = str(parsed.get("stop_cluster_risk") or "high").lower()
         if risk not in ("low", "medium", "high"):
@@ -601,6 +861,8 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
             "decision": decision if hash_ok else "REJECT",
             "theoretical_win_rate_pct": wr,
             "theoretical_mean_net_pct": mean_net_pct,
+            "theoretical_weekly_opens": weekly_opens,
+            "statistical_weekly_opens_anchor": stat_weekly,
             "mean_net_scope": "winning_trades_only",
             "stop_cluster_risk": risk,
             "stop_cluster_prob": scp,
@@ -617,6 +879,7 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
                 "candidate_hash": digest, "decision": "REJECT",
                 "theoretical_win_rate_pct": 0.0,
                 "theoretical_mean_net_pct": None,
+                "theoretical_weekly_opens": None,
                 "stop_cluster_risk": "high", "stop_cluster_prob": 1.0,
                 "reason": "复核调用失败: %s" % exc,
                 "latency_sec": round(time.time() - started, 3)}
@@ -632,6 +895,9 @@ def _provider_theoretical_pass(row):
         return False
     mean_net_pct = _sf_num(row.get("theoretical_mean_net_pct"))
     if mean_net_pct is None or mean_net_pct < MIN_THEORETICAL_WIN_MEAN_NET_PCT - 1e-9:
+        return False
+    weekly = _sf_num(row.get("theoretical_weekly_opens"))
+    if weekly is None or weekly < MIN_THEORETICAL_WEEKLY_OPENS - 1e-9:
         return False
     risk = str(row.get("stop_cluster_risk") or "").lower()
     scp = _sf_num(row.get("stop_cluster_prob"), 1.0)
@@ -662,9 +928,9 @@ def _provider_infra_unavailable(row):
 def theoretical_review_all(candidate, evidence):
     """Concurrent theoretical review.
 
-    Default: all healthy providers must clear the bar.
-    Infra-unavailable providers are skipped; require at
-    least 2 healthy approvals so DeepSeek+Qwen can pass without the third.
+    Production rule: DeepSeek, Qwen and GLM must all cast a real passing vote.
+    Infrastructure failures are retryable failures, never permission to reduce
+    the review to two providers.
     """
     digest = candidate_hash(candidate)
     pool = ThreadPoolExecutor(max_workers=len(PROVIDERS))
@@ -677,12 +943,14 @@ def theoretical_review_all(candidate, evidence):
     by_provider = {}
     wr_map = {}
     mean_net_map = {}
+    weekly_map = {}
     risk_map = {}
     for row in reviews:
         name = row.get("provider")
         by_provider[name] = row
         wr_map[name] = float(row.get("theoretical_win_rate_pct") or 0.0)
         mean_net_map[name] = row.get("theoretical_mean_net_pct")
+        weekly_map[name] = row.get("theoretical_weekly_opens")
         risk_map[name] = {
             "risk": row.get("stop_cluster_risk"),
             "prob": row.get("stop_cluster_prob"),
@@ -697,8 +965,7 @@ def theoretical_review_all(candidate, evidence):
         else:
             voters.append(p)
 
-    # Need ≥2 real votes; if fewer healthy providers, cannot approve.
-    min_voters = 2
+    min_voters = len(PROVIDERS)
     wrs_vote = [wr_map[p] for p in voters] if voters else []
     avg = (sum(wrs_vote) / float(len(wrs_vote))) if wrs_vote else 0.0
     mean_vals = []
@@ -708,6 +975,15 @@ def theoretical_review_all(candidate, evidence):
             mean_vals.append(v)
     mean_net_avg = (
         round(sum(mean_vals) / float(len(mean_vals)), 6) if mean_vals else None
+    )
+    weekly_vals = []
+    for p in voters:
+        v = _sf_num(weekly_map.get(p))
+        if v is not None:
+            weekly_vals.append(v)
+    weekly_avg = (
+        round(sum(weekly_vals) / float(len(weekly_vals)), 6)
+        if weekly_vals else None
     )
     approved = (
         len(voters) >= min_voters
@@ -721,19 +997,47 @@ def theoretical_review_all(candidate, evidence):
     for p in voters:
         row = by_provider.get(p) or {}
         if not _provider_theoretical_pass(row):
-            fail_reasons.append("%s:%s(wr=%.1f,mean_net=%.3f,risk=%s,p=%.2f)" % (
-                p, row.get("decision") or "FAIL",
-                float(row.get("theoretical_win_rate_pct") or 0),
-                float(row.get("theoretical_mean_net_pct") or 0),
-                row.get("stop_cluster_risk") or "?",
-                float(row.get("stop_cluster_prob") or 1)))
+            fail_reasons.append(
+                "%s:%s(wr=%.1f,mean_net=%.3f,weekly=%.3f,risk=%s,p=%.2f)" % (
+                    p, row.get("decision") or "FAIL",
+                    float(row.get("theoretical_win_rate_pct") or 0),
+                    float(row.get("theoretical_mean_net_pct") or 0),
+                    float(row.get("theoretical_weekly_opens") or 0),
+                    row.get("stop_cluster_risk") or "?",
+                    float(row.get("stop_cluster_prob") or 1)))
     for p in skipped:
         row = by_provider.get(p) or {}
         fail_reasons.append("%s:SKIP_INFRA(%s)" % (
             p, str(row.get("reason") or "unavailable")[:80]))
+
+    # Weekly opens: statistical anchor + AI limited discount (gate on AI avg)
+    weekly_pack = resolve_statistical_weekly_opens(candidate, evidence)
+    stat_weekly = _sf_num(weekly_pack.get("expected_weekly_fills"))
+    weekly_ok = (
+        weekly_avg is not None
+        and float(weekly_avg) >= float(MIN_THEORETICAL_WEEKLY_OPENS) - 1e-9
+        and stat_weekly is not None
+    )
+    if not weekly_ok:
+        approved = False
+        fail_reasons.append(
+            "weekly_opens_lt_%s(got=%s,anchor=%s,method=%s)"
+            % (
+                MIN_THEORETICAL_WEEKLY_OPENS,
+                ("%.4f" % weekly_avg) if weekly_avg is not None else "missing",
+                ("%.4f" % stat_weekly) if stat_weekly is not None else "missing",
+                weekly_pack.get("method") or "missing",
+            )
+        )
+
     policy = (
-        "theoretical_wr_ge_%s_win_mean_net_ge_%s_stop_cluster_low_healthy_providers_min_%s"
-        % (int(MIN_THEORETICAL_WR), int(MIN_THEORETICAL_WIN_MEAN_NET_PCT), min_voters)
+        "theoretical_wr_ge_%s_win_mean_net_ge_%s_weekly_opens_ge_%s_stop_cluster_low_healthy_providers_min_%s"
+        % (
+            int(MIN_THEORETICAL_WR),
+            int(MIN_THEORETICAL_WIN_MEAN_NET_PCT),
+            MIN_THEORETICAL_WEEKLY_OPENS,
+            min_voters,
+        )
     )
     nl_extra = (
         ("；已忽略不可用: " + ",".join(skipped)) if skipped else ""
@@ -742,7 +1046,14 @@ def theoretical_review_all(candidate, evidence):
         ("，均值盈利单盈利率 %.3f%%" % mean_net_avg)
         if mean_net_avg is not None else "，盈利单盈利率未齐"
     )
+    weekly_txt = (
+        ("，三AI周开仓 %.3f（锚点 %.3f·%s）"
+         % (weekly_avg, stat_weekly, weekly_pack.get("method")))
+        if weekly_avg is not None and stat_weekly is not None
+        else "，三AI周开仓缺失"
+    )
     return {
+        "schema": "qiyu_three_ai_theoretical_review_v2",
         "ok": True,
         "candidate_hash": digest,
         "approved": approved,
@@ -750,24 +1061,95 @@ def theoretical_review_all(candidate, evidence):
         "gates": {
             "min_theoretical_win_rate_pct": MIN_THEORETICAL_WR,
             "min_theoretical_win_mean_net_pct": MIN_THEORETICAL_WIN_MEAN_NET_PCT,
+            "min_theoretical_weekly_opens": MIN_THEORETICAL_WEEKLY_OPENS,
+            "weekly_opens_method": WEEKLY_OPENS_STAT_METHOD,
+            "weekly_opens_ai_may_override": False,
+            "weekly_opens_ai_may_discount": True,
             "mean_net_scope": "winning_trades_only",
         },
         "ai_theoretical_wr_by_provider": wr_map,
         "ai_theoretical_wr_avg": round(avg, 3),
         "ai_theoretical_mean_net_by_provider": mean_net_map,
         "ai_theoretical_mean_net_avg": mean_net_avg,
+        "ai_theoretical_weekly_opens_by_provider": weekly_map,
+        "ai_theoretical_weekly_opens_avg": weekly_avg,
         "mean_net_scope": "winning_trades_only",
+        "statistical_weekly_opens": weekly_pack,
+        "statistical_weekly_opens_expected": stat_weekly,
+        "weekly_opens_gate_ok": weekly_ok,
         "ai_stop_cluster_risk_by_provider": risk_map,
         "reviews": reviews,
         "fail_reasons": fail_reasons,
         "skipped_infra_providers": skipped,
         "voting_providers": voters,
         "natural_language": (
-            "三AI理论复核%s：有效投票%s家均值胜率 %.1f%%%s%s；%s"
+            "三AI理论复核%s：有效投票%s家均值胜率 %.1f%%%s%s%s；%s"
             % ("通过" if approved else "未通过",
-               len(voters), avg, mean_txt, nl_extra,
+               len(voters), avg, mean_txt, weekly_txt, nl_extra,
                "；".join(fail_reasons) if fail_reasons else "有效投票方均达标")
         ),
+    }
+
+
+def validate_theoretical_review_result(review):
+    """Validate the complete review before any human-confirm queue write."""
+    row = dict(review or {})
+    reasons = []
+    if row.get("schema") != "qiyu_three_ai_theoretical_review_v2":
+        reasons.append("review_schema_missing_or_legacy")
+    by_provider = {}
+    for item in row.get("reviews") or []:
+        if isinstance(item, dict) and item.get("provider"):
+            by_provider[_normalize_provider_name(item.get("provider"))] = item
+    required = {_normalize_provider_name(p) for p in PROVIDERS}
+    actual = set(by_provider)
+    if actual != required:
+        reasons.append(
+            "three_ai_votes_incomplete(required=%s,actual=%s)"
+            % (",".join(sorted(required)), ",".join(sorted(actual)) or "-")
+        )
+    for provider in sorted(required):
+        if not _provider_theoretical_pass(by_provider.get(provider) or {}):
+            reasons.append("provider_not_pass:%s" % provider)
+    weekly_pack = row.get("statistical_weekly_opens") or {}
+    stat_weekly = _sf_num(weekly_pack.get("expected_weekly_fills"))
+    if stat_weekly is None:
+        stat_weekly = _sf_num(row.get("statistical_weekly_opens_expected"))
+    theo_weekly = _sf_num(row.get("ai_theoretical_weekly_opens_avg"))
+    if theo_weekly is None:
+        # Fallback: mean provider theoretical weekly from reviews
+        vals = []
+        for item in row.get("reviews") or []:
+            if not isinstance(item, dict):
+                continue
+            v = _sf_num(item.get("theoretical_weekly_opens"))
+            if v is not None:
+                vals.append(v)
+        if vals:
+            theo_weekly = sum(vals) / float(len(vals))
+    if theo_weekly is None or theo_weekly < MIN_THEORETICAL_WEEKLY_OPENS - 1e-9:
+        reasons.append(
+            "weekly_opens_lt_%s(got=%s)"
+            % (MIN_THEORETICAL_WEEKLY_OPENS,
+               "missing" if theo_weekly is None else "%.6f" % theo_weekly)
+        )
+    if stat_weekly is None:
+        reasons.append("weekly_statistical_anchor_missing")
+    if weekly_pack.get("ai_may_override") is not False:
+        reasons.append("weekly_override_forbidden_flag_missing")
+    if weekly_pack.get("ai_may_discount") is not True:
+        reasons.append("weekly_discount_contract_missing")
+    if not row.get("approved"):
+        reasons.append("aggregate_not_approved")
+    return {
+        "ok": not reasons,
+        "approved": not reasons,
+        "reasons": reasons,
+        "required_providers": sorted(required),
+        "actual_providers": sorted(actual),
+        "statistical_weekly_opens_expected": stat_weekly,
+        "ai_theoretical_weekly_opens_avg": theo_weekly,
+        "min_weekly_opens": MIN_THEORETICAL_WEEKLY_OPENS,
     }
 
 

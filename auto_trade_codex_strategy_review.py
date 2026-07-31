@@ -127,6 +127,8 @@ def _build_evidence(definition, metrics, meta):
             "timeframe": timeframe,
             "trades": metrics.get("trades"),
             "mean_net": metrics.get("mean_net"),
+            "mean_net_win_only": metrics.get("mean_net_win_only"),
+            "mean_net_win_only_pct": metrics.get("mean_net_win_only_pct"),
             "win_rate": metrics.get("win_rate"),
             "empirical_win_rate": metrics.get("win_rate"),
             "max_drawdown": metrics.get("max_drawdown"),
@@ -245,6 +247,7 @@ def submit_codex_strategy(dsl, meta=None, dry_run=False):
         "safety_reason": reason,
         "metrics": metrics,
         "ai_review": {
+            "schema": review.get("schema"),
             "approved": review.get("approved"),
             "ai_theoretical_wr_avg": review.get("ai_theoretical_wr_avg"),
             "ai_theoretical_wr_by_provider": review.get(
@@ -256,11 +259,20 @@ def submit_codex_strategy(dsl, meta=None, dry_run=False):
             "ai_stop_cluster_risk_by_provider": review.get(
                 "ai_stop_cluster_risk_by_provider"),
             "fail_reasons": review.get("fail_reasons"),
+            "statistical_weekly_opens": review.get("statistical_weekly_opens"),
+            "statistical_weekly_opens_expected": review.get(
+                "statistical_weekly_opens_expected"),
+            "ai_theoretical_weekly_opens_by_provider": review.get(
+                "ai_theoretical_weekly_opens_by_provider"),
+            "ai_theoretical_weekly_opens_avg": review.get(
+                "ai_theoretical_weekly_opens_avg"),
+            "weekly_opens_gate_ok": review.get("weekly_opens_gate_ok"),
             "natural_language": review.get("natural_language"),
             "reviews": [
                 {"provider": r.get("provider"), "decision": r.get("decision"),
                  "theoretical_win_rate_pct": r.get("theoretical_win_rate_pct"),
                  "theoretical_mean_net_pct": r.get("theoretical_mean_net_pct"),
+                 "theoretical_weekly_opens": r.get("theoretical_weekly_opens"),
                  "stop_cluster_risk": r.get("stop_cluster_risk"),
                  "stop_cluster_prob": r.get("stop_cluster_prob"),
                  "reason": r.get("reason"), "ok": r.get("ok")}
@@ -331,17 +343,33 @@ def review_pending_item(key):
     evidence = _build_evidence(dsl, item.get("metrics") or {}, {
         "thesis": item.get("logic_brief"), "author": "codex_rereview"})
     review = ai.theoretical_review_all(dsl, evidence)
+    verification = ai.validate_theoretical_review_result(review)
     item["ai_theoretical_wr_by_provider"] = review.get(
         "ai_theoretical_wr_by_provider")
     item["ai_theoretical_wr_avg"] = review.get("ai_theoretical_wr_avg")
+    item["ai_theoretical_mean_net_by_provider"] = review.get(
+        "ai_theoretical_mean_net_by_provider")
+    item["ai_theoretical_mean_net_avg"] = review.get(
+        "ai_theoretical_mean_net_avg")
     item["ai_stop_cluster_risk_by_provider"] = review.get(
         "ai_stop_cluster_risk_by_provider")
     item["ai_review_natural_language"] = review.get("natural_language")
+    item["ai_review_schema"] = review.get("schema")
+    item["ai_review_verified"] = bool(verification.get("ok"))
+    item["ai_review_verification"] = verification
+    item["statistical_weekly_opens"] = review.get("statistical_weekly_opens")
+    item["statistical_weekly_opens_expected"] = review.get(
+        "statistical_weekly_opens_expected")
+    item["ai_theoretical_weekly_opens_by_provider"] = review.get(
+        "ai_theoretical_weekly_opens_by_provider")
+    item["ai_theoretical_weekly_opens_avg"] = review.get(
+        "ai_theoretical_weekly_opens_avg")
     item["ai_rereview_at"] = _now()
-    if not review.get("approved"):
+    if not verification.get("ok"):
         item["status"] = "ai_rereview_rejected"
     pipeline.save_pending(pending)
-    return {"ok": True, "key": key, "approved": review.get("approved"),
+    return {"ok": True, "key": key, "approved": verification.get("ok"),
+            "review_verification": verification,
             "ai_theoretical_wr_avg": review.get("ai_theoretical_wr_avg"),
             "natural_language": review.get("natural_language")}
 

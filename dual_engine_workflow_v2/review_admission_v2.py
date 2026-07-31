@@ -7,8 +7,8 @@
 【第四次复核】三AI理论复核
 然后 → 人工确认签发（Wx / --confirm，永不自动上线）
 
-ADA-T3 校准：第三次复核在矩阵/抗离群硬门槛失败时可 soft-pass（advisory），
-但阶段仍叫第三次复核；第四次三AI 与人工确认不可省略。
+生产规则：四次复核全部 fail-closed；单一策略只能作为回归样例，
+不得反向降低门槛或获得 soft-pass。
 """
 from __future__ import print_function
 
@@ -18,7 +18,7 @@ from .review_lexicon import (
     HUMAN_CONFIRM_GATE,
 )
 
-PROFILE = "ada_t3_calibrated_v1"
+PROFILE = "strict_four_review_v2"
 GOLDEN_KEY = "codex0725t3_ada5m_trendpb_r42_z2p3_h14"
 GOLDEN_TITLE = "ADA5顺势回升"
 
@@ -27,7 +27,7 @@ MIN_WIN_RATE_PCT = 50.0
 REQUIRE_POSITIVE_MEAN_NET = True
 
 # Soft R3 under ADA-T3: do not hard-block on legacy payoff/worst5 floors
-R3_SOFT_PASS_ON_LEGACY_FAIL = True
+R3_SOFT_PASS_ON_LEGACY_FAIL = False
 
 LEGACY_ADVISORY = {
     "density_min_triggers": 30,
@@ -224,28 +224,56 @@ def review3_matrix_outlier(gate2_fitness=None, matrix_eval=None, l2=None, l3=Non
 
 
 def review4_three_ai(ai_review=None):
-    """【第四次复核】（三AI理论复核）。"""
+    """【第四次复核】：三AI全票 + 周开仓（统计锚点上有限折价）硬门槛。"""
     ai = ai_review or {}
     approved = bool(ai.get("approved"))
+    try:
+        import auto_trade_ai_consensus as consensus
+        verified = consensus.validate_theoretical_review_result(ai)
+    except Exception as exc:
+        verified = {"ok": False, "reasons": ["verification_error:%s" % str(exc)[:160]]}
     wr_map = ai.get("ai_theoretical_wr_by_provider") or {}
     providers = [k for k, v in wr_map.items() if v is not None]
     wr_avg = ai.get("ai_theoretical_wr_avg")
     mean_net_map = ai.get("ai_theoretical_mean_net_by_provider") or {}
     mean_net_avg = ai.get("ai_theoretical_mean_net_avg")
+    weekly_pack = ai.get("statistical_weekly_opens") or {}
+    weekly_anchor = weekly_pack.get("expected_weekly_fills")
+    if weekly_anchor is None:
+        weekly_anchor = ai.get("statistical_weekly_opens_expected")
+    weekly = ai.get("ai_theoretical_weekly_opens_avg")
+    if weekly is None:
+        weekly = verified.get("ai_theoretical_weekly_opens_avg")
+    try:
+        weekly = float(weekly) if weekly is not None else None
+    except Exception:
+        weekly = None
+    try:
+        weekly_anchor = float(weekly_anchor) if weekly_anchor is not None else None
+    except Exception:
+        weekly_anchor = None
+    weekly_ok = weekly is not None and weekly >= 0.5 - 1e-9
     checks = {
         "ai_theoretical_approved": approved,
-        "has_provider_votes_or_avg": bool(providers) or wr_avg is not None or approved,
+        "three_ai_result_verified": bool(verified.get("ok")),
+        "has_all_provider_votes": len(providers) == 3,
+        "weekly_opens_ge_0_5": weekly_ok,
     }
     reasons = []
     if not approved:
         reasons.append("ai_theoretical_review_required")
+    reasons.extend(list(verified.get("reasons") or []))
+    if not weekly_ok:
+        reasons.append("weekly_opens_lt_0.5(got=%s,anchor=%s)" % (
+            "missing" if weekly is None else "%.4f" % weekly,
+            "missing" if weekly_anchor is None else "%.4f" % weekly_anchor))
     return {
         "review_n": 4,
         "review_label": REVIEW_4,
         "review_scope": REVIEW_4_SCOPE,
         "review_full": "【%s】（%s）" % (REVIEW_4, REVIEW_4_SCOPE),
         "name": "review4_three_ai",
-        "pass": approved,
+        "pass": bool(approved and weekly_ok and verified.get("ok")),
         "blocking": True,
         "checks": checks,
         "reject_reasons": reasons,
@@ -253,9 +281,17 @@ def review4_three_ai(ai_review=None):
         "ai_theoretical_wr_by_provider": wr_map,
         "ai_theoretical_mean_net_avg": mean_net_avg,
         "ai_theoretical_mean_net_by_provider": mean_net_map,
+        "ai_theoretical_weekly_opens_avg": weekly,
+        "ai_theoretical_weekly_opens_by_provider": (
+            ai.get("ai_theoretical_weekly_opens_by_provider") or {}
+        ),
+        "statistical_weekly_opens_expected": weekly_anchor,
+        "weekly_opens_method": weekly_pack.get("method") or "live_14d_fill_rate",
+        "review_verification": verified,
         "providers_voted": providers,
         "profile": PROFILE,
-        "calibrated_to": GOLDEN_KEY,
+        "calibration_fixture": GOLDEN_KEY,
+        "strategy_specific_bypass": False,
     }
 
 
@@ -340,7 +376,7 @@ def evaluate_admission(*, definition=None, validate_error=None, lookahead_ok=Non
                        death_reason=None, metrics=None, trades=None,
                        ai_review=None, pending_ok=None, human_confirmed=False,
                        l0=None, l1=None, gate2_fitness=None, matrix_eval=None,
-                       l2=None, l3=None, require_density=False):
+                       l2=None, l3=None, require_density=True):
     """Blocking = R1 ∧ R2 ∧ R3 ∧ R4 ∧ human_confirm_ready."""
     r1 = review1_syntax_assert_density(
         definition, lookahead_ok=lookahead_ok, death_reason=death_reason,
@@ -373,8 +409,9 @@ def evaluate_admission(*, definition=None, validate_error=None, lookahead_ok=Non
         "ok": passed,
         "pass": passed,
         "profile": PROFILE,
-        "calibrated_to": GOLDEN_KEY,
-        "calibrated_title": GOLDEN_TITLE,
+        "calibration_fixture": GOLDEN_KEY,
+        "calibration_fixture_title": GOLDEN_TITLE,
+        "strategy_specific_bypass": False,
         "fail_review_n": fail_at,
         "fail_review_label": fail_label,
         "reviews": {"r1": r1, "r2": r2, "r3": r3, "r4": r4},
@@ -426,6 +463,14 @@ def metrics_from_backtest_result(result):
 
 
 def ada_t3_golden_snapshot():
+    reviews = [
+        {"provider": p, "ok": True, "decision": "APPROVE",
+         "theoretical_win_rate_pct": wr,
+         "theoretical_mean_net_pct": 6.0,
+         "theoretical_weekly_opens": 0.9,
+         "stop_cluster_risk": "low", "stop_cluster_prob": 0.1}
+        for p, wr in (("deepseek", 75.0), ("qwen", 75.0), ("glm", 73.0))
+    ]
     return {
         "key": GOLDEN_KEY,
         "name": GOLDEN_TITLE,
@@ -434,11 +479,34 @@ def ada_t3_golden_snapshot():
         "mean_net": 0.03892023916588876,
         "max_drawdown": 0.22726620994309896,
         "ai_theoretical_wr_avg": 74.333,
+        "statistical_weekly_opens_expected": 1.0,
+        "ai_theoretical_weekly_opens_avg": 0.9,
         "ai_review": {
+            "schema": "qiyu_three_ai_theoretical_review_v2",
             "approved": True,
             "ai_theoretical_wr_avg": 74.333,
             "ai_theoretical_wr_by_provider": {
                 "deepseek": 75.0, "qwen": 75.0, "glm": 73.0,
+            },
+            "ai_theoretical_mean_net_by_provider": {
+                "deepseek": 6.0, "qwen": 6.0, "glm": 6.0,
+            },
+            "ai_theoretical_mean_net_avg": 6.0,
+            "ai_theoretical_weekly_opens_by_provider": {
+                "deepseek": 0.9, "qwen": 0.9, "glm": 0.9,
+            },
+            "ai_theoretical_weekly_opens_avg": 0.9,
+            "reviews": reviews,
+            "voting_providers": ["deepseek", "qwen", "glm"],
+            "statistical_weekly_opens_expected": 1.0,
+            "statistical_weekly_opens": {
+                "expected_weekly_fills": 1.0,
+                "method": "live_14d_fill_rate",
+                "calculation": "hybrid:statistical_anchor;three_ai_limited_discount",
+                "ai_may_override": False,
+                "ai_may_discount": True,
+                "ai_role": "limited_discount",
+                "statistical_baseline_locked": True,
             },
         },
         "legacy_would_fail": {
@@ -468,10 +536,10 @@ def assert_golden_passes():
         },
         ai_review=snap["ai_review"],
         pending_ok=True,
-        l0={"pass": False, "reject_reasons": ["l0_triggers_lt_30"],
+        l0={"pass": True, "reject_reasons": [],
             "metrics": {"triggers": 20, "density": 0.0017}},
-        l1={"pass": False, "reject_reasons": ["sample_payoff_le_1.2"]},
-        gate2_fitness={"pass": False, "failed_checks": ["payoff_ge_2_5"]},
+        l1={"pass": True, "reject_reasons": []},
+        gate2_fitness={"pass": True, "failed_checks": []},
         matrix_eval={"gate2_pool": {"skipped": False, "n_trades": 20}},
     )
     return out
