@@ -259,6 +259,40 @@ SEED_MECHANISMS = (
         "family": "mean_reversion",
         "factor_hints": ["atr_pct_14", "range_pct", "abs_ret_1", "close_z_20"],
     },
+    {
+        "mechanism_id": "panic_exhaustion_recovery_001",
+        "economic_actor": ["panic_seller", "forced_liquidator", "mean_reversion_liquidity"],
+        "constraint": ["margin_stress", "inventory_shock", "stop_cascade"],
+        "forced_trade": "panic_sell_exhausts_then_inventory_and_opportunistic_buyers_reprice",
+        "observable_proxy": ["rsi_14", "close_z_20", "lower_wick_pct", "exhaustion_score", "volume_z"],
+        "predicted_effect": {
+            "direction": "short_horizon_recovery_after_exhaustion",
+            "horizon": "15m-2h",
+            "conditional_on": [
+                "rsi_extreme_oversold",
+                "deep_negative_z",
+                "wick_or_engulf_confirm",
+                "not_trend_continuation",
+            ],
+        },
+        "who_pays": "late_panic_sellers_and_breakout_chasers_into_flush",
+        "alternative_explanations": [
+            "trend_continuation_after_pause",
+            "informed_flow_still_selling",
+            "news_driven_repricing",
+        ],
+        "capacity_limit": "low_to_medium",
+        "known_failure_modes": [
+            "falling_knife_in_persistent_trend",
+            "multi_wave_liquidation",
+            "catching_mid_impulse_without_confirmation",
+        ],
+        "family": "mean_reversion",
+        "factor_hints": [
+            "rsi_14", "close_z_20", "lower_wick_pct", "exhaustion_score",
+            "volume_z", "abs_ret_1", "ret_3",
+        ],
+    },
 )
 
 

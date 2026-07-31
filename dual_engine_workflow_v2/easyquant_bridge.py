@@ -248,6 +248,58 @@ def _build_factor_matrix(candles):
     rets_abs = [abs(x) if x is not None else None for x in ret1]
     atr_proxy = _sma([((h[i] - l[i]) / c[i]) if c[i] else 0.0 for i in range(n)], 14)
 
+    # RSI-14 (Wilder lite) — needed for exhaustion / oversold recovery research
+    rsi14 = [None] * n
+    if n >= 16:
+        gains = []
+        losses = []
+        for i in range(1, n):
+            dlt = c[i] - c[i - 1]
+            gains.append(dlt if dlt > 0 else 0.0)
+            losses.append((-dlt) if dlt < 0 else 0.0)
+        ag = sum(gains[:14]) / 14.0
+        al = sum(losses[:14]) / 14.0
+        rsi14[14] = 100.0 - (100.0 / (1.0 + (ag / al if al > 1e-12 else 1e12)))
+        for i in range(15, n):
+            g = gains[i - 1]
+            lss = losses[i - 1]
+            ag = (ag * 13.0 + g) / 14.0
+            al = (al * 13.0 + lss) / 14.0
+            rs = ag / al if al > 1e-12 else 1e12
+            rsi14[i] = 100.0 - (100.0 / (1.0 + rs))
+
+    # volume z if available
+    vols = []
+    for r in candles:
+        v = r.get("volume")
+        if v is None:
+            v = r.get("vol")
+        try:
+            vols.append(float(v) if v is not None else None)
+        except Exception:
+            vols.append(None)
+    volume_z = [None] * n
+    if any(v is not None for v in vols):
+        vv = [float(v) if v is not None else 0.0 for v in vols]
+        vma = _sma(vv, 20)
+        vstd = _std(vv, 20)
+        for i in range(n):
+            if vma[i] is None or vstd[i] is None or vstd[i] <= 1e-12:
+                volume_z[i] = None
+            else:
+                volume_z[i] = (vv[i] - vma[i]) / vstd[i]
+
+    # exhaustion score: deep negative z + low RSI + long lower wick (higher = more exhausted)
+    exhaustion_score = [None] * n
+    for i in range(n):
+        if vol_z[i] is None or rsi14[i] is None or lower_wick[i] is None:
+            continue
+        exhaustion_score[i] = (
+            max(0.0, -float(vol_z[i])) * 0.45
+            + max(0.0, (30.0 - float(rsi14[i])) / 30.0) * 0.35
+            + min(3.0, float(lower_wick[i]) * 100.0) * 0.20
+        )
+
     return {
         "ret_1": ret1,
         "ret_3": ret3,
@@ -260,6 +312,9 @@ def _build_factor_matrix(candles):
         "dist_roll_low": dist_low,
         "atr_pct_14": atr_proxy,
         "abs_ret_1": rets_abs,
+        "rsi_14": rsi14,
+        "volume_z": volume_z,
+        "exhaustion_score": exhaustion_score,
     }
 
 
