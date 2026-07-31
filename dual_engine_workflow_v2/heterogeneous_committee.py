@@ -12,7 +12,7 @@ Roles (forced separation):
   execution_engineer   — cost / slippage / capacity feasibility (not strategy invent)
   statistician         — DSR/PBO/trial budget (non-LLM judge inputs)
   research_director    — allocates budget only (no strategies)
-  judge                — evidence-field scoring only; Kimi optional when enabled
+  judge                — deterministic evidence gate + Kimi independent veto
 
 LLM enrichment is optional and MUST NOT replace non-LLM cores.
 Multi-vendor live LLM roundtable is NOT required; blackboard is structured fields.
@@ -91,9 +91,9 @@ ROLE_CONTRACTS = {
         "forbids_zh": "不应由LLM裁决",
     },
     "judge": {
-        "model_pref": "kimi_optional_else_rules",
+        "model_pref": "deterministic_rules_then_kimi_independent_veto",
         "may_propose_strategy": False,
-        "task_zh": "只基于证据字段分配资源/放行",
+        "task_zh": "本地硬门槛通过后，由Kimi独立裁决是否允许进入策略组装",
     },
 }
 
@@ -160,9 +160,13 @@ def run_mechanism_scientist(brief, symbol, timeframe, run_id, limit=12):
     }
 
 
-def run_empirical_scientist(factor_matrix, fwd_returns, run_id, max_phenomena=24):
+def run_empirical_scientist(factor_matrix, fwd_returns, run_id, max_phenomena=24,
+                            candles=None, timeframe=None):
     """Independent: phenomena only. No trade rules."""
-    scanned = phscan.scan_all(factor_matrix, fwd_returns, max_phenomena=max_phenomena)
+    scanned = phscan.scan_all(
+        factor_matrix, fwd_returns, max_phenomena=max_phenomena,
+        candles=candles, timeframe=timeframe,
+    )
     hyps = [
         phscan.phenomenon_to_hypothesis(ph, rank=i)
         for i, ph in enumerate(scanned.get("phenomena") or [])
@@ -446,8 +450,62 @@ def run_constructive_redteam(main_hyp, factor_matrix, fwd_returns, run_id):
     }
 
 
+KIMI_EVIDENCE_JUDGE_PROMPT = """你是策略正式四次复核之前的独立研究裁判。
+你不是策略生成者，不得提出新策略、阈值或过滤条件。输入只有脱敏的证据布尔字段
+和本地规则得分，不含账户、密钥或下单信息。请独立判断证据是否足以进入策略组装。
+本地硬门槛拥有最高优先级，你只能同意或否决，绝不能覆盖本地否决。
+严格输出JSON：{"decision":"ADMIT或REJECT","reason":"...",
+"unresolved_risks":["..."]}。ADMIT只代表可进入策略组装，不代表通过正式复核或可实盘。
+"""
+
+
+def _kimi_evidence_judgment(evidence_fields, rule_score):
+    """Call the configured Kimi K3 endpoint with redacted evidence only."""
+    try:
+        from auto_trade_pre_review_discovery import _call_structured
+        result = _call_structured(
+            "kimi", KIMI_EVIDENCE_JUDGE_PROMPT,
+            {
+                "evidence_fields": dict(evidence_fields or {}),
+                "deterministic_rule_score": float(rule_score),
+                "contains_market_data": False,
+                "contains_account_data": False,
+                "authority": "pre-review research ADMIT or REJECT only",
+            },
+            max_tokens=700, retry=True,
+        )
+    except Exception as exc:
+        return {
+            "attempted": True, "enabled": True, "ok": False,
+            "decision": "REJECT", "error": str(exc),
+            "note_zh": "Kimi独立裁判调用异常，按安全原则拒绝进入策略组装。",
+        }
+    parsed = result.get("result") or {}
+    decision = str(parsed.get("decision") or "").strip().upper()
+    if not result.get("ok") or decision not in ("ADMIT", "REJECT"):
+        return {
+            "attempted": True, "enabled": True, "ok": False,
+            "decision": "REJECT", "error": result.get("error"),
+            "note_zh": "Kimi未返回有效结构化裁决，按安全原则拒绝进入策略组装。",
+        }
+    return {
+        "attempted": True, "enabled": True, "ok": True,
+        "model": result.get("model"), "decision": decision,
+        "reason": str(parsed.get("reason") or "")[:1200],
+        "unresolved_risks": [
+            str(value)[:400] for value in
+            (parsed.get("unresolved_risks") or [])[:8]
+        ],
+        "note_zh": (
+            "Kimi独立裁判同意进入策略组装"
+            if decision == "ADMIT" else
+            "Kimi独立裁判否决进入策略组装"
+        ),
+    }
+
+
 def judge_from_evidence(evidence_fields, run_id=None):
-    """Rule judge on evidence fields only. Optional Kimi comment if enabled."""
+    """Deterministic evidence gate followed by an independent Kimi veto gate."""
     required = [
         "naked_probe_passed", "antifalsify_passed", "efr_passed",
         "leakage_passed", "causal_boundary_passed", "execution_passed",
@@ -472,27 +530,36 @@ def judge_from_evidence(evidence_fields, run_id=None):
         score += 1.5
     if evidence_fields.get("bidirectional_hit"):
         score += 1.0
-    admit = bool(not missing and score >= 6.5)
-    kimi_note = None
-    # Kimi judge slot — only if explicitly enabled; never invent strategies
+    deterministic_admit = bool(not missing and score >= 6.5)
+    # Kimi is called only after all deterministic research gates pass.  It
+    # may reject but can never turn a deterministic rejection into admission.
     if str(os.environ.get("QIYU_KIMI_ENABLED") or "0").strip().lower() in (
         "1", "true", "yes", "on",
     ):
-        kimi_note = {
-            "attempted": True,
-            "enabled": True,
-            "role": "judge_only",
-            "note_zh": "Kimi 仅可就证据字段发表资源分配意见；本次默认仍以规则裁判为准（防相关偏差）。",
-        }
+        if deterministic_admit:
+            kimi_note = _kimi_evidence_judgment(evidence_fields, score)
+        else:
+            kimi_note = {
+                "attempted": False, "enabled": True, "ok": True,
+                "decision": "REJECT",
+                "note_zh": "本地确定性门槛已否决，不向Kimi发送无资格候选。",
+            }
     else:
         kimi_note = {
             "attempted": False,
             "enabled": False,
+            "ok": False,
+            "decision": "REJECT",
             "note_zh": "Kimi Judge 未启用（QIYU_KIMI_ENABLED=0）；使用非LLM规则裁判。",
         }
+    kimi_admit = bool(
+        kimi_note.get("ok") and kimi_note.get("decision") == "ADMIT")
+    admit = bool(deterministic_admit and kimi_admit)
     out = {
         "role": "judge",
         "admit_to_assembly": admit,
+        "deterministic_admit": deterministic_admit,
+        "kimi_admit": kimi_admit,
         "score": score,
         "missing": missing,
         "evidence_fields": evidence_fields,

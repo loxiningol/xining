@@ -15,6 +15,8 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
+from .process_safe_state import atomic_write_json, process_lock
+
 from . import generator_scorecard as scorecard
 from . import mechanism_beliefs as beliefs
 
@@ -46,6 +48,12 @@ DEFAULT_ARMS = (
     "family:trend_pullback",
     "family:crowding_fade",
     "family:liquidation_bounce",
+    "tree:exhaustion_recovery",
+    "tree:vol_squeeze_expansion",
+    "branch:C_absorption_reclaim",
+    "branch:T1_volatility_only",
+    "branch:T2_direction",
+    "branch:T3_continuation_or_fade",
 )
 
 
@@ -71,9 +79,7 @@ def save_state(state):
     state = dict(state or {})
     state["updated_at"] = _now()
     with _LOCK:
-        state_path().write_text(
-            json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        atomic_write_json(state_path(), state)
     return state
 
 
@@ -101,11 +107,19 @@ def _arm_reward_from_scorecard(name, summary):
 
 def observe_attribution(attribution, contract_compare=None):
     """Online update after one outcome (medium timescale)."""
+    with process_lock("budget_allocator"):
+        return _observe_attribution_locked(attribution, contract_compare=contract_compare)
+
+
+def _observe_attribution_locked(attribution, contract_compare=None):
     state = load_state()
     arms = state.setdefault("arms", {})
     gen = (attribution or {}).get("generator") or "unknown"
     fam = (attribution or {}).get("family")
+    tree_id = (attribution or {}).get("mechanism_tree_id")
+    branch_id = (attribution or {}).get("mechanism_branch_id")
     rv = (attribution or {}).get("reward_vector") or {}
+    fail_codes = set((attribution or {}).get("failure_codes") or [])
 
     # vector → scalar only at allocation layer
     r = (
@@ -117,19 +131,36 @@ def observe_attribution(attribution, contract_compare=None):
         - 0.15 * float(rv.get("overfitting_risk") or 0.3)
         - 0.10 * float(rv.get("research_cost") or 0.3)
     )
+    # data/proxy inadequacy: hold tree, do not punish family as dead
+    if fail_codes & {"data_insufficient", "proxy_failure"}:
+        r = max(r, -0.05)
     # execution-dominated failure: do not punish mechanism family hard
     resp = (attribution or {}).get("responsibility") or {}
-    if float(resp.get("execution_failure") or 0) >= 0.35:
+    tree_arm = ("tree:%s" % tree_id) if tree_id else None
+    branch_arm = ("branch:%s" % branch_id) if branch_id and branch_id != "unassigned_leaf" else None
+    if float(resp.get("execution_failure") or 0) >= 0.35 or (
+        fail_codes & {"execution_mapping_failure", "spread_dominated"}
+    ):
         if fam:
             arm = "family:%s" % fam
             slot = arms.setdefault(arm, {"pulls": 0, "reward_sum": 0.0})
             slot["pulls"] += 1
             slot["reward_sum"] += 0.05  # weak hold
+        for soft in (tree_arm, branch_arm):
+            if soft:
+                slot = arms.setdefault(soft, {"pulls": 0, "reward_sum": 0.0})
+                slot["pulls"] += 1
+                slot["reward_sum"] += 0.03
         exe_arm = arms.setdefault("execution_engineer", {"pulls": 0, "reward_sum": 0.0})
         exe_arm["pulls"] += 1
         exe_arm["reward_sum"] += -0.25
     else:
-        for arm_name in (gen, ("family:%s" % fam) if fam else None):
+        for arm_name in (
+            gen,
+            ("family:%s" % fam) if fam else None,
+            tree_arm,
+            branch_arm,
+        ):
             if not arm_name:
                 continue
             slot = arms.setdefault(arm_name, {"pulls": 0, "reward_sum": 0.0})
@@ -140,8 +171,13 @@ def observe_attribution(attribution, contract_compare=None):
     return {"ok": True, "reward_scalar": r, "at": _now()}
 
 
-def allocate(total_budget=320, context=None, epsilon=0.15):
+def allocate(total_budget=400, context=None, epsilon=0.15):
     """Return next-round budget shares + concrete discovery knobs."""
+    with process_lock("budget_allocator"):
+        return _allocate_locked(total_budget=total_budget, context=context, epsilon=epsilon)
+
+
+def _allocate_locked(total_budget=400, context=None, epsilon=0.15):
     context = context or {}
     state = load_state()
     arms = state.get("arms") or {}
@@ -181,6 +217,8 @@ def allocate(total_budget=320, context=None, epsilon=0.15):
     emp_weight = 1.0
     sym_weight = 1.0
     family_priority = []
+    tree_priority = []
+    branch_priority = []
     for row in scored[:12]:
         arm = row["arm"]
         if arm == "mechanism_scientist":
@@ -191,10 +229,14 @@ def allocate(total_budget=320, context=None, epsilon=0.15):
             sym_weight = 1.0 + max(-0.4, min(0.8, row["score"]))
         elif arm.startswith("family:"):
             family_priority.append(arm.split(":", 1)[1])
+        elif arm.startswith("tree:"):
+            tree_priority.append(arm.split(":", 1)[1])
+        elif arm.startswith("branch:"):
+            branch_priority.append(arm.split(":", 1)[1])
 
-    base_mech = int(context.get("base_max_mechanisms") or 14)
-    base_ph = int(context.get("base_max_phenomena") or 24)
-    base_probe = int(context.get("base_max_hyp_probe") or 28)
+    base_mech = int(context.get("base_max_mechanisms") or 18)
+    base_ph = int(context.get("base_max_phenomena") or 28)
+    base_probe = int(context.get("base_max_hyp_probe") or 36)
 
     # Dampen early UCB explosion on tiny VPS / few pulls
     def _damp(w):
@@ -216,16 +258,20 @@ def allocate(total_budget=320, context=None, epsilon=0.15):
             "symbolic_searcher": sym_weight,
         },
         "family_priority": family_priority[:6],
+        "tree_priority": tree_priority[:4],
+        "branch_priority": branch_priority[:6],
         "knobs": {
-            "max_mechanisms": max(6, min(16, int(round(base_mech * mech_weight)))),
-            "max_phenomena": max(8, min(28, int(round(base_ph * emp_weight)))),
-            "max_hypotheses_probe": max(8, min(32, int(round(base_probe * (
+            "max_mechanisms": max(10, min(28, int(round(base_mech * mech_weight)))),
+            "max_phenomena": max(14, min(48, int(round(base_ph * emp_weight)))),
+            "max_hypotheses_probe": max(16, min(72, int(round(base_probe * (
                 0.4 * mech_weight + 0.3 * emp_weight + 0.3 * sym_weight
             ))))),
             "sym_pop_boost": max(0.8, min(1.25, sym_weight)),
+            "max_total_trials": max(120, min(420, int(total_budget))),
         },
         "reward_definition_zh": (
             "信息增益代理+校准+复制+新颖 − 成本低估 − 过拟合风险；禁用裸PnL单分。"
+            "树/分支臂仅作覆盖调度，不因微数据缺失惩罚机制族。"
         ),
         "at": _now(),
     }
@@ -233,6 +279,8 @@ def allocate(total_budget=320, context=None, epsilon=0.15):
     state["last_allocation"] = {
         "knobs": alloc["knobs"],
         "family_priority": alloc["family_priority"],
+        "tree_priority": alloc["tree_priority"],
+        "branch_priority": alloc["branch_priority"],
         "at": _now(),
     }
     save_state(state)

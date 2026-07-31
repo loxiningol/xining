@@ -13,6 +13,8 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
+from .process_safe_state import atomic_write_json, process_lock
+
 
 _LOCK = threading.Lock()
 
@@ -63,20 +65,19 @@ def save(data):
     data = dict(data or {})
     data["updated_at"] = _now()
     with _LOCK:
-        beliefs_path().write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        atomic_write_json(beliefs_path(), data)
     return data
 
 
 def get(mechanism_id):
-    data = load()
-    mid = mechanism_id or "unknown"
-    mechs = data.setdefault("mechanisms", {})
-    if mid not in mechs:
-        mechs[mid] = _blank(mid)
-        save(data)
-    return mechs[mid]
+    with process_lock("mechanism_beliefs"):
+        data = load()
+        mid = mechanism_id or "unknown"
+        mechs = data.setdefault("mechanisms", {})
+        if mid not in mechs:
+            mechs[mid] = _blank(mid)
+            save(data)
+        return mechs[mid]
 
 
 def _posterior(alpha, beta):
@@ -93,6 +94,13 @@ def update_from_attribution(attribution, symbol=None, regime=None, timescale="me
             "reason": "fast_feedback_cannot_update_mechanism_core",
             "at": _now(),
         }
+    with process_lock("mechanism_beliefs"):
+        return _update_from_attribution_locked(
+            attribution, symbol=symbol, regime=regime, timescale=timescale,
+        )
+
+
+def _update_from_attribution_locked(attribution, symbol=None, regime=None, timescale="medium"):
     mid = (attribution or {}).get("mechanism_id")
     if not mid:
         fam = (attribution or {}).get("family")

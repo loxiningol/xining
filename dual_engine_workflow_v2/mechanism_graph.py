@@ -332,6 +332,114 @@ SEED_MECHANISMS = (
 )
 
 
+# Structured mechanism variants.  Missing-data variants remain explicit
+# DATA_INADEQUATE observations; OHLCV proxies are never relabelled as L2/OI facts.
+EXTENDED_MECHANISMS = (
+    {
+        "mechanism_id": "exhaustion_absorption_reclaim_002",
+        "economic_actor": ["panic_seller", "passive_absorber"],
+        "constraint": ["urgent_sell_pressure", "finite_passive_inventory"],
+        "forced_trade": "selling_velocity_decays_while_price_reclaims_after_absorption",
+        "observable_proxy": ["exhaustion_score", "absorption_proxy", "downside_velocity_decay", "reclaim_strength"],
+        "predicted_effect": {"direction": "short_horizon_recovery_after_exhaustion",
+                             "horizon": "1-12 bars", "conditional_on": ["shock", "absorption", "reclaim"]},
+        "who_pays": "late_sellers_after_pressure_decay",
+        "alternative_explanations": ["temporary_pause_in_persistent_downtrend"],
+        "capacity_limit": "low_to_medium",
+        "known_failure_modes": ["new_information_shock", "second_liquidation_wave"],
+        "family": "mean_reversion",
+        "factor_hints": ["exhaustion_score", "absorption_proxy", "downside_velocity_decay", "reclaim_strength"],
+        "required_data": ["derived_ohlcv_proxy"],
+        "proxy_group": "ohlcv_absorption_proxy",
+    },
+    {
+        "mechanism_id": "liquidation_flow_exhaustion_direct_002",
+        "economic_actor": ["forced_liquidator", "liquidation_engine"],
+        "constraint": ["margin_constraint", "open_interest_flush"],
+        "forced_trade": "direct_liquidation_flow_peaks_then_open_interest_and_sell_pressure_contract",
+        "observable_proxy": ["liquidation_flow", "open_interest_change", "aggressive_sell_flow"],
+        "predicted_effect": {"direction": "bounce_after_verified_liquidation_exhaustion",
+                             "horizon": "1-12 bars", "conditional_on": ["liquidation_peak", "oi_flush"]},
+        "who_pays": "late_sellers_after_forced_flow_ends",
+        "alternative_explanations": ["information_driven_deleveraging"],
+        "capacity_limit": "low",
+        "known_failure_modes": ["multi_wave_liquidation"],
+        "family": "liquidation_bounce",
+        "factor_hints": ["liquidation_flow", "open_interest_change"],
+        "required_data": ["liquidation_flow", "open_interest"],
+        "proxy_group": "direct_derivatives_flow",
+    },
+    {
+        "mechanism_id": "liquidity_vacuum_recovery_direct_001",
+        "economic_actor": ["market_maker", "urgent_taker"],
+        "constraint": ["book_depth", "inventory_limit"],
+        "forced_trade": "temporary_book_vacuum_closes_after_quotes_replenish",
+        "observable_proxy": ["order_book_depth", "spread", "order_flow_imbalance"],
+        "predicted_effect": {"direction": "recovery_after_quote_replenishment",
+                             "horizon": "seconds-to-6-bars", "conditional_on": ["depth_replenishment"]},
+        "who_pays": "urgent_takers_crossing_the_vacuum",
+        "alternative_explanations": ["informed_flow"],
+        "capacity_limit": "low",
+        "known_failure_modes": ["persistent_quote_withdrawal"],
+        "family": "liquidity_sweep",
+        "factor_hints": ["order_book_depth", "order_flow_imbalance"],
+        "required_data": ["level2_order_book", "trade_side_flow"],
+        "proxy_group": "direct_microstructure",
+    },
+    {
+        "mechanism_id": "squeeze_volatility_release_002",
+        "economic_actor": ["option_hedger", "range_trader"],
+        "constraint": ["volatility_compression", "hedging_demand"],
+        "forced_trade": "compression_releases_future_absolute_movement_without_assuming_direction",
+        "observable_proxy": ["squeeze_persistence", "volatility_acceleration", "atr_pct_14"],
+        "predicted_effect": {"direction": "future_volatility_only", "horizon": "1-12 bars",
+                             "conditional_on": ["persistent_compression"]},
+        "who_pays": "late_volatility_sellers",
+        "alternative_explanations": ["low_volatility_persists"],
+        "capacity_limit": "unknown",
+        "known_failure_modes": ["no_release_event"],
+        "family": "vol_squeeze_break",
+        "factor_hints": ["squeeze_persistence", "volatility_acceleration"],
+        "required_data": ["derived_ohlcv_proxy"],
+        "proxy_group": "volatility_only",
+    },
+    {
+        "mechanism_id": "squeeze_break_acceptance_002",
+        "economic_actor": ["breakout_follower", "trapped_range_trader"],
+        "constraint": ["range_boundary", "acceptance_after_break"],
+        "forced_trade": "post_break_acceptance_forces_range_inventory_to_unwind",
+        "observable_proxy": ["squeeze_persistence", "expansion_score", "breakout_acceptance", "trend_efficiency_12"],
+        "predicted_effect": {"direction": "continuation_after_confirmed_acceptance", "horizon": "1-12 bars",
+                             "conditional_on": ["compression", "break", "acceptance"]},
+        "who_pays": "trapped_faders_and_late_range_inventory",
+        "alternative_explanations": ["session_open_jump"],
+        "capacity_limit": "medium",
+        "known_failure_modes": ["failed_acceptance", "two_sided_whipsaw"],
+        "family": "vol_squeeze_break",
+        "factor_hints": ["squeeze_persistence", "expansion_score", "breakout_acceptance", "trend_efficiency_12"],
+        "required_data": ["derived_ohlcv_proxy"],
+        "proxy_group": "post_break_acceptance",
+    },
+    {
+        "mechanism_id": "squeeze_fake_break_reversion_001",
+        "economic_actor": ["breakout_follower", "passive_fader"],
+        "constraint": ["range_boundary", "failed_acceptance"],
+        "forced_trade": "failed_break_forces_breakout_positions_to_unwind_back_into_range",
+        "observable_proxy": ["squeeze_persistence", "expansion_score", "breakout_acceptance", "upper_wick_pct", "lower_wick_pct"],
+        "predicted_effect": {"direction": "reversal_after_failed_squeeze_break", "horizon": "1-12 bars",
+                             "conditional_on": ["compression", "break", "rejection"]},
+        "who_pays": "breakout_chasers_without_acceptance",
+        "alternative_explanations": ["delayed_second_break_leg"],
+        "capacity_limit": "medium",
+        "known_failure_modes": ["delayed_continuation"],
+        "family": "vol_squeeze_break",
+        "factor_hints": ["squeeze_persistence", "expansion_score", "breakout_acceptance", "upper_wick_pct"],
+        "required_data": ["derived_ohlcv_proxy"],
+        "proxy_group": "failed_break_reversion",
+    },
+)
+
+
 REQUIRED_FIELDS = (
     "economic_actor",
     "constraint",
@@ -351,7 +459,7 @@ def graph_dir():
 
 def load_graph():
     """Seed + optional on-disk mechanisms."""
-    items = [copy.deepcopy(m) for m in SEED_MECHANISMS]
+    items = [copy.deepcopy(m) for m in (SEED_MECHANISMS + EXTENDED_MECHANISMS)]
     path = graph_dir() / "mechanisms.json"
     if path.exists():
         try:
@@ -403,11 +511,19 @@ def select_for_brief(brief, symbol=None, timeframe=None, limit=12):
     """Rank seed mechanisms against brief keywords; keep population, no early pick-1."""
     text = str(brief or "").lower()
     graph = load_graph()
+    try:
+        from .research_branch_manager import preferred_mechanism_ids, mechanism_branch_map
+        prefer = set(preferred_mechanism_ids(brief))
+        branch_map = mechanism_branch_map()
+    except Exception:
+        prefer = set()
+        branch_map = {}
     scored = []
     for m in graph:
         score = 1.0
+        mid = str(m.get("mechanism_id") or "")
         blob = " ".join([
-            str(m.get("mechanism_id") or ""),
+            mid,
             str(m.get("family") or ""),
             " ".join(m.get("economic_actor") or []),
             " ".join(m.get("constraint") or []),
@@ -427,25 +543,31 @@ def select_for_brief(brief, symbol=None, timeframe=None, limit=12):
                 score += 0.2
         # boost explicit exhaustion mechanism when brief asks for it
         if any(k in text for k in ("衰竭", "超卖", "rsi", "回收", "恐慌")):
-            if "exhaustion" in str(m.get("mechanism_id") or "") or "exhaustion" in blob:
+            if "exhaustion" in mid or "exhaustion" in blob:
                 score += 3.0
             if m.get("family") == "mean_reversion":
                 score += 0.8
             if m.get("family") == "trend_pullback":
                 score -= 0.5  # opposing family for knife risk
         if any(k in text for k in ("压缩", "扩张", "squeeze", "波动率收缩", "收缩扩张")):
-            if "squeeze" in str(m.get("mechanism_id") or "") or "squeeze" in blob or "expansion" in blob:
+            if "squeeze" in mid or "squeeze" in blob or "expansion" in blob:
                 score += 3.0
             if m.get("family") == "vol_squeeze_break":
                 score += 1.2
             if m.get("family") == "mean_reversion":
                 score -= 0.3  # opposing fade risk after true expansion
+        if mid in prefer:
+            score += 4.0
         gate = completeness_check(m)
         row = copy.deepcopy(m)
         row["match_score"] = score
         row["completeness"] = gate
         row["symbol"] = symbol
         row["timeframe"] = timeframe
+        if mid in branch_map:
+            tree_id, branch_id = branch_map[mid]
+            row["mechanism_tree_id"] = tree_id
+            row["mechanism_branch_id"] = branch_id
         if gate.get("passed"):
             scored.append(row)
     scored.sort(key=lambda r: float(r.get("match_score") or 0), reverse=True)
@@ -456,6 +578,7 @@ def select_for_brief(brief, symbol=None, timeframe=None, limit=12):
         "n_incomplete_dropped": sum(
             1 for m in graph if not completeness_check(m).get("passed")
         ),
+        "preferred_hits": [m.get("mechanism_id") for m in scored if m.get("mechanism_id") in prefer][:12],
         "at": _now(),
     }
 
@@ -463,7 +586,7 @@ def select_for_brief(brief, symbol=None, timeframe=None, limit=12):
 def mechanism_to_hypothesis(mechanism, source="mechanism_graph"):
     m = mechanism or {}
     pe = m.get("predicted_effect") or {}
-    return {
+    out = {
         "hypothesis_id": "H_%s" % (m.get("mechanism_id") or "unknown"),
         "source": source,
         "path": "theory_to_data",
@@ -481,7 +604,14 @@ def mechanism_to_hypothesis(mechanism, source="mechanism_graph"):
         "factor_hints": m.get("factor_hints") or list(m.get("observable_proxy") or []),
         "simplest_antifalsify": "shuffle_event_time_and_sign_flip_should_kill_edge",
         "completeness": completeness_check(m),
+        "required_data": m.get("required_data") or ["derived_ohlcv_proxy"],
+        "proxy_group": m.get("proxy_group") or "legacy_ohlcv_proxy",
     }
+    if m.get("mechanism_tree_id"):
+        out["mechanism_tree_id"] = m.get("mechanism_tree_id")
+    if m.get("mechanism_branch_id"):
+        out["mechanism_branch_id"] = m.get("mechanism_branch_id")
+    return out
 
 
 def probe():

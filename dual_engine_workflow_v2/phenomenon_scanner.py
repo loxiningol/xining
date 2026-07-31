@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Phenomenon scanner — find statistical anomalies BEFORE writing strategies.
-
-Output is conditional distribution shifts / state breaks, never trade rules.
-"""
+"""Multi-outcome phenomenon scanner; describes evidence and writes no rules."""
 from __future__ import print_function
 
 import math
@@ -16,219 +13,206 @@ def _now():
 def _finite(xs):
     out = []
     for x in xs or []:
-        if x is None:
-            continue
         try:
             v = float(x)
+            if not math.isnan(v) and not math.isinf(v):
+                out.append(v)
         except Exception:
-            continue
-        if math.isnan(v) or math.isinf(v):
-            continue
-        out.append(v)
+            pass
     return out
 
 
 def _mean(xs):
-    xs = _finite(xs)
-    if not xs:
-        return None
-    return sum(xs) / float(len(xs))
+    vals = _finite(xs)
+    return sum(vals) / float(len(vals)) if vals else None
 
 
 def _std(xs):
-    xs = _finite(xs)
-    if len(xs) < 2:
+    vals = _finite(xs)
+    if len(vals) < 2:
         return None
-    m = sum(xs) / float(len(xs))
-    var = sum((x - m) ** 2 for x in xs) / float(len(xs) - 1)
-    return math.sqrt(var) if var > 0 else 0.0
-
-
-def _quantile(xs, q):
-    xs = sorted(_finite(xs))
-    if not xs:
-        return None
-    if q <= 0:
-        return xs[0]
-    if q >= 1:
-        return xs[-1]
-    i = int(q * (len(xs) - 1))
-    return xs[i]
+    mu = _mean(vals)
+    return math.sqrt(max(0.0, sum((x - mu) ** 2 for x in vals) / float(len(vals) - 1)))
 
 
 def _t_stat(a, b):
-    a = _finite(a)
-    b = _finite(b)
-    if len(a) < 20 or len(b) < 20:
+    a, b = _finite(a), _finite(b)
+    if len(a) < 12 or len(b) < 20:
         return None
-    ma, mb = _mean(a), _mean(b)
     sa, sb = _std(a), _std(b)
-    if sa is None or sb is None:
-        return None
     se = math.sqrt((sa * sa) / len(a) + (sb * sb) / len(b))
-    if se <= 1e-12:
-        return 0.0
-    return (ma - mb) / se
+    return ((_mean(a) - _mean(b)) / se) if se > 1e-12 else 0.0
 
 
-def _mask_top(series, q=0.8):
-    thr = _quantile(series, q)
-    if thr is None:
-        return [False] * len(series)
-    return [v is not None and float(v) >= thr for v in series]
+def _quantile(xs, q):
+    vals = sorted(_finite(xs))
+    if not vals:
+        return None
+    return vals[max(0, min(len(vals) - 1, int(float(q) * (len(vals) - 1))))]
 
 
-def _fwd_slice(fwd, mask):
-    return [fwd[i] for i, keep in enumerate(mask) if keep and i < len(fwd)]
+def _causal_mask(series, side, q, window=240, min_history=80):
+    # Reuse the exact prior-only event definition used by the probe protocol.
+    try:
+        from .probe_protocol import _causal_quantile_mask
+        return _causal_quantile_mask(series, side=side, q=q,
+                                     window=window, min_history=min_history)
+    except Exception:
+        threshold = _quantile(series, q if side == "high" else 1.0 - q)
+        if threshold is None:
+            return [False] * len(series or [])
+        return [x is not None and ((float(x) >= threshold) if side == "high"
+                                   else (float(x) <= threshold)) for x in series]
 
 
-def _comp_slice(fwd, mask):
-    return [fwd[i] for i, keep in enumerate(mask) if (not keep) and i < len(fwd)]
+def _actual_outcomes(candles, horizons):
+    rows = list(candles or [])
+    out = {}
+    for h in horizons:
+        directional, absolute = [None] * len(rows), [None] * len(rows)
+        for i in range(len(rows) - int(h)):
+            try:
+                start = float(rows[i]["close"])
+                end = float(rows[i + int(h)]["close"])
+                if start:
+                    directional[i] = end / start - 1.0
+                    absolute[i] = abs(directional[i])
+            except Exception:
+                pass
+        out[int(h)] = {"directional_return": directional,
+                       "absolute_movement": absolute}
+    return out
+
+
+def scan_all(factor_matrix, fwd_returns, max_phenomena=30, candles=None,
+             horizons=(1, 3, 6, 12), timeframe=None):
+    """Scan real horizons and separate directional from volatility effects."""
+    matrix = factor_matrix or {}
+    if candles:
+        outcomes = _actual_outcomes(candles, horizons)
+    else:
+        outcomes = {3: {"directional_return": list(fwd_returns or []),
+                        "absolute_movement": [abs(x) if x is not None else None
+                                              for x in (fwd_returns or [])]}}
+    phenomena = []
+    # Bound CPU but include new mechanism proxies first.
+    preferred = [
+        "exhaustion_score", "absorption_proxy", "impact_decay_proxy",
+        "downside_velocity_decay", "reclaim_strength", "squeeze_persistence",
+        "volatility_acceleration", "breakout_acceptance", "signed_volume_pressure",
+    ]
+    names = [x for x in preferred if x in matrix]
+    names += [x for x in sorted(matrix.keys()) if x not in names]
+    for name in names[:28]:
+        series = matrix.get(name) or []
+        for side in ("high", "low"):
+            for q in (0.80, 0.90):
+                mask = _causal_mask(series, side, q)
+                for horizon, outcome_pack in outcomes.items():
+                    for outcome_name, values in outcome_pack.items():
+                        n = min(len(mask), len(values))
+                        treated = [values[i] for i in range(n)
+                                   if mask[i] and values[i] is not None]
+                        control = [values[i] for i in range(n)
+                                   if (not mask[i]) and values[i] is not None]
+                        t = _t_stat(treated, control)
+                        if t is None:
+                            continue
+                        mt, mc = _mean(treated), _mean(control)
+                        shift = (mt - mc) if mt is not None and mc is not None else None
+                        # Keep strong evidence and a limited descriptive frontier.
+                        evidence = "formal_signal" if abs(t) >= 1.96 else (
+                            "descriptive_candidate" if abs(t) >= 1.0 else "weak_observation"
+                        )
+                        if evidence == "weak_observation":
+                            continue
+                        phenomena.append({
+                            "phenomenon_id": "PH_%s_%s_q%s_h%s_%s" % (
+                                name, side, int(q * 100), horizon, outcome_name),
+                            "type": "conditional_distribution_shift",
+                            "outcome_type": outcome_name,
+                            "factor": name, "side": side, "quantile": q,
+                            "treated_mean": mt, "control_mean": mc, "shift": shift,
+                            "t_stat": t, "n_treated": len(_finite(treated)),
+                            "n_control": len(_finite(control)),
+                            "horizon_bars": int(horizon), "horizon_note": "真实前瞻周期",
+                            "evidence_level": evidence,
+                            "causal_claim": False,
+                            "statement_zh": (
+                                "%s处于%s侧%.0f%%事件时，真实向前%d根的%s相对对照偏移%.6f；"
+                                "当前仅为%s，不作因果或盈利承诺。"
+                                % (name, side, q * 100, int(horizon), outcome_name,
+                                   float(shift or 0.0), evidence)
+                            ),
+                        })
+    phenomena.sort(key=lambda r: (
+        1 if r.get("evidence_level") == "formal_signal" else 0,
+        abs(float(r.get("t_stat") or 0.0)),
+        int(r.get("n_treated") or 0),
+    ), reverse=True)
+    # Preserve breadth: take the strongest observation from each
+    # factor × outcome cell before filling remaining slots by strength.
+    frontier, rest = [], []
+    seen_cells = set()
+    for row in phenomena:
+        cell = (row.get("factor"), row.get("outcome_type"))
+        if cell not in seen_cells:
+            seen_cells.add(cell)
+            frontier.append(row)
+        else:
+            rest.append(row)
+    kept = (frontier + rest)[: int(max_phenomena)]
+    return {
+        "ok": True, "n": len(kept), "phenomena": kept,
+        "outcomes_scanned": ["方向收益", "绝对波动"],
+        "horizons_scanned": sorted(outcomes.keys()),
+        "uses_actual_horizons": bool(candles),
+        "descriptive_is_not_tradable": True,
+        "note_zh": "现象层只描述真实周期上的方向/波动偏移，不生成交易规则。",
+        "at": _now(),
+    }
 
 
 def scan_conditional_shifts(factor_matrix, fwd_returns, horizons_note="h=label",
                             min_abs_t=1.96, max_phenomena=30):
-    """Scan each factor's extreme quantile for fwd-return distribution shift."""
-    matrix = factor_matrix or {}
-    fwd = list(fwd_returns or [])
-    phenomena = []
-    for name, series in matrix.items():
-        if not series or len(series) != len(fwd):
-            # allow shorter by aligning tail
-            n = min(len(series or []), len(fwd))
-            if n < 80:
-                continue
-            series = list(series)[-n:]
-            fwd_use = fwd[-n:]
-        else:
-            fwd_use = fwd
-            n = len(fwd_use)
-        for q, side in ((0.8, "high"), (0.2, "low")):
-            if side == "high":
-                mask = _mask_top(series, q=q)
-            else:
-                thr = _quantile(series, q)
-                mask = [v is not None and float(v) <= thr for v in series]
-            treated = _fwd_slice(fwd_use, mask)
-            control = _comp_slice(fwd_use, mask)
-            t = _t_stat(treated, control)
-            if t is None:
-                continue
-            if abs(float(t)) < float(min_abs_t):
-                continue
-            mt, mc = _mean(treated), _mean(control)
-            phenomena.append({
-                "phenomenon_id": "PH_%s_%s" % (name, side),
-                "type": "conditional_return_shift",
-                "factor": name,
-                "side": side,
-                "quantile": q if side == "high" else q,
-                "treated_mean": mt,
-                "control_mean": mc,
-                "shift": (None if mt is None or mc is None else mt - mc),
-                "t_stat": t,
-                "n_treated": len(treated),
-                "n_control": len(control),
-                "horizon_note": horizons_note,
-                "statement_zh": (
-                    "在 %s 处于%s分位时，前瞻收益均值相对对照偏移 %.5f (t=%.2f)"
-                    % (name, side, (mt - mc) if mt is not None and mc is not None else 0.0, t)
-                ),
-            })
-    phenomena.sort(key=lambda r: abs(float(r.get("t_stat") or 0)), reverse=True)
-    return {
-        "ok": True,
-        "n": len(phenomena[: int(max_phenomena)]),
-        "phenomena": phenomena[: int(max_phenomena)],
-        "at": _now(),
-        "note_zh": "只报告现象，不生成交易规则。",
-    }
+    # Compatibility wrapper.
+    return scan_all(factor_matrix, fwd_returns, max_phenomena=max_phenomena)
 
 
 def scan_vol_reaction_asymmetry(factor_matrix, fwd_returns):
-    """After high-range bars, check upside vs downside fwd asymmetry."""
-    rng = (factor_matrix or {}).get("range_pct") or (factor_matrix or {}).get("atr_pct_14")
-    if not rng:
-        return {"ok": False, "error": "no_range_proxy"}
-    mask = _mask_top(rng, q=0.8)
-    fwd = list(fwd_returns or [])
-    up = [fwd[i] for i, k in enumerate(mask) if k and i < len(fwd) and fwd[i] is not None and fwd[i] > 0]
-    dn = [abs(fwd[i]) for i, k in enumerate(mask) if k and i < len(fwd) and fwd[i] is not None and fwd[i] < 0]
-    mu, md = _mean(up), _mean(dn)
-    if mu is None or md is None:
-        return {"ok": False, "error": "insufficient"}
-    return {
-        "ok": True,
-        "type": "vol_reaction_asymmetry",
-        "up_mean": mu,
-        "down_abs_mean": md,
-        "asymmetry": mu - md,
-        "statement_zh": (
-            "高波动后上行反应均值=%.5f，下行绝对均值=%.5f，不对称度=%.5f"
-            % (mu, md, mu - md)
-        ),
-        "at": _now(),
-    }
-
-
-def scan_all(factor_matrix, fwd_returns, max_phenomena=30):
-    shifts = scan_conditional_shifts(
-        factor_matrix, fwd_returns, max_phenomena=max_phenomena,
-    )
-    asym = scan_vol_reaction_asymmetry(factor_matrix, fwd_returns)
-    extra = []
-    if asym.get("ok") and abs(float(asym.get("asymmetry") or 0)) > 1e-6:
-        extra.append({
-            "phenomenon_id": "PH_vol_reaction_asymmetry",
-            "type": asym.get("type"),
-            "statement_zh": asym.get("statement_zh"),
-            "t_stat": None,
-            "shift": asym.get("asymmetry"),
-            "factor": "range_pct",
-            "side": "high_vol",
-        })
-    merged = list(shifts.get("phenomena") or []) + extra
-    return {
-        "ok": True,
-        "n": len(merged),
-        "phenomena": merged[: int(max_phenomena)],
-        "asymmetry": asym,
-        "at": _now(),
-    }
+    rows = scan_all({"range_pct": (factor_matrix or {}).get("range_pct") or []},
+                    fwd_returns, max_phenomena=4)
+    return {"ok": bool(rows.get("n")), "observations": rows.get("phenomena") or [],
+            "at": _now()}
 
 
 def phenomenon_to_hypothesis(phenomenon, rank=0):
     ph = phenomenon or {}
+    direction = "volatility_only" if ph.get("outcome_type") == "absolute_movement" else (
+        "positive_shift" if float(ph.get("shift") or 0) > 0 else "negative_shift"
+    )
     return {
         "hypothesis_id": "H_%s" % (ph.get("phenomenon_id") or ("ph_%d" % rank)),
-        "source": "phenomenon_scanner",
-        "path": "data_to_theory",
-        "mechanism_id": None,
-        "family": "data_driven",
+        "source": "phenomenon_scanner", "path": "data_to_theory",
+        "mechanism_id": None, "family": "data_driven",
         "payoff_payer": "unknown_pending_mechanism_link",
         "constraint_used": ["empirical_conditional_shift"],
         "observable_proxy": [ph.get("factor")] if ph.get("factor") else [],
-        "predicted_direction": (
-            "positive_shift" if float(ph.get("shift") or 0) > 0 else "negative_shift"
-        ),
-        "horizon": ph.get("horizon_note") or "label_horizon",
+        "predicted_direction": direction,
+        "horizon": ph.get("horizon_bars") or ph.get("horizon_note"),
         "conditional_on": ["%s_%s" % (ph.get("factor"), ph.get("side"))],
         "failure_conditions": ["shift_disappears_oos", "driven_by_one_regime"],
         "capacity_limit": "unknown",
-        "alternative_explanations": [
-            "multiple_testing_artifact", "regime_sampling_bias", "bid_ask_bounce",
-        ],
+        "alternative_explanations": ["multiple_testing_artifact", "regime_bias", "cost"],
         "factor_hints": [ph.get("factor")] if ph.get("factor") else [],
         "simplest_antifalsify": "time_shift_and_cross_asset_placebo",
-        "phenomenon": ph,
-        "statement_zh": ph.get("statement_zh"),
+        "phenomenon": ph, "statement_zh": ph.get("statement_zh"),
     }
 
 
 def probe():
     return {
-        "ok": True,
-        "provider": "phenomenon_scanner_v1",
-        "tools_zh": "条件收益偏移 / 波动反应不对称；无交易规则输出",
+        "ok": True, "provider": "multi_outcome_phenomenon_scanner_v2",
+        "tools_zh": "真实多周期方向偏移 / 波动偏移 / 描述证据分级；不生成交易规则",
         "at": _now(),
     }

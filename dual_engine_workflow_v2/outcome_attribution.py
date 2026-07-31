@@ -8,6 +8,7 @@ from __future__ import print_function
 
 import json
 import os
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -69,7 +70,45 @@ def attribute_creation_outcome(
     elif fail_stage == "naked_probe":
         probs["signal_failure"] += 0.25
         probs["proxy_failure"] += 0.25
-        probs["mechanism_failure"] += 0.20
+        probs["mechanism_failure"] += 0.05
+    elif fail_stage == "NO_DIRECTIONAL_EFFECT":
+        probs["signal_failure"] += 0.30
+        probs["proxy_failure"] += 0.25
+        probs["statistical_noise"] += 0.15
+    elif fail_stage == "DIRECTIONAL_BUT_SMALL":
+        probs["strategy_param_failure"] += 0.20
+        probs["execution_failure"] += 0.25
+        probs["success_credit_mechanism"] += 0.20
+    elif fail_stage == "VOLATILITY_EFFECT_ONLY":
+        probs["proxy_failure"] += 0.20
+        probs["signal_failure"] += 0.20
+        probs["success_credit_mechanism"] += 0.15
+    elif fail_stage == "STATE_CONDITIONAL":
+        probs["regime_mismatch"] += 0.45
+        probs["success_credit_mechanism"] += 0.10
+    elif fail_stage == "HORIZON_MISMATCH":
+        probs["signal_failure"] += 0.25
+        probs["strategy_param_failure"] += 0.30
+    elif fail_stage == "EXECUTION_MAPPING_FAILURE":
+        probs["execution_failure"] += 0.55
+        probs["success_credit_mechanism"] += 0.15
+    elif fail_stage == "PROXY_INADEQUATE":
+        probs["proxy_failure"] += 0.60
+        probs["mechanism_failure"] *= 0.20
+    elif fail_stage == "DATA_INADEQUATE":
+        probs["data_quality_issue"] += 0.65
+        probs["mechanism_failure"] *= 0.10
+    elif fail_stage == "SAMPLE_INADEQUATE":
+        probs["statistical_noise"] += 0.55
+        probs["data_quality_issue"] += 0.15
+        probs["mechanism_failure"] *= 0.20
+    elif fail_stage == "NEAR_MISS_DIAGNOSTIC":
+        probs["statistical_noise"] += 0.30
+        probs["execution_failure"] += 0.15
+        probs["success_credit_mechanism"] += 0.10
+    elif fail_stage in ("MECHANISM_CONTRADICTED", "FAMILY_EXHAUSTED"):
+        # These states may only be emitted by aggregate coverage logic, never a leaf probe.
+        probs["mechanism_failure"] += 0.70
     elif fail_stage == "multiverse":
         probs["regime_mismatch"] += 0.30
         probs["signal_failure"] += 0.20
@@ -99,7 +138,7 @@ def attribute_creation_outcome(
         probs["statistical_noise"] += 0.25
         probs["generator_process_issue"] += 0.25
         probs["signal_failure"] += 0.15
-    elif fail_stage == "survived":
+    elif fail_stage in ("survived", "READY_FOR_ASSEMBLY"):
         probs["success_credit_mechanism"] = 0.35
         probs["success_credit_signal"] = 0.30
         probs["success_credit_execution_model"] = 0.15
@@ -112,6 +151,13 @@ def attribute_creation_outcome(
 
     # Evidence adjustments
     mean_net = (probe or {}).get("mean_net")
+    axes = (probe or {}).get("evidence_axes") or {}
+    if axes.get("statistical_direction"):
+        probs["success_credit_mechanism"] += 0.15
+        probs["signal_failure"] *= 0.55
+    if axes.get("economic_magnitude") and not axes.get("execution_feasibility"):
+        probs["execution_failure"] += 0.20
+        probs["mechanism_failure"] *= 0.50
     if mean_net is not None and float(mean_net) > 0 and fail_stage in (
         "efr", "execution",
     ):
@@ -137,6 +183,25 @@ def attribute_creation_outcome(
 
     probs = _norm(probs)
     primary = max(probs.items(), key=lambda kv: kv[1])[0]
+
+    failure_codes = list(
+        (probe or {}).get("failure_codes")
+        or []
+    )
+    # Fine codes adjust soft mass without overriding stage logic
+    if "data_insufficient" in failure_codes:
+        probs["data_quality_issue"] = float(probs.get("data_quality_issue") or 0) + 0.08
+        probs["mechanism_failure"] = float(probs.get("mechanism_failure") or 0) * 0.85
+    if "execution_mapping_failure" in failure_codes or "spread_dominated" in failure_codes:
+        probs["execution_failure"] = float(probs.get("execution_failure") or 0) + 0.08
+        probs["mechanism_failure"] = float(probs.get("mechanism_failure") or 0) * 0.85
+    if "state_conditional_only" in failure_codes:
+        probs["regime_mismatch"] = float(probs.get("regime_mismatch") or 0) + 0.08
+    if "horizon_mismatch" in failure_codes:
+        probs["strategy_param_failure"] = float(probs.get("strategy_param_failure") or 0) + 0.08
+    if failure_codes:
+        probs = _norm(probs)
+        primary = max(probs.items(), key=lambda kv: kv[1])[0]
 
     # Reward vector (NOT collapsed to PnL)
     reward_vector = {
@@ -164,16 +229,19 @@ def attribute_creation_outcome(
         "schema": "qiyu_outcome_attribution_v1",
         "hypothesis_id": h.get("hypothesis_id"),
         "mechanism_id": h.get("mechanism_id"),
+        "mechanism_tree_id": h.get("mechanism_tree_id"),
+        "mechanism_branch_id": h.get("mechanism_branch_id"),
         "generator": h.get("source"),
         "family": h.get("family"),
         "fail_stage": fail_stage,
+        "failure_codes": failure_codes,
         "market_regime": regime or "unspecified",
         "responsibility": probs,
         "primary_attribution": primary,
         "reward_vector": reward_vector,
         "gross_prediction_error": (
             None if mean_net is None else -float(mean_net)
-            if fail_stage != "survived" else 0.0
+            if fail_stage not in ("survived", "READY_FOR_ASSEMBLY") else 0.0
         ),
         "llm_decides_blame": False,
         "note_zh": (
@@ -187,9 +255,11 @@ def attribute_creation_outcome(
 
 def persist(attribution, run_id=None):
     a = dict(attribution or {})
-    oid = "O_%s_%s" % (
+    oid = "O_%s_%s_%s_%s" % (
         (a.get("hypothesis_id") or "na")[:40],
-        datetime.now().strftime("%H%M%S"),
+        datetime.now().strftime("%H%M%S_%f"),
+        str(run_id or "run")[-16:],
+        uuid.uuid4().hex[:6],
     )
     a["outcome_id"] = oid
     path = attributions_dir() / ("%s.json" % oid)

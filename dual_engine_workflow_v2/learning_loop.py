@@ -92,7 +92,20 @@ def close_creation_outcome(
     ensure_isolation_zones()
     outcome_obs = {
         "mean_net": (probe or {}).get("mean_net"),
-        "probe_passed": fail_stage not in ("naked_probe", "incomplete_mechanism"),
+        "probe_passed": bool(
+            fail_stage in ("survived", "READY_FOR_ASSEMBLY") or
+            ((probe or {}).get("evidence_axes") or {}).get("statistical_direction")
+        ),
+        "research_state": fail_stage,
+        "statistical_direction": ((probe or {}).get("evidence_axes") or {}).get(
+            "statistical_direction"
+        ),
+        "economic_magnitude": ((probe or {}).get("evidence_axes") or {}).get(
+            "economic_magnitude"
+        ),
+        "execution_feasibility": ((probe or {}).get("evidence_axes") or {}).get(
+            "execution_feasibility"
+        ),
         "antifalsify_passed": bool((antifalsify or {}).get("passed")) if antifalsify else None,
         "multiverse_passed": bool((multiverse or {}).get("passed")) if multiverse else None,
         "efr_passed": bool((efr or {}).get("passed")) if efr else None,
