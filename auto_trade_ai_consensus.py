@@ -91,6 +91,39 @@ def _load_root_only_env():
 _load_root_only_env()
 
 
+# Domestic custom gateway (cmkey): never route through VPN/"magic" proxies.
+_NO_PROXY_OPENER = urllib_request.build_opener(urllib_request.ProxyHandler({}))
+
+
+def _urlopen(req, timeout=90):
+    """urlopen wrapper: force direct connect for cmkey.cn (China VPS friendly)."""
+    try:
+        url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+    except Exception:
+        url = ""
+    force = str(os.environ.get("QIYU_FORCE_NO_PROXY", "") or "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+    if force or ("cmkey.cn" in str(url)):
+        return _NO_PROXY_OPENER.open(req, timeout=timeout)
+    return urllib_request.urlopen(req, timeout=timeout)
+
+
+def _normalize_kimi_url(url):
+    """Accept https://cmkey.cn or .../v1; always resolve to OpenAI-compatible chat URL."""
+    u = str(url or "").strip().rstrip("/")
+    if not u or "moonshot." in u:
+        # Non-official cmkey keys cannot use Moonshot official endpoints.
+        u = "https://cmkey.cn/v1"
+    if u in ("https://cmkey.cn", "http://cmkey.cn"):
+        u = "https://cmkey.cn/v1"
+    if u.endswith("/chat/completions"):
+        return u
+    if u.endswith("/v1"):
+        return u + "/chat/completions"
+    return u + "/v1/chat/completions"
+
+
 def canonical_json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
                       separators=(",", ":"))
@@ -142,10 +175,13 @@ def _provider_config(name):
     if name not in defaults:
         raise KeyError("unknown AI provider: %s" % name)
     url, model = defaults[name]
+    resolved_url = os.environ.get(prefix + "URL", url).strip()
+    if name == "kimi":
+        resolved_url = _normalize_kimi_url(resolved_url)
     return {
         "name": name,
         "api_key": os.environ.get(prefix + "API_KEY", "").strip(),
-        "url": os.environ.get(prefix + "URL", url).strip(),
+        "url": resolved_url,
         "model": os.environ.get(prefix + "MODEL", model).strip(),
         "timeout": int(os.environ.get(prefix + "TIMEOUT_SEC", "90")),
         "enabled": _provider_enabled(name),
@@ -172,7 +208,11 @@ def credentials_status():
             "model": cfg["model"],
             "enabled": bool(cfg.get("enabled")),
             "standby": True,
-            "note_zh": "已预置，默认不参与复核/创造；QIYU_KIMI_ENABLED=1 后才可调用",
+            "note_zh": (
+                "自定义提供商 cmkey.cn（OpenAI兼容）；非官方Key勿走Moonshot官方域名；"
+                "默认不参与复核/创造；QIYU_KIMI_ENABLED=1 后才可调用；"
+                "国内机请关魔法/代理，直连 cmkey.cn"
+            ),
         }
     rows["standby"] = standby
     return rows
@@ -227,7 +267,7 @@ def review_one(name, candidate, evidence, _retry=True):
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST",
         )
-        response = urllib_request.urlopen(http_request, timeout=cfg["timeout"])
+        response = _urlopen(http_request, timeout=cfg["timeout"])
         raw = json.loads(response.read().decode("utf-8"))
         text = (((raw.get("choices") or [{}])[0].get("message") or {})
                 .get("content") or "").strip()
@@ -378,7 +418,7 @@ def phase5_review_one(name, candidate, evidence, _retry=True):
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST",
         )
-        response = urllib_request.urlopen(http_request, timeout=cfg["timeout"])
+        response = _urlopen(http_request, timeout=cfg["timeout"])
         raw = json.loads(response.read().decode("utf-8"))
         text = (((raw.get("choices") or [{}])[0].get("message") or {})
                 .get("content") or "").strip()
@@ -939,7 +979,7 @@ def theoretical_review_one(name, candidate, evidence, _retry=True):
             cfg["url"], data=encoded,
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        with urllib_request.urlopen(req, timeout=max(int(cfg.get("timeout") or 90), 120)) as resp:
+        with _urlopen(req, timeout=max(int(cfg.get("timeout") or 90), 120)) as resp:
             raw = json.loads(resp.read().decode("utf-8"))
         content = (((raw.get("choices") or [{}])[0].get("message") or {})
                    .get("content"))
@@ -1351,7 +1391,7 @@ def retrospective_live_review_one(name, manifest, evidence, _retry=True):
             cfg["url"], data=encoded,
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        response = urllib_request.urlopen(request, timeout=cfg["timeout"])
+        response = _urlopen(request, timeout=cfg["timeout"])
         raw = json.loads(response.read().decode("utf-8"))
         content = (((raw.get("choices") or [{}])[0].get("message") or {})
                    .get("content") or "").strip()
@@ -1577,7 +1617,7 @@ def research_one(name, context, strategy_metadata, _retry=True):
         req = urllib_request.Request(cfg["url"], data=encoded,
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        response = urllib_request.urlopen(req, timeout=max(cfg["timeout"], 180))
+        response = _urlopen(req, timeout=max(cfg["timeout"], 180))
         raw = json.loads(response.read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         content = message.get("content") or message.get("reasoning_content") or ""
@@ -1655,7 +1695,7 @@ def active_hunt_one(name, hunt_context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        response = urllib_request.urlopen(req, timeout=max(cfg["timeout"], 180))
+        response = _urlopen(req, timeout=max(cfg["timeout"], 180))
         raw = json.loads(response.read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         content = message.get("content") or message.get("reasoning_content") or ""
@@ -1758,7 +1798,7 @@ def prescreen_death_analysis(context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -1829,7 +1869,7 @@ def _micro_primitive_propose(context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -1878,7 +1918,7 @@ def _micro_primitive_audit_one(name, context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -1962,7 +2002,7 @@ def death_micro_cooccurrence_analysis(context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -2020,7 +2060,7 @@ def _system_solvability_one(name, context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -2101,7 +2141,7 @@ def probe_failure_autopsy(context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or "")
@@ -2154,7 +2194,7 @@ def _audit_pruning_rule_one(name, context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -2221,7 +2261,7 @@ def _death_distillation_propose(context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -2292,7 +2332,7 @@ def _death_distillation_audit_one(name, context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -2373,7 +2413,7 @@ def analyze_failure_one(name, context, strategy_metadata, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        response = urllib_request.urlopen(req, timeout=max(cfg["timeout"], 180))
+        response = _urlopen(req, timeout=max(cfg["timeout"], 180))
         raw = json.loads(response.read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(
@@ -2470,7 +2510,7 @@ def review_hypotheses_one(name, batch_hash, catalog, context, _retry=True):
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST",
         )
-        response = urllib_request.urlopen(req, timeout=max(cfg["timeout"], 150))
+        response = _urlopen(req, timeout=max(cfg["timeout"], 150))
         raw = json.loads(response.read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         content = message.get("content") or message.get("reasoning_content") or ""
@@ -2620,7 +2660,7 @@ def propose_environment_boundary(context, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or
@@ -2665,7 +2705,7 @@ def audit_environment_boundary(name, context, boundary, _retry=True):
             cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
             headers={"Authorization": "Bearer " + cfg["api_key"],
                      "Content-Type": "application/json"}, method="POST")
-        raw = json.loads(urllib_request.urlopen(
+        raw = json.loads(_urlopen(
             req, timeout=max(cfg["timeout"], 180)).read().decode("utf-8"))
         message = ((raw.get("choices") or [{}])[0].get("message") or {})
         parsed = _parse_content_json(message.get("content") or

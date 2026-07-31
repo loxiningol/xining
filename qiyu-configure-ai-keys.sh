@@ -34,13 +34,15 @@ fi
   printf '%s\n' 'QIYU_KIMI_MODEL=kimi-k3'
   printf '%s\n' 'QIYU_KIMI_URL=https://cmkey.cn/v1/chat/completions'
   printf '%s\n' 'QIYU_KIMI_ENABLED=0'
+  # 国内机关魔法：cmkey 强制直连，不走 clash/VPN 代理
+  printf '%s\n' 'QIYU_FORCE_NO_PROXY=1'
   printf '%s\n' 'QIYU_ECOSYSTEM_VARIANTS=6'
   printf '%s\n' 'QIYU_ECOSYSTEM_BACKTEST_START="2026-01-01 00:00:00"'
 } > "${target}.tmp"
 chmod 600 "${target}.tmp"
 mv -f "${target}.tmp" "$target"
 unset deepseek_key qwen_key glm_key kimi_key
-printf '完成：密钥已写入权限为600的配置文件；Kimi 为待机（ENABLED=0）。\n'
+printf '完成：密钥已写入权限为600的配置文件；Kimi 为待机（ENABLED=0）；FORCE_NO_PROXY=1 直连 cmkey。\n'
 set -a
 source "$target"
 set +a
