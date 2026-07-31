@@ -41,7 +41,9 @@ def compile_research_contract(brief, symbol, timeframe, constraints=None):
     if weekly_demand is not None and float(weekly_demand) >= 0.08:
         forced_weekly = float(weekly_demand)
     if "周收益" in text and "8%" in text:
-        forced_weekly = forced_weekly or 0.08
+        # Only treat as hard demand when not an explicit prohibition / revoke note
+        if not any(k in text for k in ("禁止", "撤销", "不作", "不得", "已撤销", "不要硬凑")):
+            forced_weekly = forced_weekly or 0.08
     feasible = True
     warnings = []
     if forced_weekly and forced_weekly >= 0.08:
