@@ -1,54 +1,46 @@
-# 策略创造蓝图 v1（不含复核）
+# 策略创造蓝图 v2（研究发现优先，不含复核）
 
-人类通过 Cursor 下达「创造策略」后，GLM 作为总指挥调度下列飞轮。**本蓝图止于交付策略包；ADA5 四复核为后续独立环节，代码路径不改动。**
+人类通过 Cursor 下达「创造策略」后，系统先跑**研究发现**，再组装候选。**止于交付策略包；ADA5 四复核为后续独立环节。**
 
-## 架构
+## 范式
 
 ```mermaid
 flowchart TD
-    User[人类指令] --> Cursor[Cursor]
-    Cursor --> GLM[GLM 策略总指挥]
-    GLM --> S1[① MetaGPT/AutoGen 风格元思考]
-    S1 --> Doc[策略设计文档]
-    Doc --> S2[② Alphalens/CausalImpact 假设验证]
-    S2 -->|未通过≤5次| S1
-    S2 -->|通过| S3[③ EasyQuant+DeepSeek 挖因子]
-    S3 --> QO[QuantOracle 精确计算]
-    QO --> S4[④ Alphalens 再筛 IC/IR/换手]
-    S4 --> S5[⑤ Backtrader 极端 + AutoGen 红队]
-    S5 -->|未通过≤5次| S1
-    S5 -->|通过| Pack[strategy_code + params + risk_report]
-    Pack -.->|之后另走| Review[现有 ADA5 四复核]
+    User[人类指令] --> Contract[研究契约]
+    Contract -->|目标不可实现| Empty[返回无可信候选]
+    Contract --> Pop[机制图谱 + 现象扫描种群]
+    Pop --> Dedupe[去重 / MAP-Elites 格子]
+    Dedupe --> Probe[裸探针 禁止先写完整策略]
+    Probe --> Anti[反证证据矩阵]
+    Anti --> EFR[EFR + 容量]
+    EFR --> MT[DSR / PBO / CPCV-lite]
+    MT -->|存活| Assemble[因子矿工 / 压力 / 交付]
+    MT -->|全灭| Empty
+    Assemble -.->|之后另走| Review[现有 ADA5 四复核]
 ```
 
-## 阶段与模块
+## 模块
 
 | 阶段 | 模块 | 说明 |
 |---|---|---|
-| ① | `creation_meta_think.py` | 强制发散 + 年化容量；四角色设计文档 |
-| ①b | `creation_knowledge_distill.py` | 外部微观真相卡片（RAG/蒸馏） |
-| ①c | `creation_socratic_agent.py` | AutoGen 风格苏格拉底质询 |
-| ② | `creation_alphalens_lite.py` | **winsorize + neutralize** → IC/IR/换手 + 因果显著 |
-| ②b | `creation_causal_counterfactual.py` | 反事实剔除混杂时段，相关性错觉熔断 |
-| ③ | EasyQuant + DeepSeek + QuantOracle | 挖因子 + 确定性认证 |
-| ④ | Alphalens 再筛 | winsorize/neutralize；过拟合熔断 |
-| ④b | `creation_multiverse.py` | 蒙特卡洛多宇宙生存测试 |
-| ⑤ | `creation_stress_lite.py` | 危机窗口 + 红队 |
-| ⑤b/c | prelim + return_hardness | 胜率≥50%；周收益≥8%；退化熔断 |
+| 0 | `research_discovery.compile_research_contract` | 可行性；拒绝被迫交付周收益≥8% |
+| 1 | `mechanism_graph` + `phenomenon_scanner` | 理论→数据 与 数据→理论；双向交叉加权 |
+| 2 | `map_elites_archive` | 行为格子多样性，不是 Top-N 克隆 |
+| 3 | `probe_protocol` | 固定持有/仓位；裸机制无效禁止用退出优化 |
+| 4 | `antifalsify` | 负对照/安慰剂/竞争解释；**不宣称因果证明** |
+| 5 | `edge_friction` | 早期 EFR；不足不得组装 |
+| 6 | `multiple_testing` + `research_ledger` | 试验次数入账；DSR/PBO |
+| 7 | 组装（原 ①–⑤ lite） | Meta/知识卡/矿工/QuantOracle/压力/收益硬度 |
 
-VPS 未装 alphalens/metagpt/backtrader/autogen 时使用 `*_lite` 可复现适配器；探针会报告真实包是否可用。`winsorize` / `neutralize` 为 Alphalens 有效性底线，轻量适配器中**不得省略**。
+## 熔断（更新）
 
-## 熔断
-
-1. 迭代次数：②/⑤ 回溯 > 5 → 终止并报告无法构建  
-2. 过拟合：IC 衰减过快或换手过高 → 丢弃  
-3. VaR 超日损阈值 → 否决  
-4. 胜率 < 50% → 禁止展示，换方向/经典变式  
-5. **收益硬度**：周收益代理（窗内权益总收益×7/span_days，带杠杆仓位路径）< 8%，或收益/|MDD| < 1.0 → 换视角  
-6. **策略退化**：暴露 < 10% / 单笔 < 1bp / 窗内总收益 < 1% → 换视角  
-7. **因子多空周收益（带杠杆、扣双边成本）< 3%** → 丢弃（即使 IC 显著）  
-
-设计文档强制字段：`expected_annual_return_range`、`minimum_acceptable_annual_return`；发散视角须带 `max_annual_net_estimate`。
+1. 研究发现无存活假设 → **直接无可信候选**（禁止硬凑）  
+2. 裸探针失败 → 禁止组装  
+3. 反证矩阵 oppose 过多 → 淘汰  
+4. EFR < 1.5 → 淘汰  
+5. DSR 未过（有效试验次数校正后）→ 淘汰  
+6. 收益硬度：默认**年化代理≥6%** + 收益/回撤≥1.0；**已撤销周收益≥8%硬门槛**  
+7. CausalImpact-lite 仅作证据降权，**不再当因果一票否决**
 
 ## 入口
 
@@ -56,3 +48,5 @@ VPS 未装 alphalens/metagpt/backtrader/autogen 时使用 `*_lite` 可复现适�
 python3 scripts/strategy_create_blueprint.py --symbol ADA-USDT-SWAP --timeframe 5m --brief "..."
 python3 scripts/strategy_create_collab.py --symbol ADA-USDT-SWAP --timeframe 5m --brief "..."
 ```
+
+Kimi Judge 槽位已预留但默认未启用（`QIYU_KIMI_ENABLED=0`）。

@@ -1,24 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Creation Blueprint Orchestrator — stages ①–⑤ only (NO review).
+"""Creation Blueprint Orchestrator — research discovery THEN assembly (NO review).
 
-Flywheel:
+Paradigm (2026-07-31 upgrade):
   human intent
-    → ① MetaGPT/AutoGen-style meta-think → design doc
-    → ② Alphalens/CausalImpact-style hypothesis validation
-    → ③ EasyQuant + DeepSeek mine → QuantOracle certify
-    → ④ Alphalens rescreen (IC/IR/turnover)
-    → ⑤ Backtrader extreme + AutoGen red-team stress
-    → deliver pack (then existing ADA5 review is a SEPARATE later step)
+    → research contract
+    → mechanism graph + phenomenon population (no early pick-1)
+    → naked probes (forbid sculpting with exits)
+    → antifalsify evidence matrix (not causal proof)
+    → MAP-Elites archive + EFR + DSR/PBO
+    → only survivors enter factor mine / stress / deliverables
+    → existing ADA5 review remains a SEPARATE later step
 
-Hard fuses:
-  1) max 5 retries on stage② / stage⑤ failure loops
-  2) overfit fuse: fast IC decay / high turnover → drop factor
-  3) VaR fuse: exceed human daily-loss bound → reject before stress
-  4) return-hardness fuse: weekly proxy <8% or return/MDD <1.0 → switch lens
-  5) degeneration fuse: low exposure / tiny avg trade / window total <1%
-  6) factor LS weekly (levered) <3% → drop even if IC looks fine
-
-Does NOT import or modify review_admission_v2 / four-review gates.
+Legacy MetaGPT-style meta-think remains as design annotation, but must not
+bypass discovery gates.
 """
 from __future__ import print_function
 
@@ -40,6 +34,8 @@ from . import creation_stress_lite as stress
 from . import easyquant_bridge as eq
 from . import quantoracle_bridge as qo
 from . import research_candle_store as rcs
+from . import research_discovery as discovery
+from . import research_ledger as ledger
 
 
 MAX_LOOP = 5
@@ -395,14 +391,68 @@ def run_creation_blueprint(
         "note_zh": data.get("note_zh"),
     }
 
-    # ① Meta-think
+    run_id = ledger.new_run_id("blueprint")
+    # --- Research discovery FIRST (population → naked probe → antifalsify → EFR) ---
+    disc = discovery.run_discovery(
+        symbol=symbol,
+        timeframe=timeframe,
+        brief=brief,
+        factor_matrix=data.get("matrix"),
+        fwd_returns=data.get("fwd"),
+        candles=data.get("candles"),
+        constraints=rh.default_return_constraints(),
+        run_id=run_id,
+    )
+    stages["research_discovery"] = {
+        "ok": disc.get("ok"),
+        "run_id": disc.get("run_id"),
+        "n_survivors": disc.get("n_survivors"),
+        "handoff": disc.get("handoff"),
+        "trial_budget": (disc.get("stages") or {}).get("trial_budget"),
+        "multiple_testing": (disc.get("stages") or {}).get("multiple_testing"),
+        "map_elites": (disc.get("stages") or {}).get("map_elites"),
+        "population": (disc.get("stages") or {}).get("population"),
+        "contract": (disc.get("stages") or {}).get("contract"),
+        "human_banner_zh": disc.get("human_banner_zh"),
+    }
+    if not disc.get("present_to_assembly"):
+        return {
+            "ok": False,
+            "schema": "qiyu_creation_blueprint_v1",
+            "present_to_human": False,
+            "error": "no_credible_discovery_candidate",
+            "stages": stages,
+            "fuses": {"abort_reason": "research_discovery_empty"},
+            "probes": {
+                "discovery": discovery.probe(),
+                "ledger": ledger.probe(),
+                "research_candles": rcs.probe(),
+            },
+            "handoff_zh": disc.get("human_banner_zh"),
+            "run_id": run_id,
+            "at": _now(),
+        }
+
+    handoff = disc.get("handoff") or {}
+
+    # ① Meta-think (annotation only; hints seeded from discovery handoff)
     meta_pack = meta.run_meta_think(
         brief=brief, symbol=symbol, timeframe=timeframe,
         direction=direction, skip_llm=skip_llm,
     )
     stages["meta"] = meta_pack
     design = meta_pack.get("design_doc") or {}
-    constraints = design.get("constraints") or {}
+    # Overlay discovery-backed mechanism onto design doc
+    if handoff.get("family"):
+        design["mechanism_family"] = handoff.get("family")
+    if handoff.get("core_logic_zh"):
+        design["core_logic_zh"] = handoff.get("core_logic_zh")
+    design["discovery_handoff"] = handoff
+    design["research_run_id"] = run_id
+    if handoff.get("factor_hints"):
+        design["factor_hints"] = list(handoff.get("factor_hints") or [])
+    constraints = rh.merge_constraints(design.get("constraints") or {})
+    design["constraints"] = constraints
     max_dd = -abs(float(constraints.get("max_drawdown") or 0.18))
     max_daily = float(constraints.get("max_daily_loss") or 0.05)
 
@@ -466,8 +516,13 @@ def run_creation_blueprint(
 
     stages["meta"]["design_doc"] = design
 
-    # Core factor hints from design
+    # Core factor hints: discovery handoff first, then design hypotheses
     core_hints = []
+    for name in (handoff.get("factor_hints") or []):
+        if name and name not in core_hints:
+            core_hints.append(name)
+    if handoff.get("probe_factor") and handoff.get("probe_factor") not in core_hints:
+        core_hints.insert(0, handoff.get("probe_factor"))
     for h in design.get("hypotheses") or []:
         for name in h.get("testable_factor_hints") or []:
             if name not in core_hints:
@@ -552,22 +607,20 @@ def run_creation_blueprint(
             ],
         }
         if not cf.get("passed"):
+            # Evidence demotion only — discovery antifalsify already ran.
+            # Do NOT treat CausalImpact-lite as causal proof gate.
             design.setdefault("mutation_log", []).append({
                 "at": _now(),
-                "reason": "causal_counterfactual_fail",
+                "reason": "causal_counterfactual_weak_evidence",
                 "banner": cf.get("human_banner_zh"),
                 "loop": loops["hypothesis"],
+                "note_zh": "仅作机制一致性降权，不宣称因果失败即否决。",
             })
-            design, hints, switched = _switch_direction(
-                design, classic_tried, perspectives_tried,
-            )
-            if switched is None:
-                fuses["abort_reason"] = "causal_counterfactual_directions_exhausted"
-                abort = True
-                break
-            core_hints = hints or core_hints
-            stages["meta"]["design_doc"] = design
-            continue
+            stages["causal_counterfactual"]["gate_mode"] = "evidence_not_veto"
+            # continue to mining with warning rather than exhausting directions
+            pass
+        else:
+            stages["causal_counterfactual"]["gate_mode"] = "evidence_support"
 
         # ③ Mine + QuantOracle
         specs_pack = dsf.propose_factor_specs(design, skip_llm=skip_llm, max_specs=12)
@@ -949,15 +1002,19 @@ def run_creation_blueprint(
             "socratic": socratic.probe(),
             "knowledge_distill": {"ok": True, "module": "creation_knowledge_distill"},
             "multiverse": multiverse.probe(),
+            "discovery": discovery.probe(),
+            "ledger": ledger.probe(),
         },
+        "run_id": run_id,
         "data": stages.get("data"),
         "handoff_zh": (
             (
-                "创造蓝图通过初评（胜率≥50% + 收益硬度）并可进入后续 ADA5 复核；本编排器不改复核代码。"
+                "研究发现+组装通过初评，可进入后续 ADA5 复核；本编排器不改复核代码。"
                 if presentable and ok else
                 (hardness_pack or {}).get("human_banner_zh")
                 or (prelim_pack or {}).get("human_banner_zh")
-                or "初评未通过或熔断：禁止把胜率<50%或近零收益策略当交付展示。"
+                or (stages.get("research_discovery") or {}).get("human_banner_zh")
+                or "初评未通过或无可信候选：禁止硬凑完整策略。"
             )
         ),
         "at": _now(),
@@ -989,13 +1046,13 @@ def run_creation_blueprint(
             "stress_passed": (stages.get("stress") or {}).get("passed"),
             "prelim": prelim_pack,
             "fuses": fuses,
+            "research_discovery": stages.get("research_discovery"),
             "instructions_zh": (
-                "【发散强制】请先列举 3 种完全不同的市场微观结构视角，"
-                "并估算每种可承载的最大年化净收益，再择一深入——"
-                "禁止一上来直接写策略。"
-                "你是总指挥。下列结果来自创造蓝图且已过胜率≥50%与收益硬度门禁。"
-                "请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突；"
-                "禁止声称已过复核；禁止设计近零收益守财奴策略。"
+                "【研究发现优先】下列候选已经过机制图谱/现象扫描、裸探针、反证证据矩阵、"
+                "EFR 与多重检验（DSR/PBO-lite）。禁止回退到『先写完整策略再圆故事』。"
+                "禁止把 CausalImpact-lite 说成因果证明；禁止周收益≥8%硬凑。"
+                "你是总指挥。请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突；"
+                "禁止声称已过复核。"
             ),
             "built_at": _now(),
         }

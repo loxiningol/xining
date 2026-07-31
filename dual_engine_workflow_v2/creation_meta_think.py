@@ -20,13 +20,12 @@ def _now():
 # Forced divergence preamble — compensates for missing multi-agent debate.
 # Must lead every GLM meta-think prompt; also applied in local heuristic path.
 GLM_META_DIVERGENCE_INSTRUCTION = (
-    "请先列举 3 种完全不同的市场微观结构视角来解释当前指令，"
-    "并估算每种视角在当前环境下可承载的最大年化净收益（max_annual_net_estimate），"
-    "然后选择一种视角深入推演。"
-    "禁止选择预期年化净收益低于 6% 的视角（除非三种都不足，则选容量最高者并标注风险）。"
-    "禁止一上来直接写策略；禁止三种视角同质化（例如都写成均值回归变体）。"
-    "最终策略必须赚钱：1周收益率代理不得低于 8%（带杠杆后的账户权益），"
-    "收益回撤比不得低于 1.0；禁止产出守财奴式近零收益策略。"
+    "请先列举至少 5 种彼此正交的市场微观结构/参与者约束视角（不要只写3个同质变体），"
+    "每条必须写清：收益支付者、被利用约束、可观测代理、预测方向、成立/失效条件、容量。"
+    "禁止过早收敛为单一完整策略；禁止一上来直接写进出场规则。"
+    "后续由研究发现系统用裸探针与反证实验淘汰，而不是靠文笔选最优故事。"
+    "禁止把周收益≥8%当作硬交付目标；若人类要求不可实现，应标明不可行而非硬凑。"
+    "年化净收益启发式估计可写 max_annual_net_estimate，但不得替代独立证据。"
 )
 
 # Default three orthogonal microstructure lenses (local path when LLM skipped)

@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
 """Creation-stage return hardness + strategy-degeneration fuses.
 
-Human diagnosis (2026-07-30): the pipeline optimized for low risk / low DD and
-accepted near-zero absolute return with inflated Sharpe. These gates force the
-creation flywheel to also earn — without touching ADA5 review code.
-
-Hard rules (creation only):
-  1) Levered weekly-return proxy >= MIN_WEEKLY_RETURN (default 8%)
-  2) Return / |MDD| >= MIN_RETURN_MDD (default 1.0)
-  3) Factor long-short weekly return (levered, cost-aware) >= MIN_FACTOR_WEEKLY
-  4) Degeneration fuse: low exposure / tiny avg trade / window total < 1%
+Calibrated against live ADA5 seed (2026-07-31 audit):
+  - Hard weekly >=8% was revoked: forces overfitting / leverage chasing.
+  - Prefer annualized proxy floor + return/MDD + anti-degeneration.
+  - If a brief still demands unreachable weekly targets, discovery contract
+    should return no credible candidate instead of forcing delivery.
 """
 from __future__ import print_function
 
@@ -17,16 +13,19 @@ from datetime import datetime
 
 
 # --- defaults (overridable via design_doc.constraints) ---
-MIN_WEEKLY_RETURN = 0.08          # 1-week equity return, levered sizing path
+# Weekly hard floor OFF by default (0.0). Brief may still request, but discovery
+# treats >=8% weekly as usually infeasible rather than an optimization target.
+MIN_WEEKLY_RETURN = 0.0
 MIN_RETURN_MDD = 1.0              # total_return / abs(mdd)
 MIN_WINDOW_TOTAL_RETURN = 0.01    # absolute window equity return floor
 MIN_FACTOR_WEEKLY_LEV = 0.03      # factor LS weekly after leverage + 2x costs
 FACTOR_LEV_SCALE = 8.0            # amplify unit-notional factor rets toward "带杠杆"
 ROUND_TRIP_COST = 0.001           # 5bp slip + 5bp fee each way ≈ 10bp RT
-MIN_EXPOSURE = 0.10               # market exposure floor (degen if below)
+MIN_EXPOSURE = 0.0                # exposure floor off (ADA5 contradiction)
 MIN_AVG_TRADE_BP = 1.0            # average trade net < 1bp → degen
 MIN_ANNUAL_ACCEPTABLE = 0.06
 EXPECTED_ANNUAL_RANGE = (0.08, 0.20)
+MIN_ANNUALIZED_PROXY = 0.06       # total_return * (365/span_days)
 
 
 def _now():
@@ -37,6 +36,7 @@ def default_return_constraints():
     return {
         "expected_annual_return_range": list(EXPECTED_ANNUAL_RANGE),
         "minimum_acceptable_annual_return": MIN_ANNUAL_ACCEPTABLE,
+        "minimum_annualized_return": MIN_ANNUALIZED_PROXY,
         "minimum_weekly_return": MIN_WEEKLY_RETURN,
         "minimum_return_mdd": MIN_RETURN_MDD,
         "minimum_window_total_return": MIN_WINDOW_TOTAL_RETURN,
@@ -44,10 +44,11 @@ def default_return_constraints():
         "factor_lev_scale": FACTOR_LEV_SCALE,
         "minimum_exposure": MIN_EXPOSURE,
         "minimum_avg_trade_bp": MIN_AVG_TRADE_BP,
+        "eval_lookback_days": 730,
         "note_zh": (
-            "收益硬度：周收益代理≥8%、收益/回撤≥1.0；"
-            "因子多空周收益(带杠杆)≥3%；"
-            "退化：暴露<10% 或 单笔<1bp 或 窗内总收益<1% → 换视角重做。"
+            "收益硬度（ADA5模板校准）：近2年视界年化代理≥6%、收益/回撤≥1.0；"
+            "因子多空周收益(带杠杆)≥3%；退化：单笔<1bp 或 窗内总收益<1% → 换视角。"
+            "已撤销：周收益≥8%、暴露≥10%（逼过拟合且与 ADA5顺势回升 矛盾）。"
         ),
     }
 
@@ -245,6 +246,9 @@ def evaluate_return_hardness(
         max_drawdown = max_drawdown_from_returns(rets)
 
     weekly = weekly_return_proxy(total_return, span_days)
+    annualized = None
+    if total_return is not None and span_days and float(span_days) > 1e-9:
+        annualized = float(total_return) * (365.0 / float(span_days))
     mdd = float(max_drawdown) if max_drawdown is not None else None
     ret_mdd = None
     if total_return is not None and mdd is not None and abs(mdd) > 1e-12:
@@ -253,13 +257,25 @@ def evaluate_return_hardness(
         ret_mdd = 0.0 if abs(float(total_return)) < 1e-6 else 999.0
 
     reasons = []
-    min_w = float(c.get("minimum_weekly_return") or MIN_WEEKLY_RETURN)
+    min_w = float(c["minimum_weekly_return"]) if c.get("minimum_weekly_return") is not None else float(MIN_WEEKLY_RETURN)
     min_rm = float(c.get("minimum_return_mdd") or MIN_RETURN_MDD)
+    min_ann = float(
+        c.get("minimum_annualized_return")
+        or c.get("minimum_acceptable_annual_return")
+        or MIN_ANNUALIZED_PROXY
+    )
 
-    if weekly is None:
-        reasons.append("weekly_return_missing")
-    elif weekly < min_w:
-        reasons.append("weekly_return_below_8pct")
+    # Weekly floor only enforced when explicitly > 0 (default off).
+    if min_w > 0:
+        if weekly is None:
+            reasons.append("weekly_return_missing")
+        elif weekly < min_w:
+            reasons.append("weekly_return_below_floor")
+
+    if annualized is None:
+        reasons.append("annualized_return_missing")
+    elif annualized < min_ann:
+        reasons.append("annualized_return_below_floor")
 
     if ret_mdd is None:
         reasons.append("return_mdd_missing")
@@ -294,6 +310,7 @@ def evaluate_return_hardness(
         "metrics": {
             "total_return": total_return,
             "weekly_return_proxy": weekly,
+            "annualized_return_proxy": annualized,
             "max_drawdown": mdd,
             "return_mdd": ret_mdd,
             "span_days": span_days,
@@ -302,24 +319,25 @@ def evaluate_return_hardness(
         },
         "floors": {
             "minimum_weekly_return": min_w,
+            "minimum_annualized_return": min_ann,
             "minimum_return_mdd": min_rm,
             "minimum_acceptable_annual_return": c.get("minimum_acceptable_annual_return"),
             "expected_annual_return_range": c.get("expected_annual_return_range"),
         },
         "degeneration": degen,
         "return_scope_zh": (
-            "weekly_return_proxy = 窗内权益总收益 × (7 / span_days)；"
-            "是带杠杆仓位路径下的账户权益口径，不是无杠杆价格涨幅，也不是整户 OKX 资产。"
+            "annualized_return_proxy = 窗内权益总收益 × (365 / span_days)；"
+            "weekly_return_proxy 仅作诊断，默认不再作硬门槛。"
         ),
         "human_banner_zh": (
             None if passed else (
                 "【收益硬度未通过·禁止展示】原因: %s。"
-                "周收益代理=%s（门槛≥%.0f%%），收益/回撤=%s（门槛≥%.1f）。"
-                "系统将换视角/经典变式重做，不做守财奴零收益策略。"
+                "年化代理=%s（门槛≥%.0f%%），收益/回撤=%s（门槛≥%.1f）。"
+                "若需求本身不可实现，应返回无可信候选，而非逼过拟合。"
                 % (
                     ",".join(uniq),
-                    ("%.2f%%" % (100 * weekly) if weekly is not None else "缺失"),
-                    100 * min_w,
+                    ("%.2f%%" % (100 * annualized) if annualized is not None else "缺失"),
+                    100 * min_ann,
                     ("%.2f" % ret_mdd if ret_mdd is not None else "缺失"),
                     min_rm,
                 )

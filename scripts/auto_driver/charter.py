@@ -24,7 +24,8 @@ OPERATING_CHARTER = """
    * 严禁直接阅读工程师堆叠出的臃肿代码并尝试“改好它”；严禁加法式优化。
  * 总工程师 (Codex / Cursor) — 精密打字员：
    * 只按契约与伪代码落 DSL；跑通 sanity asserts。
-   * 创造入口：scripts/strategy_create_blueprint.py（①–⑤）与 scripts/strategy_create_collab.py（蓝图→GLM→可选 STEP A）。
+   * 创造入口：scripts/strategy_create_blueprint.py / strategy_create_collab.py
+     （先 research_discovery：机制图谱+现象种群→裸探针→反证→EFR→DSR/PBO，再组装；止于复核前）。
    * 严禁自行补全未定义业务逻辑、严禁用常见套路偷换精细边界（假懂）。
    * 负责快照/回滚与 DSL 语法保护。
  * 四维审查法庭 (4D Formal Audit Engine)：
