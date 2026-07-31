@@ -1,0 +1,73 @@
+{
+  "ok": true,
+  "rows": [
+    {
+      "key": "mut_bopb_bnb_15m_lon_o24_r45_z2p3_h14_tp60",
+      "rsi": 45,
+      "z": 2.3,
+      "hold": 14,
+      "off": 24,
+      "tp": 60,
+      "box": "lon",
+      "n": 22,
+      "wr": 0.5,
+      "mean_net": -0.03464299750949359,
+      "span_days": 187.49,
+      "weekly_opens_proxy": 0.8214,
+      "frame_start": "2026-01-18 19:45:00",
+      "frame_end": "2026-07-25 07:30:00",
+      "pos": false
+    },
+    {
+      "key": "mut_bopb_bnb_15m_asia_o20_r45_z2p3_h14_tp55",
+      "rsi": 45,
+      "z": 2.3,
+      "hold": 14,
+      "off": 20,
+      "tp": 55,
+      "box": "asia",
+      "n": 23,
+      "wr": 0.5652173913043478,
+      "mean_net": -0.01814780548551242,
+      "span_days": 187.49,
+      "weekly_opens_proxy": 0.8587,
+      "frame_start": "2026-01-18 19:45:00",
+      "frame_end": "2026-07-25 07:30:00",
+      "pos": false
+    },
+    {
+      "key": "mut_bopb_bnb_15m_asia_o24_r45_z2p3_h12_tp55",
+      "rsi": 45,
+      "z": 2.3,
+      "hold": 12,
+      "off": 24,
+      "tp": 55,
+      "box": "asia",
+      "n": 26,
+      "wr": 0.6153846153846154,
+      "mean_net": -0.01149335144558267,
+      "span_days": 187.49,
+      "weekly_opens_proxy": 0.9707,
+      "frame_start": "2026-01-18 19:45:00",
+      "frame_end": "2026-07-25 07:30:00",
+      "pos": false
+    },
+    {
+      "key": "mut_bopb_bnb_15m_asia_o20_r42_z2p3_h14_tp60",
+      "rsi": 42,
+      "z": 2.3,
+      "hold": 14,
+      "off": 20,
+      "tp": 60,
+      "box": "asia",
+      "n": 6,
+      "wr": 0.6666666666666666,
+      "mean_net": -0.008221162126421539,
+      "span_days": 187.49,
+      "weekly_opens_proxy": 0.224,
+      "frame_start": "2026-01-18 19:45:00",
+      "frame_end": "2026-07-25 07:30:00",
+      "pos": false
+    }
+  ]
+}

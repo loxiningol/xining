@@ -1,0 +1,148 @@
+{
+  "ok": true,
+  "note_zh": "完整长窗网格未跑完；对短窗POS代表候选做了~6个月OHLC再测，全部坍塌",
+  "bnb15m_long_retest": {
+    "ok": true,
+    "rows": [
+      {
+        "key": "mut_bopb_bnb_15m_lon_o24_r45_z2p3_h14_tp60",
+        "rsi": 45,
+        "z": 2.3,
+        "hold": 14,
+        "off": 24,
+        "tp": 60,
+        "box": "lon",
+        "n": 22,
+        "wr": 0.5,
+        "mean_net": -0.03464299750949359,
+        "span_days": 187.49,
+        "weekly_opens_proxy": 0.8214,
+        "frame_start": "2026-01-18 19:45:00",
+        "frame_end": "2026-07-25 07:30:00",
+        "pos": false
+      },
+      {
+        "key": "mut_bopb_bnb_15m_asia_o20_r45_z2p3_h14_tp55",
+        "rsi": 45,
+        "z": 2.3,
+        "hold": 14,
+        "off": 20,
+        "tp": 55,
+        "box": "asia",
+        "n": 23,
+        "wr": 0.5652173913043478,
+        "mean_net": -0.01814780548551242,
+        "span_days": 187.49,
+        "weekly_opens_proxy": 0.8587,
+        "frame_start": "2026-01-18 19:45:00",
+        "frame_end": "2026-07-25 07:30:00",
+        "pos": false
+      },
+      {
+        "key": "mut_bopb_bnb_15m_asia_o24_r45_z2p3_h12_tp55",
+        "rsi": 45,
+        "z": 2.3,
+        "hold": 12,
+        "off": 24,
+        "tp": 55,
+        "box": "asia",
+        "n": 26,
+        "wr": 0.6153846153846154,
+        "mean_net": -0.01149335144558267,
+        "span_days": 187.49,
+        "weekly_opens_proxy": 0.9707,
+        "frame_start": "2026-01-18 19:45:00",
+        "frame_end": "2026-07-25 07:30:00",
+        "pos": false
+      },
+      {
+        "key": "mut_bopb_bnb_15m_asia_o20_r42_z2p3_h14_tp60",
+        "rsi": 42,
+        "z": 2.3,
+        "hold": 14,
+        "off": 20,
+        "tp": 60,
+        "box": "asia",
+        "n": 6,
+        "wr": 0.6666666666666666,
+        "mean_net": -0.008221162126421539,
+        "span_days": 187.49,
+        "weekly_opens_proxy": 0.224,
+        "frame_start": "2026-01-18 19:45:00",
+        "frame_end": "2026-07-25 07:30:00",
+        "pos": false
+      }
+    ]
+  },
+  "xag5m_long_retest": {
+    "ok": true,
+    "rows": [
+      {
+        "rsi": 42,
+        "z": 3.0,
+        "hold": 12,
+        "off": 28,
+        "tp": 60,
+        "n": 39,
+        "wr": 0.3076923076923077,
+        "mean_net": -0.030638429799422242,
+        "weekly": 1.5765791056747542,
+        "span_days": 173.15972222222223,
+        "pos": false
+      },
+      {
+        "rsi": 42,
+        "z": 3.0,
+        "hold": 24,
+        "off": 28,
+        "tp": 58,
+        "n": 39,
+        "wr": 0.358974358974359,
+        "mean_net": -0.03428393726911941,
+        "weekly": 1.5765791056747542,
+        "span_days": 173.15972222222223,
+        "pos": false
+      },
+      {
+        "rsi": 42,
+        "z": 2.3,
+        "hold": 14,
+        "off": 20,
+        "tp": 60,
+        "n": 31,
+        "wr": 0.3225806451612903,
+        "mean_net": -0.034262428215178976,
+        "weekly": 1.253178263485061,
+        "span_days": 173.15972222222223,
+        "pos": false
+      },
+      {
+        "rsi": 42,
+        "z": 2.3,
+        "hold": 12,
+        "off": 28,
+        "tp": 60,
+        "n": 38,
+        "wr": 0.2894736842105263,
+        "mean_net": -0.03205758209567886,
+        "weekly": 1.5361540004010426,
+        "span_days": 173.15972222222223,
+        "pos": false
+      },
+      {
+        "rsi": 40,
+        "z": 2.3,
+        "hold": 14,
+        "off": 20,
+        "tp": 55,
+        "n": 17,
+        "wr": 0.4117647058823529,
+        "mean_net": -0.01093754872129619,
+        "weekly": 0.687226789653098,
+        "span_days": 173.15972222222223,
+        "pos": false
+      }
+    ]
+  },
+  "long_window_pos_hits": 0
+}

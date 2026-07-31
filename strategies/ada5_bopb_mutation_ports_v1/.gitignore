@@ -1,0 +1,4 @@
+_scratch/frames/
+_scratch/ohlc/
+*.pkl
+*.parquet

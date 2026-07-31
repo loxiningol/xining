@@ -1,0 +1,46 @@
+{
+  "ok": false,
+  "present_to_human": false,
+  "status": "REJECTED_CREATION_GATES",
+  "schema": "qiyu_creation_delivery_v1",
+  "strategy_id": "ada5_bopb_mutation_ports_v1",
+  "review_name_zh": "四阶段复核",
+  "submitted_to_four_review": false,
+  "direction_zh": "ADA5顺势回升 + 亚盘高突破回踩再进 的异标的/异周期变异推演",
+  "seed_keys": [
+    "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+    "ada5m_bopb_asia_o20_r42_z2p3"
+  ],
+  "universe_zh": [
+    "ETH/BNB/SOL/LTC/XRP/AVAX/LINK/DOGE/XAG 5m",
+    "BNB 15m（周期演化）",
+    "会话箱演化：asia_high → london_high（救援）"
+  ],
+  "human_banner_zh": "【创造链条完成·禁止交付】既有策略变异族在短窗救援出现 POS，但更长窗（~6个月）再测 mean_net 全面转负；不提交四阶段复核，不挂载。",
+  "gates": {
+    "min_win_rate": 0.5,
+    "require_positive_mean_net": true,
+    "min_trades": 10,
+    "short_window_pos_hits": 33,
+    "long_window_pos_hits": 0
+  },
+  "evidence_paths": [
+    "strategies/ada5_bopb_mutation_ports_v1/DESIGN.md",
+    "strategies/ada5_bopb_mutation_ports_v1/_scratch/mutation_ports_screen_v1.json",
+    "strategies/ada5_bopb_mutation_ports_v1/_scratch/mutation_ports_rescue_v1.json",
+    "strategies/ada5_bopb_mutation_ports_v1/_scratch/bnb15m_mutation_long_retest.json",
+    "strategies/ada5_bopb_mutation_ports_v1/_scratch/xag5m_mutation_long_retest.json",
+    "strategies/ada5_bopb_mutation_ports_v1/_scratch/long_window_collapse_summary.json",
+    "scripts/screen_ada5_bopb_mutation_ports.py",
+    "scripts/screen_ada5_bopb_mutation_rescue.py"
+  ],
+  "best_near_miss": {
+    "sym": "BNB-USDT-SWAP",
+    "tf": "15m",
+    "variant": "london_high breakout-memory + RSI re-entry (r45/z2.3/h14/o24/tp60)",
+    "short_window": {"trades": 12, "win_rate": 0.6667, "mean_net": 0.00987},
+    "long_window_~187d": {"trades": 22, "win_rate": 0.5, "mean_net": -0.03464},
+    "note_zh": "短窗唯一高胜率正期望槽位，长窗期望坍塌，不可交付"
+  },
+  "next_step_zh": "若续研会话箱移植，建议先改出场/摩擦敏感结构并要求≥6个月正期望，再开新创造链；需你确认。"
+}
