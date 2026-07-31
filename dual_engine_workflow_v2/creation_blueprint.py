@@ -210,7 +210,7 @@ def _pick_trade_returns(survivors):
 def _write_deliverables(out_dir, symbol, timeframe, blueprint):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     base = "%s_%s_%s" % (symbol.split("-")[0].lower(), timeframe, stamp)
 
     presentable = bool((blueprint.get("prelim") or {}).get("present_to_human"))
@@ -369,6 +369,7 @@ def run_creation_blueprint(
     skip_llm=True,
     max_loops=MAX_LOOP,
     out_dir=None,
+    run_id=None,
 ):
     """Execute stages ①–⑤ with fuses. Returns blueprint envelope for GLM / collab."""
     loops = {"hypothesis": 0, "stress": 0}
@@ -391,7 +392,7 @@ def run_creation_blueprint(
         "note_zh": data.get("note_zh"),
     }
 
-    run_id = ledger.new_run_id("blueprint")
+    run_id = run_id or ledger.new_run_id("blueprint")
     # --- Research discovery FIRST (population → naked probe → antifalsify → EFR) ---
     disc = discovery.run_discovery(
         symbol=symbol,

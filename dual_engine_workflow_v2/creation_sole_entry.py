@@ -14,6 +14,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from .process_safe_state import atomic_write_json, process_lock, unique_id
+
 
 SOLE_SCHEMA = "qiyu_sole_creation_entry_v1"
 BLOCKED_REASON = (
@@ -92,7 +94,7 @@ def verify_blueprint_stages(blueprint):
     }
 
 
-def create_strategy(
+def _create_strategy_unlocked(
     symbol="ADA-USDT-SWAP",
     timeframe="5m",
     direction="long",
@@ -101,6 +103,10 @@ def create_strategy(
     max_loops=5,
     with_glm_spec=False,
     submit_step_a=False,
+    mission_id=None,
+    source="direct",
+    research_direction="",
+    out_dir=None,
 ):
     """Canonical creation. Always research-discovery blueprint first."""
     from .creation_blueprint import run_creation_blueprint
@@ -109,6 +115,7 @@ def create_strategy(
         "人类下达创造指令：在 %s %s 上寻找可证伪收益机制（研究发现优先，禁止先写完整策略）"
         % (symbol, timeframe)
     )
+    mission_id = str(mission_id or unique_id("creation"))
     blueprint = run_creation_blueprint(
         symbol=symbol,
         timeframe=timeframe,
@@ -116,6 +123,8 @@ def create_strategy(
         brief=brief,
         skip_llm=skip_llm,
         max_loops=max_loops,
+        out_dir=out_dir,
+        run_id=mission_id,
     )
     stages = (blueprint or {}).get("stages") or {}
     gate = verify_blueprint_stages({
@@ -139,6 +148,9 @@ def create_strategy(
         "timeframe": timeframe,
         "direction": direction,
         "brief": brief[:500],
+        "mission_id": mission_id,
+        "source": str(source or "direct"),
+        "research_direction": str(research_direction or brief)[:500],
         "blueprint": blueprint,
         "pipeline_gate": gate,
         "present_to_human": bool(blueprint.get("present_to_human")),
@@ -156,11 +168,7 @@ def create_strategy(
     try:
         d = _root() / "auto_trade" / "dual_engine" / "sole_creation_runs"
         d.mkdir(parents=True, exist_ok=True)
-        path = d / ("%s_%s_%s.json" % (
-            datetime.now().strftime("%Y%m%d_%H%M%S"),
-            str(symbol).split("-")[0].lower(),
-            timeframe,
-        ))
+        path = d / ("%s.json" % mission_id)
         slim = {
             "ok": out.get("ok"),
             "schema": out.get("schema"),
@@ -170,14 +178,66 @@ def create_strategy(
             "blueprint_ok": blueprint.get("ok"),
             "present_to_human": blueprint.get("present_to_human"),
             "run_id": blueprint.get("run_id"),
+            "mission_id": mission_id,
+            "source": str(source or "direct"),
+            "research_direction": str(research_direction or brief)[:500],
             "handoff_zh": out.get("handoff_zh"),
             "at": out.get("at"),
         }
-        path.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(path, slim)
         out["receipt_path"] = str(path)
     except Exception:
         pass
     return out
+
+
+def create_strategy(
+    symbol="ADA-USDT-SWAP",
+    timeframe="5m",
+    direction="long",
+    brief="",
+    skip_llm=True,
+    max_loops=5,
+    with_glm_spec=False,
+    submit_step_a=False,
+    mission_id=None,
+    source="direct",
+    research_direction="",
+    out_dir=None,
+):
+    """Canonical executor with a global maximum of two simultaneous missions."""
+    kwargs = {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "direction": direction,
+        "brief": brief,
+        "skip_llm": skip_llm,
+        "max_loops": max_loops,
+        "with_glm_spec": with_glm_spec,
+        "submit_step_a": submit_step_a,
+        "mission_id": mission_id,
+        "source": source,
+        "research_direction": research_direction,
+        "out_dir": out_dir,
+    }
+    # Queue workers already hold one of these locks for their whole lifetime.
+    if os.environ.get("QIYU_CREATION_SLOT_HELD") in ("0", "1"):
+        return _create_strategy_unlocked(**kwargs)
+    for slot in (0, 1):
+        with process_lock("creation_capacity_%s" % slot, blocking=False) as lock_handle:
+            if lock_handle is None:
+                continue
+            out = _create_strategy_unlocked(**kwargs)
+            out["capacity_slot"] = slot
+            return out
+    return {
+        "ok": False,
+        "schema": SOLE_SCHEMA,
+        "error": "parallel_creation_capacity_full",
+        "message_zh": "两个策略研究槽均在运行；请通过唯一任务入口排队，禁止启动第三条旁路。",
+        "required_entry": "dual_engine_workflow_v2.parallel_creation.submit_job",
+        "at": _now(),
+    }
 
 
 def probe():
@@ -192,6 +252,11 @@ def probe():
             "auto_trade_strategy_creation_factory.run_daily_collaborative_round",
             "auto_trade_mass_engine",
         ],
-        "required": "create_strategy(symbol,timeframe,brief=...)",
+        "required": "parallel_creation.submit_job(source,research_direction,...)",
+        "maximum_parallel_missions": 2,
+        "parallel_isolation": [
+            "mission_id", "research_ledger", "research_blackboard",
+            "artifact_directory", "formal_review_handoff",
+        ],
         "at": _now(),
     }

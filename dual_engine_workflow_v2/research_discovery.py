@@ -148,6 +148,15 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
     }
 
 
+def _emit_progress(stage_key, detail="", percent=None, extras=None):
+    """Best-effort live progress for 管道1/管道2 frontend."""
+    try:
+        from .parallel_creation import report_progress
+        report_progress(stage_key, detail=detail, percent=percent, extras=extras)
+    except Exception:
+        pass
+
+
 def run_discovery(
     symbol,
     timeframe,
@@ -171,6 +180,7 @@ def run_discovery(
     # Tiny-VPS cap
     max_hypotheses_probe = max(8, min(int(max_hypotheses_probe), 40))
     stages = {}
+    _emit_progress("contract", detail="编译研究契约 · %s %s" % (symbol, timeframe), percent=12)
     contract = compile_research_contract(brief, symbol, timeframe, constraints)
     stages["contract"] = contract
     ledger.append_event({
@@ -205,6 +215,7 @@ def run_discovery(
     )
     max_hypotheses_probe = max(8, min(int(max_hypotheses_probe), 40))
 
+    _emit_progress("population", detail="生成机制种群（委员会并行提交）", percent=22)
     pop = build_hypothesis_population(
         brief, symbol, timeframe, factor_matrix, fwd_returns,
         max_mechanisms=int((constraints or {}).get("max_mechanisms") or 14),
@@ -226,6 +237,13 @@ def run_discovery(
             1 for h in (pop.get("hypotheses") or []) if h.get("bidirectional_hit")
         ),
     }
+    _emit_progress(
+        "committee",
+        detail="异构委员会完成 · 假设 %s" % len(pop.get("hypotheses") or []),
+        percent=35,
+        extras={"n_hypotheses": len(pop.get("hypotheses") or [])},
+    )
+    _emit_progress("probe", detail="裸探测 / 摩擦检验进行中", percent=60)
     for h in (pop.get("hypotheses") or [])[:120]:
         ledger.append_event({
             "event_type": "hypothesis",
@@ -555,6 +573,14 @@ def run_discovery(
             for e in elites[:30]
         ],
     }
+    _emit_progress(
+        "map_elites",
+        detail="质量—多样性搜索（MAP-Elites）· 填充格 %s · 精英 %s" % (
+            len(archive), len(elites),
+        ),
+        percent=55,
+        extras={"filled_cells": len(archive), "n_elites": len(elites)},
+    )
 
     # Close loop: shadow ingest (fast-only) + next-round budget snapshot
     learning_end = learn.end_of_discovery_learning(run_id, symbol=symbol)

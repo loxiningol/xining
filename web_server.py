@@ -653,6 +653,87 @@ def api_forecast_run():
 
 # ─── Dual-engine strategy creation (GLM designer + Codex engineer) ─────
 
+_VECTOR_STATUS_CACHE = {"ts": 0.0, "payload": None, "building": False, "error": None}
+_VECTOR_STATUS_CACHE_LOCK = threading.Lock()
+_VECTOR_STATUS_CACHE_TTL = 8.0
+_VECTOR_STATUS_STALE_TTL = 120.0
+_VECTOR_STATUS_BUILD_TIMEOUT = 18.0
+
+
+def _vector_minimal_status_payload(error=None):
+    return {
+        "ok": False if error else True,
+        "degraded": True,
+        "error": str(error) if error else None,
+        "message": "运行策略状态降级返回（主机内存紧张或构建超时）",
+        "asset_zones": [],
+        "daily_trade_records": [],
+        "assets": [],
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def _vector_status_payload_cached():
+    """Serve fresh/stale cache; never block the web thread on a full roster rebuild."""
+    now = time.time()
+    with _VECTOR_STATUS_CACHE_LOCK:
+        cached = _VECTOR_STATUS_CACHE.get("payload")
+        ts = float(_VECTOR_STATUS_CACHE.get("ts") or 0)
+        building = bool(_VECTOR_STATUS_CACHE.get("building"))
+        age = now - ts if ts else 1e9
+        if cached is not None and age < _VECTOR_STATUS_CACHE_TTL:
+            return cached
+        stale = cached if (cached is not None and age < _VECTOR_STATUS_STALE_TTL) else None
+        already_building = building
+
+    def _build():
+        try:
+            payload = _vector_status_payload()
+            with _VECTOR_STATUS_CACHE_LOCK:
+                _VECTOR_STATUS_CACHE["ts"] = time.time()
+                _VECTOR_STATUS_CACHE["payload"] = payload
+                _VECTOR_STATUS_CACHE["error"] = None
+                _VECTOR_STATUS_CACHE["building"] = False
+        except Exception as exc:
+            with _VECTOR_STATUS_CACHE_LOCK:
+                _VECTOR_STATUS_CACHE["error"] = str(exc)
+                _VECTOR_STATUS_CACHE["building"] = False
+                if _VECTOR_STATUS_CACHE.get("payload") is None:
+                    _VECTOR_STATUS_CACHE["payload"] = _vector_minimal_status_payload(exc)
+                    _VECTOR_STATUS_CACHE["ts"] = time.time()
+
+    # Kick a background rebuild when cache is missing/expired.
+    with _VECTOR_STATUS_CACHE_LOCK:
+        if not _VECTOR_STATUS_CACHE.get("building"):
+            _VECTOR_STATUS_CACHE["building"] = True
+            already_building = False
+            threading.Thread(target=_build, name="vector-status-build", daemon=True).start()
+        else:
+            already_building = True
+
+    if stale is not None:
+        out = dict(stale)
+        out["cache"] = "stale"
+        return out
+
+    # Another request is already rebuilding — do not stack 18s waits on the UI.
+    if already_building:
+        return _vector_minimal_status_payload("status_building")
+
+    # First paint only: wait briefly for the builder, then degrade instead of hanging.
+    deadline = time.time() + min(4.0, _VECTOR_STATUS_BUILD_TIMEOUT)
+    while time.time() < deadline:
+        with _VECTOR_STATUS_CACHE_LOCK:
+            cached = _VECTOR_STATUS_CACHE.get("payload")
+            if cached is not None:
+                return cached
+            if not _VECTOR_STATUS_CACHE.get("building"):
+                err = _VECTOR_STATUS_CACHE.get("error")
+                return _vector_minimal_status_payload(err or "status_build_failed")
+        time.sleep(0.05)
+    return _vector_minimal_status_payload("status_build_timeout")
+
+
 @app.route("/api/dual_engine/status", methods=["GET"])
 @auth.login_required
 def api_dual_engine_status():
@@ -661,6 +742,51 @@ def api_dual_engine_status():
         dual._ensure_dirs()
         dual._load_env()
         return jsonify({"ok": True, "status": dual.load_status()})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/creation/pipelines", methods=["GET"])
+@auth.login_required
+def api_creation_pipelines():
+    """策略创造演进模块：管道1 / 管道2 实时状态。"""
+    try:
+        from dual_engine_workflow_v2 import parallel_creation as pc
+        return jsonify(pc.status())
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "pipelines": []}), 500
+
+
+@app.route("/api/creation/submit", methods=["POST"])
+@auth.login_required
+def api_creation_submit():
+    """Submit a research direction into the sole parallel creation entry."""
+    try:
+        from dual_engine_workflow_v2 import parallel_creation as pc
+        payload = request.get_json(silent=True) or {}
+        out = pc.submit_job(
+            source=payload.get("source") or "web",
+            research_direction=payload.get("research_direction") or payload.get("brief") or "",
+            symbol=payload.get("symbol") or "ADA-USDT-SWAP",
+            timeframe=payload.get("timeframe") or "5m",
+            direction=payload.get("direction") or "long",
+            brief=payload.get("brief") or "",
+            skip_llm=not bool(payload.get("with_llm")),
+            max_loops=int(payload.get("max_loops") or 5),
+            pipeline=payload.get("pipeline"),
+        )
+        return jsonify(out), (200 if out.get("ok") else 400)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "message": str(e)}), 400
+
+
+@app.route("/api/creation/review", methods=["GET"])
+@auth.login_required
+def api_creation_review():
+    """策略创造复核模块：四阶段复核板 + 双管道对接。"""
+    try:
+        from dual_engine_workflow_v2 import parallel_creation as pc
+        return jsonify(pc.review_status())
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -3950,27 +4076,43 @@ def _vector_read_jsonl(path, limit=160):
     return out
 
 def _vector_import_status_only():
+    """Local-only daemon/executor snapshots. Never block the UI on exchange I/O."""
     daemon = {}
     executor = {}
+    # Prefer on-disk fingerprints over live module status() which may touch OKX.
     try:
-        import sys as _sys
-        if "/root" not in _sys.path:
-            _sys.path.insert(0, "/root")
-        import auto_trade_formal_daemon as d
-        if hasattr(d, "status"):
-            daemon = d.status()
+        daemon = _vector_load_json(_VECTOR_AUTO / "formal_daemon_status.json", {}) or {}
+        if not isinstance(daemon, dict):
+            daemon = {}
+        if not daemon:
+            cfg = _vector_load_json(_VECTOR_AUTO / "formal_daemon_config.json", {}) or {}
+            try:
+                pid = int((_VECTOR_AUTO / "formal_daemon.pid").read_text().strip())
+                running = bool(pid > 0 and is_pid_alive(str(_VECTOR_AUTO / "formal_daemon.pid")))
+            except Exception:
+                pid, running = None, False
+            daemon = {
+                "running": running,
+                "daemon_running": running,
+                "pid": pid,
+                "allow_auto_open": bool((cfg or {}).get("allow_auto_open")),
+                "allow_auto_close": bool((cfg or {}).get("allow_auto_close")),
+                "formal_auto_trading_authorized": bool((cfg or {}).get("formal_auto_trading_authorized")),
+                "gate_authorized_auto_trading": bool((cfg or {}).get("gate_authorized_auto_trading")),
+                "notification_enabled": bool((cfg or {}).get("notification_enabled")),
+                "strategy": {"key": (cfg or {}).get("strategy_key"), "status": {}},
+                "take_profit_pct": (cfg or {}).get("take_profit_pct"),
+                "stop_loss_pct": (cfg or {}).get("stop_loss_pct"),
+                "leverage": (cfg or {}).get("leverage"),
+                "position_mode": (cfg or {}).get("position_mode"),
+            }
     except Exception as e:
         daemon = {"ok": False, "error": str(e)}
 
     try:
-        import sys as _sys
-        if "/root" not in _sys.path:
-            _sys.path.insert(0, "/root")
-        import auto_trade_formal_v6_executor as ex
-        if hasattr(ex, "get_status"):
-            executor = ex.get_status()
-        elif hasattr(ex, "status"):
-            executor = ex.status()
+        executor = _vector_load_json(_VECTOR_AUTO / "formal_executor_status.json", {}) or {}
+        if not isinstance(executor, dict):
+            executor = {}
     except Exception as e:
         executor = {"ok": False, "error": str(e)}
 
@@ -4007,34 +4149,8 @@ def _vector_current(executor=None):
         cur["_source_file"] = "executor.get_status"
         return cur
 
-    # Final read-only fallback: if local state is unavailable but OKX reports one
-    # active position, show it as an exchange-recovered holding instead of
-    # incorrectly reporting no position.  Strategy attribution stays explicit.
-    try:
-        import auto_trade_formal_v6_executor as ex
-        res = ex._get_positions() if hasattr(ex, "_get_positions") else {}
-        rows = res.get("positions") if isinstance(res, dict) else []
-        rows = [row for row in (rows or []) if isinstance(row, dict)]
-        if len(rows) == 1:
-            row = rows[0]
-            side = str(row.get("posSide") or "").lower()
-            return {
-                "status": "open",
-                "strategy_key": "exchange_recovered_position",
-                "strategy_name": "交易所持仓（策略待恢复）",
-                "symbol": row.get("instId") or "BTC-USDT-SWAP",
-                "side": side,
-                "posSide": side,
-                "sz": row.get("pos"),
-                "real_position_sz": row.get("availPos") or row.get("pos"),
-                "entry_price": row.get("avgPx"),
-                "leverage": row.get("lever"),
-                "exchange_side_stop_verified": False,
-                "_source_file": "okx.account.positions",
-                "_exchange_recovered": True,
-            }
-    except Exception:
-        pass
+    # Status API must stay network-free. Do NOT call OKX positions here —
+    # exchange recovery belongs to daemons, not the dashboard poll path.
     return None
 
 def _vector_active(cur):
@@ -5259,7 +5375,7 @@ def vector_safe_real_verify_v3_api():
         if not _vector_auth_ok():
             return _vector_unauth()
         try:
-            return _vector_jsonify(_vector_status_payload())
+            return _vector_jsonify(_vector_status_payload_cached())
         except Exception as e:
             return _vector_jsonify({"ok": False, "stage": "vector_safe_real_verify_v3_status", "error": str(e)}), 500
 
@@ -5315,4 +5431,14 @@ if __name__ == "__main__":
             return None
     except Exception:
         pass
-    app.run(host="0.0.0.0", port=8080)
+    # Warm the auto-trade roster cache so the first UI paint is not empty/degraded.
+    try:
+        def _warm_vector_status():
+            try:
+                _vector_status_payload_cached()
+            except Exception:
+                pass
+        threading.Thread(target=_warm_vector_status, name="vector-status-warm", daemon=True).start()
+    except Exception:
+        pass
+    app.run(host="0.0.0.0", port=8080, threaded=True)
