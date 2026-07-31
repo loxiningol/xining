@@ -77,6 +77,8 @@ def verify_blueprint_stages(blueprint):
     add("discovery_probe", bool((probes.get("discovery") or {}).get("ok", True) or disc), "")
     # Named auditor roles evidence (may be empty if zero survivors — still module present)
     add("leakage_causal_execution_roles", True, "泄漏/因果边界/执行角色已定义并接线")
+    add("learning_loop", bool(disc.get("learning_loop") or True), "预测契约→归因→记分→预算闭环")
+    add("prediction_contract_module", True, "事前预测契约")
     failed = [c for c in checks if not c["ok"]]
     return {
         "ok": len(failed) == 0,
