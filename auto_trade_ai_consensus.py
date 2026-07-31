@@ -18,6 +18,9 @@ from urllib import error as urllib_error
 
 
 PROVIDERS = ("deepseek", "qwen", "glm")
+# Prepared but inactive unless QIYU_<NAME>_ENABLED=1. Never joined into
+# PROVIDERS consensus / review voting while standby.
+STANDBY_PROVIDERS = ("kimi",)
 CONSENT_SCOPES = ("redacted_market_research_data",
                   "redacted_trade_research_data")
 
@@ -99,10 +102,25 @@ def candidate_hash(candidate):
 
 def _normalize_provider_name(name):
     """Map legacy chatgpt/openai slot to glm (Zhipu GLM-5.2)."""
-    n = str(name or "").strip().lower()
+    n = str(name or "").strip().lower().replace("-", "").replace("_", "")
     if n in ("chatgpt", "openai", "gpt", "glm"):
         return "glm"
-    return n
+    if n in ("kimi", "kimik3", "moonshot", "moonshotai"):
+        return "kimi"
+    # restore common dashed forms for unknown names
+    raw = str(name or "").strip().lower()
+    return raw
+
+
+def _provider_enabled(name):
+    """Active consensus providers are always on; standby need explicit enable."""
+    name = _normalize_provider_name(name)
+    if name in PROVIDERS:
+        return True
+    if name in STANDBY_PROVIDERS:
+        flag = str(os.environ.get("QIYU_%s_ENABLED" % name.upper(), "0")).strip().lower()
+        return flag in ("1", "true", "yes", "on")
+    return False
 
 
 def _provider_config(name):
@@ -115,6 +133,11 @@ def _provider_config(name):
             "https://open.bigmodel.cn/api/paas/v4/chat/completions",
             "glm-5.2",
         ),
+        # Moonshot Kimi K3 — standby only until QIYU_KIMI_ENABLED=1
+        "kimi": (
+            "https://api.moonshot.ai/v1/chat/completions",
+            "kimi-k3",
+        ),
     }
     if name not in defaults:
         raise KeyError("unknown AI provider: %s" % name)
@@ -125,17 +148,33 @@ def _provider_config(name):
         "url": os.environ.get(prefix + "URL", url).strip(),
         "model": os.environ.get(prefix + "MODEL", model).strip(),
         "timeout": int(os.environ.get(prefix + "TIMEOUT_SEC", "90")),
+        "enabled": _provider_enabled(name),
+        "standby": name in STANDBY_PROVIDERS,
     }
 
 
 def credentials_status():
+    # Keep active providers at top-level for existing status UIs.
     rows = {}
     for name in PROVIDERS:
         cfg = _provider_config(name)
         rows[name] = {
             "configured": bool(cfg["api_key"]), "url": cfg["url"],
             "model": cfg["model"],
+            "enabled": True,
+            "standby": False,
         }
+    standby = {}
+    for name in STANDBY_PROVIDERS:
+        cfg = _provider_config(name)
+        standby[name] = {
+            "configured": bool(cfg["api_key"]), "url": cfg["url"],
+            "model": cfg["model"],
+            "enabled": bool(cfg.get("enabled")),
+            "standby": True,
+            "note_zh": "已预置，默认不参与复核/创造；QIYU_KIMI_ENABLED=1 后才可调用",
+        }
+    rows["standby"] = standby
     return rows
 
 
@@ -152,6 +191,11 @@ def review_one(name, candidate, evidence, _retry=True):
     name = _normalize_provider_name(name)
     cfg = _provider_config(name)
     digest = candidate_hash(candidate)
+    if not cfg.get("enabled"):
+        return {"provider": name, "ok": False, "decision": "REJECT",
+                "candidate_hash": digest,
+                "reason": "待机模型未启用（QIYU_%s_ENABLED≠1）" % name.upper(),
+                "standby_disabled": True}
     consent = external_research_consent_status(name, "final_review")
     if not consent.get("allowed"):
         return {"provider": name, "ok": False, "decision": "REJECT",
