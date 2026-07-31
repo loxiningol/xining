@@ -71,26 +71,34 @@ def main():
     research = None
     blueprint = None
     if not args.skip_research:
-        from dual_engine_workflow_v2.creation_blueprint import run_creation_blueprint
+        from dual_engine_workflow_v2.creation_sole_entry import create_strategy as _sole_create
         skip_llm = False if args.with_llm_research else True
-        print("BLUEPRINT_START", args.symbol, args.timeframe, "skip_llm", skip_llm, flush=True)
+        print("SOLE_ENTRY_START", args.symbol, args.timeframe, "skip_llm", skip_llm, flush=True)
         t_res = time.time()
-        blueprint = run_creation_blueprint(
+        _sole = _sole_create(
             symbol=args.symbol,
             timeframe=args.timeframe,
             direction=args.direction,
             brief=args.brief,
-            horizon=args.horizon,
             skip_llm=skip_llm,
         )
+        blueprint = (_sole or {}).get("blueprint") or {}
         print(
-            "BLUEPRINT_DONE", round(time.time() - t_res, 1),
-            "ok", (blueprint or {}).get("ok"),
+            "SOLE_ENTRY_DONE", round(time.time() - t_res, 1),
+            "ok", (_sole or {}).get("ok"),
+            "gate", ((_sole or {}).get("pipeline_gate") or {}).get("passed"),
             "present", (blueprint or {}).get("present_to_human"),
             "loops", (blueprint or {}).get("loops"),
             "fuses", (blueprint or {}).get("fuses"),
             flush=True,
         )
+        if not ((_sole or {}).get("pipeline_gate") or {}).get("passed"):
+            print("BLOCKED_PIPELINE_GATE", (_sole or {}).get("handoff_zh"), flush=True)
+            return 4
+        # keep variable name blueprint for rest of collab flow
+        _ = None  # sole path replaces direct run_creation_blueprint
+        if False:
+            blueprint = None
         prelim = (blueprint or {}).get("prelim") or {}
         if prelim:
             print("PRELIM", prelim.get("human_banner_zh") or "ok",

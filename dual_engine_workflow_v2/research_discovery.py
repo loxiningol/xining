@@ -12,12 +12,15 @@ from datetime import datetime
 from . import antifalsify
 from . import creation_multiverse as multiverse
 from . import edge_friction as efr_mod
+from . import heterogeneous_committee as committee
 from . import map_elites_archive as qd
 from . import mechanism_graph as mgraph
 from . import multiple_testing as mtest
 from . import phenomenon_scanner as phscan
 from . import probe_protocol as probes
+from . import research_blackboard as board
 from . import research_ledger as ledger
+from . import symbolic_searcher as sym
 
 
 def _now():
@@ -63,46 +66,34 @@ def compile_research_contract(brief, symbol, timeframe, constraints=None):
 
 
 def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_returns,
-                                max_mechanisms=12, max_phenomena=20):
-    """Independent theory-driven + data-driven hypotheses (no early pick-1)."""
-    mech = mgraph.select_for_brief(
-        brief, symbol=symbol, timeframe=timeframe, limit=max_mechanisms,
+                                max_mechanisms=12, max_phenomena=20, run_id=None):
+    """Independent heterogeneous committee submissions (no early pick-1, no chat)."""
+    run_id = run_id or ledger.new_run_id("pop")
+    director = committee.research_director_budget()
+    board.write(run_id, "research_director", "budget", director)
+
+    mech = committee.run_mechanism_scientist(
+        brief, symbol, timeframe, run_id, limit=max_mechanisms,
     )
-    hyps = [mgraph.mechanism_to_hypothesis(m) for m in (mech.get("mechanisms") or [])]
-
-    scanned = phscan.scan_all(factor_matrix, fwd_returns, max_phenomena=max_phenomena)
-    for i, ph in enumerate(scanned.get("phenomena") or []):
-        hyps.append(phscan.phenomenon_to_hypothesis(ph, rank=i))
-
-    # Bidirectional boost: same factor appearing in both paths
-    mech_factors = set()
-    for h in hyps:
-        if h.get("path") == "theory_to_data":
-            for f in (h.get("factor_hints") or []):
-                mech_factors.add(f)
-    for h in hyps:
-        if h.get("path") == "data_to_theory":
-            hints = h.get("factor_hints") or []
-            if any(f in mech_factors for f in hints):
-                h["bidirectional_hit"] = True
-                h["priority_boost"] = 2.0
-            else:
-                h["bidirectional_hit"] = False
-                h["priority_boost"] = 0.0
-
-    hyps.sort(
-        key=lambda h: (
-            1 if h.get("bidirectional_hit") else 0,
-            float(h.get("priority_boost") or 0),
-            abs(float(((h.get("phenomenon") or {}).get("t_stat") or 0))),
-        ),
-        reverse=True,
+    emp = committee.run_empirical_scientist(
+        factor_matrix, fwd_returns, run_id, max_phenomena=max_phenomena,
     )
+    sym_pack = committee.run_symbolic_searcher(factor_matrix, fwd_returns, run_id)
+
+    hyps = committee.merge_independent_hypotheses(mech, emp, sym_pack)
     dedup = qd.dedupe_hypotheses(hyps)
     return {
         "ok": True,
-        "mechanisms": mech,
-        "phenomena": scanned,
+        "run_id": run_id,
+        "committee": {
+            "research_director": director,
+            "mechanism_scientist": {"n": mech.get("n"), "saw_returns": False},
+            "empirical_scientist": {"n": emp.get("n"), "wrote_trade_rules": False},
+            "symbolic_searcher": {"n": sym_pack.get("n"), "llm": False},
+        },
+        "mechanisms": {"n": mech.get("n"), "hypotheses": mech.get("hypotheses")},
+        "phenomena": emp.get("phenomena"),
+        "symbolic": sym_pack.get("search"),
         "hypotheses_raw_n": len(hyps),
         "hypotheses": dedup.get("kept") or [],
         "dedupe": {"dropped": dedup.get("dropped"), "n_kept": dedup.get("n_kept")},
@@ -142,12 +133,14 @@ def run_discovery(
         stages["contract_flag"] = "unreachable_target_soft_block"
 
     pop = build_hypothesis_population(
-        brief, symbol, timeframe, factor_matrix, fwd_returns,
+        brief, symbol, timeframe, factor_matrix, fwd_returns, run_id=run_id,
     )
     stages["population"] = {
         "n_hypotheses": len(pop.get("hypotheses") or []),
         "n_mechanisms": (pop.get("mechanisms") or {}).get("n"),
         "n_phenomena": (pop.get("phenomena") or {}).get("n"),
+        "n_symbolic": ((pop.get("committee") or {}).get("symbolic_searcher") or {}).get("n"),
+        "committee": pop.get("committee"),
         "dedupe_dropped": len((pop.get("dedupe") or {}).get("dropped") or []),
         "bidirectional_hits": sum(
             1 for h in (pop.get("hypotheses") or []) if h.get("bidirectional_hit")
@@ -241,6 +234,26 @@ def run_discovery(
         if not feas.get("passed"):
             continue
 
+        # Constructive red team: opposing-family naked probe must lose
+        red = committee.run_constructive_redteam(
+            h, factor_matrix, fwd_returns, run_id,
+        )
+        if not red.get("passed"):
+            continue
+
+        # Evidence-field judge (non-LLM; Kimi optional comment only)
+        judgment = committee.judge_from_evidence({
+            "naked_probe_passed": True,
+            "antifalsify_passed": bool(af.get("passed")),
+            "efr_passed": bool(feas.get("passed")),
+            "redteam_passed": bool(red.get("passed")),
+            "bidirectional_hit": bool(h.get("bidirectional_hit")),
+            "dsr_passed": False,  # filled after MT for top survivors
+        }, run_id=run_id)
+        if not judgment.get("admit_to_assembly"):
+            # still allow into archive candidates but mark judge_block
+            pass
+
         archive, elite_row, _replaced = qd.upsert(
             archive, h, probe_best=best, antifalsify=af,
             efr=feas.get("efr"), n_bars=n_bars,
@@ -274,8 +287,21 @@ def run_discovery(
                 "research_value": feas.get("research_value"),
                 "capacity": feas.get("capacity"),
             },
+            "redteam": {
+                "passed": red.get("passed"),
+                "main_net": red.get("main_net"),
+                "opp_net": red.get("opp_net"),
+                "opp_family": red.get("opp_family"),
+            },
+            "judge": {
+                "admit_to_assembly": judgment.get("admit_to_assembly"),
+                "score": judgment.get("score"),
+                "kimi_enabled": ((judgment.get("kimi") or {}).get("enabled")),
+            },
             "elite": elite_row,
         }
+        if not judgment.get("admit_to_assembly"):
+            continue
         survivors.append(row)
         if best.get("trade_returns"):
             probe_returns_for_pbo.append(list(best.get("trade_returns") or [])[:200])
@@ -380,7 +406,8 @@ def probe():
         "ok": True,
         "provider": "research_discovery_v1",
         "modules": [
-            "research_ledger", "mechanism_graph", "phenomenon_scanner",
+            "research_ledger", "research_blackboard", "mechanism_graph",
+            "phenomenon_scanner", "symbolic_searcher", "heterogeneous_committee",
             "probe_protocol", "antifalsify", "map_elites_archive",
             "multiple_testing", "edge_friction", "creation_multiverse",
         ],

@@ -1404,8 +1404,9 @@ def run_daily_collaborative_round(force=False):
         "mode": "ai_review_ops_only",
         "time": _now(),
         "natural_language": (
-            "策略创造工厂已停用：三AI改为复核与运维。"
-            "新策略请由 Codex 开发后经 auto_trade_codex_strategy_review.py --submit 提交。"
+            "策略创造工厂已停用。唯一创造入口："
+            "scripts/strategy_create_sole.py / creation_sole_entry.create_strategy"
+            "（研究发现蓝图）。禁止旁路创造。"
         ),
         "force_ignored": bool(force),
     }

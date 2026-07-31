@@ -1615,57 +1615,63 @@ def _workflow_entry():
 
 def start_creation_task(async_mode=True, symbol=None, timeframe=None,
                         exploration_mode=None, force_workflow=None):
-    """Start a dual-engine creation task (steps 1→…).
-
-    When workflow_flags.creation_entry == 'v2' (or force_workflow='v2'), routes to
-    institutional workflow v2. Default remains legacy until acceptance A–H flips the flag.
-    """
+    """Sole-entry redirect: blank dual-engine creation is forbidden."""
     _ensure_dirs()
     _load_env()
-    entry = str(force_workflow or _workflow_entry() or "legacy")
-    if entry in ("v2", "step_a"):
-        # STEP A: Gates 0–7 / mechanism_spec / 20-split tests supersede bare v2 entry.
-        # Old start_creation_task_v2 remains importable for rollback.
-        import dual_engine_workflow_v2 as wfv2
-        mode = exploration_mode or "A"
-        if hasattr(wfv2, "start_creation_task_step_a"):
-            return wfv2.start_creation_task_step_a(
-                async_mode=async_mode, symbol=symbol, timeframe=timeframe,
-                exploration_mode=mode,
-            )
-        return wfv2.start_creation_task_v2(
-            async_mode=async_mode, symbol=symbol, timeframe=timeframe,
-            exploration_mode=mode,
+    try:
+        from dual_engine_workflow_v2.creation_sole_entry import (
+            is_sole_creation_enforced, create_strategy, refuse_side_path,
         )
-
-    with JOB_LOCK:
-        if _JOB.get("running"):
-            return {"ok": False, "status": "running", "error": "job_already_running",
-                    "kind": _JOB.get("kind")}
-        _JOB.update({"running": True, "kind": "creation", "started_at": _now(),
-                     "error": None})
-
-    def _worker():
-        try:
-            run_creation_pipeline(symbol=symbol, timeframe=timeframe)
-        except Exception as exc:
-            _append_audit({"event": "creation_crash", "error": str(exc),
-                           "trace": traceback.format_exc()[-800:]})
-            save_status({"last_error": str(exc), "stage": "failed"})
-        finally:
-            with JOB_LOCK:
-                _JOB.update({"running": False, "kind": None})
-
-    if async_mode:
-        threading.Thread(target=_worker, name="dual-engine-creation",
-                         daemon=True).start()
-        time.sleep(0.05)
-        return {"ok": True, "status": "started", "async": True,
-                "workflow_version": "v1", "creation_entry": "legacy"}
-    return run_creation_pipeline(symbol=symbol, timeframe=timeframe)
+    except Exception as exc:
+        return {"ok": False, "error": "sole_entry_import_error", "detail": str(exc)}
+    if is_sole_creation_enforced():
+        sym = symbol or "ADA-USDT-SWAP"
+        tf = timeframe or "5m"
+        if async_mode:
+            def _worker():
+                create_strategy(
+                    symbol=sym, timeframe=tf,
+                    brief="dual_engine_start_task_redirected_to_sole_entry",
+                )
+            threading.Thread(target=_worker, name="sole-creation", daemon=True).start()
+            return {
+                "ok": True,
+                "status": "started",
+                "async": True,
+                "creation_entry": "sole_research_discovery",
+                "message_zh": "已强制转入唯一蓝图创造入口（研究发现管道）",
+            }
+        out = create_strategy(
+            symbol=sym, timeframe=tf,
+            brief="dual_engine_start_task_redirected_to_sole_entry",
+        )
+        return {
+            "ok": bool(out.get("ok")),
+            "status": "finished",
+            "creation_entry": "sole_research_discovery",
+            "sole": {
+                "present_to_human": out.get("present_to_human"),
+                "pipeline_gate": out.get("pipeline_gate"),
+                "handoff_zh": out.get("handoff_zh"),
+            },
+        }
+    return refuse_side_path("auto_trade_dual_engine_factory.start_creation_task")
 
 
 def run_creation_pipeline(symbol=None, timeframe=None):
+    try:
+        from dual_engine_workflow_v2.creation_sole_entry import (
+            is_sole_creation_enforced, create_strategy, refuse_side_path,
+        )
+        if is_sole_creation_enforced():
+            return create_strategy(
+                symbol=symbol or "ADA-USDT-SWAP",
+                timeframe=timeframe or "5m",
+                brief="legacy_run_creation_pipeline_redirected",
+            )
+        return refuse_side_path("auto_trade_dual_engine_factory.run_creation_pipeline")
+    except Exception as exc:
+        return {"ok": False, "error": "sole_entry_import_error", "detail": str(exc)}
     _ensure_dirs()
     _load_env()
     tid = _new_task_id()

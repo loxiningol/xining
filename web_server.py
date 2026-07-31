@@ -709,11 +709,7 @@ def api_dual_engine_bootstrap():
 @app.route("/api/dual_engine/start_task", methods=["POST"])
 @auth.login_required
 def api_dual_engine_start_task():
-    """启动新策略创造任务（异步四步流水线）。
-
-    默认走 workflow_flags.creation_entry；验收 A–H 通过前为 legacy。
-    可传 exploration_mode=A|B|C|D（仅 v2 生效）。
-    """
+    """启动策略创造：已强制转入唯一蓝图研究发现入口（creation_sole_entry）。"""
     try:
         import auto_trade_dual_engine_factory as dual
         payload = request.get_json(silent=True) or {}
@@ -4961,7 +4957,27 @@ def _vector_status_payload():
         chain_ready = bool(zone_running and config.get("enabled") and auto_open and config.get("formal_auto_trading_authorized") and config.get("gate_authorized_auto_trading"))
         runtime_state = "持仓中" if _vector_active(zone_current) else ("监测中" if chain_ready else ("等待配置5分钟策略" if not configured_keys else "未运行"))
         five_minute_assets.append({"symbol":symbol,"timeframe":"5m","timeframe_label":"5分钟","running":zone_running,"pid":zone_pid,"status":runtime_state,"current":zone_current})
-        five_minute_zones.append({"symbol":symbol,"name":"%s 自动交易（5分钟）"%symbol.split("-")[0],"timeframe":"5m","timeframe_label":"5分钟","running":zone_running,"pid":zone_pid,"auto_open":auto_open,"auto_close":auto_close,"runtime_state":runtime_state,"position":zone_current,"config":config,"records":dashboard,"strategy_count":len(dashboard.get("strategy_stats") or []),"assignment_status":config.get("assignment_status") or "waiting_for_5m_strategy"})
+        five_minute_zones.append({
+            "symbol": symbol,
+            "name": "%s 自动交易（5分钟）" % symbol.split("-")[0],
+            "timeframe": "5m",
+            "timeframe_label": "5分钟",
+            "running": zone_running,
+            "pid": zone_pid,
+            "auto_open": auto_open,
+            "auto_close": auto_close,
+            "runtime_state": runtime_state,
+            "position": zone_current,
+            "config": config,
+            "records": dashboard,
+            "strategy_count": len(dashboard.get("strategy_stats") or []),
+            "assignment_status": config.get("assignment_status") or "waiting_for_5m_strategy",
+            "validity_days_total": config.get("validity_days_total"),
+            "valid_until": config.get("valid_until"),
+            "days_remaining": config.get("days_remaining"),
+            "validity_countdown_zh": config.get("validity_countdown_zh"),
+            "strategy_validity": config.get("strategy_validity") or {},
+        })
 
     full_pass = bool(logic.get("ok") and preflight.get("ok") and active_verify.get("ok") and tp_verify.get("ok"))
     waiting_real_position = bool(active_verify.get("status") == "NO_ACTIVE_POSITION_REAL_FALLBACK_NOT_EXECUTED")
