@@ -64,7 +64,7 @@ def _switch_direction(design, classic_tried, perspectives_tried):
             },
             {
                 "id": "H2_return_hardness",
-                "statement_zh": "周收益代理≥8%且收益/回撤≥1.0，禁止近零收益退化",
+                "statement_zh": "年化容量≥6%且收益/回撤≥1.0，禁止近零收益退化（不作周收益≥8%硬门）",
                 "testable_factor_hints": list(p.get("factor_hints") or [])[:3],
             },
         ]

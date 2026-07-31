@@ -67,8 +67,10 @@ def run_antifalsify_battery(factor_values, fwd_returns, side="high", seed=7,
     for name, series in (
         ("time_shift_plus_5", _shift(factor_values, 5)),
         ("time_shift_minus_5", _shift(factor_values, -5)),
+        ("time_shift_plus_12", _shift(factor_values, 12)),
         ("sign_flip", _sign_flip(factor_values)),
         ("block_permute", _permute_block(factor_values, block=10, rng=rng)),
+        ("block_permute_24", _permute_block(factor_values, block=24, rng=rng)),
     ):
         p = _probe_net(series, fwd_returns, side=side)
         e = _effect(series, fwd_returns)
@@ -83,6 +85,18 @@ def run_antifalsify_battery(factor_values, fwd_returns, side="high", seed=7,
             "t_stat": (e or {}).get("t_stat"),
         })
 
+    # Lag-1 factor should not dominate (leakage / look-ahead smell)
+    lag1 = [None] + list(factor_values or [])[:-1]
+    p_lag = _probe_net(lag1, fwd_returns, side=side)
+    lag_net = float((p_lag or {}).get("mean_net") or 0.0)
+    rows.append({
+        "test": "lag1_factor_dominance",
+        "family": "negative_control",
+        "support": "support" if base_net > lag_net else ("oppose" if lag_net > base_net * 1.05 else "neutral"),
+        "mean_net": lag_net,
+        "t_stat": (p_lag or {}).get("t_stat"),
+    })
+
     # Placebo: shuffle fwd labels in blocks (keep autocorr-ish)
     fwd_placebo = _permute_block(fwd_returns, block=12, rng=rng)
     p = _probe_net(factor_values, fwd_placebo, side=side)
@@ -96,6 +110,49 @@ def run_antifalsify_battery(factor_values, fwd_returns, side="high", seed=7,
         "mean_net": (p or {}).get("mean_net"),
         "t_stat": (e or {}).get("t_stat"),
     })
+    # Calendar / stride placebo: take every k-th label scrambled
+    fwd_stride = list(fwd_returns or [])
+    if len(fwd_stride) >= 40:
+        odd = fwd_stride[1::2]
+        even = fwd_stride[0::2]
+        rng.shuffle(odd)
+        merged = []
+        for i in range(len(fwd_stride)):
+            if i % 2 == 0:
+                merged.append(even[i // 2] if i // 2 < len(even) else None)
+            else:
+                merged.append(odd[i // 2] if i // 2 < len(odd) else None)
+        p2 = _probe_net(factor_values, merged, side=side)
+        rows.append({
+            "test": "calendar_stride_placebo",
+            "family": "placebo",
+            "support": (
+                "support" if float((p2 or {}).get("mean_net") or 0) < base_net * 0.55 else "oppose"
+            ),
+            "mean_net": (p2 or {}).get("mean_net"),
+            "t_stat": (p2 or {}).get("t_stat"),
+        })
+
+    # Rolling half-sample stability (not causal proof)
+    n = min(len(factor_values or []), len(fwd_returns or []))
+    if n >= 80:
+        mid = n // 2
+        f = list(factor_values or [])[-n:]
+        r = list(fwd_returns or [])[-n:]
+        p_a = _probe_net(f[:mid], r[:mid], side=side)
+        p_b = _probe_net(f[mid:], r[mid:], side=side)
+        net_a = float((p_a or {}).get("mean_net") or 0.0)
+        net_b = float((p_b or {}).get("mean_net") or 0.0)
+        both_pos = net_a > 0 and net_b > 0
+        rows.append({
+            "test": "half_sample_stability",
+            "family": "stability",
+            "support": "support" if both_pos else ("oppose" if net_a * net_b < 0 else "neutral"),
+            "mean_net": (net_a + net_b) / 2.0,
+            "t_stat": None,
+            "half_a": net_a,
+            "half_b": net_b,
+        })
 
     # Competing explanations: if competing factor explains more, mark oppose
     competing_factors = list(competing_factors or [])
@@ -144,6 +201,7 @@ def run_antifalsify_battery(factor_values, fwd_returns, side="high", seed=7,
         },
         "negative_control": _bucket("negative_control"),
         "placebo": _bucket("placebo"),
+        "stability": _bucket("stability"),
         "competing_explanation": _bucket("competing_explanation"),
         "cost_after_edge": {
             "support": 1 if base_net > 0 else 0,
@@ -154,15 +212,16 @@ def run_antifalsify_battery(factor_values, fwd_returns, side="high", seed=7,
     }
     oppose_n = sum(
         int((matrix[k].get("oppose") or 0))
-        for k in ("negative_control", "placebo", "competing_explanation", "cost_after_edge")
+        for k in ("negative_control", "placebo", "stability",
+                  "competing_explanation", "cost_after_edge")
     )
     support_n = sum(
         int((matrix[k].get("support") or 0))
         for k in ("mechanism_consistency", "negative_control", "placebo",
-                  "competing_explanation", "cost_after_edge")
+                  "stability", "competing_explanation", "cost_after_edge")
     )
     # Pass if more support than oppose AND cost edge positive — still NOT causal proof
-    passed = bool(base_net > 0 and support_n > oppose_n and oppose_n <= 2)
+    passed = bool(base_net > 0 and support_n > oppose_n and oppose_n <= 3)
     return {
         "ok": True,
         "schema": "qiyu_antifalsify_evidence_matrix_v1",

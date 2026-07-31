@@ -7,11 +7,15 @@ Roles (forced separation):
   symbolic_searcher    — non-LLM GP expressions; FORBIDDEN to write stories
   antifalsify_auditor  — negative controls / placebo / competitors (stats)
   constructive_redteam — build strongest opposing-family naked probe
+  leakage_auditor      — look-ahead / timestamp / label leakage checks
+  causal_auditor       — CausalImpact-lite hygiene; FORBIDDEN to claim proof
+  execution_engineer   — cost / slippage / capacity feasibility (not strategy invent)
   statistician         — DSR/PBO/trial budget (non-LLM judge inputs)
   research_director    — allocates budget only (no strategies)
   judge                — evidence-field scoring only; Kimi optional when enabled
 
 LLM enrichment is optional and MUST NOT replace non-LLM cores.
+Multi-vendor live LLM roundtable is NOT required; blackboard is structured fields.
 """
 from __future__ import print_function
 
@@ -65,6 +69,22 @@ ROLE_CONTRACTS = {
         "task_zh": "构造最强反方探针并比较",
         "forbids_zh": "禁止给主假设找借口",
     },
+    "leakage_auditor": {
+        "model_pref": "non_llm",
+        "task_zh": "检查前视/标签/时间戳泄漏气味",
+        "forbids_zh": "禁止优化入场以掩盖泄漏",
+    },
+    "causal_auditor": {
+        "model_pref": "non_llm_stats",
+        "task_zh": "复核因果主张边界；只做卫生检查",
+        "forbids_zh": "禁止把相关/干预代理说成因果证明",
+    },
+    "execution_engineer": {
+        "model_pref": "non_llm",
+        "may_propose_strategy": False,
+        "task_zh": "成本/滑点/容量可行性",
+        "forbids_zh": "禁止发明新交易逻辑",
+    },
     "statistician": {
         "model_pref": "non_llm",
         "task_zh": "多重检验与有效试验次数",
@@ -90,7 +110,12 @@ OPPOSING_FAMILY = {
 }
 
 
-def research_director_budget(max_trial_budget=200):
+def research_director_budget(max_trial_budget=None):
+    max_trial_budget = int(
+        max_trial_budget
+        or os.environ.get("QIYU_MAX_TRIAL_BUDGET")
+        or 320
+    )
     return {
         "role": "research_director",
         "max_trial_budget": int(max_trial_budget),
@@ -98,6 +123,9 @@ def research_director_budget(max_trial_budget=200):
             "mechanism_complete",
             "naked_probe",
             "antifalsify_matrix",
+            "leakage_audit",
+            "causal_boundary",
+            "execution_feasibility",
             "efr",
             "multiple_testing",
         ],
@@ -163,7 +191,15 @@ def run_empirical_scientist(factor_matrix, fwd_returns, run_id, max_phenomena=24
 
 
 def run_symbolic_searcher(factor_matrix, fwd_returns, run_id):
-    pack = sym.search(factor_matrix, fwd_returns)
+    n_pop = int(os.environ.get("QIYU_SYM_POP") or 60)
+    n_gen = int(os.environ.get("QIYU_SYM_GEN") or 6)
+    top_k = int(os.environ.get("QIYU_SYM_TOPK") or 16)
+    # RAM-safe caps on tiny VPS
+    n_pop = max(20, min(n_pop, 100))
+    n_gen = max(2, min(n_gen, 8))
+    pack = sym.search(
+        factor_matrix, fwd_returns, n_pop=n_pop, n_gen=n_gen, top_k=top_k,
+    )
     hyps = sym.expressions_to_hypotheses(pack, factor_matrix=factor_matrix)
     # inject synthetic series into caller's matrix for later probes
     for h in hyps:
@@ -175,8 +211,11 @@ def run_symbolic_searcher(factor_matrix, fwd_returns, run_id):
     board.write(run_id, "symbolic_searcher", "expression_population", {
         "n": len(hyps),
         "n_evaluated": pack.get("n_evaluated"),
+        "n_pop": n_pop,
+        "n_gen": n_gen,
         "top_keys": [h.get("observable_proxy") for h in hyps[:5]],
         "llm": False,
+        "backend": "gp_lite_not_pysr",
     })
     for h in hyps:
         ledger.append_event({
@@ -194,6 +233,164 @@ def run_symbolic_searcher(factor_matrix, fwd_returns, run_id):
         "llm": False,
         "at": _now(),
     }
+
+
+def run_leakage_auditor(factor_values, fwd_returns, side="high", run_id=None):
+    """Look-ahead / label leakage smell checks. Does not invent strategies."""
+    issues = []
+    f = list(factor_values or [])
+    r = list(fwd_returns or [])
+    n = min(len(f), len(r))
+    if n < 40:
+        out = {
+            "role": "leakage_auditor",
+            "ok": False,
+            "passed": False,
+            "error": "insufficient_series",
+            "at": _now(),
+        }
+        if run_id:
+            board.write(run_id, "leakage_auditor", "audit", out)
+        return out
+
+    # Future-shift: if shifting factor forward improves edge → leakage smell
+    base = probes.evaluate_naked_probe(f[-n:], r[-n:], side=side)
+    base_net = float((base or {}).get("mean_net") or 0.0)
+    fwd_shift = [None, None] + f[-n:][:-2]
+    fut = probes.evaluate_naked_probe(fwd_shift, r[-n:], side=side)
+    fut_net = float((fut or {}).get("mean_net") or 0.0)
+    if fut_net > base_net * 1.15 and fut_net > 0:
+        issues.append("future_shift_improves_edge")
+
+    # Same-bar perfect alignment with abs return proxy
+    same_bar_hits = 0
+    checked = 0
+    for i in range(n):
+        if f[i] is None or r[i] is None:
+            continue
+        checked += 1
+        try:
+            if abs(float(f[i])) > 0 and abs(float(r[i])) > 0:
+                # crude: factor equals fwd in magnitude often → smell
+                if abs(float(f[i]) - float(r[i])) < 1e-12:
+                    same_bar_hits += 1
+        except Exception:
+            pass
+    if checked > 50 and same_bar_hits / float(checked) > 0.05:
+        issues.append("factor_equals_fwd_too_often")
+
+    passed = len(issues) == 0
+    out = {
+        "role": "leakage_auditor",
+        "ok": True,
+        "passed": passed,
+        "issues": issues,
+        "base_net": base_net,
+        "future_shift_net": fut_net,
+        "forbids_zh": ROLE_CONTRACTS["leakage_auditor"]["forbids_zh"],
+        "note_zh": (
+            "未发现明显泄漏气味" if passed else
+            ("泄漏气味: %s" % ",".join(issues))
+        ),
+        "at": _now(),
+    }
+    if run_id:
+        board.write(run_id, "leakage_auditor", "audit", out)
+        ledger.append_event({
+            "event_type": "leakage_audit",
+            "passed": passed,
+            "issues": issues,
+        }, run_id=run_id)
+    return out
+
+
+def run_causal_auditor(antifalsify_pack, causal_claim_flag=False, run_id=None):
+    """Boundary check: antifalsify must NOT be marketed as causal proof."""
+    pack = antifalsify_pack or {}
+    violations = []
+    if causal_claim_flag or pack.get("causal_claim") is True:
+        violations.append("explicit_causal_claim")
+    if not pack.get("ok"):
+        violations.append("antifalsify_missing")
+    # Hygiene: require evidence matrix present
+    if not pack.get("evidence_matrix"):
+        violations.append("missing_evidence_matrix")
+    passed = len(violations) == 0 and pack.get("causal_claim") is False
+    out = {
+        "role": "causal_auditor",
+        "ok": True,
+        "passed": passed,
+        "causal_claim_allowed": False,
+        "violations": violations,
+        "credibility": pack.get("credibility") or "elevated_if_pass_not_proven",
+        "forbids_zh": ROLE_CONTRACTS["causal_auditor"]["forbids_zh"],
+        "note_zh": (
+            "因果边界合规：反证通过≠因果证明" if passed else
+            ("因果卫生失败: %s" % ",".join(violations))
+        ),
+        "dowhy_installed": False,
+        "at": _now(),
+    }
+    if run_id:
+        board.write(run_id, "causal_auditor", "boundary", out)
+        ledger.append_event({
+            "event_type": "causal_boundary",
+            "passed": passed,
+            "violations": violations,
+        }, run_id=run_id)
+    return out
+
+
+def run_execution_engineer(probe_best, efr_pack=None, run_id=None, min_efr=1.5):
+    """Cost/capacity feasibility. Does not invent trade logic."""
+    best = probe_best or {}
+    mean_net = float(best.get("mean_net") or 0.0)
+    n_hits = int(best.get("n_hits") or 0)
+    efr = (efr_pack or {}).get("efr") if isinstance(efr_pack, dict) else efr_pack
+    efr_val = None
+    if isinstance(efr, dict):
+        efr_val = efr.get("efr")
+    elif efr is not None:
+        try:
+            efr_val = float(efr)
+        except Exception:
+            efr_val = None
+    issues = []
+    if mean_net <= 0:
+        issues.append("non_positive_net_after_cost")
+    if n_hits < 12:
+        issues.append("too_few_hits_for_capacity")
+    if efr_val is not None and float(efr_val) < float(min_efr):
+        issues.append("efr_below_floor")
+    # Fragile edge vs typical swap round-trip
+    if 0 < mean_net < 0.0004:
+        issues.append("edge_thinner_than_typical_slippage_buffer")
+    passed = len(issues) == 0
+    out = {
+        "role": "execution_engineer",
+        "ok": True,
+        "passed": passed,
+        "issues": issues,
+        "mean_net": mean_net,
+        "n_hits": n_hits,
+        "efr": efr_val,
+        "may_propose_strategy": False,
+        "lean_installed": False,
+        "note_zh": (
+            "执行可行性初检通过（轻量；非 LEAN 撮合仿真）" if passed else
+            ("执行可行性未过: %s" % ",".join(issues))
+        ),
+        "at": _now(),
+    }
+    if run_id:
+        board.write(run_id, "execution_engineer", "feasibility", out)
+        ledger.append_event({
+            "event_type": "execution_feasibility",
+            "passed": passed,
+            "issues": issues,
+            "mean_net": mean_net,
+        }, run_id=run_id)
+    return out
 
 
 def run_constructive_redteam(main_hyp, factor_matrix, fwd_returns, run_id):
@@ -251,7 +448,10 @@ def run_constructive_redteam(main_hyp, factor_matrix, fwd_returns, run_id):
 
 def judge_from_evidence(evidence_fields, run_id=None):
     """Rule judge on evidence fields only. Optional Kimi comment if enabled."""
-    required = ["naked_probe_passed", "antifalsify_passed", "efr_passed"]
+    required = [
+        "naked_probe_passed", "antifalsify_passed", "efr_passed",
+        "leakage_passed", "causal_boundary_passed", "execution_passed",
+    ]
     missing = [k for k in required if not evidence_fields.get(k)]
     score = 0.0
     if evidence_fields.get("naked_probe_passed"):
@@ -262,11 +462,17 @@ def judge_from_evidence(evidence_fields, run_id=None):
         score += 1.5
     if evidence_fields.get("redteam_passed"):
         score += 1.0
+    if evidence_fields.get("leakage_passed"):
+        score += 0.8
+    if evidence_fields.get("causal_boundary_passed"):
+        score += 0.8
+    if evidence_fields.get("execution_passed"):
+        score += 0.8
     if evidence_fields.get("dsr_passed"):
         score += 1.5
     if evidence_fields.get("bidirectional_hit"):
         score += 1.0
-    admit = bool(not missing and score >= 5.5)
+    admit = bool(not missing and score >= 6.5)
     kimi_note = None
     # Kimi judge slot — only if explicitly enabled; never invent strategies
     if str(os.environ.get("QIYU_KIMI_ENABLED") or "0").strip().lower() in (

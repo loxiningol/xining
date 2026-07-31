@@ -99,8 +99,8 @@ def _expr_key(expr):
     return "%s(%s,%s)" % (expr.get("op"), _expr_key(expr.get("left")), _expr_key(expr.get("right")))
 
 
-def search(factor_matrix, fwd_returns, n_pop=40, n_gen=4, seed=13, top_k=12):
-    """Evolve expressions maximizing |IC| with fwd returns. No LLM."""
+def search(factor_matrix, fwd_returns, n_pop=60, n_gen=6, seed=13, top_k=16):
+    """Evolve expressions maximizing |IC| with fwd returns. No LLM / no PySR."""
     factors = [k for k, v in (factor_matrix or {}).items() if v and len(v) >= 50]
     if len(factors) < 2:
         return {
@@ -227,7 +227,9 @@ def expressions_to_hypotheses(search_pack, factor_matrix=None):
 def probe():
     return {
         "ok": True,
-        "provider": "symbolic_searcher_gp_lite_v1",
+        "provider": "symbolic_searcher_gp_lite_v2",
         "llm": False,
+        "pysr": False,
+        "note_zh": "GP-lite；PySR/RL 因内存与依赖未装。",
         "at": _now(),
     }

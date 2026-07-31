@@ -7,6 +7,7 @@ antifalsify evidence → QD archive → only then hand off to factor/assembly.
 from __future__ import print_function
 
 import copy
+import os
 from datetime import datetime
 
 from . import antifalsify
@@ -16,6 +17,7 @@ from . import heterogeneous_committee as committee
 from . import map_elites_archive as qd
 from . import mechanism_graph as mgraph
 from . import multiple_testing as mtest
+from . import parameter_platform as paramplat
 from . import phenomenon_scanner as phscan
 from . import probe_protocol as probes
 from . import research_blackboard as board
@@ -54,8 +56,11 @@ def compile_research_contract(brief, symbol, timeframe, constraints=None):
         "available_data": ["ohlcv_swap_candles", "derived_factors"],
         "forbidden_info": ["future_bars", "unrealized_label_leak"],
         "max_complexity": "probe_then_assemble",
-        "max_trial_budget": int(c.get("max_trial_budget") or 200),
-        "min_evidence": ["naked_probe", "antifalsify_matrix", "efr"],
+        "max_trial_budget": int(c.get("max_trial_budget") or 320),
+        "min_evidence": [
+            "naked_probe", "antifalsify_matrix", "leakage_audit",
+            "causal_boundary", "execution_feasibility", "efr",
+        ],
         "constraints": c,
         "forced_weekly_demand": forced_weekly,
         "requirement_feasible": feasible,
@@ -66,7 +71,7 @@ def compile_research_contract(brief, symbol, timeframe, constraints=None):
 
 
 def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_returns,
-                                max_mechanisms=12, max_phenomena=20, run_id=None):
+                                max_mechanisms=14, max_phenomena=24, run_id=None):
     """Independent heterogeneous committee submissions (no early pick-1, no chat)."""
     run_id = run_id or ledger.new_run_id("pop")
     director = committee.research_director_budget()
@@ -85,6 +90,8 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
     return {
         "ok": True,
         "run_id": run_id,
+        "population_first": True,
+        "early_pick_one": False,
         "committee": {
             "research_director": director,
             "mechanism_scientist": {"n": mech.get("n"), "saw_returns": False},
@@ -110,11 +117,19 @@ def run_discovery(
     candles=None,
     constraints=None,
     run_id=None,
-    max_hypotheses_probe=16,
+    max_hypotheses_probe=None,
     min_efr=1.5,
 ):
     """Full discovery stages 0–early robustness. Returns survivors for assembly."""
     run_id = run_id or ledger.new_run_id("discover")
+    max_hypotheses_probe = int(
+        max_hypotheses_probe
+        or (constraints or {}).get("max_hypotheses_probe")
+        or os.environ.get("QIYU_MAX_HYP_PROBE")
+        or 28
+    )
+    # Tiny-VPS cap
+    max_hypotheses_probe = max(8, min(int(max_hypotheses_probe), 40))
     stages = {}
     contract = compile_research_contract(brief, symbol, timeframe, constraints)
     stages["contract"] = contract
@@ -124,16 +139,20 @@ def run_discovery(
         "timeframe": timeframe,
         "feasible": contract.get("requirement_feasible"),
         "warnings": contract.get("warnings_zh"),
+        "experiment_id": ledger.experiment_id(run_id),
+        "git_hash": ledger.git_hash_short(),
     }, run_id=run_id)
 
     if contract.get("requirement_feasible") is False and str(
         (constraints or {}).get("allow_unreachable_targets") or ""
     ).lower() not in ("1", "true", "yes"):
-        # Still run discovery, but final deliverable must not claim success on 8% week
         stages["contract_flag"] = "unreachable_target_soft_block"
 
     pop = build_hypothesis_population(
-        brief, symbol, timeframe, factor_matrix, fwd_returns, run_id=run_id,
+        brief, symbol, timeframe, factor_matrix, fwd_returns,
+        max_mechanisms=int((constraints or {}).get("max_mechanisms") or 14),
+        max_phenomena=int((constraints or {}).get("max_phenomena") or 24),
+        run_id=run_id,
     )
     stages["population"] = {
         "n_hypotheses": len(pop.get("hypotheses") or []),
@@ -141,12 +160,14 @@ def run_discovery(
         "n_phenomena": (pop.get("phenomena") or {}).get("n"),
         "n_symbolic": ((pop.get("committee") or {}).get("symbolic_searcher") or {}).get("n"),
         "committee": pop.get("committee"),
+        "population_first": True,
+        "early_pick_one": False,
         "dedupe_dropped": len((pop.get("dedupe") or {}).get("dropped") or []),
         "bidirectional_hits": sum(
             1 for h in (pop.get("hypotheses") or []) if h.get("bidirectional_hit")
         ),
     }
-    for h in (pop.get("hypotheses") or [])[:80]:
+    for h in (pop.get("hypotheses") or [])[:120]:
         ledger.append_event({
             "event_type": "hypothesis",
             "hypothesis_id": h.get("hypothesis_id"),
@@ -194,12 +215,13 @@ def run_discovery(
             continue
 
         best = pr.get("best") or {}
-        # Early multiverse on naked probe returns
+        # Early multiverse on naked probe returns (multi-generator)
         mv = multiverse.survival_test(best.get("trade_returns") or [])
         ledger.append_event({
             "event_type": "multiverse_probe",
             "hypothesis_id": h.get("hypothesis_id"),
             "passed": mv.get("passed"),
+            "generators": mv.get("generators"),
         }, run_id=run_id)
         if not mv.get("passed"):
             continue
@@ -221,6 +243,19 @@ def run_discovery(
         if not af.get("passed"):
             continue
 
+        # Leakage / causal / execution named roles
+        leak = committee.run_leakage_auditor(
+            (factor_matrix or {}).get(best.get("factor")) or [],
+            fwd_returns,
+            side=best.get("side") or "high",
+            run_id=run_id,
+        )
+        if not leak.get("passed"):
+            continue
+        causal = committee.run_causal_auditor(af, causal_claim_flag=False, run_id=run_id)
+        if not causal.get("passed"):
+            continue
+
         feas = efr_mod.evaluate_early_feasibility(
             best, n_bars=n_bars, span_days=span_days, min_efr=min_efr,
         )
@@ -233,6 +268,25 @@ def run_discovery(
         }, run_id=run_id)
         if not feas.get("passed"):
             continue
+
+        exe = committee.run_execution_engineer(
+            best, efr_pack=feas, run_id=run_id, min_efr=min_efr,
+        )
+        if not exe.get("passed"):
+            continue
+
+        # Lite parameter platform around surviving factor
+        psearch = paramplat.search(
+            (factor_matrix or {}).get(best.get("factor")) or [],
+            fwd_returns,
+            method="sobol",
+            max_evals=int(os.environ.get("QIYU_PARAM_MAX_EVALS") or 24),
+            run_id=run_id,
+        )
+        if psearch.get("best") and psearch["best"].get("passed"):
+            # keep probe identity; record best params as enrichment
+            best = dict(best)
+            best["param_platform_best"] = psearch.get("best")
 
         # Constructive red team: opposing-family naked probe must lose
         red = committee.run_constructive_redteam(
@@ -247,11 +301,13 @@ def run_discovery(
             "antifalsify_passed": bool(af.get("passed")),
             "efr_passed": bool(feas.get("passed")),
             "redteam_passed": bool(red.get("passed")),
+            "leakage_passed": bool(leak.get("passed")),
+            "causal_boundary_passed": bool(causal.get("passed")),
+            "execution_passed": bool(exe.get("passed")),
             "bidirectional_hit": bool(h.get("bidirectional_hit")),
-            "dsr_passed": False,  # filled after MT for top survivors
+            "dsr_passed": False,
         }, run_id=run_id)
         if not judgment.get("admit_to_assembly"):
-            # still allow into archive candidates but mark judge_block
             pass
 
         archive, elite_row, _replaced = qd.upsert(
@@ -265,7 +321,9 @@ def run_discovery(
             "multiverse": {
                 "passed": mv.get("passed"),
                 "profit_frac": mv.get("profit_frac"),
-                "median_total": mv.get("median_total"),
+                "median_return": mv.get("median_return"),
+                "generators": mv.get("generators"),
+                "generator_summary": mv.get("generator_summary"),
             },
             "antifalsify": {
                 "passed": af.get("passed"),
@@ -280,6 +338,24 @@ def run_discovery(
                     for k, v in ((af.get("evidence_matrix") or {}).items())
                 },
                 "causal_claim": False,
+            },
+            "leakage": {
+                "passed": leak.get("passed"),
+                "issues": leak.get("issues"),
+            },
+            "causal_boundary": {
+                "passed": causal.get("passed"),
+                "causal_claim_allowed": False,
+            },
+            "execution": {
+                "passed": exe.get("passed"),
+                "issues": exe.get("issues"),
+            },
+            "parameter_platform": {
+                "n_evaluated": psearch.get("n_evaluated"),
+                "n_passed": psearch.get("n_passed"),
+                "best_params": ((psearch.get("best") or {}).get("params")),
+                "best_mean_net": ((psearch.get("best") or {}).get("mean_net")),
             },
             "feasibility": {
                 "passed": feas.get("passed"),
@@ -308,6 +384,7 @@ def run_discovery(
 
     budget = ledger.effective_trial_budget(run_id=run_id)
     stages["trial_budget"] = budget
+    stages["n_probed"] = tested
 
     # Multiple testing on best survivor vs peers
     mt_pack = None
@@ -330,10 +407,8 @@ def run_discovery(
             "effective_trials": budget.get("effective_trials"),
         }, run_id=run_id)
         if not mt_pack.get("passed"):
-            # demote: keep archive but mark assembly blocked unless DSR ok alone with note
             for s in survivors:
                 s["multiple_testing_gate"] = mt_pack
-            # If DSR passes but PBO weak, still allow with warning
             dsr_ok = bool((mt_pack.get("dsr") or {}).get("passed"))
             if not dsr_ok:
                 survivors = []
@@ -353,13 +428,27 @@ def run_discovery(
                 "quality": e.get("quality"),
                 "probe_mean_net": e.get("probe_mean_net"),
             }
-            for e in elites[:20]
+            for e in elites[:30]
         ],
     }
 
     ok = len(survivors) > 0
+    # Population handoff: ranked survivors, NOT a forced early pick-1
     handoff = None
+    handoff_population = []
     if ok:
+        for top in survivors[:8]:
+            h = top.get("hypothesis") or {}
+            handoff_population.append({
+                "hypothesis_id": h.get("hypothesis_id"),
+                "mechanism_id": h.get("mechanism_id"),
+                "family": h.get("family"),
+                "path": h.get("path"),
+                "factor_hints": h.get("factor_hints") or h.get("observable_proxy") or [],
+                "quality": ((top.get("elite") or {}).get("quality")),
+                "probe_factor": (top.get("probe") or {}).get("factor"),
+                "efr": (top.get("feasibility") or {}).get("efr"),
+            })
         top = survivors[0]
         h = top.get("hypothesis") or {}
         handoff = {
@@ -377,22 +466,29 @@ def run_discovery(
             "probe_side": (top.get("probe") or {}).get("side"),
             "efr": (top.get("feasibility") or {}).get("efr"),
             "research_value": (top.get("feasibility") or {}).get("research_value"),
+            "rank": 1,
+            "population_size": len(survivors),
+            "selection_mode": "post_gate_rank_not_early_pick",
+            "population_peers": handoff_population,
         }
 
     return {
         "ok": ok,
-        "schema": "qiyu_research_discovery_v1",
+        "schema": "qiyu_research_discovery_v2",
         "run_id": run_id,
+        "experiment_id": ledger.experiment_id(run_id),
+        "git_hash": ledger.git_hash_short(),
         "stages": stages,
         "survivors": [
             {k: v for k, v in s.items() if k != "probe_returns"} for s in survivors
         ],
         "n_survivors": len(survivors),
         "handoff": handoff,
+        "handoff_population": handoff_population,
         "archive_elites": stages.get("map_elites"),
         "present_to_assembly": ok,
         "human_banner_zh": (
-            "研究发现通过：%d 个假设经裸探针+反证矩阵+EFR+多重检验后存活，可进入组装。"
+            "研究发现通过：%d 个假设经裸探针+反证+泄漏/因果边界+执行+EFR+多重检验后存活，可进入组装。"
             % len(survivors)
             if ok else
             "当前搜索空间无可信候选（裸探针/反证/EFR/多重检验未通过）。禁止硬凑完整策略。"
@@ -404,12 +500,14 @@ def run_discovery(
 def probe():
     return {
         "ok": True,
-        "provider": "research_discovery_v1",
+        "provider": "research_discovery_v2",
         "modules": [
             "research_ledger", "research_blackboard", "mechanism_graph",
             "phenomenon_scanner", "symbolic_searcher", "heterogeneous_committee",
             "probe_protocol", "antifalsify", "map_elites_archive",
             "multiple_testing", "edge_friction", "creation_multiverse",
+            "parameter_platform",
         ],
+        "roles": list(committee.ROLE_CONTRACTS.keys()),
         "at": _now(),
     }

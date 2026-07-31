@@ -38,6 +38,28 @@ def new_run_id(prefix="create"):
     return "%s_%s" % (prefix, datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 
+def git_hash_short():
+    """Best-effort short git SHA for experiment provenance."""
+    env = str(os.environ.get("QIYU_GIT_HASH") or "").strip()
+    if env:
+        return env[:12]
+    try:
+        import subprocess
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.STDOUT,
+            cwd=str(Path(__file__).resolve().parents[1]),
+        )
+        return out.decode("utf-8", "ignore").strip()[:12]
+    except Exception:
+        return "unknown"
+
+
+def experiment_id(run_id=None):
+    rid = run_id or new_run_id("exp")
+    return "exp_%s_%s" % (git_hash_short(), rid)
+
+
 def _hash_payload(payload):
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
@@ -123,8 +145,9 @@ def probe():
     p = ledger_path()
     return {
         "ok": True,
-        "provider": "research_ledger_v1",
+        "provider": "research_ledger_v2",
         "path": str(p),
         "exists": p.exists(),
+        "git_hash": git_hash_short(),
         "at": _now(),
     }

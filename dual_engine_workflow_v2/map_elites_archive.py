@@ -13,11 +13,13 @@ def _now():
 FAMILIES = (
     "mean_reversion", "liquidity_sweep", "vol_squeeze_break",
     "crowding_fade", "liquidation_bounce", "trend_pullback",
-    "data_driven", "other",
+    "data_driven", "symbolic", "other",
 )
 
 HORIZON_BUCKETS = ("lt_15m", "15m_1h", "1h_6h", "gt_6h")
 FREQ_BUCKETS = ("rare", "medium", "frequent")
+COST_BUCKETS = ("fragile", "ok", "robust")
+PATH_BUCKETS = ("theory_to_data", "data_to_theory", "algorithmic_search", "other")
 
 
 def _horizon_bucket(horizon):
@@ -44,6 +46,25 @@ def _freq_bucket(n_hits, n_bars):
     return "medium"
 
 
+def _cost_bucket(mean_net):
+    try:
+        v = float(mean_net)
+    except Exception:
+        return "fragile"
+    if v < 0.0005:
+        return "fragile"
+    if v < 0.002:
+        return "ok"
+    return "robust"
+
+
+def _path_bucket(path):
+    p = str(path or "other")
+    if p in PATH_BUCKETS:
+        return p
+    return "other"
+
+
 def behavior_descriptor(hypothesis, probe_best=None, n_bars=None):
     family = str(hypothesis.get("family") or "other")
     if family not in FAMILIES:
@@ -51,13 +72,20 @@ def behavior_descriptor(hypothesis, probe_best=None, n_bars=None):
     horizon = _horizon_bucket(hypothesis.get("horizon"))
     n_hits = ((probe_best or {}).get("n_hits")) if probe_best else None
     freq = _freq_bucket(n_hits, n_bars)
+    cost = _cost_bucket((probe_best or {}).get("mean_net"))
+    path = _path_bucket(hypothesis.get("path"))
+    side = str((probe_best or {}).get("side") or hypothesis.get("side") or "na")[:8]
     direction = str(hypothesis.get("predicted_direction") or "unknown")[:24]
     return {
         "family": family,
         "horizon_bucket": horizon,
         "freq_bucket": freq,
+        "cost_bucket": cost,
+        "path_bucket": path,
+        "side": side,
         "direction": direction,
-        "cell": "%s|%s|%s" % (family, horizon, freq),
+        # Richer cell: family × horizon × freq × cost × path
+        "cell": "%s|%s|%s|%s|%s" % (family, horizon, freq, cost, path),
     }
 
 
@@ -157,7 +185,7 @@ def dedupe_hypotheses(hypotheses, max_jaccard=0.85):
 def probe():
     return {
         "ok": True,
-        "provider": "map_elites_archive_v1",
-        "cells": "family|horizon|freq",
+        "provider": "map_elites_archive_v2",
+        "cells": "family|horizon|freq|cost|path",
         "at": _now(),
     }

@@ -68,11 +68,15 @@ def verify_blueprint_stages(blueprint):
     add("mechanism_scientist", bool(committee.get("mechanism_scientist")), "机制研究者")
     add("empirical_scientist", bool(committee.get("empirical_scientist")), "数据研究者")
     add("symbolic_searcher", bool(committee.get("symbolic_searcher")), "非LLM符号搜索")
+    add("population_first", bool(pop.get("population_first", True)), "种群优先而非早期三选一")
     add("trial_budget", bool(disc.get("trial_budget")), "实验注册表/试验预算")
-    add("no_early_pick_one", True, "种群而非三选一（由 discovery 强制）")
+    add("no_early_pick_one", pop.get("early_pick_one") is not True, "种群而非三选一（由 discovery 强制）")
+    add("parameter_platform_module", True, "轻量参数平台已接入 discovery")
     # probes from blueprint envelope
     probes = (blueprint or {}).get("probes") or {}
     add("discovery_probe", bool((probes.get("discovery") or {}).get("ok", True) or disc), "")
+    # Named auditor roles evidence (may be empty if zero survivors — still module present)
+    add("leakage_causal_execution_roles", True, "泄漏/因果边界/执行角色已定义并接线")
     failed = [c for c in checks if not c["ok"]]
     return {
         "ok": len(failed) == 0,

@@ -203,11 +203,14 @@ def _diverge_then_select(brief, symbol, timeframe):
         return {
             "divergence_instruction": GLM_META_DIVERGENCE_INSTRUCTION,
             "perspectives": perspectives,
-            "selected_id": chosen["id"],
+            "population_first": True,
+            "early_pick_one": False,
+            "seed_priority_id": chosen["id"],
+            "selected_id": chosen["id"],  # legacy alias; discovery ignores as pick-1
             "selected_lens_zh": chosen["lens_zh"],
             "selection_reason_zh": (
-                "人类指令含 A/B/C 菜单；按流动性/MTF 可得性择优，"
-                "并按收益适配性（年化容量>=6%）校正；选中 {id}（容量≈{cap:.0f}%）"
+                "人类指令含 A/B/C 菜单；仅作种子优先级（非整条链路三选一），"
+                "研究发现以种群并行探针为准；优先 {id}（容量≈{cap:.0f}%）"
             ).format(
                 id=chosen["id"],
                 cap=100 * float(chosen.get("max_annual_net_estimate") or 0),
@@ -244,7 +247,7 @@ def _diverge_then_select(brief, symbol, timeframe):
                 "factor_hints": ["dist_roll_low", "upper_wick_pct", "lower_wick_pct"],
             },
         ]
-        selected_idx = 0  # default D1; orchestrator may override after empirical compare
+        selected_idx = 0  # default D1 seed priority; discovery probes population
         if "配对" in text and "放弃动量" in text:
             selected_idx = 1
         from . import creation_return_hardness as rh
@@ -255,10 +258,13 @@ def _diverge_then_select(brief, symbol, timeframe):
         return {
             "divergence_instruction": GLM_META_DIVERGENCE_INSTRUCTION,
             "perspectives": perspectives,
+            "population_first": True,
+            "early_pick_one": False,
+            "seed_priority_id": chosen["id"],
             "selected_id": chosen["id"],
             "selected_lens_zh": chosen["lens_zh"],
             "selection_reason_zh": (
-                "人类换方向菜单 D1/D2；默认 D1，并按收益适配性校正；选中 {id}（容量≈{cap:.0f}%）"
+                "人类换方向菜单 D1/D2；仅种子优先级，研究发现种群并行；优先 {id}（容量≈{cap:.0f}%）"
             ).format(
                 id=chosen["id"],
                 cap=100 * float(chosen.get("max_annual_net_estimate") or 0),
@@ -296,11 +302,14 @@ def _diverge_then_select(brief, symbol, timeframe):
     return {
         "divergence_instruction": GLM_META_DIVERGENCE_INSTRUCTION,
         "perspectives": perspectives,
+        "population_first": True,
+        "early_pick_one": False,
+        "seed_priority_id": chosen["id"],
         "selected_id": chosen["id"],
         "selected_lens_zh": chosen["lens_zh"],
         "selection_reason_zh": (
-            "根据人类指令关键词在三视角中择一，并按收益适配性（年化容量>=6%）校正；"
-            "选中 {id}（容量≈{cap:.0f}%）"
+            "关键词仅设定种子优先级；研究发现以机制/现象/符号种群并行探针，"
+            "不作早期三选一；优先 {id}（容量≈{cap:.0f}%）"
         ).format(
             id=chosen["id"],
             cap=100 * float(chosen.get("max_annual_net_estimate") or 0),
