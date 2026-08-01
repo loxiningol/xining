@@ -44,6 +44,46 @@ class TestResearchDiscovery(unittest.TestCase):
             ["volume_z", "close_z_20"], rows[0]["factor_hints"],
         )
 
+    def test_enforced_family_owns_probe_budget_before_controls(self):
+        rows = [
+            {
+                "hypothesis_id": "off_%02d" % i,
+                "family": "mean_reversion",
+                "contract_family_match": False,
+                "priority_boost": 100.0 - i,
+                "mechanism_tree_id": "off_tree",
+            }
+            for i in range(30)
+        ]
+        rows.extend([
+            {
+                "hypothesis_id": "requested_ai",
+                "family": "volume_anomaly_breakout",
+                "contract_family_match": True,
+                "ai_generated_before_discovery": True,
+                "priority_boost": 1.0,
+            },
+            {
+                "hypothesis_id": "requested_seed",
+                "family": "volume_anomaly_breakout",
+                "contract_family_match": True,
+                "priority_boost": 0.0,
+            },
+        ])
+        scheduled = rd._schedule_probe_population(
+            rows, 16, 0.0, set(), {"family_hints_enforced": True},
+        )
+        self.assertEqual(
+            ["requested_ai", "requested_seed"],
+            [row["hypothesis_id"] for row in scheduled[:2]],
+        )
+        self.assertEqual(2, sum(
+            1 for row in scheduled if row.get("contract_family_match")
+        ))
+        self.assertLessEqual(4, sum(
+            1 for row in scheduled if not row.get("contract_family_match")
+        ))
+
     def test_phenomenon_scan_finds_shift(self):
         n = 200
         factor = [float(i) for i in range(n)]

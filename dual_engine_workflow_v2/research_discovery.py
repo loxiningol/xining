@@ -341,6 +341,67 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
     }
 
 
+def _schedule_probe_population(hypotheses, max_hypotheses_probe, micro_cov,
+                               prefer_ids, contract):
+    """Put immutable-contract hypotheses ahead of discovery controls.
+
+    A family-enforced ResearchContract is a resource-allocation constraint, not
+    merely a final survivor filter.  If off-family controls consume the early
+    probe budget, the requested hypothesis can reach a prediction contract but
+    never receive an empirical probe.  Keep a small control tail for
+    antifalsification, while guaranteeing that every in-budget contract-family
+    hypothesis is scheduled first.
+    """
+    prefer_ids = set(prefer_ids or [])
+
+    def _rank(h):
+        mid = str(h.get("mechanism_id") or "")
+        tree = 1 if h.get("mechanism_tree_id") else 0
+        pref = 1 if mid in prefer_ids else 0
+        micro_ready = 0
+        req = h.get("required_data") or []
+        if micro_cov >= 0.15 and any(
+            "snapshot" in str(x) or "level2" in str(x) or "trade_side" in str(x)
+            for x in req
+        ):
+            micro_ready = 1
+        bidir = 1 if h.get("bidirectional_hit") else 0
+        return (
+            1 if h.get("contract_family_match") else 0,
+            1 if h.get("ai_generated_before_discovery") else 0,
+            pref, tree, micro_ready, bidir,
+            float(h.get("priority_boost") or 0),
+        )
+
+    raw = list(hypotheses or [])
+    limit = max(1, int(max_hypotheses_probe))
+    if contract.get("family_hints_enforced"):
+        in_family = sorted(
+            [h for h in raw if h.get("contract_family_match")],
+            key=_rank, reverse=True,
+        )
+        controls = sorted(
+            [h for h in raw if not h.get("contract_family_match")],
+            key=_rank, reverse=True,
+        )
+        # Requested-family rows own the budget.  Controls can use only unused
+        # capacity and remain a bounded antifalsification tail.
+        selected = in_family[:limit]
+        unused = max(0, limit - len(selected))
+        control_limit = min(unused, 4)
+        selected.extend(controls[:control_limit])
+    else:
+        selected = sorted(raw, key=_rank, reverse=True)[:limit]
+
+    scheduled = []
+    for h in selected:
+        row = dict(h)
+        if micro_cov >= 0.15:
+            row["micro_data_available"] = True
+        scheduled.append(row)
+    return scheduled
+
+
 def run_discovery(
     symbol,
     timeframe,
@@ -738,27 +799,21 @@ def run_discovery(
     prefer_ids = set(pop.get("preferred_mechanism_ids") or branch_mgr.preferred_mechanism_ids(brief))
     micro_cov = float((stages.get("microstructure") or {}).get("coverage_ratio") or 0.0)
     raw_pop = list(pop.get("hypotheses") or [])
-    # Tree-first / preferred-first / micro-ready-first ordering for effective breadth.
-    def _hyp_rank(h):
-        mid = str(h.get("mechanism_id") or "")
-        tree = 1 if h.get("mechanism_tree_id") else 0
-        pref = 1 if mid in prefer_ids else 0
-        micro_ready = 0
-        req = h.get("required_data") or []
-        if micro_cov >= 0.15 and any("snapshot" in str(x) or "level2" in str(x) or "trade_side" in str(x) for x in req):
-            micro_ready = 1
-            h = dict(h)
-            h["micro_data_available"] = True
-        bidir = 1 if h.get("bidirectional_hit") else 0
-        return (pref, tree, micro_ready, bidir, float(h.get("priority_boost") or 0))
-    ranked_pop = sorted(raw_pop, key=_hyp_rank, reverse=True)
-    # annotate micro availability onto untested copies
-    probe_population = []
-    for h in ranked_pop[: int(max_hypotheses_probe)]:
-        row = dict(h)
-        if micro_cov >= 0.15:
-            row["micro_data_available"] = True
-        probe_population.append(row)
+    probe_population = _schedule_probe_population(
+        raw_pop, max_hypotheses_probe, micro_cov, prefer_ids, contract,
+    )
+    stages["population"]["probe_scheduled_n"] = len(probe_population)
+    stages["population"]["probe_contract_family_n"] = sum(
+        1 for h in probe_population if h.get("contract_family_match")
+    )
+    stages["population"]["probe_control_n"] = sum(
+        1 for h in probe_population if not h.get("contract_family_match")
+    )
+    stages["population"]["contract_family_scheduled_first"] = bool(
+        not contract.get("family_hints_enforced")
+        or not probe_population
+        or probe_population[0].get("contract_family_match")
+    )
 
     stop_reason = None
     branch_tested = set()
