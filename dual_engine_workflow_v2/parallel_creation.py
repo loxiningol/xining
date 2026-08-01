@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover
     fcntl = None
 
 from .process_safe_state import atomic_write_json, process_lock, unique_id
+from .research_symbol_policy import require_allowed as require_research_symbol_allowed
 
 
 SCHEMA = "qiyu_parallel_creation_job_v1"
@@ -893,7 +894,7 @@ def start_workers(preferred_pipeline=None):
 def submit_job(
     source,
     research_direction,
-    symbol="ADA-USDT-SWAP",
+    symbol=None,
     timeframe="5m",
     direction="long",
     brief="",
@@ -914,7 +915,7 @@ def submit_job(
     research_direction = str(research_direction or brief or "").strip()
     if not research_direction:
         raise ValueError("research_direction is required")
-    symbol = str(symbol).upper()
+    symbol = require_research_symbol_allowed(symbol)
     timeframe = str(timeframe).lower()
     direction = str(direction).strip().lower()
     if direction not in ("long", "short"):
@@ -1996,11 +1997,11 @@ def self_test():
     try:
         one = submit_job(
             "cursor", "衰竭回收型策略方向", brief="并行自测一",
-            wake_workers=False, pipeline=1,
+            symbol="BTC-USDT-SWAP", wake_workers=False, pipeline=1,
         )
         two = submit_job(
             "codex", "成交量异动型策略方向", brief="并行自测二",
-            wake_workers=False, pipeline=2,
+            symbol="LTC-USDT-SWAP", wake_workers=False, pipeline=2,
         )
         p0 = subprocess.Popen(
             [sys.executable, "-m", __package__ + ".parallel_creation", "worker", "--slot", "0"],
@@ -2043,7 +2044,7 @@ def main():
     sp = sub.add_parser("submit")
     sp.add_argument("--source", required=True, choices=ALLOWED_SOURCES)
     sp.add_argument("--research-direction", required=True)
-    sp.add_argument("--symbol", default="ADA-USDT-SWAP")
+    sp.add_argument("--symbol", required=True, help="必须显式指定研究标的；ADA 已禁止研究")
     sp.add_argument("--timeframe", default="5m")
     sp.add_argument("--direction", default="long", choices=("long", "short", "both"))
     sp.add_argument("--brief", default="")

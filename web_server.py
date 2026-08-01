@@ -65,7 +65,7 @@ VERSION_RECORDER = Path("/root/scripts/record_strategy_version.py")
 RESEARCH_INSTRUMENTS = (
     # majors
     "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "BNB-USDT-SWAP",
-    "XRP-USDT-SWAP", "ADA-USDT-SWAP", "DOGE-USDT-SWAP", "LTC-USDT-SWAP",
+    "XRP-USDT-SWAP", "DOGE-USDT-SWAP", "LTC-USDT-SWAP",
     # liquid alts
     "LINK-USDT-SWAP", "AVAX-USDT-SWAP", "DOT-USDT-SWAP", "ATOM-USDT-SWAP",
     "NEAR-USDT-SWAP", "APT-USDT-SWAP", "SUI-USDT-SWAP", "OP-USDT-SWAP",
@@ -767,7 +767,7 @@ def api_creation_submit():
         out = pc.submit_job(
             source=payload.get("source") or "web",
             research_direction=payload.get("research_direction") or payload.get("brief") or "",
-            symbol=payload.get("symbol") or "ADA-USDT-SWAP",
+            symbol=payload.get("symbol"),
             timeframe=payload.get("timeframe") or "5m",
             direction=payload.get("direction") or "long",
             brief=payload.get("brief") or "",

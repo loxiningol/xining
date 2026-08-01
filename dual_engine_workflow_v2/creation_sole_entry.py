@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .process_safe_state import atomic_write_json, process_lock, unique_id
+from .research_symbol_policy import require_allowed as require_research_symbol_allowed
 
 
 SOLE_SCHEMA = "qiyu_sole_creation_entry_v1"
@@ -212,7 +213,7 @@ def _creation_outcome(blueprint, gate):
 
 
 def _create_strategy_unlocked(
-    symbol="ADA-USDT-SWAP",
+    symbol=None,
     timeframe="5m",
     direction="long",
     brief="",
@@ -231,6 +232,8 @@ def _create_strategy_unlocked(
 ):
     """Canonical creation. Always research-discovery blueprint first."""
     from . import creation_blueprint as blueprint_module
+
+    symbol = require_research_symbol_allowed(symbol)
 
     brief = str(brief or "").strip() or (
         "人类下达创造指令：在 %s %s 上寻找可证伪收益机制（研究发现优先，禁止先写完整策略）"
@@ -388,7 +391,7 @@ def _create_strategy_unlocked(
 
 
 def create_strategy(
-    symbol="ADA-USDT-SWAP",
+    symbol=None,
     timeframe="5m",
     direction="long",
     brief="",
@@ -406,6 +409,9 @@ def create_strategy(
     code_version=None,
 ):
     """Canonical executor with a global maximum of two simultaneous missions."""
+    # Reject a missing/forbidden research instrument before acquiring worker
+    # capacity or creating any queue/lock artifacts.
+    symbol = require_research_symbol_allowed(symbol)
     kwargs = {
         "symbol": symbol,
         "timeframe": timeframe,

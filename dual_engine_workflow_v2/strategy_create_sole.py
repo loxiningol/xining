@@ -15,17 +15,14 @@ os.chdir(str(ROOT))
 
 
 def main():
-    ap = argparse.ArgumentParser(description="提交策略研究方向到唯一创造入口（管道1/管道2）")
+    ap = argparse.ArgumentParser(description="提交策略研究方向到唯一创造入口")
     ap.add_argument("--source", default="human", choices=(
         "cursor", "codex", "human", "web", "system_timer", "direct",
     ))
     ap.add_argument("--research-direction", required=True)
     ap.add_argument("--symbol", required=True, help="必须显式指定研究标的；ADA 已禁止研究")
     ap.add_argument("--timeframe", default="5m")
-    ap.add_argument(
-        "--direction", default="long", choices=("long", "short"),
-        help="双向研究必须拆成独立 long/short 任务，避免编译与统计身份混用",
-    )
+    ap.add_argument("--direction", default="long", choices=("long", "short", "both"))
     ap.add_argument("--brief", default="")
     ap.add_argument("--brief-file", default="")
     ap.add_argument("--with-llm", action="store_true")
@@ -36,10 +33,6 @@ def main():
     ap.add_argument("--code-version", default="")
     ap.add_argument("--cooldown-seconds", type=int, default=None)
     ap.add_argument("--force", action="store_true")
-    ap.add_argument(
-        "--pipeline", default="",
-        help="指定管道：1 / 2 / 管道1 / 管道2；省略则自动分配",
-    )
     args = ap.parse_args()
     brief = args.brief
     if args.brief_file:
@@ -62,7 +55,6 @@ def main():
         brief=brief,
         skip_llm=not args.with_llm,
         max_loops=args.max_loops,
-        pipeline=(args.pipeline or None),
         research_contract=research_contract,
         mutation_contract=mutation_contract,
         data_version=(args.data_version or None),

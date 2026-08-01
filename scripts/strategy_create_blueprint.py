@@ -16,7 +16,7 @@ os.chdir(str(ROOT))
 
 def main():
     ap = argparse.ArgumentParser(description="Redirect → sole creation entry")
-    ap.add_argument("--symbol", default="ADA-USDT-SWAP")
+    ap.add_argument("--symbol", required=True, help="必须显式指定研究标的；ADA 已禁止研究")
     ap.add_argument("--timeframe", default="5m")
     ap.add_argument("--direction", default="long", choices=("long", "short", "both"))
     ap.add_argument("--brief", default="")

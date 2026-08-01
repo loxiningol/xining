@@ -33,7 +33,7 @@ class TempQueueCase(unittest.TestCase):
         return {
             "schema": "qiyu_research_contract_v2",
             "target": {
-                "symbol": "ADA-USDT-SWAP",
+                "symbol": "ETH-USDT-SWAP",
                 "timeframe": "5m",
                 "direction": "long",
             },
@@ -51,7 +51,7 @@ class TempQueueCase(unittest.TestCase):
         row = {
             "schema": queue.SCHEMA,
             "job_id": job_id,
-            "symbol": "ADA-USDT-SWAP",
+            "symbol": "ETH-USDT-SWAP",
             "timeframe": "5m",
             "trade_direction": "long",
             "brief": "mutation baseline",
@@ -86,7 +86,7 @@ class TempQueueCase(unittest.TestCase):
         kwargs = {
             "source": "human",
             "research_direction": "mutation baseline",
-            "symbol": "ADA-USDT-SWAP",
+            "symbol": "ETH-USDT-SWAP",
             "timeframe": "5m",
             "direction": "long",
             "brief": "mutation baseline",
@@ -112,7 +112,7 @@ class TestMutationParentValidation(TempQueueCase):
     def test_bidirectional_request_must_be_split_before_queueing(self):
         with self.assertRaisesRegex(ValueError, "split into two jobs"):
             queue.submit_job(
-                "human", "both directions", direction="both",
+                "human", "both directions", symbol="ETH-USDT-SWAP", direction="both",
                 wake_workers=False, data_version="d", code_version="c",
             )
         self.assertEqual(list((queue.base_dir() / "pending").glob("*.json")), [])

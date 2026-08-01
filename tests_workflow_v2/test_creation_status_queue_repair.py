@@ -125,13 +125,14 @@ class TestCreationOutcome(TempRootCase):
             captured.update(kwargs)
             return valid_blueprint(ok=False, present=False)
 
-        research_contract = {"symbol": "ADA-USDT-SWAP", "required": ["event_a"]}
+        research_contract = {"symbol": "LTC-USDT-SWAP", "required": ["event_a"]}
         mutation_contract = {"parent_id": "p1", "failed_gate": "dsr"}
         with mock.patch.object(
             creation_blueprint,
             "run_creation_blueprint", side_effect=fake_blueprint,
         ):
             result = sole._create_strategy_unlocked(
+                symbol="LTC-USDT-SWAP",
                 mission_id="outcome_reject",
                 research_contract=research_contract,
                 mutation_contract=mutation_contract,
@@ -159,7 +160,9 @@ class TestCreationOutcome(TempRootCase):
             creation_blueprint,
             "run_creation_blueprint", return_value=blueprint,
         ):
-            result = sole._create_strategy_unlocked(mission_id="outcome_data")
+            result = sole._create_strategy_unlocked(
+                symbol="LTC-USDT-SWAP", mission_id="outcome_data",
+            )
         self.assertFalse(result["ok"])
         self.assertTrue(result["technical_completed"])
         self.assertEqual(result["outcome"], "data_blocked")
@@ -173,7 +176,9 @@ class TestCreationOutcome(TempRootCase):
             creation_blueprint,
             "run_creation_blueprint", return_value=blueprint,
         ):
-            result = sole._create_strategy_unlocked(mission_id="outcome_ready")
+            result = sole._create_strategy_unlocked(
+                symbol="LTC-USDT-SWAP", mission_id="outcome_ready",
+            )
         self.assertTrue(result["ok"])
         self.assertEqual(result["outcome"], "candidate_ready")
 
@@ -183,7 +188,9 @@ class TestCreationOutcome(TempRootCase):
             "run_creation_blueprint",
             side_effect=RuntimeError("schema exploded"),
         ):
-            result = sole._create_strategy_unlocked(mission_id="outcome_exception")
+            result = sole._create_strategy_unlocked(
+                symbol="LTC-USDT-SWAP", mission_id="outcome_exception",
+            )
         self.assertFalse(result["ok"])
         self.assertFalse(result["technical_completed"])
         self.assertEqual(result["outcome"], "technical_failed")
@@ -200,6 +207,7 @@ class TestFormalSubmissionStatus(TempRootCase):
     def _run_qualified(self, formal_result):
         submitted = queue.submit_job(
             "human", "formal status", brief="formal status",
+            symbol="LTC-USDT-SWAP",
             wake_workers=False, data_version="d", code_version="c",
         )
         job, running_path, lock = queue.claim_next(0)
@@ -293,7 +301,7 @@ class TestCompactFailureEvidence(unittest.TestCase):
 class TestJobFingerprintAndCooldown(TempRootCase):
     def test_full_identity_changes_for_each_material_input(self):
         base = dict(
-            text="same direction", symbol="ADA-USDT-SWAP", timeframe="5m",
+            text="same direction", symbol="LTC-USDT-SWAP", timeframe="5m",
             direction="long", brief="brief", data_version="d1", code_version="c1",
             research_contract={"event": "a"}, mutation_contract={"parent_id": "p1"},
             skip_llm=True, max_loops=5,
@@ -313,10 +321,10 @@ class TestJobFingerprintAndCooldown(TempRootCase):
 
     def test_contract_runtime_metadata_cannot_evade_semantic_deduplication(self):
         base = dict(
-            text="same direction", symbol="ADA-USDT-SWAP", timeframe="5m",
+            text="same direction", symbol="LTC-USDT-SWAP", timeframe="5m",
             direction="long", brief="brief", data_version="d1", code_version="c1",
             research_contract={
-                "target": {"symbol": "ADA-USDT-SWAP", "timeframe": "5m"},
+                "target": {"symbol": "LTC-USDT-SWAP", "timeframe": "5m"},
                 "event_contract": {
                     "entry_conditions": [{"feature": "J_5m", "value": 89}],
                     "verified_at": "2026-08-01 01:00:00",
@@ -328,7 +336,7 @@ class TestJobFingerprintAndCooldown(TempRootCase):
         first = queue._direction_key(**base)
         recompiled = dict(base)
         recompiled["research_contract"] = {
-            "target": {"symbol": "ADA-USDT-SWAP", "timeframe": "5m"},
+            "target": {"symbol": "LTC-USDT-SWAP", "timeframe": "5m"},
             "event_contract": {
                 "entry_conditions": [{"feature": "J_5m", "value": 89}],
                 "verified_at": "2026-08-01 02:00:00",
@@ -347,7 +355,7 @@ class TestJobFingerprintAndCooldown(TempRootCase):
 
         submit = dict(
             source="human", research_direction="same direction",
-            symbol="ADA-USDT-SWAP", timeframe="5m", direction="long", brief="brief",
+            symbol="LTC-USDT-SWAP", timeframe="5m", direction="long", brief="brief",
             wake_workers=False, data_version="d1", code_version="c1",
             cooldown_seconds=3600,
         )
@@ -363,7 +371,7 @@ class TestJobFingerprintAndCooldown(TempRootCase):
 
     def test_active_and_completed_duplicates_do_not_enqueue_again(self):
         kwargs = dict(
-            source="human", research_direction="same", symbol="ADA-USDT-SWAP",
+            source="human", research_direction="same", symbol="LTC-USDT-SWAP",
             timeframe="5m", direction="long", brief="exact brief",
             wake_workers=False, data_version="data-v1", code_version="code-v1",
             cooldown_seconds=3600,
@@ -395,6 +403,7 @@ class TestJobFingerprintAndCooldown(TempRootCase):
     def test_worker_persists_research_rejected_not_false_success(self):
         submitted = queue.submit_job(
             "human", "worker status", brief="worker status", wake_workers=False,
+            symbol="LTC-USDT-SWAP",
             data_version="d", code_version="c",
         )
         job, running_path, lock = queue.claim_next(0)
