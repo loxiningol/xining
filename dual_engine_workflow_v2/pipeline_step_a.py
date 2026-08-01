@@ -290,6 +290,53 @@ def _compiler_contract(spec_pack, spec, meta):
     return {}
 
 
+def _apply_contract_frequency_gate(theoretical_review, verification, contract):
+    """Apply a stricter immutable per-task weekly-open gate before review."""
+    theo = dict(theoretical_review or {})
+    verified = dict(verification or {})
+    performance = dict((contract or {}).get("performance_contract") or {})
+    if performance.get("metric") != "theoretical_weekly_opens":
+        return theo, verified
+    try:
+        threshold = float(performance.get("threshold"))
+    except (TypeError, ValueError):
+        threshold = None
+    operator = str(performance.get("operator") or ">=").strip()
+    try:
+        observed = float(theo.get("ai_theoretical_weekly_opens_avg"))
+    except (TypeError, ValueError):
+        observed = None
+    passed = False
+    if threshold is not None and observed is not None:
+        passed = observed > threshold if operator == ">" else observed >= threshold
+    gate = {
+        "metric": "theoretical_weekly_opens",
+        "operator": operator,
+        "threshold": threshold,
+        "observed": observed,
+        "pass": bool(passed),
+        "scope": "pre_review_submission",
+        "research_contract_id": (contract or {}).get("contract_id"),
+    }
+    theo["research_contract_frequency_gate"] = gate
+    theo["approved"] = bool(theo.get("approved") and passed)
+    reasons = list(verified.get("reasons") or [])
+    if not passed:
+        reason = "research_contract_weekly_opens_fail(got=%s,required=%s%s)" % (
+            "missing" if observed is None else "%.6f" % observed,
+            operator,
+            "missing" if threshold is None else "%.6f" % threshold,
+        )
+        if reason not in reasons:
+            reasons.append(reason)
+    verified.update({
+        "ok": bool(verified.get("ok") and passed),
+        "reasons": reasons,
+        "research_contract_frequency_gate": gate,
+    })
+    return theo, verified
+
+
 def _formal_submission_authority(requested, contract, admitted_recipe):
     """Only the discovery→formal bridge may create a review submission."""
     if requested is not True:
@@ -3483,6 +3530,9 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         }
         theo = ai_cons.theoretical_review_all(definition, theo_evidence) or {}
         verification = ai_cons.validate_theoretical_review_result(theo)
+        theo, verification = _apply_contract_frequency_gate(
+            theo, verification, contract,
+        )
         _save_artifact(tid, "theoretical_review_all", theo)
     except Exception as exc:
         theo = {"approved": False, "error": str(exc)[:240]}

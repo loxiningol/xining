@@ -178,12 +178,65 @@ def _strong_clauses(text):
 def _is_performance_target_clause(text):
     """Separate research targets from executable event requirements."""
     blob = str(text or "").lower()
+    if any(token in blob for token in (
+        "周交易量", "周开仓", "周交易次数", "weekly opens", "weekly trades",
+    )):
+        return True
     return any(token in blob for token in (
         "周收益", "月收益", "年化", "夏普", "sharpe", "dsr", "pbo",
         "最大回撤", "胜率", "收益率目标", "收益目标", "交易频率",
+        "周交易量", "周开仓", "周交易次数",
     )) and not any(token in blob for token in (
         "开仓", "入场", "平仓", "止盈", "止损", "k线", "指标",
     ))
+
+
+_WEEKLY_OPEN_GATE_RE = re.compile(
+    r"(?:平均)?(?:每)?周(?:理论)?(?:开仓|交易)(?:次数|频率|量)?\s*"
+    r"(?P<op>>=|>|大于等于|不小于|至少|大于|超过)\s*"
+    r"(?P<value>\d+(?:\.\d+)?)",
+    re.IGNORECASE,
+)
+
+
+def _performance_contract(text, supplied, constraints):
+    """Normalize task-specific performance gates without weakening defaults."""
+    raw = supplied.get("performance_contract") or constraints.get("performance_contract") or {}
+    raw = dict(raw) if isinstance(raw, dict) else {}
+    threshold = raw.get("threshold")
+    if threshold is None:
+        threshold = raw.get("minimum_theoretical_weekly_opens")
+    operator = _operator(raw.get("operator") or raw.get("comparison"))
+    source = "structured" if raw else None
+
+    match = _WEEKLY_OPEN_GATE_RE.search(str(text or ""))
+    if match:
+        if threshold is None:
+            threshold = match.group("value")
+        if not operator:
+            operator = _operator(match.group("op"))
+        source = "human_instruction"
+    if threshold is None:
+        return {}, []
+
+    errors = []
+    try:
+        threshold = float(threshold)
+        if not math.isfinite(threshold) or threshold < 0.0:
+            raise ValueError("outside_bounds")
+    except (TypeError, ValueError):
+        errors.append("performance_weekly_opens_threshold_invalid")
+        threshold = None
+    operator = operator or ">="
+    if operator not in (">", ">="):
+        errors.append("performance_weekly_opens_operator_invalid:%s" % operator)
+    return {
+        "metric": "theoretical_weekly_opens",
+        "operator": operator,
+        "threshold": threshold,
+        "scope": "pre_review_submission",
+        "source": source or "structured",
+    }, errors
 
 
 def _additional_timeframes(text, primary):
@@ -196,6 +249,7 @@ def _family_hints(text):
     blob = str(text or "").lower()
     mapping = (
         (("唐奇安", "donchian", "通道突破"), "donchian_trend_break"),
+        (("成交量异动", "异常成交量", "放量突破", "volume anomaly"), "volume_anomaly_breakout"),
         (("趋势", "顺势", "momentum", "pullback", "回撤"), "trend_pullback"),
         (("压缩", "squeeze", "波动扩张"), "vol_squeeze_break"),
         (("均值回归", "mean reversion", "反转"), "mean_reversion"),
@@ -285,7 +339,7 @@ def _parse_holding_contract(text, supplied, constraints):
 def stable_contract_payload(contract):
     """Return exactly the immutable body used to derive ``contract_id``."""
     row = contract if isinstance(contract, dict) else {}
-    return {
+    payload = {
         "schema": row.get("schema"),
         "target": row.get("target") or {},
         "event_contract": row.get("event_contract") or {},
@@ -296,6 +350,10 @@ def stable_contract_payload(contract):
         "family_hints": row.get("family_hints") or [],
         "brief": row.get("brief") or "",
     }
+    # Keep v2 contracts created before performance gates hash-compatible.
+    if row.get("performance_contract"):
+        payload["performance_contract"] = row.get("performance_contract")
+    return payload
 
 
 def verify_contract_integrity(contract):
@@ -334,6 +392,9 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
     feature_in = supplied.get("feature_contract") or {}
     data_in = supplied.get("data_contract") or {}
     mutation_in = supplied.get("mutation_contract") or constraints.get("mutation_contract") or {}
+    performance_contract, performance_errors = _performance_contract(
+        text, supplied, constraints,
+    )
 
     target = {
         "symbol": str(target_in.get("symbol") or symbol).upper(),
@@ -431,6 +492,7 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
     missing_data = [name for name in required_data if name not in set(available)]
 
     errors = []
+    errors.extend(performance_errors)
     if not target["symbol"]:
         errors.append("target_symbol_missing")
     if not target["timeframe"]:
@@ -546,8 +608,19 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
         "failed_gate": mutation_in.get("failed_gate"),
         "allowed_mutations": _list(mutation_in.get("allowed_mutations")),
         "structural_delta": mutation_in.get("structural_delta"),
-        "data_version": mutation_in.get("data_version") or data_version,
-        "code_version": mutation_in.get("code_version") or code_version,
+        # A normalized immutable contract explicitly contains these keys even
+        # when their values are null.  Recompilation inside the worker must
+        # preserve that choice; filling later queue/runtime versions here would
+        # change the body hash before discovery starts.  Fresh uncompiled
+        # constraints still receive the supplied runtime versions.
+        "data_version": (
+            mutation_in.get("data_version")
+            if "data_version" in mutation_in else data_version
+        ),
+        "code_version": (
+            mutation_in.get("code_version")
+            if "code_version" in mutation_in else code_version
+        ),
     }
     if mutation_contract.get("parent_id"):
         if not mutation_contract.get("failed_gate"):
@@ -568,6 +641,8 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
         "family_hints": family_hints,
         "brief": text,
     }
+    if performance_contract:
+        stable["performance_contract"] = performance_contract
     contract_id = "rc_%s" % _canonical_hash(stable_contract_payload(stable))
     supplied_contract_id = str(supplied.get("contract_id") or "").strip()
     if supplied_contract_id and supplied_contract_id != contract_id:
@@ -612,6 +687,7 @@ def apply_to_hypothesis(hypothesis, contract):
         (contract.get("event_contract") or {}).get("session_window")
     )
     row["holding_contract"] = dict(contract.get("holding_contract") or {})
+    row["performance_contract"] = dict(contract.get("performance_contract") or {})
     row["required_horizons_bars"] = list(
         ((contract.get("holding_contract") or {}).get("allowed_horizons_bars") or [])
     )
