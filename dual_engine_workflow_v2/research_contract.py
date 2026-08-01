@@ -253,6 +253,9 @@ def _parse_holding_contract(text, supplied, constraints):
         )
     except Exception:
         stop_pct = None
+    source = raw.get("source")
+    if source not in ("platform_default", "structured_or_human_exact"):
+        source = "structured_or_human_exact" if (raw or text_match) else "platform_default"
     return {
         "mode": "exact_horizon" if exact is not None else "allowed_horizons",
         "allowed_horizons_bars": sorted(normalized),
@@ -271,7 +274,11 @@ def _parse_holding_contract(text, supplied, constraints):
         },
         "execution_leverage": PRODUCTION_EXECUTION_LEVERAGE,
         "statistical_return_basis": "full_size_leveraged_after_cost_v1",
-        "source": "structured_or_human_exact" if (raw or text_match) else "platform_default",
+        # Recompiling an already-compiled immutable contract must preserve its
+        # provenance.  Treating the supplied normalized holding payload as a
+        # fresh human override changed only this metadata field and therefore
+        # produced a different body hash inside discovery.
+        "source": source,
     }
 
 

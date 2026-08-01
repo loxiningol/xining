@@ -16,6 +16,34 @@ from dual_engine_workflow_v2 import research_discovery
 
 
 class ResearchContractRepairTests(unittest.TestCase):
+    def test_recompiling_compiled_contract_preserves_body_hash(self):
+        constraints = {
+            "mutation_contract": {
+                "parent_id": "parent-1",
+                "failed_gate": "invalid_research_contract",
+                "allowed_mutations": ["brief"],
+                "structural_delta": {
+                    "brief": {"before": "old", "after": "new"},
+                },
+            },
+        }
+        first = research_contract.compile_contract(
+            "Donchian trend research", "ADA-USDT-SWAP", "5m", "long",
+            constraints=constraints, data_version="data-v1", code_version="code-v1",
+        )
+        second = research_contract.compile_contract(
+            "Donchian trend research", "ADA-USDT-SWAP", "5m", "long",
+            constraints={"research_contract": first},
+            data_version="data-v1", code_version="code-v1",
+        )
+        self.assertTrue(first["valid"], first["validation_errors"])
+        self.assertTrue(second["valid"], second["validation_errors"])
+        self.assertEqual(first["contract_id"], second["contract_id"])
+        self.assertEqual(
+            "platform_default", second["holding_contract"]["source"],
+        )
+        self.assertTrue(research_contract.verify_contract_integrity(second)["ok"])
+
     def test_contract_body_tamper_is_detected_even_when_id_is_unchanged(self):
         contract = research_contract.compile_contract(
             "开仓K<=20；K线走完后再开仓",
