@@ -43,6 +43,47 @@ class TestResearchDiscovery(unittest.TestCase):
         self.assertEqual(
             ["volume_z", "close_z_20"], rows[0]["factor_hints"],
         )
+        self.assertEqual(
+            ["volume_z", "close_z_20"],
+            rows[0]["required_factor_intersection"],
+        )
+        self.assertEqual(
+            {"volume_z": "high", "close_z_20": "trade_direction"},
+            rows[0]["factor_side_constraints"],
+        )
+
+    def test_volume_anomaly_probe_never_uses_low_volume_or_wrong_price_side(self):
+        matrix = {
+            "volume_z": [float(i % 20) for i in range(400)],
+            "close_z_20": [float((i % 31) - 15) for i in range(400)],
+        }
+        base = {
+            "factor_hints": ["volume_z", "close_z_20"],
+            "required_factor_intersection": ["volume_z", "close_z_20"],
+            "factor_side_constraints": {
+                "volume_z": "high", "close_z_20": "trade_direction",
+            },
+            "trade_direction_locked": True,
+        }
+        long_specs, _ = rd.probes._candidate_events(
+            dict(base, predicted_direction="long"), matrix, max_specs=18,
+        )
+        short_specs, _ = rd.probes._candidate_events(
+            dict(base, predicted_direction="short"), matrix, max_specs=18,
+        )
+        self.assertEqual(2, len(long_specs))
+        self.assertEqual(2, len(short_specs))
+        for spec in long_specs:
+            self.assertEqual("mechanism_intersection", spec["kind"])
+            self.assertEqual(
+                [("volume_z", "high"), ("close_z_20", "high")],
+                [(term["factor"], term["side"]) for term in spec["terms"]],
+            )
+        for spec in short_specs:
+            self.assertEqual(
+                [("volume_z", "high"), ("close_z_20", "low")],
+                [(term["factor"], term["side"]) for term in spec["terms"]],
+            )
 
     def test_enforced_family_owns_probe_budget_before_controls(self):
         rows = [

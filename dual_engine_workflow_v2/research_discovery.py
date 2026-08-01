@@ -197,6 +197,14 @@ def _design_seed_hypotheses(design_seed, contract):
             p.get("factor_hints") or p.get("observable_proxy")
             or fallback.get("factor_hints") or fallback.get("observable_proxy") or []
         )
+        required_intersection = (
+            p.get("required_factor_intersection")
+            or fallback.get("required_factor_intersection") or []
+        )
+        side_constraints = (
+            p.get("factor_side_constraints")
+            or fallback.get("factor_side_constraints") or {}
+        )
         identity = "%s|%s|%s|%s" % (
             (contract or {}).get("contract_id"), p.get("id") or index,
             p.get("family"), p.get("thesis_zh") or p.get("refined_logic_zh"),
@@ -214,6 +222,8 @@ def _design_seed_hypotheses(design_seed, contract):
             "constraint_used": p.get("constraint") or p.get("constraints") or [],
             "observable_proxy": list(p.get("observable_proxy") or hints),
             "factor_hints": list(hints),
+            "required_factor_intersection": list(required_intersection),
+            "factor_side_constraints": dict(side_constraints),
             "predicted_direction": target.get("direction") or design.get("direction"),
             "horizon": p.get("horizon") or target.get("timeframe"),
             "conditional_on": list(p.get("conditional_on") or []),

@@ -105,6 +105,14 @@ SEED_MECHANISMS = (
         "family": "volume_anomaly_breakout",
         # Both factors have an exact research→formal DSL mapping.
         "factor_hints": ["volume_z", "close_z_20"],
+        # This mechanism is an intersection, not a free quantile menu:
+        # participation must be abnormal on the high side, while signed price
+        # displacement must agree with the contract-locked trade direction.
+        "required_factor_intersection": ["volume_z", "close_z_20"],
+        "factor_side_constraints": {
+            "volume_z": "high",
+            "close_z_20": "trade_direction",
+        },
     },
     {
         "mechanism_id": "funding_crowding_fade_001",
@@ -729,6 +737,10 @@ def mechanism_to_hypothesis(mechanism, source="mechanism_graph"):
         "capacity_limit": m.get("capacity_limit"),
         "alternative_explanations": m.get("alternative_explanations"),
         "factor_hints": m.get("factor_hints") or list(m.get("observable_proxy") or []),
+        "required_factor_intersection": list(
+            m.get("required_factor_intersection") or []
+        ),
+        "factor_side_constraints": dict(m.get("factor_side_constraints") or {}),
         "simplest_antifalsify": "shuffle_event_time_and_sign_flip_should_kill_edge",
         "completeness": completeness_check(m),
         "required_data": m.get("required_data") or ["derived_ohlcv_proxy"],

@@ -298,6 +298,11 @@ def _diverge_then_select(brief, symbol, timeframe):
             "thesis_zh": "成交量相对自身历史突然放大，且价格脱离近期分布后只跟随同方向延续",
             "family": "volume_anomaly_breakout",
             "factor_hints": ["volume_z", "close_z_20"],
+            "required_factor_intersection": ["volume_z", "close_z_20"],
+            "factor_side_constraints": {
+                "volume_z": "high",
+                "close_z_20": "trade_direction",
+            },
         }
 
     # Optional swap when brief clearly asks trend
@@ -588,6 +593,13 @@ def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True,
                 ) or _string_list(fallback.get("factor_hints"))
                 row["factor_hints"] = hints
                 row["observable_proxy"] = _string_list(row.get("observable_proxy")) or hints
+                row["required_factor_intersection"] = _string_list(
+                    row.get("required_factor_intersection")
+                ) or _string_list(fallback.get("required_factor_intersection"))
+                row["factor_side_constraints"] = dict(
+                    row.get("factor_side_constraints")
+                    or fallback.get("factor_side_constraints") or {}
+                )
                 row["failure_conditions"] = _string_list(row.get("failure_conditions"))
                 row["required_data"] = _string_list(row.get("required_data")) or ["derived_ohlcv_proxy"]
                 row["structured_for_discovery"] = bool(

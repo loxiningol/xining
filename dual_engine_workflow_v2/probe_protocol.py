@@ -192,6 +192,28 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
             "threshold_source": "prior_only_rolling_quantile",
         }
 
+    def constrained_side(name):
+        raw = ((hypothesis or {}).get("factor_side_constraints") or {}).get(name)
+        if isinstance(raw, dict):
+            declared = str(
+                (hypothesis or {}).get("predicted_direction") or ""
+            ).strip().lower()
+            key = "long" if declared in ("long", "buy", "positive_shift") else (
+                "short" if declared in ("short", "sell", "negative_shift") else ""
+            )
+            raw = raw.get(key) or raw.get("default")
+        raw = str(raw or "").strip().lower()
+        if raw == "trade_direction":
+            declared = str(
+                (hypothesis or {}).get("predicted_direction") or ""
+            ).strip().lower()
+            if declared in ("long", "buy", "positive_shift"):
+                return "high"
+            if declared in ("short", "sell", "negative_shift"):
+                return "low"
+            return None
+        return raw if raw in ("high", "low") else None
+
     # Exact human-contract comparisons take precedence over generic quantiles.
     # The contract compiler already rejects missing required features; this
     # branch preserves numeric thresholds and AND/OR structure during probing.
@@ -248,6 +270,43 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
             "kind": "human_contract_exact",
             "logic": "ordered_joins",
         })
+        return specs[: int(max_specs)], available
+
+    # Structured mechanism intersections are immutable event identity.  Do
+    # not let a generic low-volume proxy or an opposite signed displacement
+    # consume trials and then masquerade as the requested volume-breakout
+    # mechanism.
+    required_intersection = list(
+        (hypothesis or {}).get("required_factor_intersection") or []
+    )
+    if required_intersection:
+        if any(name not in (factor_matrix or {}) for name in required_intersection):
+            return [], available
+        for q in DEFAULT_QUANTILES:
+            terms = []
+            masks = []
+            sides = []
+            for name in required_intersection:
+                side = constrained_side(name)
+                if side not in ("high", "low"):
+                    return [], available
+                sides.append(side)
+                terms.append(quantile_term(name, side, q))
+                masks.append(mask(name, side, q))
+            n = min([len(row) for row in masks] or [0])
+            specs.append({
+                "event_id": "%s_q%s" % (
+                    "_AND_".join(
+                        "%s_%s" % (name, sides[index])
+                        for index, name in enumerate(required_intersection)
+                    ),
+                    int(q * 100),
+                ),
+                "terms": terms,
+                "mask": [all(row[k] for row in masks) for k in range(n)],
+                "kind": "mechanism_intersection",
+                "logic": "all",
+            })
         return specs[: int(max_specs)], available
 
     for name in available:
@@ -818,6 +877,22 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
     specs, available = _candidate_events(hypothesis, matrix, max_specs=max_trials)
     requested = list((hypothesis or {}).get("factor_hints") or
                      (hypothesis or {}).get("observable_proxy") or [])
+    required_intersection = list(
+        (hypothesis or {}).get("required_factor_intersection") or []
+    )
+    missing_required = [
+        name for name in required_intersection if name not in matrix
+    ]
+    if missing_required:
+        return {
+            "ok": True, "passed": False, "hypothesis_id": hypothesis.get("hypothesis_id"),
+            "research_state": "PROXY_INADEQUATE",
+            "research_state_zh": RESEARCH_STATES_ZH["PROXY_INADEQUATE"],
+            "n_probes": 0, "best": None, "probes": [],
+            "missing_proxies": missing_required,
+            "available_proxies": sorted(matrix.keys()),
+            "family_closed": False, "at": _now(),
+        }
     if requested and not available:
         return {
             "ok": True, "passed": False, "hypothesis_id": hypothesis.get("hypothesis_id"),
