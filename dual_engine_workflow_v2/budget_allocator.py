@@ -267,7 +267,7 @@ def _allocate_locked(total_budget=400, context=None, epsilon=0.15):
                 0.4 * mech_weight + 0.3 * emp_weight + 0.3 * sym_weight
             ))))),
             "sym_pop_boost": max(0.8, min(1.25, sym_weight)),
-            "max_total_trials": max(120, min(420, int(total_budget))),
+            "max_total_trials": max(160, min(520, int(total_budget))),
         },
         "reward_definition_zh": (
             "信息增益代理+校准+复制+新颖 − 成本低估 − 过拟合风险；禁用裸PnL单分。"

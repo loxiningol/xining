@@ -25,6 +25,7 @@ from . import probe_protocol as probes
 from . import research_blackboard as board
 from . import research_branch_manager as branch_mgr
 from . import research_ledger as ledger
+from . import microstructure_bridge as micro
 from . import symbolic_searcher as sym
 
 
@@ -69,7 +70,7 @@ def compile_research_contract(brief, symbol, timeframe, constraints=None):
         ),
         "forbidden_info": ["future_bars", "unrealized_label_leak"],
         "max_complexity": "probe_then_assemble",
-        "max_trial_budget": int(c.get("max_trial_budget") or 400),
+        "max_trial_budget": int(c.get("max_trial_budget") or 520),
         "min_evidence": [
             "naked_probe", "antifalsify_matrix", "leakage_audit",
             "causal_boundary", "execution_feasibility", "efr",
@@ -187,13 +188,21 @@ def run_discovery(
         max_hypotheses_probe
         or (constraints or {}).get("max_hypotheses_probe")
         or os.environ.get("QIYU_MAX_HYP_PROBE")
-        or 56
+        or 72
     )
     # Tiny-VPS cap: more breadth, but a strict global trial budget below.
-    max_hypotheses_probe = max(12, min(int(max_hypotheses_probe), 80))
+    max_hypotheses_probe = max(16, min(int(max_hypotheses_probe), 96))
     stages = {}
     contract = compile_research_contract(brief, symbol, timeframe, constraints)
+    contract = micro.enrich_contract(contract, symbol=symbol)
     stages["contract"] = contract
+    # Inject forward micro snapshots into factor matrix when overlap exists.
+    micro_meta = {}
+    if factor_matrix is not None and candles:
+        factor_matrix, micro_meta = micro.inject_into_factor_matrix(
+            factor_matrix, symbol, candles,
+        )
+    stages["microstructure"] = micro_meta
     ledger.append_event({
         "event_type": "contract",
         "symbol": symbol,
@@ -224,7 +233,7 @@ def run_discovery(
     max_hypotheses_probe = int(
         (budget_plan.get("knobs") or {}).get("max_hypotheses_probe") or max_hypotheses_probe
     )
-    max_hypotheses_probe = max(12, min(int(max_hypotheses_probe), 80))
+    max_hypotheses_probe = max(16, min(int(max_hypotheses_probe), 96))
 
     pop = build_hypothesis_population(
         brief, symbol, timeframe, factor_matrix, fwd_returns,
@@ -271,10 +280,10 @@ def run_discovery(
     coverage_horizons = set()
     coverage_mappings = set()
     coverage_directions = set()
-    global_trial_limit = int(contract.get("max_trial_budget") or 400)
+    global_trial_limit = int(contract.get("max_trial_budget") or 520)
     global_trials_used = 0
     base_trials_per_hypothesis = max(
-        6, min(12, int(global_trial_limit / float(max(max_hypotheses_probe, 1))))
+        6, min(14, int(global_trial_limit / float(max(max_hypotheses_probe, 1))))
     )
     n_bars = len(fwd_returns or [])
     span_days = None
@@ -293,13 +302,54 @@ def run_discovery(
             "hypothesis_id": (hyp or {}).get("hypothesis_id"),
             "fail_stage": stage,
             "primary": ((upd.get("attribution") or {}).get("primary")),
+            "failure_codes": list((kw.get("probe") or {}).get("failure_codes") or []),
         })
         return upd
 
     tested = 0
-    probe_population = (pop.get("hypotheses") or [])[: int(max_hypotheses_probe)]
+    prefer_ids = set(pop.get("preferred_mechanism_ids") or branch_mgr.preferred_mechanism_ids(brief))
+    micro_cov = float((stages.get("microstructure") or {}).get("coverage_ratio") or 0.0)
+    raw_pop = list(pop.get("hypotheses") or [])
+    # Tree-first / preferred-first / micro-ready-first ordering for effective breadth.
+    def _hyp_rank(h):
+        mid = str(h.get("mechanism_id") or "")
+        tree = 1 if h.get("mechanism_tree_id") else 0
+        pref = 1 if mid in prefer_ids else 0
+        micro_ready = 0
+        req = h.get("required_data") or []
+        if micro_cov >= 0.15 and any("snapshot" in str(x) or "level2" in str(x) or "trade_side" in str(x) for x in req):
+            micro_ready = 1
+            h = dict(h)
+            h["micro_data_available"] = True
+        bidir = 1 if h.get("bidirectional_hit") else 0
+        return (pref, tree, micro_ready, bidir, float(h.get("priority_boost") or 0))
+    ranked_pop = sorted(raw_pop, key=_hyp_rank, reverse=True)
+    # annotate micro availability onto untested copies
+    probe_population = []
+    for h in ranked_pop[: int(max_hypotheses_probe)]:
+        row = dict(h)
+        if micro_cov >= 0.15:
+            row["micro_data_available"] = True
+        probe_population.append(row)
+
+    stop_reason = None
+    branch_tested = set()
     for hypothesis_index, h in enumerate(probe_population):
         if global_trials_used >= global_trial_limit:
+            stop_reason = "trial_budget_exhausted"
+            break
+        # Coverage-driven stop: preferred tree branches evaluated + high space coverage
+        # and no survivor — do not burn remaining budget on redundant symbolic tails.
+        if (
+            tested >= 12
+            and len(branch_tested) >= 4
+            and len(coverage_events) >= 24
+            and len(coverage_horizons) >= 3
+            and len(coverage_mappings) >= 3
+            and not survivors
+            and hypothesis_index >= max(16, int(0.55 * len(probe_population)))
+        ):
+            stop_reason = "coverage_sufficient_no_survivor"
             break
         pcon = learn.register_and_probe_prepare(h, symbol, timeframe, run_id)
 
@@ -356,6 +406,8 @@ def run_discovery(
                     "best_event": ((pr.get("best") or {}).get("event_id")),
                 })
         tested += 1
+        if h.get("mechanism_branch_id"):
+            branch_tested.add("%s:%s" % (h.get("mechanism_tree_id"), h.get("mechanism_branch_id")))
         research_state = pr.get("research_state") or "NO_DIRECTIONAL_EFFECT"
         state_counts[research_state] = int(state_counts.get(research_state) or 0) + 1
         cov = pr.get("coverage") or {}
@@ -620,6 +672,11 @@ def run_discovery(
     budget["near_miss_extra_trials"] = sum(
         int(x.get("extra_trials") or 0) for x in near_miss_diagnostics
     )
+    budget["stop_reason"] = stop_reason or (
+        "completed_population" if tested >= len(probe_population) else "unknown"
+    )
+    budget["branch_tested_n"] = len(branch_tested)
+    budget["coverage_stop_enabled"] = True
     stages["trial_budget"] = budget
     stages["n_probed"] = tested
     stages["learning_updates_n"] = len(learning_updates)
@@ -639,10 +696,16 @@ def run_discovery(
         "missing_high_information_data": [
             "真实订单簿", "持仓量", "资金费率历史", "清算流", "跨交易所基差",
         ],
-        "family_exhaustion_allowed": False,
+        "family_exhaustion_allowed": bool(
+            micro_cov >= 0.35
+            and not (contract.get("unavailable_data") or [])
+        ),
+        "micro_coverage_ratio": micro_cov,
         "reason_zh": (
-            "当前覆盖可评价具体代理与执行映射，但仅有OHLCV衍生代理，"
-            "不足以宣判需要订单簿、持仓量或清算流的整个机制族耗尽。"
+            "当前覆盖可评价具体代理与执行映射；若仅有OHLCV或前向盘口快照、"
+            "仍缺持仓量/清算/资金费率，则禁止 FAMILY_EXHAUSTED。"
+            if micro_cov < 0.35 else
+            "已有前向微观快照重叠；仍缺 OI/清算/funding 时不得关闭依赖这些维度的机制族。"
         ),
     }
     stages["research_state_counts"] = state_counts
@@ -809,9 +872,12 @@ def run_discovery(
         "research_state_counts": stages.get("research_state_counts"),
         "mechanism_space_coverage": stages.get("mechanism_space_coverage"),
         "family_closures": stages.get("family_closures"),
+        "failure_lineage": (stages.get("failure_lineage") or [])[:40],
+        "microstructure": stages.get("microstructure"),
         "near_miss_diagnostics_n": len(near_miss_diagnostics),
         "probe_trials_used": global_trials_used,
         "probe_trial_limit": global_trial_limit,
+        "stop_reason": (stages.get("trial_budget") or {}).get("stop_reason"),
     }, run_id=run_id)
 
     return {
@@ -854,7 +920,7 @@ def probe():
             "multiple_testing", "edge_friction", "creation_multiverse",
             "parameter_platform", "prediction_contract", "outcome_attribution",
             "generator_scorecard", "mechanism_beliefs", "budget_allocator",
-            "shadow_feedback", "learning_loop", "research_branch_manager",
+            "shadow_feedback", "learning_loop", "research_branch_manager", "microstructure_bridge",
         ],
         "roles": list(committee.ROLE_CONTRACTS.keys()),
         "learning_mvp": learn.probe().get("mvp"),

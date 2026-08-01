@@ -374,7 +374,10 @@ EXTENDED_MECHANISMS = (
         "economic_actor": ["market_maker", "urgent_taker"],
         "constraint": ["book_depth", "inventory_limit"],
         "forced_trade": "temporary_book_vacuum_closes_after_quotes_replenish",
-        "observable_proxy": ["order_book_depth", "spread", "order_flow_imbalance"],
+        "observable_proxy": [
+            "micro_depth_imbalance", "micro_bid_depth_usd", "micro_ask_depth_usd",
+            "micro_half_spread_rate", "micro_trade_flow_imbalance",
+        ],
         "predicted_effect": {"direction": "recovery_after_quote_replenishment",
                              "horizon": "seconds-to-6-bars", "conditional_on": ["depth_replenishment"]},
         "who_pays": "urgent_takers_crossing_the_vacuum",
@@ -382,9 +385,12 @@ EXTENDED_MECHANISMS = (
         "capacity_limit": "low",
         "known_failure_modes": ["persistent_quote_withdrawal"],
         "family": "liquidity_sweep",
-        "factor_hints": ["order_book_depth", "order_flow_imbalance"],
-        "required_data": ["level2_order_book", "trade_side_flow"],
-        "proxy_group": "direct_microstructure",
+        "factor_hints": [
+            "micro_depth_imbalance", "micro_bid_depth_usd", "micro_ask_depth_usd",
+            "micro_half_spread_rate", "micro_trade_flow_imbalance",
+        ],
+        "required_data": ["level2_order_book_snapshot", "trade_side_flow_snapshot"],
+        "proxy_group": "forward_microstructure_snapshot",
     },
     {
         "mechanism_id": "squeeze_volatility_release_002",

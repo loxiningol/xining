@@ -27,11 +27,13 @@ EXHAUSTION_TREE = {
                 "forced_liquidation_bounce_001",
             ],
             "requires_micro_data": True,
+            "requires_data": ["liquidation_flow", "open_interest"],
         },
         "B_liquidity_vacuum": {
             "title_zh": "流动性真空后恢复",
             "mechanism_ids": ["liquidity_vacuum_recovery_direct_001"],
             "requires_micro_data": True,
+            "requires_data": ["level2_order_book_snapshot", "trade_side_flow_snapshot"],
         },
         "C_absorption_reclaim": {
             "title_zh": "信息冲击后价格接受失败 / 吸收收回",
@@ -42,6 +44,7 @@ EXHAUSTION_TREE = {
             "title_zh": "跨市场非同步冲击",
             "mechanism_ids": ["correlation_breakdown_001"],
             "requires_micro_data": True,
+            "requires_data": ["cross_exchange_basis"],
         },
         "E_false_exhaustion_redteam": {
             "title_zh": "假衰竭反方",
@@ -162,13 +165,35 @@ def evaluate_family_closures(failure_lineage, coverage, contract=None, brief="")
     contract = contract or {}
     missing_high = list(cov.get("missing_high_information_data") or [])
     available = set(contract.get("available_data") or ["ohlcv", "derived_ohlcv_proxy"])
-    micro_ok = not missing_high and (
-        "level2_order_book" in available or "open_interest" in available
-        or "liquidation_flow" in available
-    )
+    book_ok = bool(available & {
+        "level2_order_book", "level2_order_book_snapshot",
+        "trade_side_flow", "trade_side_flow_snapshot",
+        "microstructure_forward_samples",
+    })
+    derivatives_ok = bool(available & {
+        "open_interest", "liquidation_flow", "historical_funding",
+    })
+    # Full micro_ok only when derivatives feeds exist; book snapshots alone are partial.
+    micro_ok = derivatives_ok and book_ok and not missing_high
     score = float(cov.get("score") or 0.0)
     closures = []
     branch_reports = []
+
+    def _branch_data_ready(branch):
+        req = list(branch.get("requires_data") or [])
+        if not req:
+            return not bool(branch.get("requires_micro_data")) or book_ok
+        for item in req:
+            if item in ("liquidation_flow", "open_interest", "historical_funding"):
+                if item not in available:
+                    return False
+            elif item in (
+                "level2_order_book", "level2_order_book_snapshot",
+                "trade_side_flow", "trade_side_flow_snapshot",
+            ):
+                if not book_ok:
+                    return False
+        return True
 
     active_trees = trees_for_brief(brief) or list(TREES)
     for tree in active_trees:
@@ -195,10 +220,10 @@ def evaluate_family_closures(failure_lineage, coverage, contract=None, brief="")
                     "STATE_CONDITIONAL", "HORIZON_MISMATCH",
                 )
             )
-            requires_micro = bool(branch.get("requires_micro_data"))
+            data_ready = _branch_data_ready(branch)
             if tested == 0:
                 status = "untested"
-            elif requires_micro and not micro_ok:
+            elif not data_ready:
                 status = "data_blocked"
             elif proxy_or_data and not any(
                 s not in ("PROXY_INADEQUATE", "DATA_INADEQUATE", "SAMPLE_INADEQUATE")
@@ -217,7 +242,8 @@ def evaluate_family_closures(failure_lineage, coverage, contract=None, brief="")
                 "contradicted": contradicted,
                 "near_miss_like": near,
                 "proxy_or_data": proxy_or_data,
-                "requires_micro_data": requires_micro,
+                "requires_micro_data": bool(branch.get("requires_micro_data")),
+                "data_ready": data_ready,
                 "title_zh": branch.get("title_zh"),
             }
             branch_reports.append({

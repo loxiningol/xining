@@ -41,6 +41,53 @@ def _now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _timeframe_bar_minutes(timeframe):
+    text = str(timeframe or "5m").strip().lower()
+    try:
+        if text.endswith("m"):
+            return max(1, int(float(text[:-1])))
+        if text.endswith("h"):
+            return max(1, int(float(text[:-1]) * 60))
+        if text.endswith("d"):
+            return max(1, int(float(text[:-1]) * 1440))
+    except Exception:
+        pass
+    return 5
+
+
+def _independence_gap_bars(horizon, timeframe=None):
+    """Economic independence gap: hold window + ~2h refractory on the bar grid.
+
+    A 6-bar gap on 5m data still admits ~1 event / 30m and can invent 1000+
+    "independent" events on long OHLCV.  Use a harder refractory.
+    """
+    bar_min = _timeframe_bar_minutes(timeframe)
+    # ~120 minutes of market time between independent economic events
+    refractory = max(1, int(math.ceil(120.0 / float(bar_min))))
+    hold = max(1, int(horizon or 1))
+    return max(hold * 2, refractory, 12)
+
+
+def _parse_hypothesis_horizon_bars(hypothesis, timeframe=None):
+    """Map free-text horizon to preferred bar band for HORIZON_MISMATCH."""
+    text = str((hypothesis or {}).get("horizon") or "").lower()
+    bar_min = _timeframe_bar_minutes(timeframe)
+    # defaults: prefer medium holds
+    preferred = {3, 6}
+    if any(k in text for k in ("秒", "second", "tick")):
+        preferred = {1}
+    elif any(k in text for k in ("15m", "15分", "1-12", "1–12", "短周期", "short")):
+        preferred = {1, 3, 6}
+    elif any(k in text for k in ("2h", "1-2h", "1h", "小时", "medium")):
+        # 60–120 minutes
+        lo = max(1, int(math.ceil(60.0 / bar_min)))
+        hi = max(lo, int(math.ceil(120.0 / bar_min)))
+        preferred = set(h for h in DEFAULT_HORIZONS if lo <= h <= hi) or {6, 12}
+    elif any(k in text for k in ("4h", "日", "day", "long")):
+        preferred = {12}
+    return preferred
+
+
 def _finite(v):
     try:
         x = float(v)
@@ -190,12 +237,14 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
     return unique[: int(max_specs)], available
 
 
-def _independent_events(mask, gap_bars):
-    """Collapse contiguous hits to event onsets, then enforce non-overlap gap.
+def _independent_events(mask, gap_bars, merge_bars=None):
+    """Collapse signal runs into economically independent event onsets.
 
-    Without onset clustering, a multi-bar flush produces dozens of "events" and
-    overstates significance while understating cost.  Gap defaults to at least
-    the hold horizon so successive events do not share the same holding window.
+    Steps:
+      1) collect raw hits
+      2) contiguous run → single onset
+      3) soft-merge onsets within merge_bars (same episode)
+      4) enforce refractory gap so holding windows do not overlap in economic time
     """
     raw = [i for i, hit in enumerate(mask or []) if hit]
     if not raw:
@@ -206,9 +255,14 @@ def _independent_events(mask, gap_bars):
         if i > prev + 1:
             onsets.append(i)
         prev = i
-    gap = max(6, int(gap_bars) or 0)
+    merge = max(1, int(merge_bars if merge_bars is not None else max(3, int(gap_bars or 1) // 2)))
+    episodes = [onsets[0]]
+    for i in onsets[1:]:
+        if i - episodes[-1] > merge:
+            episodes.append(i)
+    gap = max(12, int(gap_bars) or 0)
     kept, last = [], -10 ** 9
-    for i in onsets:
+    for i in episodes:
         if i - last >= gap:
             kept.append(i)
             last = i
@@ -423,8 +477,12 @@ def _cost_scenarios(symbol, horizon):
 
 
 def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mapping,
-                    symbol=None):
-    raw, independent = _independent_events(event.get("mask") or [], max(6, int(horizon)))
+                    symbol=None, timeframe=None):
+    gap = _independence_gap_bars(horizon, timeframe=timeframe)
+    merge = max(3, int(horizon or 1))
+    raw, independent = _independent_events(
+        event.get("mask") or [], gap, merge_bars=merge,
+    )
     obs = []
     if candles:
         for i in independent:
@@ -447,7 +505,7 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
     t = _newey_west_t(rets)
     event_abs = [abs(float(x)) for x in rets]
     control_abs = _control_absolute_moves(
-        candles, event.get("mask") or [], horizon, mapping, max(6, int(horizon)),
+        candles, event.get("mask") or [], horizon, mapping, gap,
     )
     volatility_t = _two_sample_t(event_abs, control_abs)
     volatility_effect = bool(
@@ -510,6 +568,8 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         "n_raw_triggers": len(raw),
         "n_event_clusters": len(independent),
         "n_independent_events": len(independent),
+        "independence_gap_bars": gap,
+        "independence_merge_bars": merge,
         "n_filled_events": n,
         "effective_sample_size": n,
         "mean_hit": gross,
@@ -577,13 +637,41 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
             "family_closed": False, "at": _now(),
         }
     required_data = list((hypothesis or {}).get("required_data") or [])
-    unavailable = [x for x in required_data if x not in (
-        "ohlcv", "ohlcv_swap_candles", "derived_ohlcv_proxy")]
-    if unavailable:
+    # Snapshots from microstructure_bridge count as partial book/flow evidence.
+    micro_ok = any(
+        str(k).startswith("micro_") for k in (matrix or {}).keys()
+    ) or bool((hypothesis or {}).get("micro_data_available"))
+    allowed_data = {
+        "ohlcv", "ohlcv_swap_candles", "derived_ohlcv_proxy", "derived_factors",
+    }
+    if micro_ok:
+        allowed_data.update({
+            "level2_order_book", "level2_order_book_snapshot",
+            "trade_side_flow", "trade_side_flow_snapshot",
+            "microstructure_forward_samples",
+        })
+    unavailable = [x for x in required_data if x not in allowed_data]
+    # Keep true derivatives feeds as hard blocks even when book snapshots exist.
+    hard_missing = [
+        x for x in unavailable
+        if x in ("open_interest", "liquidation_flow", "historical_funding",
+                 "cross_exchange_basis", "historical_l2_replay")
+    ]
+    if hard_missing:
         return {
             "ok": True, "passed": False, "hypothesis_id": hypothesis.get("hypothesis_id"),
             "research_state": "DATA_INADEQUATE",
             "research_state_zh": RESEARCH_STATES_ZH["DATA_INADEQUATE"],
+            "failure_codes": ["data_insufficient"],
+            "n_probes": 0, "best": None, "probes": [], "missing_data": hard_missing,
+            "family_closed": False, "at": _now(),
+        }
+    if unavailable and not micro_ok:
+        return {
+            "ok": True, "passed": False, "hypothesis_id": hypothesis.get("hypothesis_id"),
+            "research_state": "DATA_INADEQUATE",
+            "research_state_zh": RESEARCH_STATES_ZH["DATA_INADEQUATE"],
+            "failure_codes": ["data_insufficient"],
             "n_probes": 0, "best": None, "probes": [], "missing_data": unavailable,
             "family_closed": False, "at": _now(),
         }
@@ -618,12 +706,12 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
                              "next_bar_open"))
     for spec, horizon, direction, mapping in plan[:budget]:
         rows.append(_evaluate_trial(
-            candles, fwd_returns, spec, horizon, direction, mapping, symbol=symbol,
+            candles, fwd_returns, spec, horizon, direction, mapping,
+            symbol=symbol, timeframe=timeframe,
         ))
 
-    # Horizon mismatch: same event+direction+mapping significant only on
-    # horizons far from the hypothesis statement, while preferred band fails.
-    preferred_band = set(preferred_horizons[:2] or preferred_horizons)
+    # Horizon mismatch vs hypothesis statement band (not search-order bias).
+    preferred_band = _parse_hypothesis_horizon_bars(hypothesis, timeframe=timeframe)
     by_key = {}
     for row in rows:
         key = (row.get("event_id"), row.get("trade_direction"), row.get("execution_mapping"))
@@ -632,18 +720,28 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
         if len(group) < 2:
             continue
         good = []
+        weak_pref = []
         for row in group:
             axes = row.get("evidence_axes") or {}
-            if axes.get("statistical_direction") or (
-                row.get("mean_hit") is not None and float(row.get("mean_hit") or 0) > 0
-                and float(row.get("hac_t_stat") or 0) >= 1.64
-            ):
+            h = int(row.get("horizon_bars") or 0)
+            strong = bool(
+                axes.get("statistical_direction") or (
+                    row.get("mean_hit") is not None and float(row.get("mean_hit") or 0) > 0
+                    and float(row.get("hac_t_stat") or 0) >= 1.64
+                )
+            )
+            if strong:
                 good.append(row)
+            if h in preferred_band and (
+                axes.get("statistical_direction")
+                or (row.get("mean_hit") is not None and float(row.get("mean_hit") or 0) > 0
+                    and float(row.get("hac_t_stat") or 0) >= 1.0)
+            ):
+                weak_pref.append(row)
         if not good:
             continue
         good_h = set(int(r.get("horizon_bars") or 0) for r in good)
-        if good_h and preferred_band and good_h.isdisjoint(preferred_band):
-            # Promote a representative row to HORIZON_MISMATCH for diagnosis.
+        if good_h and preferred_band and good_h.isdisjoint(preferred_band) and not weak_pref:
             pick = max(good, key=lambda r: float(r.get("hac_t_stat") or 0))
             if pick.get("research_state") not in (
                 "READY_FOR_ASSEMBLY", "EXECUTION_MAPPING_FAILURE",
@@ -660,6 +758,7 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
             "READY_FOR_ASSEMBLY": 7, "EXECUTION_MAPPING_FAILURE": 6,
             "DIRECTIONAL_BUT_SMALL": 5, "NEAR_MISS_DIAGNOSTIC": 4,
             "STATE_CONDITIONAL": 3, "HORIZON_MISMATCH": 3,
+            "MECHANISM_CONTRADICTED": 1,
             "VOLATILITY_EFFECT_ONLY": 2,
             "NO_DIRECTIONAL_EFFECT": 0, "SAMPLE_INADEQUATE": -1,
         }
@@ -670,17 +769,61 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
     best = ordered[0] if ordered else None
     passed = bool(best and best.get("passed"))
     state = (best or {}).get("research_state") or "SAMPLE_INADEQUATE"
+
+    # Hypothesis-level contradiction under leaf coverage (NOT family exhaustion).
+    event_n = len(set(r.get("event_id") for r in rows if r.get("event_id")))
+    map_n = len(set(r.get("execution_mapping") for r in rows if r.get("execution_mapping")))
+    hor_n = len(set(r.get("horizon_bars") for r in rows if r.get("horizon_bars") is not None))
+    evaluable = [
+        r for r in rows
+        if r.get("research_state") not in (
+            "SAMPLE_INADEQUATE", "PROXY_INADEQUATE", "DATA_INADEQUATE",
+        )
+    ]
+    dead = [
+        r for r in evaluable
+        if r.get("research_state") in ("NO_DIRECTIONAL_EFFECT", "MECHANISM_CONTRADICTED")
+    ]
+    nearish = [
+        r for r in evaluable
+        if r.get("research_state") in (
+            "NEAR_MISS_DIAGNOSTIC", "DIRECTIONAL_BUT_SMALL", "VOLATILITY_EFFECT_ONLY",
+            "EXECUTION_MAPPING_FAILURE", "STATE_CONDITIONAL", "HORIZON_MISMATCH",
+            "READY_FOR_ASSEMBLY",
+        )
+    ]
+    if (
+        not passed
+        and event_n >= 2 and map_n >= 2 and hor_n >= 2
+        and len(evaluable) >= 6
+        and len(dead) >= max(4, int(0.75 * len(evaluable)))
+        and not nearish
+        and state in ("NO_DIRECTIONAL_EFFECT", "SAMPLE_INADEQUATE")
+    ):
+        state = "MECHANISM_CONTRADICTED"
+        if best is not None:
+            best["research_state"] = state
+            best["research_state_zh"] = RESEARCH_STATES_ZH[state]
+            codes = list(best.get("failure_codes") or [])
+            if "mechanism_contradicted" not in codes:
+                codes.append("mechanism_contradicted")
+            best["failure_codes"] = codes
+
     event_kinds = sorted(set(r.get("event_kind") for r in rows if r.get("event_kind")))
     coverage = {
-        "event_definitions_tested": len(set(r.get("event_id") for r in rows)),
+        "event_definitions_tested": event_n,
         "event_kinds_tested": event_kinds,
         "horizons_tested": sorted(set(r.get("horizon_bars") for r in rows)),
         "execution_mappings_tested": sorted(set(r.get("execution_mapping") for r in rows)),
         "directions_tested": sorted(set(r.get("trade_direction") for r in rows)),
         "independent_events_max": max([int(r.get("n_independent_events") or 0) for r in rows] or [0]),
         "raw_triggers_max": max([int(r.get("n_raw_triggers") or 0) for r in rows] or [0]),
+        "independence_gap_bars": _independence_gap_bars(
+            preferred_horizons[0] if preferred_horizons else 3, timeframe=timeframe,
+        ),
         "trial_budget_used": len(rows),
         "trial_budget_limit": budget,
+        "leaf_coverage_enough_for_contradiction": bool(state == "MECHANISM_CONTRADICTED"),
         "sufficient_to_close_family": False,
     }
     return {
