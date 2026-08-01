@@ -5294,6 +5294,24 @@ def _vector_status_payload():
 
 @app.before_request
 def vector_safe_real_verify_v3_api():
+    if _vector_req.path == "/api/vector/auto_trade/latest_records":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        if _vector_req.method != "GET":
+            return _vector_jsonify({"ok": False, "error": "GET_REQUIRED"}), 405
+        try:
+            import auto_trade_daily_report as _latest_report
+            return _vector_jsonify(_latest_report.sync_latest_trade_records(limit=20))
+        except Exception as e:
+            return _vector_jsonify({
+                "ok": False,
+                "schema": "qiyu_latest_auto_trade_records_v1",
+                "max_records": 20,
+                "record_count": 0,
+                "records": [],
+                "error": str(e),
+            }), 500
+
     if _vector_req.path == "/api/vector/auto_trade/risk_settings":
         if not _vector_auth_ok():
             return _vector_unauth()

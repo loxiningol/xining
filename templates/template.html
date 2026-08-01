@@ -228,6 +228,15 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .vector-daily-ledger-head-v10{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
   .vector-daily-ledger-title-v10{font-size:15px;color:var(--focus);letter-spacing:.08em;font-weight:600}
   .vector-daily-ledger-sub-v10{font-size:11px;color:var(--muted);margin-top:6px}
+  .vector-latest-table-wrap-v11{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.014)}
+  .vector-latest-table-v11{width:100%;min-width:960px;border-collapse:collapse;font-size:11px}
+  .vector-latest-table-v11 th,.vector-latest-table-v11 td{padding:10px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap}
+  .vector-latest-table-v11 th{color:var(--muted);font-weight:500;background:rgba(255,255,255,.018)}
+  .vector-latest-table-v11 tr:last-child td{border-bottom:0}
+  .vector-latest-table-v11 td{color:var(--text)}
+  .vector-latest-table-v11 .gain{color:var(--gain)}
+  .vector-latest-table-v11 .loss{color:var(--loss)}
+  .vector-latest-meta-v11{margin-top:8px;font-size:10px;color:var(--muted);text-align:right}
   .vector-daily-day-v10{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:rgba(255,255,255,.014);overflow:hidden}
   .vector-daily-day-v10 summary{display:grid;grid-template-columns:1.2fr repeat(4,minmax(90px,1fr));gap:10px;align-items:center;padding:14px 16px;cursor:pointer;list-style:none;font-size:12px;color:var(--text)}
   .vector-daily-day-v10 summary::-webkit-details-marker{display:none}
@@ -393,16 +402,16 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     </details>
   </section>
 
-  <!-- 第二栏：每日自动交易记录 -->
+  <!-- 第二栏：最新自动交易记录 -->
   <section class="atm-section" id="atmSectionDaily" data-atm-section="2">
     <div class="vector-daily-ledger-v10" id="vectorDailyLedger">
       <div class="vector-daily-ledger-head-v10">
         <div>
-          <div class="vector-daily-ledger-title-v10">每日自动交易记录</div>
-          <div class="vector-daily-ledger-sub-v10">按北京时间分别记录每日开仓、平仓、胜负及已实现净盈亏；每日23:59发送WxPusher日志。</div>
+          <div class="vector-daily-ledger-title-v10">最新自动交易记录</div>
+          <div class="vector-daily-ledger-sub-v10">按平仓时间倒序展示最近20笔正式自动交易；超过20笔后自动移除最旧记录，不修改原始成交历史。</div>
         </div>
       </div>
-      <div id="vectorDailyLedgerRows"><div class="vector-auto-empty-v5">正在读取每日交易记录…</div></div>
+      <div id="vectorDailyLedgerRows"><div class="vector-auto-empty-v5">正在读取最新自动交易记录…</div></div>
     </div>
   </section>
 
@@ -725,22 +734,28 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       : '<div class="atm-empty">当前没有已挂载的运行策略。</div>';
     renderOpsZones(zones);
   }
-  function renderDailyRecords(days){
+  function renderLatestTradeRecords(payload){
     const box=$('vectorDailyLedgerRows');
     if(!box)return;
-    if(!Array.isArray(days)||!days.length){box.innerHTML='<div class="vector-auto-empty-v5">暂无每日交易记录。</div>';return}
-    function eventHtml(row,type){
-      const at=type==='open'?(row.opened_at||'-'):(row.closed_at||'-');
-      const rate=row.pnl_rate_pct===null||row.pnl_rate_pct===undefined?'':`｜收益率 ${(Number(row.pnl_rate_pct)>=0?'+':'')+Number(row.pnl_rate_pct).toFixed(2)}%`;
-      const pnl=type==='close'&&row.net_pnl_usdt!==null&&row.net_pnl_usdt!==undefined?`｜净盈亏 ${(Number(row.net_pnl_usdt)>=0?'+':'')+Number(row.net_pnl_usdt).toFixed(6)} USDT`:'';
-      const action=type==='open'?(String(row.side||'').toLowerCase()==='short'?'做空开仓':'做多开仓'):(row.close_type||'平仓');
-      return `<div class="vector-daily-event-v10"><b>${zoneEsc(at)}</b>｜${zoneEsc((row.symbol||'-').replace('-USDT-SWAP',''))} ${zoneEsc(row.timeframe||'')}<br>${zoneEsc(row.strategy_name||'未命名策略')}｜${zoneEsc(action)}${zoneEsc(pnl)}${zoneEsc(rate)}</div>`;
+    const rows=Array.isArray(payload&&payload.records)?payload.records:[];
+    if(!rows.length){box.innerHTML='<div class="vector-auto-empty-v5">暂无已平仓的自动交易记录。</div>';return}
+    function numText(value,digits,suffix){
+      if(value===null||value===undefined||value==='')return '待核算';
+      const n=Number(value); if(!Number.isFinite(n))return '待核算';
+      return (n>0?'+':'')+n.toFixed(digits)+(suffix||'');
     }
-    box.innerHTML=days.map(function(day,index){
-      const net=Number(day.net_pnl_usdt||0); const netClass=net>0?'gain':(net<0?'loss':'');
-      const opens=Array.isArray(day.open_events)?day.open_events:[]; const closes=Array.isArray(day.close_events)?day.close_events:[];
-      return `<details class="vector-daily-day-v10" ${index===0?'open':''}><summary><strong>${zoneEsc(day.date||'-')}</strong><span>开仓 <strong>${Number(day.open_count||0)}</strong></span><span>平仓 <strong>${Number(day.close_count||0)}</strong></span><span>胜/负 <strong>${Number(day.wins||0)}/${Number(day.losses||0)}</strong></span><span>净盈亏 <strong class="${netClass}">${net>=0?'+':''}${net.toFixed(6)} USDT</strong></span></summary><div class="vector-daily-events-v10"><div><h4>当日开仓</h4>${opens.length?opens.map(function(x){return eventHtml(x,'open')}).join(''):'<div class="vector-daily-event-v10">无开仓</div>'}</div><div><h4>当日平仓</h4>${closes.length?closes.map(function(x){return eventHtml(x,'close')}).join(''):'<div class="vector-daily-event-v10">无平仓</div>'}</div></div></details>`;
+    const body=rows.map(function(row){
+      const pnl=Number(row.profit_amount_usdt); const rate=Number(row.pnl_rate_leveraged_pct);
+      const valueClass=Number.isFinite(pnl)?(pnl>0?'gain':(pnl<0?'loss':'')):(Number.isFinite(rate)?(rate>0?'gain':(rate<0?'loss':'')):'');
+      return `<tr><td>${zoneEsc(row.symbol_label||String(row.symbol||'-').replace('-USDT-SWAP',''))}</td><td>${zoneEsc(row.timeframe_label||row.timeframe||'-')}</td><td>${zoneEsc(row.opened_at||'-')}</td><td>${zoneEsc(row.closed_at||'-')}</td><td class="${valueClass}">${zoneEsc(row.result||'待核算')}</td><td class="${valueClass}">${zoneEsc(numText(row.pnl_rate_leveraged_pct,2,'%'))}</td><td class="${valueClass}">${zoneEsc(numText(row.profit_amount_usdt,6,' USDT'))}</td></tr>`;
     }).join('');
+    box.innerHTML=`<div class="vector-latest-table-wrap-v11"><table class="vector-latest-table-v11"><thead><tr><th>开仓标的</th><th>周期</th><th>开仓时间</th><th>平仓时间</th><th>结果</th><th>盈利率（加杠杆）</th><th>盈利额</th></tr></thead><tbody>${body}</tbody></table></div><div class="vector-latest-meta-v11">${rows.length} / ${Number(payload.max_records||20)} 笔 · 更新时间 ${zoneEsc(payload.updated_at||'-')}</div>`;
+  }
+  async function loadLatestTradeRecords(){
+    const pack=await fetchJson('/api/vector/auto_trade/latest_records', null, 10000);
+    const j=pack.j||{};
+    if(!pack.res.ok||j.ok!==true)throw new Error(j.error||('HTTP '+pack.res.status));
+    renderLatestTradeRecords(j);
   }
   window.vectorAssetSaveRisk=async function(symbol,timeframe,button){
     const zone=button.closest('.atm-ops-zone')||button.closest('[data-asset-symbol]');
@@ -803,6 +818,10 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     }
   }
   window.vectorAutoFetch=async function(){
+    const latestPromise=loadLatestTradeRecords().catch(function(e){
+      const daily=$('vectorDailyLedgerRows');
+      if(daily) daily.innerHTML='<div class="vector-auto-empty-v5">最新自动交易记录读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</div>';
+    });
     try{
       const pack=await fetchJson('/api/vector/auto_trade/status', null, 25000);
       const j=pack.j||{};
@@ -810,7 +829,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         throw new Error(j.error||j.message||('HTTP '+pack.res.status));
       }
       const zones=j.asset_zones||[];
-      const daily=j.daily_trade_records||[];
       if(j.degraded && !zones.length){
         const box=$('atmStrategyRoster');
         if(box) box.innerHTML='<div class="atm-empty">运行策略读取降级：'+zoneEsc(j.message||j.error||'主机繁忙，稍后自动重试')+'</div>';
@@ -818,18 +836,11 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       }else{
         renderAssetZones(zones);
       }
-      if(j.degraded && !daily.length){
-        const dailyBox=$('vectorDailyLedgerRows');
-        if(dailyBox) dailyBox.innerHTML='<div class="vector-auto-empty-v5">每日交易记录读取降级，稍后自动重试</div>';
-      }else{
-        renderDailyRecords(daily);
-      }
     }catch(e){
       const box=$('atmStrategyRoster');
       if(box) box.innerHTML='<div class="atm-empty">状态读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</div>';
-      const daily=$('vectorDailyLedgerRows');
-      if(daily) daily.innerHTML='<div class="vector-auto-empty-v5">每日交易记录读取失败，稍后重试</div>';
     }
+    await latestPromise;
   };
   function renderPipelineCard(pipe){
     const id=pipe.pipeline;
