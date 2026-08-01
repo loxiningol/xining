@@ -87,7 +87,50 @@ SQUEEZE_TREE = {
     },
 }
 
-TREES = (EXHAUSTION_TREE, SQUEEZE_TREE)
+# Donchian / trend-break tree (8.1 direction-1)
+DONCHIAN_TREE = {
+    "tree_id": "donchian_trend_break",
+    "title_zh": "唐奇安通道趋势突破机制树",
+    "branches": {
+        "D1_valid_break_continuation": {
+            "title_zh": "有效通道突破后的趋势延续",
+            "mechanism_ids": ["donchian_break_continuation_001", "asia_range_break_001"],
+            "requires_micro_data": False,
+            "task": "direction_continuation",
+        },
+        "D2_false_break_filter": {
+            "title_zh": "震荡假突破过滤 / 收回",
+            "mechanism_ids": [
+                "donchian_false_break_reclaim_001",
+                "squeeze_fake_break_reversion_001",
+                "failed_breakout_trap_001",
+            ],
+            "requires_micro_data": False,
+            "task": "false_break_filter",
+        },
+        "D3_htf_trend_filter": {
+            "title_zh": "高周期趋势过滤下的顺势突破",
+            "mechanism_ids": [
+                "donchian_htf_filter_break_001",
+                "trend_pullback_continuation_001",
+            ],
+            "requires_micro_data": False,
+            "task": "htf_filtered_break",
+        },
+        "D4_vol_context": {
+            "title_zh": "突破前波动压缩 / 扩张确认",
+            "mechanism_ids": [
+                "vol_squeeze_break_001",
+                "squeeze_break_acceptance_002",
+                "squeeze_volatility_release_002",
+            ],
+            "requires_micro_data": False,
+            "task": "vol_context",
+        },
+    },
+}
+
+TREES = (EXHAUSTION_TREE, SQUEEZE_TREE, DONCHIAN_TREE)
 
 # Fine-grained failure codes (report §漏洞六)
 FAILURE_CODE_ZH = {
@@ -116,8 +159,17 @@ def trees_for_brief(brief=""):
     out = []
     if any(k in text for k in ("衰竭", "回收", "exhaust", "panic", "清算", "超跌")):
         out.append(EXHAUSTION_TREE)
+    if any(k in text for k in (
+        "唐奇安", "donchian", "通道突破", "趋势突破", "假突破", "有效突破",
+        "主趋势", "中频突破",
+    )):
+        out.append(DONCHIAN_TREE)
     if any(k in text for k in ("收缩", "扩张", "squeeze", "压缩", "波动率", "突破")):
-        out.append(SQUEEZE_TREE)
+        # Avoid double-adding squeeze when Donchian brief already covers breakout context.
+        if DONCHIAN_TREE not in out:
+            out.append(SQUEEZE_TREE)
+        elif any(k in text for k in ("收缩", "扩张", "squeeze", "压缩")):
+            out.append(SQUEEZE_TREE)
     return out
 
 

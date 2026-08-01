@@ -124,6 +124,26 @@ MECHANISM_CLAIMS = {
         "proxy_claim": "failed_break_reversion",
         "proxy_wording_zh": "突破失败陷阱路径",
     },
+    "donchian_break_continuation_001": {
+        "strong_claim": "break_acceptance_path",
+        "proxy_claim": "break_acceptance_path",
+        "proxy_wording_zh": "唐奇安通道有效突破后的路径延续（OHLCV）",
+    },
+    "donchian_false_break_reclaim_001": {
+        "strong_claim": "failed_break_reversion",
+        "proxy_claim": "failed_break_reversion",
+        "proxy_wording_zh": "唐奇安假突破收回路径",
+    },
+    "donchian_htf_filter_break_001": {
+        "strong_claim": "break_acceptance_path",
+        "proxy_claim": "break_acceptance_path",
+        "proxy_wording_zh": "高周期过滤下的顺势通道突破",
+    },
+    "asia_range_break_001": {
+        "strong_claim": "break_acceptance_path",
+        "proxy_claim": "break_acceptance_path",
+        "proxy_wording_zh": "会话区间突破延续路径",
+    },
 }
 
 

@@ -443,6 +443,87 @@ EXTENDED_MECHANISMS = (
         "required_data": ["derived_ohlcv_proxy"],
         "proxy_group": "failed_break_reversion",
     },
+    {
+        "mechanism_id": "donchian_break_continuation_001",
+        "economic_actor": ["trend_follower", "breakout_follower", "stop_runner"],
+        "constraint": ["channel_boundary", "inventory_of_range_traders"],
+        "forced_trade": "price_breaks_donchian_channel_then_stops_and_trend_followers_chase",
+        "observable_proxy": [
+            "dist_roll_high", "dist_roll_low", "breakout_acceptance",
+            "trend_efficiency_12", "volume_z", "expansion_score",
+        ],
+        "predicted_effect": {
+            "direction": "continuation_after_valid_channel_break",
+            "horizon": "30m-8h",
+            "conditional_on": [
+                "channel_break", "acceptance_holds", "not_immediate_reclaim",
+                "htf_trend_aligned",
+            ],
+        },
+        "who_pays": "range_defenders_and_fake_break_faders",
+        "alternative_explanations": ["random_stop_run", "news_impulse_only"],
+        "capacity_limit": "medium_to_high",
+        "known_failure_modes": ["chop_fake_break", "break_then_reclaim", "late_chase"],
+        "family": "donchian_trend_break",
+        "factor_hints": [
+            "dist_roll_high", "dist_roll_low", "breakout_acceptance",
+            "trend_efficiency_12", "volume_z", "expansion_score", "ret_12",
+        ],
+        "required_data": ["derived_ohlcv_proxy"],
+        "proxy_group": "donchian_break_continuation",
+    },
+    {
+        "mechanism_id": "donchian_false_break_reclaim_001",
+        "economic_actor": ["breakout_chaser", "range_defender"],
+        "constraint": ["channel_boundary", "failed_acceptance"],
+        "forced_trade": "failed_donchian_break_forces_breakout_inventory_to_unwind_into_channel",
+        "observable_proxy": [
+            "dist_roll_high", "dist_roll_low", "breakout_acceptance",
+            "upper_wick_pct", "lower_wick_pct", "close_location",
+        ],
+        "predicted_effect": {
+            "direction": "reversion_after_failed_channel_break",
+            "horizon": "15m-4h",
+            "conditional_on": ["break", "rejection_wick", "close_back_inside"],
+        },
+        "who_pays": "breakout_chasers_without_acceptance",
+        "alternative_explanations": ["delayed_second_break_leg"],
+        "capacity_limit": "medium",
+        "known_failure_modes": ["second_leg_continuation"],
+        "family": "donchian_trend_break",
+        "factor_hints": [
+            "dist_roll_high", "dist_roll_low", "breakout_acceptance",
+            "upper_wick_pct", "lower_wick_pct", "close_location",
+        ],
+        "required_data": ["derived_ohlcv_proxy"],
+        "proxy_group": "donchian_false_break",
+    },
+    {
+        "mechanism_id": "donchian_htf_filter_break_001",
+        "economic_actor": ["multi_timeframe_trend_follower"],
+        "constraint": ["higher_timeframe_bias", "ltf_channel_break"],
+        "forced_trade": "htf_trend_filter_allows_only_with_trend_donchian_breaks_to_be_followed",
+        "observable_proxy": [
+            "dist_roll_high", "ret_12", "trend_efficiency_12",
+            "close_z_20", "breakout_acceptance",
+        ],
+        "predicted_effect": {
+            "direction": "with_trend_break_continuation_only",
+            "horizon": "30m-8h",
+            "conditional_on": ["htf_slope_ok", "ltf_channel_break", "acceptance"],
+        },
+        "who_pays": "countertrend_break_chasers",
+        "alternative_explanations": ["htf_already_extended"],
+        "capacity_limit": "medium_to_high",
+        "known_failure_modes": ["htf_turn", "filter_too_late"],
+        "family": "donchian_trend_break",
+        "factor_hints": [
+            "dist_roll_high", "dist_roll_low", "ret_12", "trend_efficiency_12",
+            "close_z_20", "breakout_acceptance",
+        ],
+        "required_data": ["derived_ohlcv_proxy"],
+        "proxy_group": "donchian_htf_filtered",
+    },
 )
 
 
@@ -542,11 +623,17 @@ def select_for_brief(brief, symbol=None, timeframe=None, limit=12):
             "清算", "liquid", "资金费", "funding",
             "扫损", "sweep", "止损", "动量", "trend",
             "衰竭", "超卖", "rsi", "回收", "恐慌", "飞刀", "exhaust",
+            "唐奇安", "donchian", "通道", "趋势突破", "假突破", "有效突破",
         ):
             if token in text and token in blob:
                 score += 1.5
             elif token in text:
                 score += 0.2
+        if any(k in text for k in ("唐奇安", "donchian", "通道突破", "趋势突破", "假突破")):
+            if "donchian" in mid or m.get("family") == "donchian_trend_break":
+                score += 4.0
+            if m.get("family") in ("vol_squeeze_break", "trend_pullback"):
+                score += 1.0
         # boost explicit exhaustion mechanism when brief asks for it
         if any(k in text for k in ("衰竭", "超卖", "rsi", "回收", "恐慌")):
             if "exhaustion" in mid or "exhaustion" in blob:

@@ -202,6 +202,22 @@ def build_mechanism_cells(brief="", max_cells=80):
         {"cell_id": "pullback_second_leg", "family": "vol_squeeze",
          "prediction": "break_pullback_continuation", "features": ["trend_efficiency_12", "expansion_score"],
          "cost_class": "cheap"},
+        {"cell_id": "donchian_valid_break", "family": "donchian_trend_break",
+         "prediction": "channel_break_then_continue",
+         "features": ["dist_roll_high", "breakout_acceptance", "volume_z"],
+         "cost_class": "cheap"},
+        {"cell_id": "donchian_false_break", "family": "donchian_trend_break",
+         "prediction": "break_then_reclaim",
+         "features": ["dist_roll_high", "upper_wick_pct", "close_location"],
+         "cost_class": "cheap"},
+        {"cell_id": "donchian_htf_aligned", "family": "donchian_trend_break",
+         "prediction": "htf_filter_with_trend_break",
+         "features": ["ret_12", "trend_efficiency_12", "dist_roll_high"],
+         "cost_class": "cheap"},
+        {"cell_id": "donchian_vol_confirm", "family": "donchian_trend_break",
+         "prediction": "break_with_expansion",
+         "features": ["expansion_score", "breakout_acceptance", "dist_roll_high"],
+         "cost_class": "cheap"},
     ]
     for tree in trees:
         for bid, br in (tree.get("branches") or {}).items():
