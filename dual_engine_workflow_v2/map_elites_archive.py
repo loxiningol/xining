@@ -70,7 +70,11 @@ def behavior_descriptor(hypothesis, probe_best=None, n_bars=None):
     if family not in FAMILIES:
         family = "other"
     horizon = _horizon_bucket(hypothesis.get("horizon"))
-    n_hits = ((probe_best or {}).get("n_hits")) if probe_best else None
+    n_hits = (
+        (probe_best or {}).get("n_independent_events")
+        or (probe_best or {}).get("n_filled_events")
+        or (probe_best or {}).get("n_hits")
+    ) if probe_best else None
     freq = _freq_bucket(n_hits, n_bars)
     cost = _cost_bucket((probe_best or {}).get("mean_net"))
     path = _path_bucket(hypothesis.get("path"))
@@ -93,7 +97,11 @@ def quality_score(probe_best=None, antifalsify=None, efr=None):
     q = 0.0
     if probe_best and probe_best.get("passed"):
         q += max(0.0, float(probe_best.get("mean_net") or 0.0) * 1000.0)
-        q += min(3.0, abs(float(probe_best.get("t_stat") or 0.0)))
+        q += min(3.0, abs(float(
+            probe_best.get("hac_t_stat")
+            if probe_best.get("hac_t_stat") is not None
+            else (probe_best.get("t_stat") or 0.0)
+        )))
     if antifalsify and antifalsify.get("passed"):
         q += 2.0 + 0.3 * float(antifalsify.get("support_n") or 0)
         q -= 0.5 * float(antifalsify.get("oppose_n") or 0)

@@ -185,10 +185,10 @@ def glm_spec_prompt_template():
             "edge_decay_conditions": "when depth recovers and cascade intensity drops below threshold",
             "required_market_regime": "elevated realized vol with declining book depth",
             "entry_logic": "enter short after cascade impulse + reclaim stall below cascade mid",
-            "exit_logic": "exit when depth normalizes or reclaim completes against position",
-            "stop_logic": "fixed 0.9% attached SL; invalidate if price reclaims cascade high",
-            "take_profit_logic": "partial at vacuum mid; remainder at pre-cascade fair value",
-            "invalidation_logic": "no cascade signature or depth already restored before entry",
+            "exit_logic": "3.0x ATR trailing OR swing extreme lookback 20",
+            "stop_logic": "fixed 0.9% protective SL plus swing extreme lookback 20 invalidation",
+            "take_profit_logic": "3.0x ATR trailing",
+            "invalidation_logic": "swing extreme lookback 20; no cascade signature before entry",
             "non_negotiable_rules": [
                 "must observe forced-flow signature",
                 "no RSI/MACD substitution of cascade detector",
@@ -221,6 +221,10 @@ def glm_spec_prompt_template():
         "- why_edge_exists: 为何不会立刻被套利抹平\n"
         "- edge_decay_conditions / invalidation_logic: 偏差消失条件\n"
         "- entry/exit/stop/take_profit_logic: 与机制因果相连\n"
+        "- 可执行退出只允许明确枚举：N.x ATR trailing（N=2.5..5.0）、"
+        "swing extreme lookback N（N=5..60）、fixed_pct_tp P%（P>=2.0）、"
+        "partial N.x ATR ratio R%（N=1.5..4.0，R=10..90）。"
+        "所有参数必须显式填写；至少填写一种；禁止只写‘恢复正常/回到公允价’等不可编译叙事。\n"
         "- non_negotiable_rules: 不可修改项\n"
         "- tunable_parameters: 允许调节参数名列表\n"
         "- forbidden_transformations: 禁止Codex改写的变换\n"

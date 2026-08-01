@@ -22,11 +22,20 @@ def main():
     ap.add_argument("--research-direction", required=True)
     ap.add_argument("--symbol", default="ADA-USDT-SWAP")
     ap.add_argument("--timeframe", default="5m")
-    ap.add_argument("--direction", default="long", choices=("long", "short", "both"))
+    ap.add_argument(
+        "--direction", default="long", choices=("long", "short"),
+        help="双向研究必须拆成独立 long/short 任务，避免编译与统计身份混用",
+    )
     ap.add_argument("--brief", default="")
     ap.add_argument("--brief-file", default="")
     ap.add_argument("--with-llm", action="store_true")
     ap.add_argument("--max-loops", type=int, default=5)
+    ap.add_argument("--research-contract-file", default="")
+    ap.add_argument("--mutation-contract-file", default="")
+    ap.add_argument("--data-version", default="")
+    ap.add_argument("--code-version", default="")
+    ap.add_argument("--cooldown-seconds", type=int, default=None)
+    ap.add_argument("--force", action="store_true")
     ap.add_argument(
         "--pipeline", default="",
         help="指定管道：1 / 2 / 管道1 / 管道2；省略则自动分配",
@@ -35,6 +44,14 @@ def main():
     brief = args.brief
     if args.brief_file:
         brief = Path(args.brief_file).read_text(encoding="utf-8")
+    research_contract = (
+        json.loads(Path(args.research_contract_file).read_text(encoding="utf-8"))
+        if args.research_contract_file else None
+    )
+    mutation_contract = (
+        json.loads(Path(args.mutation_contract_file).read_text(encoding="utf-8"))
+        if args.mutation_contract_file else None
+    )
     from dual_engine_workflow_v2.parallel_creation import submit_job
     out = submit_job(
         source=args.source,
@@ -46,6 +63,12 @@ def main():
         skip_llm=not args.with_llm,
         max_loops=args.max_loops,
         pipeline=(args.pipeline or None),
+        research_contract=research_contract,
+        mutation_contract=mutation_contract,
+        data_version=(args.data_version or None),
+        code_version=(args.code_version or None),
+        cooldown_seconds=args.cooldown_seconds,
+        force=args.force,
     )
     print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
     return 0 if out.get("ok") else 2

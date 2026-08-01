@@ -55,12 +55,15 @@ LOGICAL = {"all", "any", "not"}
 MAX_DEPTH = 6
 MAX_LEAVES = 32
 MAX_LOOKBACK = 240
+EXECUTION_MAPPINGS = {"bar_close", "next_bar_open"}
+ENTRY_POLICY_SOURCE = "qiyu_research_contract_v2"
+ENTRY_POLICY_MODE = "exact_human_contract"
 
 # ---- Phase-2 structured exits (opt-in; fail-closed on misuse) ----
 # Protective production SL (0.9%) is NOT an exit_op and is never banned here.
 EXIT_OPS = {
     "atr_trailing", "swing_extreme", "fixed_pct_tp", "partial_tp_atr",
-    "entry_wick_buffer", "partial_tp_feature",
+    "entry_wick_buffer", "partial_tp_feature", "max_hold_only",
 }
 ATR_TRAIL_N_MIN = 2.5
 ATR_TRAIL_N_MAX = 5.0  # allow Macro SFP 3.5–5.0× ATR_14 harvest window
@@ -157,8 +160,10 @@ def executable_hash(strategy):
     validated = validate_strategy(strategy)
     value = {key: validated.get(key) for key in (
         "schema", "direction", "timeframe", "supported_instruments",
-        "entry", "exit", "max_hold_bars",
+        "entry", "exit", "max_hold_bars", "execution_mapping",
+        "protective_stop_pct", "execution_leverage",
     )}
+    value["execution_mapping"] = validated.get("execution_mapping") or "bar_close"
     return dsl_hash(value)
 
 
@@ -197,9 +202,13 @@ def _logic_skeleton(node, nums=None):
     role = node.get("role")
     leaf = {
         "left": left.get("feature"),
+        "left_quantile_of": left.get("quantile_of"),
         "left_offset": int(left.get("offset") or 0),
         "op": node.get("op"),
         "right_feature": right.get("feature"),
+        "right_quantile_of": right.get("quantile_of"),
+        "right_quantile_window": right.get("window"),
+        "right_quantile_min_history": right.get("min_history"),
         "right_offset": int(right.get("offset") or 0) if "feature" in right else None,
         "role": role,
         "has_value": "value" in right,
@@ -207,6 +216,11 @@ def _logic_skeleton(node, nums=None):
     if "value" in right:
         try:
             nums.append(float(right.get("value")))
+        except Exception:
+            pass
+    if "quantile_of" in right:
+        try:
+            nums.append(float(right.get("q")))
         except Exception:
             pass
     return leaf
@@ -223,6 +237,9 @@ def logic_topology_hash(strategy):
     skeleton = {
         "direction": validated.get("direction"),
         "timeframe": validated.get("timeframe"),
+        "execution_mapping": validated.get("execution_mapping") or "bar_close",
+        "protective_stop_pct": validated.get("protective_stop_pct"),
+        "execution_leverage": validated.get("execution_leverage"),
         "supported_instruments": list(validated.get("supported_instruments") or []),
         "entry": _logic_skeleton(validated.get("entry") or {}, nums),
         "exit": _logic_skeleton(validated.get("exit") or {}, nums),
@@ -337,7 +354,68 @@ def _validate_operand(operand):
             raise DSLValidationError("constant operand contains unknown fields")
         _number(operand.get("value"))
         return
-    raise DSLValidationError("operand requires feature or value")
+    if "quantile_of" in operand:
+        allowed = {"quantile_of", "q", "window", "min_history"}
+        if keys - allowed:
+            raise DSLValidationError("quantile operand contains unknown fields")
+        feature = str(operand.get("quantile_of") or "")
+        if feature not in FEATURES:
+            raise DSLValidationError("unsupported quantile feature: %s" % feature)
+        q = _number(operand.get("q"))
+        if q <= 0.0 or q >= 1.0:
+            raise DSLValidationError("quantile q must be strictly between 0 and 1")
+        try:
+            window_raw = operand.get("window")
+            history_raw = operand.get("min_history")
+            window = int(window_raw)
+            min_history = int(history_raw)
+            if float(window_raw) != float(window) or float(history_raw) != float(min_history):
+                raise ValueError("non_integer")
+        except Exception:
+            raise DSLValidationError("quantile window/min_history must be integers")
+        if window < 2 or window > MAX_LOOKBACK:
+            raise DSLValidationError("quantile window outside 2..%d" % MAX_LOOKBACK)
+        if min_history < 2 or min_history > window:
+            raise DSLValidationError("quantile min_history outside 2..window")
+        return
+    raise DSLValidationError("operand requires feature, value, or quantile_of")
+
+
+def _validate_entry_condition_policy(policy, entry, entry_count):
+    """Validate the narrow provenance exception for a one-leaf human event.
+
+    Generic/model-created DSL remains subject to the two-condition floor.  A
+    one-condition event is legal only when Step A attests that it is the exact
+    machine-readable event in an immutable ResearchContract v2.  The entry
+    semantics hash prevents the policy object from being copied onto changed
+    executable logic without re-attestation.
+    """
+    if not isinstance(policy, dict):
+        raise DSLValidationError("entry_condition_policy must be object")
+    allowed = {
+        "mode", "source", "research_contract_id", "entry_semantics_hash",
+        "exact_condition_count",
+    }
+    if set(policy) - allowed:
+        raise DSLValidationError("entry_condition_policy contains unknown fields")
+    if policy.get("mode") != ENTRY_POLICY_MODE:
+        raise DSLValidationError("unsupported entry_condition_policy mode")
+    if policy.get("source") != ENTRY_POLICY_SOURCE:
+        raise DSLValidationError("single entry policy requires ResearchContract v2")
+    contract_id = str(policy.get("research_contract_id") or "")
+    digest = contract_id[3:] if contract_id.startswith("rc_") else ""
+    if len(digest) != 24 or any(ch not in "0123456789abcdef" for ch in digest):
+        raise DSLValidationError("single entry policy research_contract_id invalid")
+    try:
+        declared_count = int(policy.get("exact_condition_count"))
+    except Exception:
+        raise DSLValidationError("single entry policy condition count invalid")
+    if declared_count != int(entry_count) or declared_count != 1:
+        raise DSLValidationError("single entry policy must attest exactly one condition")
+    expected = dsl_hash(entry)
+    supplied = str(policy.get("entry_semantics_hash") or "")
+    if supplied != expected:
+        raise DSLValidationError("single entry policy semantics hash mismatch")
 
 
 def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
@@ -461,6 +539,12 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
                 pct = (node["params"].get("pct")
                        or node["params"].get("price_pct"))
             refuse_fixed_tiny_tp(pct, context="exit_op.fixed_pct_tp")
+        elif exit_op == "max_hold_only":
+            if role not in (None, "invalidation"):
+                raise DSLValidationError("max_hold_only role must be invalidation")
+            extra = set(node) - {"id", "exit_op", "role"}
+            if extra:
+                raise DSLValidationError("max_hold_only takes no parameters")
         counter[0] += 1
         if counter[0] > MAX_LEAVES:
             raise DSLValidationError("too many conditions")
@@ -501,7 +585,9 @@ def validate_strategy(strategy):
     allowed = {"schema", "key", "name", "direction", "timeframe",
                "supported_instruments", "entry", "exit", "max_hold_bars",
                "description", "origin", "version", "live_enabled",
-               "approved_version_hash", "auto_trade_eligible"}
+               "approved_version_hash", "auto_trade_eligible",
+               "execution_mapping", "entry_condition_policy",
+               "protective_stop_pct", "execution_leverage"}
     if set(strategy) - allowed:
         raise DSLValidationError("strategy contains unknown top-level fields")
     if strategy.get("schema") != SCHEMA:
@@ -528,8 +614,27 @@ def validate_strategy(strategy):
     entry_count = [0]; exit_count = [0]
     _walk(strategy.get("entry"), counter=entry_count, seen_ids=set(), phase="entry")
     _walk(strategy.get("exit"), counter=exit_count, seen_ids=set(), phase="exit")
+    mapping = str(strategy.get("execution_mapping") or "bar_close")
+    if mapping not in EXECUTION_MAPPINGS:
+        raise DSLValidationError("unsupported execution_mapping: %s" % mapping)
+    if strategy.get("protective_stop_pct") is not None:
+        stop_pct = _number(strategy.get("protective_stop_pct"))
+        if stop_pct <= 0.0 or stop_pct > 0.10:
+            raise DSLValidationError("protective_stop_pct outside (0, 0.10]")
+    if strategy.get("execution_leverage") is not None:
+        leverage = _number(strategy.get("execution_leverage"))
+        if leverage < 1.0 or leverage > 100.0 or int(leverage) != leverage:
+            raise DSLValidationError("execution_leverage must be integer 1..100")
     if entry_count[0] < 2:
-        raise DSLValidationError("entry requires at least two independent conditions")
+        _validate_entry_condition_policy(
+            strategy.get("entry_condition_policy"),
+            strategy.get("entry"),
+            entry_count[0],
+        )
+    elif strategy.get("entry_condition_policy") is not None:
+        raise DSLValidationError(
+            "entry_condition_policy is only valid for one exact condition"
+        )
     return copy.deepcopy(strategy)
 
 
@@ -542,6 +647,29 @@ def _series(frame, feature):
 def _operand(frame, index, operand, extra_offset=0):
     if "value" in operand:
         return float(operand["value"])
+    if "quantile_of" in operand:
+        # The threshold uses only bars strictly before the evaluated bar.  For
+        # cross operators, ``extra_offset=1`` also shifts the history boundary,
+        # so neither current nor future values can leak into the comparison.
+        anchor = int(index) - int(extra_offset)
+        window = int(operand["window"])
+        min_history = int(operand["min_history"])
+        start = max(0, anchor - window)
+        values = []
+        series = _series(frame, operand["quantile_of"])
+        for position in range(start, anchor):
+            try:
+                value = float(series.iloc[position])
+            except Exception:
+                continue
+            if math.isfinite(value):
+                values.append(value)
+        if len(values) < min_history:
+            raise IndexError("insufficient prior-only quantile history")
+        values.sort()
+        q = float(operand["q"])
+        q_index = max(0, min(len(values) - 1, int(q * (len(values) - 1))))
+        return values[q_index]
     offset = _offset(operand.get("offset", 0)) + int(extra_offset)
     position = index - offset
     if position < 0:
@@ -816,6 +944,12 @@ def evaluate_exit_op(frame, index, node, position, direction, explain=False):
                 passed = low <= target
                 exit_price = target if passed else close
             detail.update({"pct": pct, "target": target})
+        elif exit_op == "max_hold_only":
+            # The holding boundary is evaluated centrally after all exit
+            # leaves.  This leaf is an identity marker and never fires early.
+            passed = False
+            exit_price = close
+            detail.update({"delegated_to": "holding_window_complete"})
         else:
             raise DSLValidationError("unsupported exit_op at runtime: %s" % exit_op)
     except DSLValidationError:
@@ -925,6 +1059,24 @@ def evaluate_strategy(frame, index, strategy, phase="entry", explain=False,
         position=position,
         direction=strategy.get("direction") if phase == "exit" else None,
     )
+
+
+def holding_window_complete(entry_index, current_index, max_hold_bars,
+                            execution_mapping="bar_close"):
+    """Return whether the executable holding horizon has completed.
+
+    A next-open fill owns the entry bar from its open through its close, so an
+    admitted horizon of N bars exits at ``entry_index + N - 1``.  A legacy
+    same-close fill has no exposure to its already-completed entry bar and
+    therefore retains the historical ``entry_index + N`` boundary.
+    """
+    entry_index = int(entry_index)
+    current_index = int(current_index)
+    hold = max(1, int(max_hold_bars))
+    mapping = str(execution_mapping or "bar_close")
+    if mapping == "next_bar_open":
+        return current_index - entry_index + 1 >= hold
+    return current_index - entry_index >= hold
 
 
 def _leaf_paths(node, path=()):
@@ -1132,6 +1284,14 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
       production B-grade 30%/20x mount path (CLI --confirm).
     """
     strategy = validate_strategy(strategy)
+    if strategy.get("execution_leverage") is not None and abs(
+        float(strategy.get("execution_leverage")) - float(leverage)
+    ) > 1e-12:
+        raise DSLValidationError("backtest leverage differs from strategy identity")
+    if strategy.get("protective_stop_pct") is not None and abs(
+        float(strategy.get("protective_stop_pct")) - float(stop_loss_pct)
+    ) > 1e-12:
+        raise DSLValidationError("backtest stop differs from strategy identity")
     direction = strategy["direction"]
     execution_rate_per_side = (fee_rate_per_side + slippage_rate_per_side +
                                half_spread_rate_per_side +
@@ -1139,59 +1299,91 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
     round_cost = 2.0 * execution_rate_per_side * leverage
     hours_per_bar = {"5m": 1.0/12.0, "15m": 0.25, "1h": 1.0}.get(
         strategy.get("timeframe"), 1.0)
-    trades = []; position = None
+    execution_mapping = strategy.get("execution_mapping") or "bar_close"
+    trades = []; position = None; pending_signal = None
     capital = float(initial_equity) if initial_equity else 1.0
     peak_equity = capital
     max_dd_so_far = 0.0
     base_risk = clamp_risk_pct(risk_pct)
     start = max(250, MAX_LOOKBACK + 2)
+
+    def position_from_signal(signal_index, entry_index, price, details):
+        size_meta = {
+            "account_fraction": 1.0,
+            "risk_pct_used": None,
+            "dynamic_risk_sizing": bool(dynamic_risk_sizing),
+        }
+        if dynamic_risk_sizing:
+            try:
+                # Sizing uses only information available when the signal bar
+                # closed.  For next-open execution this deliberately excludes
+                # the entry bar's later high/low/close.
+                atr = _atr_at(frame, signal_index, int(atr_size_period or 14))
+            except Exception:
+                atr = max(float(price) * 0.01, 1e-9)
+            r_eff = effective_risk_pct(
+                base_risk, capital, peak_equity, max_dd_so_far,
+                dd_throttle_risk_pct=dd_throttle_risk_pct,
+                dd_throttle_of_max_dd=dd_throttle_of_max_dd,
+            )
+            size_meta = atr_position_size(
+                capital, r_eff, atr,
+                target_multiplier=atr_target_multiplier,
+                entry_price=price,
+            )
+            size_meta["risk_pct_used"] = r_eff
+            size_meta["dynamic_risk_sizing"] = True
+            size_meta["dd_throttled"] = bool(
+                abs(float(r_eff) - float(dd_throttle_risk_pct)) < 1e-12
+            )
+        return {
+            "index": int(entry_index),
+            "signal_index": int(signal_index),
+            "price": float(price),
+            "conditions": details,
+            "peak_high": float(price),
+            "peak_low": float(price),
+            # Frozen triggering-bar extremes, distinct from the actual fill
+            # bar when execution_mapping=next_bar_open.
+            "entry_bar_high": float(frame["high"].iloc[signal_index]),
+            "entry_bar_low": float(frame["low"].iloc[signal_index]),
+            "mae_price_pct": 0.0,
+            "size_meta": size_meta,
+            "execution_mapping": execution_mapping,
+        }
+
     for index in range(start, len(frame)):
         if position is None:
-            # The complete definition was validated once above. Revalidating
-            # the same boolean tree on every bar dominates 5m research CPU.
-            entered, details = evaluate_expression(
-                frame, index, strategy["entry"], explain=True
-            )
-            if entered:
-                px = float(frame["close"].iloc[index])
-                size_meta = {
-                    "account_fraction": 1.0,
-                    "risk_pct_used": None,
-                    "dynamic_risk_sizing": bool(dynamic_risk_sizing),
-                }
-                if dynamic_risk_sizing:
-                    try:
-                        atr = _atr_at(frame, index, int(atr_size_period or 14))
-                    except Exception:
-                        atr = max(px * 0.01, 1e-9)
-                    r_eff = effective_risk_pct(
-                        base_risk, capital, peak_equity, max_dd_so_far,
-                        dd_throttle_risk_pct=dd_throttle_risk_pct,
-                        dd_throttle_of_max_dd=dd_throttle_of_max_dd,
+            if pending_signal is not None:
+                # The prior bar's close-confirmed signal is filled at this
+                # bar's open.  No expression is evaluated against this bar
+                # before the fill.
+                position = position_from_signal(
+                    pending_signal["signal_index"], index,
+                    float(frame["open"].iloc[index]),
+                    pending_signal["conditions"],
+                )
+                pending_signal = None
+                # Continue below so a stop/exit occurring after this bar's
+                # open is included; skipping the fill bar would be optimistic.
+            else:
+                # The complete definition was validated once above.
+                entered, details = evaluate_expression(
+                    frame, index, strategy["entry"], explain=True
+                )
+                if entered and execution_mapping == "next_bar_open":
+                    pending_signal = {
+                        "signal_index": int(index),
+                        "conditions": details,
+                    }
+                    continue
+                if entered:
+                    position = position_from_signal(
+                        index, index, float(frame["close"].iloc[index]), details,
                     )
-                    size_meta = atr_position_size(
-                        capital, r_eff, atr,
-                        target_multiplier=atr_target_multiplier,
-                        entry_price=px,
-                    )
-                    size_meta["risk_pct_used"] = r_eff
-                    size_meta["dynamic_risk_sizing"] = True
-                    size_meta["dd_throttled"] = bool(
-                        abs(float(r_eff) - float(dd_throttle_risk_pct)) < 1e-12
-                    )
-                position = {
-                    "index": index,
-                    "price": px,
-                    "conditions": details,
-                    "peak_high": float(frame["high"].iloc[index]),
-                    "peak_low": float(frame["low"].iloc[index]),
-                    # Frozen signal-bar extremes for entry_wick_buffer stops.
-                    "entry_bar_high": float(frame["high"].iloc[index]),
-                    "entry_bar_low": float(frame["low"].iloc[index]),
-                    "mae_price_pct": 0.0,
-                    "size_meta": size_meta,
-                }
-            continue
+                # A close fill cannot be exposed to the signal bar's already
+                # completed intrabar range.
+                continue
         entry_price = position["price"]
         low = float(frame["low"].iloc[index]); high = float(frame["high"].iloc[index])
         # Track MFE/MAE peaks for trailing exits + fitness MAE demotion
@@ -1209,7 +1401,10 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
             frame, index, strategy["exit"], explain=True,
             position=position, direction=direction,
         )
-        timed = index-position["index"] >= int(strategy["max_hold_bars"])
+        timed = holding_window_complete(
+            position["index"], index, strategy["max_hold_bars"],
+            execution_mapping=execution_mapping,
+        )
         partial_rows, full_rows = classify_exit_details(exit_details, position)
         do_full = bool(stopped or timed or full_rows)
         do_partial = bool(
@@ -1259,9 +1454,13 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
                 if dd > max_dd_so_far:
                     max_dd_so_far = dd
             trades.append({
+                "signal_index": position["signal_index"],
                 "entry_index": position["index"], "exit_index": index,
+                "signal_time": str(frame.index[position["signal_index"]]),
                 "entry_time": str(frame.index[position["index"]]),
                 "exit_time": str(frame.index[index]), "pnl_ratio": net,
+                "entry_price": float(entry_price),
+                "exit_price": float(exit_price),
                 "pnl_ratio_full_size": net_full,
                 "transaction_cost_ratio": (round_cost+funding_cost) * close_frac,
                 "friction_scenario": friction_scenario,
@@ -1272,6 +1471,7 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
                 "account_fraction": close_frac,
                 "partial_tp_ratio": ratio,
                 "partial_exit": True,
+                "execution_mapping": execution_mapping,
                 "sizing": size_meta,
                 "entry_conditions": position["conditions"],
                 "exit_conditions": exit_details,
@@ -1313,9 +1513,13 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
             # Legacy/experimental DSLs without an explicit semantic role
             # are deliberately not reported as take-profit events.
             exit_type = "策略规则退出"
-        trades.append({"entry_index": position["index"], "exit_index": index,
+        trades.append({"signal_index": position["signal_index"],
+                       "entry_index": position["index"], "exit_index": index,
+                       "signal_time": str(frame.index[position["signal_index"]]),
                        "entry_time": str(frame.index[position["index"]]),
                        "exit_time": str(frame.index[index]), "pnl_ratio": net,
+                       "entry_price": float(entry_price),
+                       "exit_price": float(exit_price),
                        "pnl_ratio_full_size": net_full,
                        "transaction_cost_ratio": (round_cost+funding_cost) * frac,
                        "friction_scenario": friction_scenario,
@@ -1324,6 +1528,7 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
                        "leverage": int(leverage),
                        "mae_price_pct": float(position.get("mae_price_pct") or 0.0),
                        "account_fraction": frac,
+                       "execution_mapping": execution_mapping,
                        "sizing": size_meta,
                        "entry_conditions": position["conditions"],
                        "exit_conditions": exit_details})
@@ -1335,6 +1540,7 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
             if initial_equity else (capital-1.0)*100.0,
             "trades": trades,
             "dsl_hash": dsl_hash(strategy), "dsl_schema": SCHEMA,
+            "execution_mapping": execution_mapping,
             "stop_loss_pct": float(stop_loss_pct),
             "structured_exits_enabled": True,
             "dynamic_risk_sizing": bool(dynamic_risk_sizing),

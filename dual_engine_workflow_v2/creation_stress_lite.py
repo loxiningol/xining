@@ -125,13 +125,15 @@ def red_team_attack(trade_returns, max_dd_limit=-0.18):
             "at": _now(),
         }
 
-    # Attack A: add 3bp adverse slippage per trade
-    slip = [-0.0003 if r >= 0 else 0.0003 for r in rets]
-    shocked_a = [r + s for r, s in zip(rets, slip)]
+    # Attack A: every fill pays the same 3bp adverse return delta.  The old
+    # implementation added 3bp to losing trades, accidentally improving them.
+    shocked_a = [r - 0.0003 for r in rets]
     eq_a = _equity_from_returns(shocked_a)
     mdd_a = _max_drawdown(eq_a)
     attacks.append({
         "name": "adverse_slippage_3bp",
+        "per_trade_return_delta": -0.0003,
+        "n_shocked_trades": len(shocked_a),
         "max_drawdown": mdd_a,
         "total_return": eq_a[-1] - 1.0,
         "pass": mdd_a >= float(max_dd_limit),

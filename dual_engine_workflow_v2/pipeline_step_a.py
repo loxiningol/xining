@@ -13,6 +13,7 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ""):
     __package__ = "dual_engine_workflow_v2"
 
 import copy
+import hashlib
 import json
 import threading
 import time
@@ -79,8 +80,10 @@ from .repair_drift import (
     record_repair_round,
     apply_engineering_repair_only,
 )
-from .fidelity import rule_based_condition_audit, apply_audit_removals
+from .fidelity import rule_based_condition_audit
 from .mechanism import build_fingerprint_from_statement
+from . import recipe_policy
+from . import research_contract as research_contract_mod
 
 
 _JOB = {"running": False, "kind": None, "started_at": None, "error": None}
@@ -240,7 +243,7 @@ def glm_require_mechanism_spec(mode_ctx, focus, mode_name, kb_ctx, retries=2):
                 "meta": {
                     "title": parsed.get("title") or cleaned.get("mechanism_name"),
                     "thesis": parsed.get("thesis") or cleaned.get("why_edge_exists"),
-                    "direction": parsed.get("direction") or "long",
+                    "direction": parsed.get("direction") or (focus or {}).get("direction"),
                     "symbol": parsed.get("symbol") or (focus or {}).get("symbol"),
                     "timeframe": parsed.get("timeframe") or (focus or {}).get("timeframe"),
                     "suggested_core_features": parsed.get("suggested_core_features") or [],
@@ -265,262 +268,1543 @@ def glm_require_mechanism_spec(mode_ctx, focus, mode_name, kb_ctx, retries=2):
     }
 
 
-def codex_implement_from_spec(spec_pack):
-    """Faithful implementer — NEVER use legacy hypothesis books (they inject EMA/RSI).
+def _compiler_list(value):
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [x for x in value if x not in (None, "")]
+    return [value]
 
-    Builds microstructure-proxy DSL from mechanism_spec + allowed features only.
-    If spec_pack provides a validated prebuilt `dsl` (or direction-matched
-    `dsl_long`/`dsl_short`), use that instead of the family template.
+
+def _compiler_contract(spec_pack, spec, meta):
+    """Locate ResearchContract v2 without breaking legacy prebuilt packs."""
+    for obj in (spec_pack, spec, meta):
+        if not isinstance(obj, dict):
+            continue
+        for key in ("research_contract", "creation_contract", "contract"):
+            value = obj.get(key)
+            if isinstance(value, dict):
+                # Some producers wrap the immutable contract once more.
+                nested = value.get("research_contract") or value.get("creation_contract")
+                return nested if isinstance(nested, dict) else value
+    return {}
+
+
+def _formal_submission_authority(requested, contract, admitted_recipe):
+    """Only the discovery→formal bridge may create a review submission."""
+    if requested is not True:
+        return {
+            "authorized": False,
+            "diagnostic_only": True,
+            "reasons": ["formal_submission_not_requested"],
+        }
+    reasons = []
+    integrity = research_contract_mod.verify_contract_integrity(contract)
+    if not integrity.get("ok"):
+        reasons.extend(integrity.get("reasons") or [])
+    if not isinstance(admitted_recipe, dict) or not admitted_recipe:
+        reasons.append("admitted_recipe_lock_missing")
+    else:
+        try:
+            from .research_discovery import verify_assembly_recipe
+            valid_recipe, expected_recipe_id = verify_assembly_recipe(admitted_recipe)
+        except Exception as exc:
+            valid_recipe, expected_recipe_id = False, None
+            reasons.append("admitted_recipe_integrity_check_failed:%s" % exc)
+        if not valid_recipe:
+            reasons.append("admitted_recipe_hash_invalid")
+        if admitted_recipe.get("research_contract_id") != contract.get("contract_id"):
+            reasons.append("admitted_recipe_contract_drift")
+        capability = recipe_policy.capability_from_row(admitted_recipe, contract)
+        if not capability.get("ok"):
+            reasons.extend(capability.get("reasons") or [])
+    return {
+        "authorized": not reasons,
+        "diagnostic_only": False,
+        "reasons": list(dict.fromkeys(reasons)),
+    }
+
+
+def _compiler_normalize_tf(value):
+    raw = str(value or "").strip().lower().replace(" ", "")
+    aliases = {
+        "5min": "5m", "5minute": "5m", "5minutes": "5m",
+        "15min": "15m", "15minute": "15m", "15minutes": "15m",
+        "60m": "1h", "60min": "1h", "1hour": "1h", "1hr": "1h",
+        "240m": "4h", "240min": "4h", "4hour": "4h", "4hr": "4h",
+    }
+    return aliases.get(raw, raw)
+
+
+def _compiler_feature(value, condition_tf=None, primary_tf=None):
+    """Map only true naming aliases; never turn one economic variable into another."""
+    import re
+    raw = str(value or "").strip().lower()
+    prefix_match = re.match(r"^(5m|15m|1h|4h)[:/]", raw)
+    double_prefix_match = re.match(r"^(5m|15m|1h|4h)__", raw)
+    suffix_match = re.search(r"@(5m|15m|1h|4h)$", raw)
+    declared_tf = (prefix_match.group(1) if prefix_match else
+                   (double_prefix_match.group(1) if double_prefix_match else
+                   (suffix_match.group(1) if suffix_match else None))
+                  )
+    condition_tf = condition_tf or declared_tf
+    raw = re.sub(r"^(5m|15m|1h|4h)[:/]", "", raw)
+    raw = re.sub(r"^(5m|15m|1h|4h)__", "", raw)
+    raw = re.sub(r"@(5m|15m|1h|4h)$", "", raw)
+    aliases = {
+        "volume_z": "vol_z20", "vol_z": "vol_z20",
+        "prev_high": "prev_high20", "prev_low": "prev_low20",
+        "atr": "atr14", "rsi": "rsi14",
+        "kdj_k": "k", "kdj_d": "d", "kdj_j": "j",
+    }
+    raw = aliases.get(raw, raw)
+    ctf = _compiler_normalize_tf(condition_tf)
+    ptf = _compiler_normalize_tf(primary_tf)
+    if ctf and ptf and ctf != ptf:
+        prefix = {"1h": "h1_", "4h": "h4_"}.get(ctf)
+        if prefix and not raw.startswith(prefix):
+            candidate = prefix + raw
+            # Only a genuinely implemented higher-timeframe feature is accepted.
+            try:
+                import auto_trade_strategy_dsl as _dsl_mod
+                if candidate in _dsl_mod.FEATURES:
+                    raw = candidate
+                else:
+                    raw = "%s:%s" % (ctf, raw)
+            except Exception:
+                raw = "%s:%s" % (ctf, raw)
+        elif not prefix:
+            raw = "%s:%s" % (ctf, raw)
+    return raw
+
+
+def _compiler_extract_features(tree):
+    used = set()
+
+    def walk(node):
+        if isinstance(node, dict):
+            if node.get("exit_op") in ("atr_trailing", "partial_tp_atr"):
+                used.update(("atr14", "high", "low", "close"))
+            elif node.get("exit_op") == "swing_extreme":
+                used.update(("high", "low", "close"))
+            elif node.get("exit_op") == "entry_wick_buffer":
+                used.update(("high", "low", "close"))
+            elif node.get("exit_op") == "fixed_pct_tp":
+                used.update(("high", "low", "close"))
+            if node.get("exit_op") == "partial_tp_feature" and node.get("feature"):
+                used.add(str(node.get("feature")))
+                used.update(("high", "low", "close"))
+            for side in ("left", "right"):
+                operand = node.get(side)
+                if isinstance(operand, dict) and operand.get("feature"):
+                    used.add(str(operand.get("feature")))
+                if isinstance(operand, dict) and operand.get("quantile_of"):
+                    used.add(str(operand.get("quantile_of")))
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(tree)
+    return used
+
+
+def _compiler_feature_rules(contract, spec, meta, primary_tf):
+    feature_contract = contract.get("feature_contract") or {}
+    sources = [feature_contract, contract, spec.get("feature_contract") or {}, spec, meta]
+
+    def collect(keys):
+        out = []
+        for src in sources:
+            if not isinstance(src, dict):
+                continue
+            for key in keys:
+                out.extend(_compiler_list(src.get(key)))
+        normalized = []
+        for value in out:
+            feat = _compiler_feature(value, primary_tf=primary_tf)
+            if feat and feat not in normalized:
+                normalized.append(feat)
+        return normalized
+
+    required = collect(("required_features", "required_core_features", "required_entry_features"))
+    allowed = collect(("allowed_features", "allowed_core_features"))
+    forbidden = []
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        forbidden.extend(_compiler_list(src.get("forbidden_substitutions")))
+        forbidden.extend(_compiler_list(src.get("forbidden_transformations")))
+        forbidden.extend(_compiler_list(src.get("forbidden_features")))
+    allowed_enforced = bool(feature_contract.get("allowed_features_enforced"))
+    return (
+        required,
+        allowed,
+        [str(x) for x in forbidden if str(x).strip()],
+        allowed_enforced,
+    )
+
+
+def _compiler_condition_leaf(raw, index, primary_tf, errors, phase="entry"):
+    import re
+    try:
+        import auto_trade_strategy_dsl as dsl_mod
+    except Exception as exc:
+        errors.append("dsl_runtime_unavailable:%s" % exc)
+        return None, "and"
+    if not isinstance(raw, dict):
+        errors.append("required_condition_not_object:%s" % index)
+        return None, "and"
+    condition_tf = raw.get("timeframe") or primary_tf
+    left_raw = raw.get("indicator") or raw.get("feature")
+    if left_raw is None and isinstance(raw.get("left"), dict):
+        left_raw = raw["left"].get("feature")
+    elif left_raw is None:
+        left_raw = raw.get("left")
+    left = _compiler_feature(left_raw, condition_tf, primary_tf)
+    if left not in dsl_mod.FEATURES:
+        errors.append("required_condition_feature_unsupported:%s:%s" % (index, left or left_raw))
+        return None, str(raw.get("join") or "and").lower()
+    ctf = _compiler_normalize_tf(condition_tf)
+    ptf = _compiler_normalize_tf(primary_tf)
+    if ctf and ptf and ctf != ptf:
+        prefix = {"1h": "h1_", "4h": "h4_"}.get(ctf)
+        if not prefix or not left.startswith(prefix):
+            errors.append("condition_timeframe_semantics_unsupported:%s:%s_on_%s" % (index, left, ctf))
+            return None, str(raw.get("join") or "and").lower()
+    op_alias = {
+        ">": "gt", ">=": "gte", "<": "lt", "<=": "lte", "==": "eq", "=": "eq",
+        "crosses_above": "cross_above", "crosses_below": "cross_below",
+    }
+    op_raw = str(raw.get("operator") or raw.get("op") or "").strip().lower()
+    op = op_alias.get(op_raw, op_raw)
+    if op not in dsl_mod.OPS:
+        errors.append("required_condition_operator_unsupported:%s:%s" % (index, op_raw))
+        return None, str(raw.get("join") or "and").lower()
+    phase_prefix = "x" if phase == "exit" else "e"
+    leaf = {
+        "id": re.sub(r"[^a-zA-Z0-9_]", "_", str(raw.get("id") or "%s_contract_%d" % (phase_prefix, index)))[:80],
+        "left": {"feature": left},
+        "op": op,
+    }
+    if isinstance(raw.get("left"), dict) and raw["left"].get("offset") is not None:
+        leaf["left"]["offset"] = raw["left"].get("offset")
+    if op == "between":
+        bounds = raw.get("value")
+        lower = raw.get("lower")
+        upper = raw.get("upper")
+        if isinstance(bounds, (list, tuple)) and len(bounds) == 2:
+            lower, upper = bounds
+        try:
+            leaf["lower"] = float(lower)
+            leaf["upper"] = float(upper)
+        except Exception:
+            errors.append("required_condition_between_invalid:%s" % index)
+            return None, str(raw.get("join") or "and").lower()
+    else:
+        value = raw.get("value") if "value" in raw else raw.get("right")
+        if isinstance(value, dict):
+            if value.get("feature") is not None:
+                feat = _compiler_feature(value.get("feature"), condition_tf, primary_tf)
+                if feat not in dsl_mod.FEATURES:
+                    errors.append("required_condition_right_feature_unsupported:%s:%s" % (index, feat))
+                    return None, str(raw.get("join") or "and").lower()
+                leaf["right"] = {"feature": feat}
+                if value.get("offset") is not None:
+                    leaf["right"]["offset"] = value.get("offset")
+                if value.get("scale") is not None:
+                    leaf["right"]["scale"] = value.get("scale")
+            elif value.get("quantile_of") is not None:
+                feat = _compiler_feature(value.get("quantile_of"), condition_tf, primary_tf)
+                if feat not in dsl_mod.FEATURES:
+                    errors.append("required_condition_quantile_feature_unsupported:%s:%s" % (index, feat))
+                    return None, str(raw.get("join") or "and").lower()
+                if any(value.get(key) is None for key in ("q", "window", "min_history")):
+                    errors.append("required_condition_quantile_identity_incomplete:%s" % index)
+                    return None, str(raw.get("join") or "and").lower()
+                leaf["right"] = {
+                    "quantile_of": feat,
+                    "q": value.get("q"),
+                    "window": value.get("window"),
+                    "min_history": value.get("min_history"),
+                }
+            elif "value" in value:
+                leaf["right"] = {"value": value.get("value")}
+            else:
+                errors.append("required_condition_right_invalid:%s" % index)
+                return None, str(raw.get("join") or "and").lower()
+        elif isinstance(value, str):
+            feature_value = _compiler_feature(value, condition_tf, primary_tf)
+            if feature_value in dsl_mod.FEATURES:
+                leaf["right"] = {"feature": feature_value}
+            else:
+                try:
+                    leaf["right"] = {"value": float(value)}
+                except Exception:
+                    errors.append("required_condition_value_unrepresentable:%s:%s" % (index, value))
+                    return None, str(raw.get("join") or "and").lower()
+        elif isinstance(value, (int, float)):
+            leaf["right"] = {"value": value}
+        else:
+            errors.append("required_condition_value_missing:%s" % index)
+            return None, str(raw.get("join") or "and").lower()
+    return leaf, str(raw.get("join") or "and").strip().lower()
+
+
+def _compiler_join_conditions(compiled):
+    if not compiled:
+        return None
+    expr = compiled[0][0]
+    for leaf, join in compiled[1:]:
+        logical = "any" if join in ("or", "any", "|") else "all"
+        if isinstance(expr, dict) and set(expr) == {logical}:
+            expr[logical].append(leaf)
+        else:
+            expr = {logical: [expr, leaf]}
+    return expr
+
+
+# Research features are not accepted merely because their names resemble a
+# runtime indicator.  Every entry here was checked point-for-point against the
+# formal frame builder.  In particular, ``atr_pct_14`` is not ``atr14`` and the
+# research ``rsi_14`` implementation is not the formal ``rsi14`` implementation.
+_RECIPE_FACTOR_TO_DSL = {
+    "close_z_20": {
+        "feature": "z20",
+        "semantics": "close_z20_sample_std_v1",
+    },
+    "volume_z": {
+        "feature": "vol_z20",
+        "semantics": "volume_z20_sample_std_v1",
+    },
+}
+_GENERIC_RECIPE_KINDS = {
+    "mechanism_intersection", "mechanism_preserving",
+}
+
+
+def _compiler_recipe_entry(recipe, contract, timeframe, errors):
+    """Compile the exact event admitted by discovery; never infer a template.
+
+    ``errors`` is deliberately caller-owned so this function can be used both
+    while constructing a DSL and at the final formal-review boundary.  Missing
+    estimator identity, unsupported research factors, and a one-leaf generic
+    probe all fail closed instead of being supplemented with invented logic.
     """
-    import uuid
-    import copy
-    from .config import FORBIDDEN_CORE_FEATURES
+    recipe = recipe if isinstance(recipe, dict) else {}
+    contract = contract if isinstance(contract, dict) else {}
+    evidence = {
+        "recipe_id": recipe.get("recipe_id"),
+        "event_kind": recipe.get("event_kind"),
+        "event_logic": recipe.get("event_logic"),
+        "factor_mappings": [],
+    }
+    contract_integrity = research_contract_mod.verify_contract_integrity(contract)
+    evidence["contract_integrity"] = contract_integrity
+    if not contract_integrity.get("ok"):
+        errors.extend(contract_integrity.get("reasons") or [])
+    try:
+        from .research_discovery import verify_assembly_recipe
+        integrity_ok, expected_id = verify_assembly_recipe(recipe)
+    except Exception as exc:
+        integrity_ok, expected_id = False, None
+        errors.append("admitted_recipe_integrity_check_failed:%s" % exc)
+    evidence["expected_recipe_id"] = expected_id
+    evidence["recipe_hash_valid"] = bool(integrity_ok)
+    if not integrity_ok:
+        errors.append("admitted_recipe_hash_invalid")
+    if recipe.get("schema") != "qiyu_admitted_probe_recipe_v1":
+        errors.append("admitted_recipe_schema_invalid:%s" % recipe.get("schema"))
 
+    required_identity = (
+        "recipe_id", "research_contract_id", "hypothesis_id", "mechanism_id",
+        "family", "event_id", "event_kind", "event_logic", "terms",
+        "trade_direction", "horizon_bars", "execution_mapping",
+        "primary_cost_scenario", "primary_cost_per_trade",
+        "research_contract_body_hash", "exit_policy",
+        "protective_stop_policy", "execution_leverage",
+        "statistical_return_basis",
+    )
+    for key in required_identity:
+        if recipe.get(key) in (None, "", []):
+            errors.append("admitted_recipe_%s_missing" % key)
+    if recipe.get("statistical_returns_are_post_cost") is not True:
+        errors.append("admitted_recipe_post_cost_identity_missing")
+    if recipe.get("protective_stop_evaluated") is not True:
+        errors.append("admitted_recipe_protective_stop_not_evaluated")
+    try:
+        cost = float(recipe.get("primary_cost_per_trade"))
+        if cost < 0.0:
+            raise ValueError("negative")
+    except (TypeError, ValueError):
+        errors.append("admitted_recipe_primary_cost_invalid")
+
+    contract_id = contract.get("contract_id")
+    if not contract_id or recipe.get("research_contract_id") != contract_id:
+        errors.append("admitted_recipe_contract_drift")
+    if recipe.get("research_contract_body_hash") != contract_integrity.get(
+        "expected_contract_id"
+    ):
+        errors.append("admitted_recipe_contract_body_hash_drift")
+    if contract.get("valid") is False:
+        errors.append("admitted_recipe_contract_invalid")
+    target = contract.get("target") or {}
+    direction = str(recipe.get("trade_direction") or "").lower()
+    if direction not in ("long", "short"):
+        errors.append("admitted_recipe_direction_invalid:%s" % (direction or "missing"))
+    if target.get("direction") and str(target.get("direction")).lower() != direction:
+        errors.append("admitted_recipe_direction_contract_drift")
+    target_tf = _compiler_normalize_tf(target.get("timeframe"))
+    primary_tf = _compiler_normalize_tf(timeframe)
+    if target_tf and primary_tf and target_tf != primary_tf:
+        errors.append("admitted_recipe_timeframe_contract_drift:%s!=%s" % (
+            target_tf, primary_tf,
+        ))
+    try:
+        horizon = int(recipe.get("horizon_bars"))
+        if horizon < 1 or horizon > 240:
+            raise ValueError("outside_bounds")
+    except (TypeError, ValueError):
+        errors.append("admitted_recipe_horizon_invalid")
+        horizon = None
+    evidence["horizon_bars"] = horizon
+    capability = recipe_policy.capability_from_row(recipe, contract)
+    evidence["formal_capability"] = capability
+    if not capability.get("ok"):
+        errors.extend(
+            "admitted_recipe_%s" % reason
+            for reason in (capability.get("reasons") or [])
+        )
+
+    # Discovery's closed-bar event is currently reproducible only by filling
+    # the next bar open.  Delayed/pullback mappings remain diagnostic evidence
+    # and are intentionally barred from formal assembly.
+    mapping = str(recipe.get("execution_mapping") or "")
+    if mapping != "next_bar_open":
+        errors.append("admitted_recipe_execution_mapping_not_formally_supported:%s" % (
+            mapping or "missing",
+        ))
+    timing = ((contract.get("event_contract") or {}).get("entry_timing") or {})
+    if isinstance(timing, str):
+        timing = {"mode": timing}
+    timing_mode = str((timing or {}).get("mode") or "unspecified")
+    if timing_mode not in ("unspecified", mapping):
+        errors.append("admitted_recipe_execution_mapping_contract_drift:%s!=%s" % (
+            timing_mode, mapping,
+        ))
+    recipe_timing = recipe.get("required_entry_timing") or {}
+    if isinstance(recipe_timing, str):
+        recipe_timing = {"mode": recipe_timing}
+    recipe_timing_mode = str((recipe_timing or {}).get("mode") or "unspecified")
+    if recipe_timing_mode not in ("unspecified", mapping):
+        errors.append("admitted_recipe_required_timing_drift:%s!=%s" % (
+            recipe_timing_mode, mapping,
+        ))
+
+    event = contract.get("event_contract") or {}
+    if event.get("session_window") or event.get("time_window") or contract.get("session_window"):
+        # Probe masks do not yet encode session windows.  Adding one here would
+        # produce a different event from the event whose returns were admitted.
+        errors.append("admitted_recipe_session_window_not_researched")
+
+    terms = recipe.get("terms") or []
+    if not isinstance(terms, list):
+        errors.append("admitted_recipe_terms_not_list")
+        terms = []
+    kind = str(recipe.get("event_kind") or "")
+    logic = str(recipe.get("event_logic") or "")
+    exact = kind == "human_contract_exact"
+    evidence["exact_human_contract"] = exact
+
+    compiled = []
+    if exact:
+        if logic != "ordered_joins":
+            errors.append("admitted_recipe_exact_logic_invalid:%s" % (logic or "missing"))
+        if not terms:
+            errors.append("admitted_recipe_exact_terms_missing")
+        for index, term in enumerate(terms, 1):
+            if not isinstance(term, dict):
+                errors.append("admitted_recipe_exact_term_%d_invalid" % index)
+                continue
+            literal = dict(term)
+            literal["indicator"] = term.get("factor") or term.get("feature")
+            literal["operator"] = term.get("op") or term.get("operator")
+            literal["join"] = term.get("join") or ("root" if index == 1 else "and")
+            if literal.get("indicator") in (None, "") or "value" not in term:
+                errors.append("admitted_recipe_exact_term_%d_identity_incomplete" % index)
+                continue
+            leaf, join = _compiler_condition_leaf(
+                literal, index, primary_tf, errors, phase="entry",
+            )
+            if leaf:
+                compiled.append((leaf, join))
+        recipe_entry = _compiler_join_conditions(compiled)
+
+        contract_rows = _compiler_required_conditions(contract, direction)
+        if not contract_rows:
+            errors.append("admitted_recipe_exact_contract_conditions_missing")
+        contract_compiled = []
+        for index, row in enumerate(contract_rows, 1):
+            leaf, join = _compiler_condition_leaf(
+                row, index, primary_tf, errors, phase="entry",
+            )
+            if leaf:
+                contract_compiled.append((leaf, join))
+        contract_entry = _compiler_join_conditions(contract_compiled)
+        if (
+            recipe_entry is not None and contract_entry is not None
+            and _compiler_logic_semantics(recipe_entry)
+            != _compiler_logic_semantics(contract_entry)
+        ):
+            errors.append("admitted_recipe_exact_contract_semantics_drift")
+            evidence["recipe_entry_semantics"] = _compiler_logic_semantics(recipe_entry)
+            evidence["contract_entry_semantics"] = _compiler_logic_semantics(contract_entry)
+    else:
+        contract_rows = _compiler_required_conditions(contract, direction)
+        if contract_rows:
+            errors.append("generic_recipe_cannot_replace_exact_contract_event")
+        if kind == "single_proxy":
+            errors.append("generic_single_leaf_not_formally_admissible")
+        elif kind not in _GENERIC_RECIPE_KINDS:
+            errors.append("admitted_recipe_event_kind_unsupported:%s" % (kind or "missing"))
+        if logic != "all":
+            errors.append("admitted_recipe_generic_logic_must_be_all:%s" % (logic or "missing"))
+        if len(terms) < 2:
+            errors.append("generic_recipe_requires_at_least_two_terms")
+        for index, term in enumerate(terms, 1):
+            if not isinstance(term, dict):
+                errors.append("admitted_recipe_term_%d_invalid" % index)
+                continue
+            factor = str(term.get("factor") or "")
+            registration = _RECIPE_FACTOR_TO_DSL.get(factor)
+            if not registration:
+                errors.append("admitted_recipe_factor_unsupported:%s" % (factor or "missing"))
+                continue
+            side = str(term.get("side") or "")
+            if side not in ("high", "low"):
+                errors.append("admitted_recipe_term_%d_side_invalid:%s" % (index, side or "missing"))
+                continue
+            if str(term.get("threshold_source") or "") != "prior_only_rolling_quantile":
+                errors.append("admitted_recipe_term_%d_threshold_source_invalid" % index)
+                continue
+            if str(term.get("join") or "and").lower() not in ("and", "all"):
+                errors.append("admitted_recipe_term_%d_join_conflicts_with_all" % index)
+            try:
+                q = float(term.get("q"))
+                window_raw = term.get("window")
+                history_raw = term.get("min_history")
+                window = int(window_raw)
+                min_history = int(history_raw)
+                if float(window_raw) != float(window) or float(history_raw) != float(min_history):
+                    raise ValueError("non_integer")
+                if not (0.5 < q < 1.0):
+                    raise ValueError("q_outside_bounds")
+                if not (2 <= window <= 240 and 2 <= min_history <= window):
+                    raise ValueError("history_outside_bounds")
+            except (TypeError, ValueError):
+                errors.append("admitted_recipe_term_%d_quantile_identity_invalid" % index)
+                continue
+            threshold_q = q if side == "high" else 1.0 - q
+            leaf = {
+                "id": "e_recipe_%d" % index,
+                "left": {"feature": registration["feature"]},
+                "op": "gte" if side == "high" else "lte",
+                "right": {
+                    "quantile_of": registration["feature"],
+                    "q": threshold_q,
+                    "window": window,
+                    "min_history": min_history,
+                },
+            }
+            compiled.append((leaf, "and"))
+            evidence["factor_mappings"].append({
+                "research_factor": factor,
+                "dsl_feature": registration["feature"],
+                "semantics": registration["semantics"],
+                "side": side,
+                "research_q": q,
+                "threshold_q": threshold_q,
+                "window": window,
+                "min_history": min_history,
+            })
+        recipe_entry = {"all": [row[0] for row in compiled]} if compiled else None
+
+    if terms:
+        first = terms[0] if isinstance(terms[0], dict) else {}
+        if recipe.get("factor") not in (None, first.get("factor"), first.get("feature")):
+            errors.append("admitted_recipe_primary_factor_drift")
+        if not exact and recipe.get("side") not in (None, first.get("side")):
+            errors.append("admitted_recipe_primary_side_drift")
+        if not exact and recipe.get("quantile") not in (None, first.get("q")):
+            errors.append("admitted_recipe_primary_quantile_drift")
+    evidence["compiled_entry_semantics"] = (
+        _compiler_logic_semantics(recipe_entry) if recipe_entry else None
+    )
+    return recipe_entry, evidence
+
+
+def _compiler_logic_semantics(node):
+    """Canonical executable meaning, excluding IDs and presentation order."""
+    if not isinstance(node, dict):
+        return node
+    for logical in ("all", "any"):
+        if logical in node:
+            children = []
+            for child in node.get(logical) or []:
+                normalized = _compiler_logic_semantics(child)
+                if isinstance(normalized, dict) and set(normalized) == {logical}:
+                    children.extend(normalized[logical])
+                else:
+                    children.append(normalized)
+            children.sort(key=lambda x: json.dumps(x, ensure_ascii=False, sort_keys=True))
+            return {logical: children}
+    if "not" in node:
+        return {"not": _compiler_logic_semantics(node.get("not"))}
+    keep = {}
+    for key in ("left", "op", "right", "lower", "upper", "exit_op", "role",
+                "n_atr", "atr_period", "lookback", "pct", "price_pct",
+                "partial_tp_ratio", "buffer_pct", "feature"):
+        if key in node:
+            keep[key] = copy.deepcopy(node.get(key))
+    return keep
+
+
+def _compiler_semantics_contains(actual, required):
+    """True when required logic exists without changing its AND/OR relation."""
+    if actual == required:
+        return True
+    if not isinstance(actual, dict) or not isinstance(required, dict):
+        return False
+    required_logical = next((x for x in ("all", "any") if x in required), None)
+    actual_logical = next((x for x in ("all", "any") if x in actual), None)
+    if required_logical:
+        if actual_logical != required_logical:
+            return False
+        actual_children = list(actual.get(actual_logical) or [])
+        return all(any(_compiler_semantics_contains(a, r) for a in actual_children)
+                   for r in (required.get(required_logical) or []))
+    return any(
+        _compiler_semantics_contains(child, required)
+        for logical in ("all", "any")
+        for child in (actual.get(logical) or [])
+    )
+
+
+def validate_dsl_against_admitted_recipe(dsl, recipe, contract):
+    """Final executable-identity lock used immediately before formal review."""
+    errors = []
+    contract = contract if isinstance(contract, dict) else {}
+    target = contract.get("target") or {}
+    timeframe = _compiler_normalize_tf(
+        target.get("timeframe") or ((dsl or {}).get("timeframe"))
+    )
+    expected_entry, recipe_evidence = _compiler_recipe_entry(
+        recipe, contract, timeframe, errors,
+    )
+    try:
+        import auto_trade_strategy_dsl as dsl_mod
+        validated = dsl_mod.validate_strategy(dsl)
+    except Exception as exc:
+        validated = dsl if isinstance(dsl, dict) else {}
+        errors.append("compiled_dsl_validation_failed:%s" % exc)
+
+    recipe = recipe if isinstance(recipe, dict) else {}
+    expected_symbol = target.get("symbol")
+    expected_timeframe = _compiler_normalize_tf(target.get("timeframe"))
+    expected_direction = str(recipe.get("trade_direction") or "").lower()
+    if validated.get("direction") != expected_direction:
+        errors.append("compiled_dsl_direction_drift:%s!=%s" % (
+            validated.get("direction"), expected_direction,
+        ))
+    if expected_timeframe and _compiler_normalize_tf(validated.get("timeframe")) != expected_timeframe:
+        errors.append("compiled_dsl_timeframe_drift:%s!=%s" % (
+            validated.get("timeframe"), expected_timeframe,
+        ))
+    if expected_symbol and list(validated.get("supported_instruments") or []) != [expected_symbol]:
+        errors.append("compiled_dsl_symbol_drift:%s!=%s" % (
+            validated.get("supported_instruments"), expected_symbol,
+        ))
+    try:
+        if int(validated.get("max_hold_bars")) != int(recipe.get("horizon_bars")):
+            errors.append("compiled_dsl_horizon_drift:%s!=%s" % (
+                validated.get("max_hold_bars"), recipe.get("horizon_bars"),
+            ))
+    except (TypeError, ValueError):
+        errors.append("compiled_dsl_horizon_invalid")
+    if str(validated.get("execution_mapping") or "bar_close") != str(
+        recipe.get("execution_mapping") or ""
+    ):
+        errors.append("compiled_dsl_execution_mapping_drift:%s!=%s" % (
+            validated.get("execution_mapping") or "bar_close",
+            recipe.get("execution_mapping"),
+        ))
+    try:
+        if abs(float(validated.get("protective_stop_pct")) - float(
+            (recipe.get("protective_stop_policy") or {}).get("price_pct")
+        )) > 1e-12:
+            errors.append("compiled_dsl_protective_stop_drift")
+    except (TypeError, ValueError):
+        errors.append("compiled_dsl_protective_stop_identity_missing")
+    try:
+        if int(validated.get("execution_leverage")) != int(
+            recipe.get("execution_leverage")
+        ):
+            errors.append("compiled_dsl_execution_leverage_drift")
+    except (TypeError, ValueError):
+        errors.append("compiled_dsl_execution_leverage_identity_missing")
+    expected_exit = {
+        "exit_op": "max_hold_only", "role": "invalidation",
+    }
+    actual_exit = _compiler_logic_semantics(validated.get("exit") or {})
+    if actual_exit != expected_exit:
+        errors.append("compiled_dsl_exit_semantics_drift")
+
+    expected_semantics = (
+        _compiler_logic_semantics(expected_entry) if expected_entry else None
+    )
+    actual_semantics = _compiler_logic_semantics(validated.get("entry") or {})
+    if expected_semantics is None or actual_semantics != expected_semantics:
+        errors.append("compiled_dsl_entry_semantics_drift")
+    exact = recipe.get("event_kind") == "human_contract_exact"
+    if not exact and validated.get("entry_condition_policy") is not None:
+        errors.append("generic_recipe_cannot_use_exact_human_entry_policy")
+
+    evidence = {
+        "recipe": recipe_evidence,
+        "expected_entry_semantics": expected_semantics,
+        "actual_entry_semantics": actual_semantics,
+        "expected_target": {
+            "symbol": expected_symbol,
+            "timeframe": expected_timeframe,
+            "direction": expected_direction,
+            "horizon_bars": recipe.get("horizon_bars"),
+            "execution_mapping": recipe.get("execution_mapping"),
+        },
+        "actual_target": {
+            "symbols": list(validated.get("supported_instruments") or []),
+            "timeframe": validated.get("timeframe"),
+            "direction": validated.get("direction"),
+            "horizon_bars": validated.get("max_hold_bars"),
+            "execution_mapping": validated.get("execution_mapping") or "bar_close",
+        },
+    }
+    return {
+        "ok": not errors,
+        "errors": list(dict.fromkeys(str(item) for item in errors if str(item))),
+        "evidence": evidence,
+    }
+
+
+def _compiler_required_conditions(contract, direction):
+    event = contract.get("event_contract") or {}
+    if "entry_conditions" in event:
+        rows = list(event.get("entry_conditions") or [])
+    else:
+        rows = [
+            row for row in (event.get("required_conditions") or contract.get("required_conditions") or [])
+            if not isinstance(row, dict) or str(row.get("role") or "entry").lower() != "exit"
+        ]
+    # Compatibility with the existing immutable invariant contracts.
+    cmp_key = "required_entry_feature_cmps_short" if direction == "short" and contract.get(
+        "required_entry_feature_cmps_short") else "required_entry_feature_cmps"
+    for row in contract.get(cmp_key) or []:
+        rows.append({"indicator": row.get("left"), "operator": row.get("op"),
+                     "value": row.get("right"), "join": "and"})
+    for row in contract.get("required_entry_value_cmps") or []:
+        rows.append({"indicator": row.get("left"), "operator": row.get("op"),
+                     "value": row.get("value"), "join": "and"})
+    return rows
+
+
+def _compiler_required_exit_conditions(contract):
+    event = contract.get("event_contract") or {}
+    if "exit_conditions" in event:
+        return list(event.get("exit_conditions") or [])
+    return [
+        row for row in (event.get("required_conditions") or contract.get("required_conditions") or [])
+        if isinstance(row, dict) and str(row.get("role") or "").lower() == "exit"
+    ]
+
+
+def _compiler_session_window(contract, errors):
+    """Compile an explicit UTC window. Named/text-only sessions are not guessed."""
+    event = contract.get("event_contract") or {}
+    raw = event.get("session_window") or event.get("time_window") or contract.get("session_window")
+    if not raw:
+        return None
+    if not isinstance(raw, dict):
+        errors.append("session_window_not_structured")
+        return None
+    timezone = str(raw.get("timezone") or raw.get("tz") or "UTC").upper()
+    if timezone not in ("UTC", "Z"):
+        errors.append("session_timezone_unsupported:%s" % timezone)
+        return None
+
+    def hour(value):
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value or "").strip()
+        if ":" in text:
+            hh, mm = text.split(":", 1)
+            return int(hh) + int(mm) / 60.0
+        return float(text)
+
+    try:
+        start = hour(raw.get("start_utc", raw.get("start")))
+        end = hour(raw.get("end_utc", raw.get("end")))
+        if not (0.0 <= start < 24.0 and 0.0 <= end <= 24.0 and start != end):
+            raise ValueError("outside_utc_day")
+    except Exception as exc:
+        errors.append("session_window_invalid:%s" % exc)
+        return None
+    lo = {"id": "e_session_start", "left": {"feature": "hour_utc"},
+          "op": "gte", "right": {"value": start}}
+    hi = {"id": "e_session_end", "left": {"feature": "hour_utc"},
+          "op": "lt", "right": {"value": end}}
+    return {"all": [lo, hi]} if start < end else {"any": [lo, hi]}
+
+
+def _compiler_parse_hold(raw, timeframe):
+    """Return max holding bars from a range; never multiply the first token."""
+    import math
+    import re
+    text = str(raw or "").strip().lower()
+    if not text:
+        return 24, {"raw": text, "source": "default", "max_hold_bars": 24}, []
+    normalized = (text.replace("至", "_to_").replace("～", "_to_")
+                  .replace("~", "_to_").replace("–", "_to_").replace("—", "_to_"))
+    nums = []
+    unit = "bars"
+    bar_match = re.search(r"(.+?)(?:bars?|candles?|k[_ ]?lines?|根(?:k线|线)?)", normalized)
+    minute_match = re.search(r"(.+?)(?:minutes?|mins?|分钟)", normalized)
+    hour_match = re.search(r"(.+?)(?:hours?|hrs?|小时)", normalized)
+    day_match = re.search(r"(.+?)(?:days?|天)", normalized)
+    match = bar_match or minute_match or hour_match or day_match
+    if match:
+        nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", match.group(1))]
+        unit = "bars" if bar_match else ("minutes" if minute_match else ("hours" if hour_match else "days"))
+    elif re.fullmatch(r"[\d\s_.-]+(?:to[\d\s_.-]+)?", normalized):
+        nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", normalized)]
+    if not nums:
+        return None, {"raw": text, "source": "unparsed"}, ["holding_period_unparseable:%s" % text]
+    upper = max(nums)
+    tf_minutes = {"5m": 5.0, "15m": 15.0, "1h": 60.0, "4h": 240.0}.get(
+        _compiler_normalize_tf(timeframe))
+    if unit != "bars" and not tf_minutes:
+        return None, {"raw": text, "unit": unit}, ["holding_period_timeframe_unsupported:%s" % timeframe]
+    if unit == "minutes":
+        bars = int(math.ceil(upper / tf_minutes))
+    elif unit == "hours":
+        bars = int(math.ceil(upper * 60.0 / tf_minutes))
+    elif unit == "days":
+        bars = int(math.ceil(upper * 1440.0 / tf_minutes))
+    else:
+        bars = int(math.ceil(upper))
+    evidence = {"raw": text, "unit": unit, "upper": upper, "max_hold_bars": bars,
+                "policy": "upper_bound_of_expected_range"}
+    if bars < 1 or bars > 240:
+        return None, evidence, ["holding_period_outside_dsl_bounds:%s" % bars]
+    return bars, evidence, []
+
+
+def _compiler_exits_from_spec(spec, errors):
+    """Compile structured exits from their dedicated narrative fields.
+
+    Protective stop text is never scanned for take-profit percentages.  Each
+    explicit parameter is validated in its own clause and an invalid value is
+    rejected rather than replaced by a convenient default.
+    """
+    import re
+    try:
+        import auto_trade_strategy_dsl as dsl_mod
+    except Exception as exc:
+        errors.append("dsl_runtime_unavailable:%s" % exc)
+        return []
+
+    exit_text = str(spec.get("exit_logic") or "").lower()
+    take_profit_text = str(spec.get("take_profit_logic") or "").lower()
+    stop_text = str(spec.get("stop_logic") or "").lower()
+    invalidation_text = str(spec.get("invalidation_logic") or "").lower()
+
+    def clauses(*values):
+        out = []
+        for value in values:
+            for row in re.split(r"\s+(?:or|plus)\s+|[;；]|(?:或者|或)", value or ""):
+                row = row.strip()
+                if row and row not in ("none", "n/a", "na", "无"):
+                    out.append(row)
+        return out
+
+    tp_clauses = clauses(exit_text, take_profit_text)
+    invalidation_clauses = clauses(exit_text, stop_text, invalidation_text)
+    leaves = []
+    seen_by_op = {}
+
+    def add_leaf(leaf):
+        op = leaf.get("exit_op")
+        comparable = dict(leaf)
+        comparable.pop("id", None)
+        marker = json.dumps(comparable, ensure_ascii=False, sort_keys=True)
+        previous = seen_by_op.get(op)
+        if previous is not None:
+            if previous != marker:
+                errors.append("exit_parameter_conflict:%s" % op)
+            return
+        seen_by_op[op] = marker
+        leaf = dict(leaf)
+        leaf["id"] = "x_%s" % op
+        leaves.append(leaf)
+
+    multiplier_re = re.compile(r"(\d+(?:\.\d+)?)\s*(?:x|\u00d7)\s*atr\b")
+    for clause in tp_clauses:
+        is_partial = any(token in clause for token in (
+            "partial", "scale-out", "scale out", "分批", "部分止盈", "减仓",
+        )) and "atr" in clause
+        is_trailing = "atr" in clause and any(token in clause for token in (
+            "trail", "trailing", "跟踪", "移动止盈",
+        ))
+        if is_partial:
+            multiplier = multiplier_re.search(clause)
+            ratio_match = re.search(
+                r"(?:ratio|比例|仓位)[_ :=]*(\d+(?:\.\d+)?)\s*(%)?", clause,
+            )
+            if not multiplier:
+                errors.append("partial_tp_atr_multiplier_missing")
+            if not ratio_match:
+                errors.append("partial_tp_ratio_missing")
+            if multiplier and ratio_match:
+                n_atr = float(multiplier.group(1))
+                ratio = float(ratio_match.group(1))
+                if ratio_match.group(2):
+                    ratio /= 100.0
+                if not (dsl_mod.PARTIAL_TP_ATR_N_MIN <= n_atr <= dsl_mod.PARTIAL_TP_ATR_N_MAX):
+                    errors.append("partial_tp_atr_n_atr_outside_bounds:%s" % n_atr)
+                if not (dsl_mod.PARTIAL_TP_RATIO_MIN <= ratio <= dsl_mod.PARTIAL_TP_RATIO_MAX):
+                    errors.append("partial_tp_ratio_outside_bounds:%s" % ratio)
+                add_leaf({
+                    "exit_op": "partial_tp_atr", "role": "take_profit",
+                    "n_atr": n_atr, "atr_period": 14,
+                    "partial_tp_ratio": ratio,
+                })
+        if is_trailing:
+            multiplier = multiplier_re.search(clause)
+            if not multiplier:
+                errors.append("atr_trailing_multiplier_missing")
+            else:
+                n_atr = float(multiplier.group(1))
+                if not (dsl_mod.ATR_TRAIL_N_MIN <= n_atr <= dsl_mod.ATR_TRAIL_N_MAX):
+                    errors.append("atr_trailing_n_atr_outside_bounds:%s" % n_atr)
+                add_leaf({
+                    "exit_op": "atr_trailing", "role": "take_profit",
+                    "n_atr": n_atr, "atr_period": 14,
+                })
+
+        fixed_named = any(token in clause for token in (
+            "fixed_pct_tp", "fixed tp", "fixed take profit", "固定止盈",
+        ))
+        if fixed_named:
+            pct_match = re.search(
+                r"(?:fixed_pct_tp|fixed\s+(?:tp|take profit)|固定止盈)"
+                r"[_ :=]*(\d+(?:\.\d+)?)\s*(%|percent|pct)?",
+                clause,
+            )
+            if not pct_match:
+                errors.append("fixed_pct_tp_parameter_missing")
+            else:
+                raw_pct = float(pct_match.group(1))
+                if pct_match.group(2) in ("%", "percent", "pct"):
+                    raw_pct /= 100.0
+                try:
+                    pct = dsl_mod.refuse_fixed_tiny_tp(
+                        raw_pct, context="compiler.fixed_pct_tp",
+                    )
+                    add_leaf({
+                        "exit_op": "fixed_pct_tp", "role": "take_profit",
+                        "pct": pct,
+                    })
+                except Exception as exc:
+                    errors.append("fixed_pct_tp_%s" % exc)
+
+    for clause in invalidation_clauses:
+        if any(token in clause for token in (
+            "swing", "swing extreme", "摆动极值", "前高", "前低",
+        )):
+            lookback_match = re.search(r"(?:lookback|回看)[_ :=]*(\d+)", clause)
+            if not lookback_match:
+                if "swing_extreme" not in seen_by_op:
+                    errors.append("swing_extreme_lookback_missing")
+            else:
+                lookback = int(lookback_match.group(1))
+                if not (dsl_mod.SWING_LOOKBACK_MIN <= lookback <= dsl_mod.SWING_LOOKBACK_MAX):
+                    errors.append("swing_extreme_lookback_outside_bounds:%s" % lookback)
+                add_leaf({
+                    "exit_op": "swing_extreme", "role": "invalidation",
+                    "lookback": lookback,
+                })
+
+        is_entry_wick = any(token in clause for token in (
+            "entry wick", "signal-bar wick", "signal bar wick",
+            "入场k线影线", "信号k线影线", "入场影线", "信号影线",
+        ))
+        if is_entry_wick:
+            buffer_match = re.search(
+                r"(?:buffer|缓冲)[_ :=]*(\d+(?:\.\d+)?)\s*(%|percent|pct)?",
+                clause,
+            )
+            if not buffer_match:
+                errors.append("entry_wick_buffer_parameter_missing")
+            else:
+                buffer_pct = float(buffer_match.group(1))
+                if buffer_match.group(2) in ("%", "percent", "pct"):
+                    buffer_pct /= 100.0
+                if not (
+                    dsl_mod.ENTRY_WICK_BUFFER_MIN <= buffer_pct
+                    <= dsl_mod.ENTRY_WICK_BUFFER_MAX
+                ):
+                    errors.append("entry_wick_buffer_outside_bounds:%s" % buffer_pct)
+                add_leaf({
+                    "exit_op": "entry_wick_buffer", "role": "invalidation",
+                    "buffer_pct": buffer_pct,
+                })
+    if not leaves:
+        blob = " | ".join((exit_text, take_profit_text, stop_text, invalidation_text))
+        errors.append("exit_semantics_unrepresentable:%s" % blob[:240])
+    return leaves
+
+
+def _compiler_failure(common, errors, evidence=None):
+    out = dict(common)
+    out.update({
+        "ok": False,
+        "dsl": None,
+        "status": "codex_implementation_failed",
+        "reason": "mechanism_fidelity_unrepresentable",
+        "fidelity_errors": list(dict.fromkeys(str(x) for x in errors if str(x))),
+        "fidelity_evidence": evidence or {},
+        "supplements_needed": [],
+        "core_features": [],
+    })
+    return out
+
+
+def _compiler_audit_dsl(dsl, required, allowed, forbidden, contract, errors,
+                        allowed_enforced=False):
+    from .config import FORBIDDEN_CORE_FEATURES
+    try:
+        import auto_trade_strategy_dsl as dsl_mod
+        dsl_mod.validate_strategy(dsl)
+    except Exception as exc:
+        errors.append("dsl_validation_failed:%s" % exc)
+    used = _compiler_extract_features(dsl)
+    supported = set(getattr(dsl_mod, "FEATURES", set())) if "dsl_mod" in locals() else set()
+    for feature in required:
+        if feature not in supported:
+            errors.append("required_feature_unsupported:%s" % feature)
+        elif feature not in used:
+            errors.append("required_feature_not_consumed:%s" % feature)
+    for feature in allowed:
+        if feature not in supported:
+            errors.append("allowed_feature_unsupported:%s" % feature)
+    if allowed_enforced:
+        for feature in sorted(set(required) - set(allowed)):
+            errors.append("required_feature_outside_allowlist:%s" % feature)
+        for feature in sorted(used - set(allowed)):
+            errors.append("feature_outside_allowlist:%s" % feature)
+    authorized = set(required) | set(allowed)
+    for feature in used:
+        if any(token in feature.lower() for token in FORBIDDEN_CORE_FEATURES) and feature not in authorized:
+            errors.append("unapproved_core_feature:%s" % feature)
+    forbidden_rows = [str(x).strip().lower() for x in forbidden]
+    forbidden_blob = " ".join(forbidden_rows)
+    for feature in used:
+        fl = feature.lower()
+        explicitly_forbidden = fl in forbidden_rows
+        if len(fl) >= 3 and fl in forbidden_blob:
+            explicitly_forbidden = True
+        if any(fl.startswith(token) and token in forbidden_blob
+               for token in FORBIDDEN_CORE_FEATURES):
+            explicitly_forbidden = True
+        if explicitly_forbidden:
+            errors.append("forbidden_substitution_used:%s" % feature)
+    return used
+
+
+def _compiler_finalize_fidelity(fidelity, book, statement, audit_fn=None):
+    """Merge compiler evidence into Gate1 without ever upgrading a failed diff."""
+    fidelity = dict(fidelity or {})
+    book = book or {}
+    compiler_errors = list(book.get("fidelity_errors") or [])
+    fidelity["compiler_fidelity_errors"] = compiler_errors
+    fidelity["compiler_fidelity_evidence"] = book.get("fidelity_evidence") or {}
+    fidelity["compiler_contract_verified"] = bool(
+        (book.get("fidelity_evidence") or {}).get("structured_contract_verified")
+    )
+    if not book.get("ok", True) or not book.get("dsl") or compiler_errors:
+        fidelity["pass"] = False
+        fidelity["failure_class"] = "implementation_failure"
+        fidelity["notes"] = list(fidelity.get("notes") or []) + [
+            "compiler_fail_closed:%s" % compiler_errors
+        ]
+        rule_audit = {"reject": True, "reject_reasons": compiler_errors,
+                      "condition_audit": []}
+    else:
+        audit_fn = audit_fn or rule_based_condition_audit
+        rule_audit = audit_fn(book.get("dsl"), statement, approved_supplements=[])
+        if rule_audit.get("reject"):
+            fidelity["pass"] = False
+            fidelity["failure_class"] = "implementation_failure"
+            fidelity["notes"] = list(fidelity.get("notes") or []) + [
+                "rule_audit_reject:%s" % (rule_audit.get("reject_reasons") or [])
+            ]
+    fidelity["rule_audit_reject"] = bool(rule_audit.get("reject"))
+    fidelity["rule_audit"] = {
+        "reject": bool(rule_audit.get("reject")),
+        "reject_reasons": rule_audit.get("reject_reasons") or [],
+    }
+    return fidelity
+
+
+def codex_implement_from_spec(spec_pack):
+    """Compile a mechanism contract into DSL, or fail closed with fidelity errors.
+
+    ResearchContract v2 is authoritative.  The compiler never guesses direction,
+    cross-asset data, entry timing, session windows, or an unknown family.
+    """
+    import copy
+    import uuid
+
+    spec_pack = spec_pack if isinstance(spec_pack, dict) else {}
     meta = spec_pack.get("meta") or {}
     spec = spec_pack.get("mechanism_spec") or {}
-    stmt = spec_to_mechanism_statement(spec)
-    symbol = meta.get("symbol") or (spec.get("suitable_symbols") or ["SOL-USDT-SWAP"])[0]
-    timeframe = meta.get("timeframe") or (spec.get("suitable_timeframes") or ["5m"])[0]
-    direction = str(meta.get("direction") or "short").lower()
+    contract = _compiler_contract(spec_pack, spec, meta)
+    target = contract.get("target") or {}
+    event_contract = contract.get("event_contract") or {}
+    feature_contract = contract.get("feature_contract") or {}
+    data_contract = contract.get("data_contract") or {}
+    admitted_recipe = spec_pack.get("admitted_recipe_lock")
+    if not isinstance(admitted_recipe, dict) or not admitted_recipe:
+        admitted_recipe = None
+    errors = []
+    contract_integrity = research_contract_mod.verify_contract_integrity(contract)
+    # Legacy diagnostic packs predate ResearchContract v2.  They may still be
+    # compiled for analysis, but any admitted/formal recipe requires a fully
+    # signed immutable contract and is checked again in _compiler_recipe_entry.
+    if admitted_recipe is not None and not contract_integrity.get("ok"):
+        errors.extend(contract_integrity.get("reasons") or [])
+
+    def resolve_locked(name, contract_value, meta_value, spec_values=None):
+        def norm(value):
+            if name == "timeframe":
+                return _compiler_normalize_tf(value)
+            if name == "direction":
+                return str(value).lower()
+            return str(value)
+
+        locked = norm(contract_value) if contract_value not in (None, "") else None
+        selected = norm(meta_value) if meta_value not in (None, "") else None
+        suitable = [norm(x) for x in (spec_values or []) if x not in (None, "")]
+        if locked and selected and locked != selected:
+            errors.append("target_%s_conflict:%s|%s" % (name, locked, selected))
+        resolved = locked or selected or (suitable[0] if suitable else None)
+        if resolved and suitable and resolved not in suitable:
+            errors.append("target_%s_outside_mechanism_spec:%s:not_in:%s" % (
+                name, resolved, "|".join(suitable)))
+        return resolved
+
+    symbol = resolve_locked("symbol", target.get("symbol"), meta.get("symbol"), spec.get("suitable_symbols") or [])
+    timeframe = resolve_locked("timeframe", target.get("timeframe"), meta.get("timeframe"), spec.get("suitable_timeframes") or [])
+    direction = resolve_locked("direction", target.get("direction"), meta.get("direction"), [])
+    direction = str(direction or "").lower()
+    if not symbol:
+        errors.append("target_symbol_missing")
+    if not timeframe:
+        errors.append("target_timeframe_missing")
     if direction not in ("long", "short"):
-        # "both" / unknown → pick short for sweep-reversal style, else long
-        text = (str(spec.get("entry_logic") or "") + " " + str(spec.get("mechanism_family") or "")).lower()
-        direction = "short" if any(k in text for k in ("short", "fade", "sweep", "reversal", "vacuum")) else "long"
+        errors.append("target_direction_invalid:%s" % (direction or "missing"))
+
     title = meta.get("title") or spec.get("mechanism_name") or "step_a_strategy"
-    key = ("wsa_%s_%s_%s" % (
-        str(symbol).split("-")[0].lower(), timeframe, uuid.uuid4().hex[:6]
-    )).replace("-", "_")
-
-    # Prebuilt DSL path (research handoff / Windtalker pack)
-    prebuilt = spec_pack.get("dsl")
-    if not isinstance(prebuilt, dict):
-        prebuilt = spec_pack.get("dsl_long" if direction == "long" else "dsl_short")
-    if isinstance(prebuilt, dict) and prebuilt.get("schema") == "qiyu_strategy_dsl_v1":
-        dsl = copy.deepcopy(prebuilt)
-        dsl["direction"] = direction
-        dsl["timeframe"] = timeframe or dsl.get("timeframe")
-        dsl["supported_instruments"] = [symbol]
-        dsl.setdefault("key", key)
-        dsl.setdefault("name", str(title)[:120])
-        dsl["live_enabled"] = False
-        dsl["auto_trade_eligible"] = False
-        dsl["origin"] = dsl.get("origin") or "step_a_prebuilt_dsl"
-        return {
-            "title": title,
-            "thesis": meta.get("thesis") or spec.get("why_edge_exists"),
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "direction": direction,
-            "dsl": dsl,
-            "mechanism_spec": spec,
-            "mechanism_statement": stmt,
-            "status": "codex_implemented",
-            "supplements_needed": [],
-            "core_features": [],
-            "prebuilt_dsl": True,
-        }
-
-    # Allowed core features from suggestions — strip forbidden
-    suggested = [str(x) for x in (meta.get("suggested_core_features") or [])]
-    # Map common aliases to DSL FEATURES
-    alias = {
-        "atr_pct": "atr14", "atr": "atr14", "volume_z": "vol_z20", "vol_z": "vol_z20",
-        "prev_high": "prev_high20", "prev_low": "prev_low20",
-        "range_compression": "atr14", "wick": "atr14",
-    }
-    safe_feats = []
-    for f in suggested:
-        fl = alias.get(f.lower(), f)
-        if any(t in fl.lower() for t in FORBIDDEN_CORE_FEATURES):
-            continue
-        safe_feats.append(fl)
-    # Mechanism-keyword defaults (no EMA/RSI/MACD)
-    fam = str(spec.get("mechanism_family") or "").lower() + " " + str(spec.get("entry_logic") or "").lower()
-    for f in ("prev_high20", "prev_low20", "vol_z20", "atr14"):
-        if f not in safe_feats:
-            safe_feats.append(f)
-    if not safe_feats:
-        safe_feats = ["atr14", "vol_z20"]
-
-    # Family-differentiated microstructure proxies (still no EMA/RSI/MACD).
-    # Keeps fidelity to distinct mechanism families without inventing unavailable L2 data.
-    entry_leaves = []
-    if any(k in fam for k in ("trend_continuation", "trend_pullback", "momentum_continuation", "session_trend")):
-        # Continuation after shallow pullback in direction of recent range break
-        if direction == "long":
-            entry_leaves.append({"id": "e_break_high", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_high20"}})
-            entry_leaves.append({"id": "e_hold_above", "left": {"feature": "low"}, "op": "gt", "right": {"feature": "prev_low20"}})
-        else:
-            entry_leaves.append({"id": "e_break_low", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_low20"}})
-            entry_leaves.append({"id": "e_hold_below", "left": {"feature": "high"}, "op": "lt", "right": {"feature": "prev_high20"}})
-        entry_leaves.append({"id": "e_vol_ok", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.3}})
-    elif any(k in fam for k in ("vol_regime", "volatility_expansion", "atr_regime", "vol_break")):
-        entry_leaves.append({"id": "e_atr_expand", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.002}})
-        entry_leaves.append({"id": "e_vol_expand", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.2}})
-        if direction == "long":
-            entry_leaves.append({"id": "e_dir", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}})
-        else:
-            entry_leaves.append({"id": "e_dir", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "open"}})
-    elif any(k in fam for k in ("compression_release", "atr_squeeze", "structural_breakout", "squeeze_breakout")):
-        # ATR compression then structural range break (distinct from dead high-vol-only release)
-        entry_leaves.append({
-            "id": "e_atr_compress",
-            "left": {"feature": "atr14"},
-            "op": "lt",
-            "right": {"feature": "close", "scale": 0.0025},
-        })
-        if direction == "long":
-            entry_leaves.append({
-                "id": "e_break_high",
-                "left": {"feature": "close"},
-                "op": "cross_above",
-                "right": {"feature": "prev_high20"},
-            })
-            entry_leaves.append({
-                "id": "e_dir",
-                "left": {"feature": "close"},
-                "op": "gt",
-                "right": {"feature": "open"},
-            })
-        else:
-            entry_leaves.append({
-                "id": "e_break_low",
-                "left": {"feature": "close"},
-                "op": "cross_below",
-                "right": {"feature": "prev_low20"},
-            })
-            entry_leaves.append({
-                "id": "e_dir",
-                "left": {"feature": "close"},
-                "op": "lt",
-                "right": {"feature": "open"},
-            })
-        entry_leaves.append({
-            "id": "e_vol_confirm",
-            "left": {"feature": "vol_z20"},
-            "op": "gt",
-            "right": {"value": 0.5},
-        })
-    elif any(k in fam for k in ("failed_breakout", "breakout_fail", "false_break", "liquidity_fail")):
-        # Failed breakout ≠ exhaustion_fade: range break then immediate reclaim opposite
-        if direction == "short":
-            entry_leaves.append({"id": "e_false_high", "left": {"feature": "high"}, "op": "gt", "right": {"feature": "prev_high20"}})
-            entry_leaves.append({"id": "e_fail_close", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_high20"}})
-        else:
-            entry_leaves.append({"id": "e_false_low", "left": {"feature": "low"}, "op": "lt", "right": {"feature": "prev_low20"}})
-            entry_leaves.append({"id": "e_fail_close", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_low20"}})
-        entry_leaves.append({"id": "e_vol_spike", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.6}})
-    elif any(k in fam for k in ("mean_reversion", "mean_revert", "stretch_revert", "z_revert", "non_fade")):
-        entry_leaves.append({"id": "e_atr_stretch", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.001}})
-        if direction == "long":
-            entry_leaves.append({"id": "e_stretch_low", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_low20"}})
-            entry_leaves.append({"id": "e_turn", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}})
-        else:
-            entry_leaves.append({"id": "e_stretch_high", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_high20"}})
-            entry_leaves.append({"id": "e_turn", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "open"}})
-    elif any(k in fam for k in ("time_structure", "session_open", "opening_range", "tod_structure", "session_breakout")):
-        # Session / opening-range proxy via prior range interaction + moderate vol
-        if direction == "long":
-            entry_leaves.append({"id": "e_or_break", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_high20"}})
-        else:
-            entry_leaves.append({"id": "e_or_break", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_low20"}})
-        entry_leaves.append({"id": "e_vol_mod", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.2}})
-        entry_leaves.append({"id": "e_atr_ok", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.0}})
-    elif any(k in fam for k in ("cross_asset", "lead_lag", "btc_lead")):
-        # No true cross-asset feed in DSL — mark proxy on same-symbol vol shock (data-limited)
-        entry_leaves.append({"id": "e_proxy_shock", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.5}})
-        entry_leaves.append({"id": "e_atr_shock", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.003}})
-        if direction == "long":
-            entry_leaves.append({"id": "e_dir", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}})
-        else:
-            entry_leaves.append({"id": "e_dir", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "open"}})
-    else:
-        # Default liquidity sweep / reclaim proxy (legacy STEP A path)
-        if direction == "long":
-            entry_leaves.append({"id": "e_sweep_low", "left": {"feature": "low"}, "op": "lt", "right": {"feature": "prev_low20"}})
-            entry_leaves.append({"id": "e_reclaim_low", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_low20"}})
-            entry_leaves.append({"id": "e_vol_spike", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.8}})
-        else:
-            entry_leaves.append({"id": "e_sweep_high", "left": {"feature": "high"}, "op": "gt", "right": {"feature": "prev_high20"}})
-            entry_leaves.append({"id": "e_reclaim_high", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_high20"}})
-            entry_leaves.append({"id": "e_vol_spike", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.8}})
-        entry_leaves.append({"id": "e_atr_ok", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.0}})
-    if not any(e.get("id") == "e_atr_ok" for e in entry_leaves):
-        entry_leaves.append({"id": "e_atr_ok", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.0}})
-
-    # Hold from expected_holding_period if parseable
-    max_hold = 24
-    eh = str(spec.get("expected_holding_period") or "")
-    for tok in eh.replace("-", "_").split("_"):
-        if tok.isdigit():
-            max_hold = max(4, min(96, int(tok) * 2))
-            break
-    if "max_hold_bars" in (spec.get("tunable_parameters") or []):
-        max_hold = max(max_hold, 12)
-
-    # Only DSL-allowed top-level keys (validate_strategy rejects extras)
-    dsl = {
-        "schema": "qiyu_strategy_dsl_v1",
-        "key": key,
-        "name": str(title)[:120],
-        "direction": direction,
-        "timeframe": timeframe,
-        "supported_instruments": [symbol],
-        "entry": {"all": entry_leaves},
-        "exit": {"any": [
-            # Phase-2 opt-in dynamic exits (research/formal). Protective 0.9% SL
-            # remains in backtest engine / daemon — not expressed as fixed micro-TP.
-            {"id": "x_atr_trail", "exit_op": "atr_trailing", "n_atr": 3.0,
-             "atr_period": 14, "role": "take_profit"},
-            {"id": "x_swing_inv", "exit_op": "swing_extreme", "lookback": 20,
-             "role": "invalidation"},
-        ]},
-        "max_hold_bars": max_hold,
-        "description": ("step_a|%s|sl0.9|%s" % (
-            spec.get("mechanism_family"), (spec.get("entry_logic") or "")[:80]
-        ))[:2000],
-        "origin": "step_a_codex_faithful",
-        "version": 1,
-        "live_enabled": False,
-        "auto_trade_eligible": False,
-    }
-
-    # Strip any accidental forbidden features
-    from .mechanism import extract_dsl_conditions, feature_is_forbidden_core
-    from .fidelity import apply_audit_removals
-    supplements_needed = []
-    for row in extract_dsl_conditions(dsl):
-        if feature_is_forbidden_core(row.get("feature")):
-            supplements_needed.append({
-                "problem_solved": "forbidden_core_should_not_appear",
-                "causal_link_to_mechanism": "none_auto_reject",
-                "reproducible_experiment_without": "remove_leaf",
-                "risk_becomes_dominant_mechanism": "high",
-                "proposed_condition": {"feature": row.get("feature")},
-                "glm_decision": "rejected_auto",
-            })
-    if supplements_needed:
-        fake = {"condition_audit": [
-            {"feature": (s.get("proposed_condition") or {}).get("feature"),
-             "action": "remove", "classification": "unapproved_filter"}
-            for s in supplements_needed
-        ]}
-        dsl, _ = apply_audit_removals(dsl, fake)
-
-    book = {
+    stmt = spec_to_mechanism_statement(spec)
+    common = {
         "title": title,
         "thesis": meta.get("thesis") or spec.get("why_edge_exists"),
         "symbol": symbol,
         "timeframe": timeframe,
         "direction": direction,
-        "dsl": dsl,
         "mechanism_spec": spec,
         "mechanism_statement": stmt,
-        "status": "codex_implemented",
-        "supplements_needed": supplements_needed,
-        "core_features": safe_feats,
+        "research_contract_id": contract.get("contract_id"),
     }
-    return book
+
+    cross_symbols = _compiler_list(feature_contract.get("cross_asset_symbols"))
+    fam = (str(spec.get("mechanism_family") or "") + " "
+           + str(spec.get("entry_logic") or "")).lower()
+    cross_semantics = bool(cross_symbols) or any(
+        key in fam for key in ("cross_asset", "cross-asset", "lead_lag", "lead-lag",
+                               "btc_lead", "pairs_", "cointegration", "correlation_breakdown"))
+    if cross_semantics:
+        errors.append("cross_asset_semantics_unsupported:no_symbol_qualified_feature_feed:%s" % (
+            ",".join(str(x) for x in cross_symbols) or "declared_by_mechanism"))
+    missing_data = _compiler_list(data_contract.get("missing"))
+    required_data = [str(x) for x in _compiler_list(data_contract.get("required"))]
+    available_data = [str(x) for x in _compiler_list(data_contract.get("available"))]
+    if available_data:
+        missing_data.extend(x for x in required_data if x not in available_data)
+    if missing_data:
+        errors.append("required_data_missing:%s" % ",".join(dict.fromkeys(str(x) for x in missing_data)))
+
+    timing = event_contract.get("entry_timing") or contract.get("entry_timing") or {}
+    if isinstance(timing, str):
+        timing = {"mode": timing}
+    timing_mode = str((timing or {}).get("mode") or "unspecified").strip().lower()
+    timing_tf = _compiler_normalize_tf((timing or {}).get("timeframe"))
+    if timing_mode != "unspecified" and timing_tf and timeframe and timing_tf != timeframe:
+        errors.append("entry_timing_timeframe_conflict:%s!=%s" % (timing_tf, timeframe))
+    if timing_mode not in ("unspecified", "bar_close", "next_bar_open"):
+        errors.append("entry_timing_mode_unsupported:%s" % timing_mode)
+    if admitted_recipe is not None:
+        execution_mapping = str(admitted_recipe.get("execution_mapping") or "")
+    else:
+        execution_mapping = (
+            timing_mode if timing_mode in ("bar_close", "next_bar_open")
+            else "bar_close"
+        )
+
+    hold_raw = spec.get("expected_holding_period") or meta.get("holding_horizon")
+    max_hold, hold_evidence, hold_errors = _compiler_parse_hold(hold_raw, timeframe)
+    errors.extend(hold_errors)
+    if admitted_recipe is not None:
+        try:
+            recipe_hold = int(admitted_recipe.get("horizon_bars"))
+            if max_hold is not None and int(max_hold) != recipe_hold:
+                errors.append("admitted_recipe_holding_period_spec_drift:%s!=%s" % (
+                    max_hold, recipe_hold,
+                ))
+            max_hold = recipe_hold
+            hold_evidence = dict(hold_evidence or {})
+            hold_evidence.update({
+                "source": "admitted_recipe_lock",
+                "max_hold_bars": recipe_hold,
+            })
+        except (TypeError, ValueError):
+            errors.append("admitted_recipe_horizon_invalid")
+    (
+        required_features, allowed_features, forbidden_substitutions,
+        allowed_features_enforced,
+    ) = _compiler_feature_rules(contract, spec, meta, timeframe)
+    recipe_entry = None
+    recipe_evidence = None
+    if admitted_recipe is not None:
+        recipe_entry, recipe_evidence = _compiler_recipe_entry(
+            admitted_recipe, contract, timeframe, errors,
+        )
+        if str(admitted_recipe.get("trade_direction") or "").lower() != direction:
+            errors.append("admitted_recipe_target_direction_drift")
+    evidence = {
+        "contract_id": contract.get("contract_id"),
+        "contract_present": bool(contract),
+        "target": {"symbol": symbol, "timeframe": timeframe, "direction": direction},
+        "entry_timing": {"mode": timing_mode, "timeframe": timing_tf,
+                         "locked": timing_mode != "unspecified",
+                         "compiler_execution_default": "bar_close",
+                         "compiled_execution_mapping": execution_mapping},
+        "cross_asset_symbols": [str(x) for x in cross_symbols],
+        "required_features": required_features,
+        "allowed_features": allowed_features,
+        "allowed_features_enforced": allowed_features_enforced,
+        "holding_period": hold_evidence,
+        "admitted_recipe": recipe_evidence,
+        "contract_integrity": contract_integrity,
+    }
+    if errors:
+        return _compiler_failure(common, errors, evidence)
+
+    key = ("wsa_%s_%s_%s" % (
+        str(symbol).split("-")[0].lower(), timeframe, uuid.uuid4().hex[:6]
+    )).replace("-", "_")
+
+    required_conditions = _compiler_required_conditions(contract, direction)
+    compiled_conditions = []
+    for index, raw in enumerate(required_conditions, 1):
+        leaf, join = _compiler_condition_leaf(raw, index, timeframe, errors)
+        if leaf:
+            compiled_conditions.append((leaf, join))
+    contract_entry = _compiler_join_conditions(compiled_conditions)
+    session_entry = _compiler_session_window(contract, errors)
+    if session_entry and admitted_recipe is None:
+        contract_entry = {"all": [session_entry, contract_entry]} if contract_entry else session_entry
+    evidence["required_conditions_count"] = len(required_conditions)
+    evidence["compiled_conditions_count"] = len(compiled_conditions)
+    executable_condition_count = (
+        len(admitted_recipe.get("terms") or [])
+        if admitted_recipe is not None
+        else len(compiled_conditions) + (2 if session_entry else 0)
+    )
+    if required_conditions and executable_condition_count < 1:
+        errors.append("required_event_has_no_compilable_conditions")
+    required_exit_conditions = _compiler_required_exit_conditions(contract)
+    compiled_exit_conditions = []
+    for index, raw in enumerate(required_exit_conditions, 1):
+        leaf, join = _compiler_condition_leaf(raw, index, timeframe, errors, phase="exit")
+        if leaf:
+            leaf["role"] = "invalidation" if str(raw.get("exit_role") or "").lower() == "invalidation" else "take_profit"
+            compiled_exit_conditions.append((leaf, join))
+    contract_exit = _compiler_join_conditions(compiled_exit_conditions)
+    evidence["required_exit_conditions_count"] = len(required_exit_conditions)
+    evidence["compiled_exit_conditions_count"] = len(compiled_exit_conditions)
+    exact_flag = event_contract.get("require_exact_event_fidelity")
+    exact_event = bool(
+        exact_flag if exact_flag is not None
+        else (required_conditions or required_exit_conditions or session_entry)
+    )
+    required_clauses = _compiler_list(event_contract.get("required_clauses"))
+    # Narrative clauses remain audit evidence, but they are not automatically
+    # machine-exact.  Only an explicitly exact contract may require literal
+    # machine conditions; otherwise ordinary natural-language briefs would be
+    # rejected even though the mechanism-family compiler can represent them.
+    if exact_event and not required_conditions and not session_entry and not required_exit_conditions:
+        errors.append("exact_event_missing_machine_compilable_conditions")
+
+    # Prebuilt DSLs are audited, not rewritten to conceal target drift.
+    prebuilt = spec_pack.get("dsl")
+    if not isinstance(prebuilt, dict):
+        prebuilt = spec_pack.get("dsl_long" if direction == "long" else "dsl_short")
+    if isinstance(prebuilt, dict):
+        dsl = copy.deepcopy(prebuilt)
+        if dsl.get("schema") != "qiyu_strategy_dsl_v1":
+            errors.append("prebuilt_dsl_schema_invalid:%s" % dsl.get("schema"))
+        if dsl.get("direction") != direction:
+            errors.append("prebuilt_direction_drift:%s!=%s" % (dsl.get("direction"), direction))
+        if _compiler_normalize_tf(dsl.get("timeframe")) != timeframe:
+            errors.append("prebuilt_timeframe_drift:%s!=%s" % (dsl.get("timeframe"), timeframe))
+        if list(dsl.get("supported_instruments") or []) != [symbol]:
+            errors.append("prebuilt_symbol_drift:%s!=%s" % (dsl.get("supported_instruments"), symbol))
+        prebuilt_mapping = str(dsl.get("execution_mapping") or "bar_close")
+        if prebuilt_mapping != execution_mapping:
+            errors.append("prebuilt_execution_mapping_drift:%s!=%s" % (
+                prebuilt_mapping, execution_mapping))
+        dsl.setdefault("key", key)
+        dsl.setdefault("name", str(title)[:120])
+        dsl["live_enabled"] = False
+        dsl["auto_trade_eligible"] = False
+        dsl["origin"] = dsl.get("origin") or "step_a_prebuilt_dsl"
+        used = _compiler_audit_dsl(
+            dsl, required_features, allowed_features, forbidden_substitutions,
+            contract, errors, allowed_enforced=allowed_features_enforced)
+        if contract_entry and (exact_event or required_conditions):
+            expected_semantics = _compiler_logic_semantics(contract_entry)
+            actual_semantics = _compiler_logic_semantics(dsl.get("entry") or {})
+            if actual_semantics != expected_semantics:
+                errors.append("prebuilt_exact_event_semantics_drift")
+                evidence["expected_entry_semantics"] = expected_semantics
+                evidence["actual_entry_semantics"] = actual_semantics
+        if contract_exit:
+            expected_exit = _compiler_logic_semantics(contract_exit)
+            actual_exit = _compiler_logic_semantics(dsl.get("exit") or {})
+            if not _compiler_semantics_contains(actual_exit, expected_exit):
+                errors.append("prebuilt_required_exit_semantics_missing")
+                evidence["expected_exit_semantics"] = expected_exit
+                evidence["actual_exit_semantics"] = actual_exit
+        if max_hold is not None and int(dsl.get("max_hold_bars") or 0) != int(max_hold):
+            errors.append("prebuilt_holding_period_drift:%s!=%s" % (
+                dsl.get("max_hold_bars"), max_hold))
+        if admitted_recipe is not None:
+            identity = validate_dsl_against_admitted_recipe(
+                dsl, admitted_recipe, contract,
+            )
+            if not identity.get("ok"):
+                errors.extend(identity.get("errors") or [])
+            evidence["admitted_recipe_final_validation"] = identity.get("evidence") or {}
+        evidence["used_features"] = sorted(used)
+        evidence["structured_contract_verified"] = bool(contract) and not errors
+        if errors:
+            return _compiler_failure(common, errors, evidence)
+        out = dict(common)
+        out.update({
+            "ok": True, "dsl": dsl, "status": "codex_implemented",
+            "fidelity_errors": [], "fidelity_evidence": evidence,
+            "supplements_needed": [], "core_features": sorted(used),
+            "prebuilt_dsl": True,
+        })
+        return out
+
+    entry_leaves = []
+    if admitted_recipe is not None:
+        entry = recipe_entry
+        evidence["entry_source"] = "admitted_recipe_lock"
+    elif contract_entry:
+        entry = contract_entry
+        evidence["entry_source"] = "research_contract_required_conditions"
+    elif any(k in fam for k in ("session", "opening_range", "tod_structure", "time_structure")):
+        errors.append("session_semantics_missing_structured_window_or_conditions")
+        entry = None
+    elif any(k in fam for k in ("trend_continuation", "trend_pullback", "momentum_continuation")):
+        if direction == "long":
+            entry_leaves.extend([
+                {"id": "e_break_high", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "prev_high20"}},
+                {"id": "e_hold_above", "left": {"feature": "low"}, "op": "gt", "right": {"feature": "prev_low20"}},
+            ])
+        else:
+            entry_leaves.extend([
+                {"id": "e_break_low", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "prev_low20"}},
+                {"id": "e_hold_below", "left": {"feature": "high"}, "op": "lt", "right": {"feature": "prev_high20"}},
+            ])
+        entry_leaves.append({"id": "e_vol_ok", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.3}})
+        entry = {"all": entry_leaves}
+    elif any(k in fam for k in ("vol_regime", "volatility_expansion", "atr_regime", "vol_break")):
+        entry_leaves.extend([
+            {"id": "e_atr_expand", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.002}},
+            {"id": "e_vol_expand", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.2}},
+            {"id": "e_dir", "left": {"feature": "close"},
+             "op": "gt" if direction == "long" else "lt", "right": {"feature": "open"}},
+        ])
+        entry = {"all": entry_leaves}
+    elif any(k in fam for k in ("compression_release", "atr_squeeze", "structural_breakout", "squeeze_breakout", "vol_squeeze_break")):
+        entry_leaves.append({"id": "e_atr_compress", "left": {"feature": "atr14"},
+                             "op": "lt", "right": {"feature": "close", "scale": 0.0025}})
+        entry_leaves.append({"id": "e_break", "left": {"feature": "close"},
+                             "op": "cross_above" if direction == "long" else "cross_below",
+                             "right": {"feature": "prev_high20" if direction == "long" else "prev_low20"}})
+        entry_leaves.append({"id": "e_dir", "left": {"feature": "close"},
+                             "op": "gt" if direction == "long" else "lt", "right": {"feature": "open"}})
+        entry_leaves.append({"id": "e_vol_confirm", "left": {"feature": "vol_z20"},
+                             "op": "gt", "right": {"value": 0.5}})
+        entry = {"all": entry_leaves}
+    elif any(k in fam for k in ("failed_breakout", "breakout_fail", "false_break", "liquidity_fail")):
+        anchor = "prev_high20" if direction == "short" else "prev_low20"
+        entry_leaves.extend([
+            {"id": "e_false_break", "left": {"feature": "high" if direction == "short" else "low"},
+             "op": "gt" if direction == "short" else "lt", "right": {"feature": anchor}},
+            {"id": "e_fail_close", "left": {"feature": "close"},
+             "op": "lt" if direction == "short" else "gt", "right": {"feature": anchor}},
+            {"id": "e_vol_spike", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.6}},
+        ])
+        entry = {"all": entry_leaves}
+    elif any(k in fam for k in ("mean_reversion", "mean_revert", "stretch_revert", "z_revert", "non_fade")):
+        entry_leaves.extend([
+            {"id": "e_atr_stretch", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.001}},
+            {"id": "e_stretch", "left": {"feature": "close"},
+             "op": "lt" if direction == "long" else "gt",
+             "right": {"feature": "prev_low20" if direction == "long" else "prev_high20"}},
+            {"id": "e_turn", "left": {"feature": "close"},
+             "op": "gt" if direction == "long" else "lt", "right": {"feature": "open"}},
+        ])
+        entry = {"all": entry_leaves}
+    elif any(k in fam for k in ("liquidity_sweep", "liquidity_vacuum", "stop_hunt",
+                                "sweep_reclaim", "exhaustion_fade", "crowding_fade",
+                                "liquidation_bounce", "forced_liquidation")):
+        anchor = "prev_low20" if direction == "long" else "prev_high20"
+        entry_leaves.extend([
+            {"id": "e_sweep", "left": {"feature": "low" if direction == "long" else "high"},
+             "op": "lt" if direction == "long" else "gt", "right": {"feature": anchor}},
+            {"id": "e_reclaim", "left": {"feature": "close"},
+             "op": "gt" if direction == "long" else "lt", "right": {"feature": anchor}},
+            {"id": "e_vol_spike", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.8}},
+        ])
+        entry = {"all": entry_leaves}
+    else:
+        errors.append("mechanism_family_unimplemented:%s" % (spec.get("mechanism_family") or "missing"))
+        entry = None
+    evidence.setdefault("entry_source", "explicit_family_template" if entry else None)
+
+    # Existing invariant contracts may provide a complete executable exit;
+    # ResearchContract v2 exit conditions are additive to the mechanism spec.
+    invariant_exit_leaves = []
+    for index, raw in enumerate(contract.get("required_exit_ops") or [], 1):
+        if not isinstance(raw, dict):
+            errors.append("required_exit_op_not_object:%s" % index)
+            continue
+        leaf = copy.deepcopy(raw)
+        leaf.setdefault("id", "x_contract_op_%d" % index)
+        invariant_exit_leaves.append(leaf)
+    exit_cmp_key = "required_exit_feature_cmps_short" if direction == "short" and contract.get(
+        "required_exit_feature_cmps_short") else "required_exit_feature_cmps"
+    for index, raw in enumerate(contract.get(exit_cmp_key) or [], len(invariant_exit_leaves) + 1):
+        leaf, unused_join = _compiler_condition_leaf(raw, index, timeframe, errors, phase="exit")
+        if leaf:
+            leaf["role"] = raw.get("role") or "take_profit"
+            invariant_exit_leaves.append(leaf)
+    if admitted_recipe is not None:
+        # Discovery admitted only the mandatory protective stop plus a fixed
+        # horizon close.  The stop is a top-level execution identity; this leaf
+        # records that no unresearched take-profit/invalidation may fire early.
+        exit_parts = [{
+            "id": "x_fixed_horizon", "exit_op": "max_hold_only",
+            "role": "invalidation",
+        }]
+        evidence["exit_source"] = "admitted_fixed_horizon_identity"
+    else:
+        exit_parts = list(invariant_exit_leaves)
+        if invariant_exit_leaves:
+            evidence["exit_source"] = "immutable_invariant_contract"
+        else:
+            spec_exit_leaves = _compiler_exits_from_spec(spec, errors)
+            exit_parts.extend(spec_exit_leaves)
+            evidence["exit_source"] = "mechanism_spec_structured_family"
+    if contract_exit and admitted_recipe is None:
+        exit_parts.append(contract_exit)
+        evidence["exit_source"] += "+research_contract_required_exit"
+    if not exit_parts:
+        errors.append("exit_compilation_failed")
+        exit = None
+    elif len(exit_parts) == 1:
+        exit = exit_parts[0]
+    else:
+        exit = {"any": exit_parts}
+
+    if errors or not entry or not exit or max_hold is None:
+        return _compiler_failure(common, errors or ["entry_compilation_failed"], evidence)
+    dsl = {
+        "schema": "qiyu_strategy_dsl_v1", "key": key, "name": str(title)[:120],
+        "direction": direction, "timeframe": timeframe,
+        "supported_instruments": [symbol], "entry": entry, "exit": exit,
+        "max_hold_bars": max_hold, "execution_mapping": execution_mapping,
+        "protective_stop_pct": (
+            (admitted_recipe.get("protective_stop_policy") or {}).get("price_pct")
+            if admitted_recipe is not None else None
+        ),
+        "execution_leverage": (
+            admitted_recipe.get("execution_leverage")
+            if admitted_recipe is not None else None
+        ),
+        "description": ("step_a|%s|sl0.9|%s" % (
+            spec.get("mechanism_family"), (spec.get("entry_logic") or "")[:80]))[:2000],
+        "origin": "step_a_codex_faithful", "version": 1,
+        "live_enabled": False, "auto_trade_eligible": False,
+    }
+    if executable_condition_count == 1 and exact_event:
+        try:
+            import auto_trade_strategy_dsl as dsl_mod
+            dsl["entry_condition_policy"] = {
+                "mode": "exact_human_contract",
+                "source": "qiyu_research_contract_v2",
+                "research_contract_id": contract.get("contract_id"),
+                "entry_semantics_hash": dsl_mod.dsl_hash(entry),
+                "exact_condition_count": 1,
+            }
+        except Exception as exc:
+            errors.append("single_exact_entry_attestation_failed:%s" % exc)
+    used = _compiler_audit_dsl(
+        dsl, required_features, allowed_features, forbidden_substitutions,
+        contract, errors, allowed_enforced=allowed_features_enforced)
+    if admitted_recipe is not None:
+        identity = validate_dsl_against_admitted_recipe(
+            dsl, admitted_recipe, contract,
+        )
+        if not identity.get("ok"):
+            errors.extend(identity.get("errors") or [])
+        evidence["admitted_recipe_final_validation"] = identity.get("evidence") or {}
+    evidence["used_features"] = sorted(used)
+    evidence["structured_contract_verified"] = bool(contract) and not errors
+    if errors:
+        return _compiler_failure(common, errors, evidence)
+    out = dict(common)
+    out.update({
+        "ok": True, "dsl": dsl, "status": "codex_implemented",
+        "fidelity_errors": [], "fidelity_evidence": evidence,
+        "supplements_needed": [], "core_features": sorted(used),
+    })
+    return out
 
 
 def _resolve_matrix_symbols(spec=None, meta=None, primary=None, enable=False):
@@ -691,8 +1975,17 @@ def _apply_repair_round(book, spec, round_type, round_i):
         return apply_engineering_repair_only(book, "engineering", round_i), False
     if round_type == "tunable_params_only":
         allowed = set(str(x) for x in (spec.get("tunable_parameters") or []))
+        contract = _compiler_contract(spec, spec, {})
+        feature_contract = contract.get("feature_contract") or {}
+        primary_tf = ((contract.get("target") or {}).get("timeframe"))
+        locked_features = set(
+            _compiler_feature(value, primary_tf=primary_tf)
+            for value in (feature_contract.get("required_features") or [])
+        )
+        locked_features.discard(None)
         dsl = copy.deepcopy(book.get("dsl") or {})
-        # Only nudge numeric leaves; do not add features
+        # Only explicitly tunable, non-contract leaves may move.  Empty
+        # tunables means no numeric mutation; it never means “tune all”.
         changed = []
 
         def walk(node):
@@ -700,8 +1993,10 @@ def _apply_repair_round(book, spec, round_type, round_i):
                 right = node.get("right")
                 if isinstance(right, dict) and "value" in right:
                     feat = str(((node.get("left") or {}).get("feature")) or "")
-                    # allow if feature mentioned in tunables or generic threshold
-                    if (not allowed) or any(a.lower() in feat.lower() for a in allowed) or True:
+                    explicitly_tunable = bool(
+                        allowed and any(a.lower() in feat.lower() for a in allowed)
+                    )
+                    if explicitly_tunable and feat not in locked_features:
                         try:
                             old = float(right["value"])
                             right["value"] = round(old * (0.95 if round_i % 2 == 0 else 1.05), 6)
@@ -723,12 +2018,21 @@ def _apply_repair_round(book, spec, round_type, round_i):
         book["repair_round"] = round_i + 1
         book["repair_type"] = round_type
         book["repair_changed"] = changed
+        book["repair_locked_features"] = sorted(locked_features)
         return book, False
     # mechanism_viability_verdict — no further mutation
     book = dict(book)
     book["repair_type"] = round_type
     book["viability_verdict_pending"] = True
     return book, True
+
+
+def _implementation_fingerprint(spec, dsl):
+    raw = json.dumps(
+        {"mechanism_spec": spec or {}, "dsl": dsl or {}},
+        ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str,
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _archive_step_a(task, *, stage, failed_tests, reason, verdict, lessons=None,
@@ -773,7 +2077,8 @@ def _archive_step_a(task, *, stage, failed_tests, reason, verdict, lessons=None,
 
 def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="A",
                                  allow_horizontal_expand=False, prebuilt_spec_pack=None,
-                                 windtalker_tag=None, enable_multi_symbol_matrix=False):
+                                 windtalker_tag=None, enable_multi_symbol_matrix=False,
+                                 formal_submission=False):
     ensure_dirs()
     ensure_step_a_dirs()
     store.migrate_forward()
@@ -892,7 +2197,44 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         return {"ok": False, "task_id": tid, "stage": "archived", "reason": "spec_incomplete",
                 "gate_results": task["gate_results"]}
 
-    spec = spec_pack["mechanism_spec"]
+    spec = dict(spec_pack["mechanism_spec"])
+    if isinstance(spec_pack.get("research_contract"), dict):
+        spec.setdefault("research_contract", spec_pack.get("research_contract"))
+    spec_pack["mechanism_spec"] = spec
+    # Bind formal recipe identity in the Step-A orchestration scope.  The
+    # compiler has its own local bindings; repair and final-handoff checks must
+    # not rely on those locals or the pipeline will either NameError or skip the
+    # identity lock after the initial compile.
+    contract = _compiler_contract(
+        spec_pack, spec, spec_pack.get("meta") or {},
+    )
+    admitted_recipe = spec_pack.get("admitted_recipe_lock")
+    if not isinstance(admitted_recipe, dict) or not admitted_recipe:
+        admitted_recipe = None
+    submission_authority = _formal_submission_authority(
+        formal_submission, contract, admitted_recipe,
+    )
+    task["formal_submission_authority"] = submission_authority
+    if formal_submission is True and not submission_authority.get("authorized"):
+        task["stage"] = "archived"
+        task["error"] = "formal_recipe_provenance_missing"
+        task["gate_results"] = assemble_gate_results(task["gates"], tid)
+        save_gate_results(tid, task["gate_results"])
+        _archive_step_a(
+            task, stage="formal_submission_authority",
+            failed_tests=["formal_recipe_provenance"],
+            reason=";".join(submission_authority.get("reasons") or []),
+            verdict="formal_submission_denied",
+            drift=True,
+        )
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": False, "task_id": tid, "stage": "archived",
+            "reason": "formal_recipe_provenance_missing",
+            "authority_errors": submission_authority.get("reasons") or [],
+            "submission_created": False, "review_submitted": False,
+        }
     # Block known dead families / paths
     blocked, why = path_is_blocked(
         "family|%s" % spec.get("mechanism_family"),
@@ -984,85 +2326,10 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     # ---- Codex implement + Gate1 fidelity ----
     task["stage"] = "codex_implement"
     book = codex_implement_from_spec(spec_pack)
-    # strip unapproved forbidden features
-    if book.get("supplements_needed"):
-        fake_audit = {
-            "condition_audit": [
-                {"feature": (s.get("proposed_condition") or {}).get("feature"),
-                 "action": "remove", "classification": "unapproved_filter"}
-                for s in book["supplements_needed"]
-            ]
-        }
-        book["dsl"], removed = apply_audit_removals(book.get("dsl"), fake_audit)
-        task["codex_stripped_unapproved"] = removed
-
     fidelity = build_fidelity_diff(spec, book.get("dsl"), round_i=0, repair_type=None)
-    # Rule audit: fail hard only on forbidden/unapproved traditional cores remaining
-    rule_audit = rule_based_condition_audit(book.get("dsl"), stmt, approved_supplements=[])
-    fidelity["rule_audit_reject"] = rule_audit.get("reject")
-    fidelity["rule_audit"] = {
-        "reject": rule_audit.get("reject"),
-        "reject_reasons": rule_audit.get("reject_reasons"),
-    }
-    still_forbidden = [
-        c.get("feature") for c in (rule_audit.get("condition_audit") or [])
-        if c.get("classification") in ("unapproved_filter", "mechanism_substitution")
-        or (c.get("action") == "reject_strategy")
-    ]
-    # Microstructure proxies (prev_high/low, vol_z, atr) are allowed as observation of sweep/vacuum
-    allowed_proxy = {"prev_high20", "prev_low20", "vol_z20", "atr14", "high", "low", "close", "open", "z20"}
-    hard = [f for f in still_forbidden if str(f).lower() not in allowed_proxy
-            and any(t in str(f).lower() for t in ("rsi", "macd", "ema", "sma", "boll", "cci"))]
-    if hard:
-        fidelity["pass"] = False
-        fidelity["notes"] = list(fidelity.get("notes") or []) + ["hard_forbidden_remaining:%s" % hard]
-    elif fidelity.get("forbidden_core_features_present"):
-        # Statement-named / user-authorized cores (e.g. HTF EMA + CCI pullback)
-        # retained by rule_audit as mechanism_observation are not Codex injects.
-        hits = [str(f).lower() for f in (fidelity.get("forbidden_core_features_present") or [])]
-        retained = {
-            str(c.get("feature") or "").lower()
-            for c in (rule_audit.get("condition_audit") or [])
-            if c.get("classification") in (
-                "mechanism_observation", "mechanism_core", "approved_filter"
-            )
-            and c.get("action") in ("retain", "revise", None)
-        }
-        stmt_blob = " ".join(str((stmt or {}).get(k) or "") for k in (stmt or {})).lower()
-        meta_auth = {
-            str(x).lower()
-            for x in ((spec_pack.get("meta") or {}).get("user_authorized_core_features") or [])
-        }
-        unauthorized = []
-        for h in hits:
-            if h in retained or h in meta_auth or h in stmt_blob:
-                continue
-            toks = [t for t in h.replace("_", " ").split() if len(t) >= 3]
-            if toks and all(t in stmt_blob or t in meta_auth for t in toks):
-                continue
-            unauthorized.append(h)
-        structural_ok = (
-            fidelity.get("dsl_has_entry")
-            and fidelity.get("dsl_has_exit")
-            and fidelity.get("stop_logic_in_spec")
-            and not fidelity.get("non_negotiable_violations")
-        )
-        if unauthorized or rule_audit.get("reject") or not structural_ok:
-            fidelity["pass"] = False
-            fidelity["notes"] = list(fidelity.get("notes") or []) + [
-                "forbidden_core_still_present:%s" % (unauthorized or hits)
-            ]
-        else:
-            fidelity["pass"] = True
-            fidelity["notes"] = list(fidelity.get("notes") or []) + [
-                "pass_via_statement_authorized_cores:%s" % hits
-            ]
-    else:
-        # Do not fail solely on lexical overlap / soft rule_audit for proxy features
-        if fidelity.get("dsl_has_entry") and fidelity.get("dsl_has_exit") and fidelity.get("stop_logic_in_spec"):
-            if not fidelity.get("non_negotiable_violations"):
-                fidelity["pass"] = True
-                fidelity["notes"] = list(fidelity.get("notes") or []) + ["pass_via_structural_fidelity_proxies"]
+    # This helper only preserves or downgrades the independent fidelity result.
+    # Entry/exit/stop presence is not evidence sufficient to upgrade a failure.
+    fidelity = _compiler_finalize_fidelity(fidelity, book, stmt)
     fpath = save_fidelity_diff(tid, fidelity)
     task["fidelity_diff_path"] = fpath
     task["fidelity_diff"] = fidelity
@@ -1080,11 +2347,15 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         task["gate_results"] = assemble_gate_results(task["gates"], tid)
         save_gate_results(tid, task["gate_results"])
         _archive_step_a(task, stage="gate1", failed_tests=["fidelity"],
-                        reason="fidelity/gate1 fail", verdict="code_fidelity_fail",
+                        reason=("fidelity/gate1 fail; compiler_errors=%s" %
+                                (fidelity.get("compiler_fidelity_errors") or []))[:1000],
+                        verdict="code_fidelity_fail",
                         is_eng=True)
         dual.save_task(task)
         store.save_task_meta(task)
-        return {"ok": False, "task_id": tid, "reason": "gate1_fail", "gate_results": task["gate_results"]}
+        return {"ok": False, "task_id": tid, "reason": "gate1_fail",
+                "fidelity_errors": fidelity.get("compiler_fidelity_errors") or [],
+                "gate_results": task["gate_results"]}
 
     # ---- Gate2+3 backtest / walk-forward (+ Phase-3 funnel L0→L1→L2→L3) ----
     task["stage"] = "gate2_gate3_backtest_wf"
@@ -1596,7 +2867,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     if need_repair:
         for ri, rtype in enumerate(REPAIR_ROUND_TYPES):
             task["stage"] = "repair_%s" % rtype
-            before_fp = build_step_a_fingerprint(spec)
+            before_fp = _implementation_fingerprint(spec, book.get("dsl"))
             book, stop_mut = _apply_repair_round(book, spec, rtype, ri)
             if rtype == "mechanism_viability_verdict":
                 task["stage"] = "archived"
@@ -1672,9 +2943,51 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             }
             fidelity = build_fidelity_diff(spec, book.get("dsl"), round_i=ri + 1,
                                            repair_type=rtype, prior_diff=prior_fidelity)
+            repair_audit_pack = {
+                "mechanism_spec": spec,
+                "research_contract": _compiler_contract(spec, spec, {}),
+                "meta": {
+                    "symbol": book.get("symbol"),
+                    "timeframe": book.get("timeframe"),
+                    "direction": book.get("direction"),
+                    "title": book.get("title"),
+                    "thesis": book.get("thesis"),
+                },
+                "dsl": book.get("dsl"),
+            }
+            if admitted_recipe is not None:
+                repair_audit_pack["admitted_recipe_lock"] = admitted_recipe
+            repair_contract_audit = codex_implement_from_spec(repair_audit_pack)
+            if not repair_contract_audit.get("ok"):
+                fidelity["pass"] = False
+                fidelity["failure_class"] = "implementation_failure"
+                fidelity["repair_contract_errors"] = (
+                    repair_contract_audit.get("fidelity_errors") or []
+                )
+            else:
+                book["fidelity_errors"] = []
+                book["fidelity_evidence"] = repair_contract_audit.get("fidelity_evidence") or {}
+                fidelity = _compiler_finalize_fidelity(fidelity, book, stmt)
             save_fidelity_diff(tid, fidelity)
             prior_fidelity = fidelity
-            after_fp = build_step_a_fingerprint(spec)
+            if not fidelity.get("pass"):
+                task["stage"] = "archived"
+                task["fidelity_diff"] = fidelity
+                _archive_step_a(
+                    task,
+                    stage="repair_contract_reaudit",
+                    failed_tests=["fidelity", "research_contract"],
+                    reason=(
+                        "repair changed locked mechanism semantics: %s"
+                        % (fidelity.get("repair_contract_errors") or fidelity.get("notes") or [])
+                    )[:1000],
+                    verdict="repair_contract_fidelity_fail",
+                    drift=True,
+                )
+                dual.save_task(task)
+                archived_by_repair = True
+                break
+            after_fp = _implementation_fingerprint(spec, book.get("dsl"))
             repair_log, drift = record_repair_round(
                 repair_log, failed_test="gate2_or_gate3", root_cause=rtype,
                 modifications=book.get("repair_changed") or [rtype],
@@ -1700,6 +3013,38 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     if archived_by_repair:
         return {"ok": False, "task_id": tid, "reason": "repair_exhausted_or_drift",
                 "gate_results": task.get("gate_results")}
+
+    # Defense in depth: no later gate may evaluate or submit a repaired DSL
+    # unless it is still the exact event admitted by discovery.  This catches
+    # future mutation sites even if they forget to invoke the per-round audit.
+    if admitted_recipe is not None:
+        final_recipe_identity = validate_dsl_against_admitted_recipe(
+            definition, admitted_recipe, contract,
+        )
+        task["admitted_recipe_final_identity"] = final_recipe_identity
+        _save_artifact(tid, "admitted_recipe_final_identity", final_recipe_identity)
+        if not final_recipe_identity.get("ok"):
+            task["stage"] = "archived"
+            task["gate_results"] = assemble_gate_results(task["gates"], tid)
+            save_gate_results(tid, task["gate_results"])
+            _archive_step_a(
+                task,
+                stage="admitted_recipe_final_identity",
+                failed_tests=["admitted_recipe_identity"],
+                reason=("final executable drifted from admitted recipe: %s" %
+                        (final_recipe_identity.get("errors") or []))[:1000],
+                verdict="admitted_recipe_identity_drift",
+                drift=True,
+            )
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {
+                "ok": False,
+                "task_id": tid,
+                "reason": "admitted_recipe_identity_drift",
+                "identity_errors": final_recipe_identity.get("errors") or [],
+                "gate_results": task["gate_results"],
+            }
 
     if not g2["pass"] or not g3["pass"]:
         if _legacy_soft_pass_enabled():
@@ -1983,6 +3328,27 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     # AI clarity may be 0-100; still not live ready
     _save_artifact(tid, "split_scores", task["split_scores"])
 
+    # A public/direct Step-A call is a diagnostic execution.  Only the
+    # discovery formal bridge can set ``formal_submission=True`` with a valid
+    # immutable recipe; otherwise no review row or human-approval task exists.
+    if not submission_authority.get("authorized"):
+        task["stage"] = "diagnostic_completed"
+        task["technical_completed"] = True
+        task["review_submitted"] = False
+        task["submission_created"] = False
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": True, "task_id": tid, "stage": "diagnostic_completed",
+            "technical_completed": True,
+            "candidate_ready": False,
+            "submission_created": False,
+            "review_submitted": False,
+            "reason": "diagnostic_only_no_formal_submission_authority",
+            "gate_results": task.get("gate_results"),
+            "production_mounted": False,
+        }
+
     # ---- 第四次复核（三AI）+ 人工确认签发（no auto mount）----
     task["stage"] = "review4_three_ai"
     import auto_trade_human_confirm_pipeline as pipeline
@@ -2231,7 +3597,8 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
 def start_creation_task_step_a(async_mode=True, symbol=None, timeframe=None,
                                exploration_mode="A", allow_horizontal_expand=False,
                                prebuilt_spec_pack=None, windtalker_tag=None,
-                               enable_multi_symbol_matrix=False):
+                               enable_multi_symbol_matrix=False,
+                               formal_submission=False):
     ensure_dirs()
     ensure_step_a_dirs()
     with _JOB_LOCK:
@@ -2250,6 +3617,7 @@ def start_creation_task_step_a(async_mode=True, symbol=None, timeframe=None,
                 prebuilt_spec_pack=prebuilt_spec_pack,
                 windtalker_tag=windtalker_tag,
                 enable_multi_symbol_matrix=enable_multi_symbol_matrix,
+                formal_submission=formal_submission,
             )
         except Exception as exc:
             _JOB["error"] = str(exc)
@@ -2280,6 +3648,7 @@ def start_creation_task_step_a(async_mode=True, symbol=None, timeframe=None,
         prebuilt_spec_pack=prebuilt_spec_pack,
         windtalker_tag=windtalker_tag,
         enable_multi_symbol_matrix=enable_multi_symbol_matrix,
+        formal_submission=formal_submission,
     )
 
 
@@ -2393,8 +3762,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description=(
-            "STEP A creation pipeline CLI. Prefer --strategy_json for prebuilt "
-            "mechanism_spec (+ optional dsl). Never auto-mounts production."
+            "STEP A diagnostic creation CLI. --strategy_json runs diagnostics "
+            "only; formal review submission requires the discovery bridge."
         )
     )
     parser.add_argument(

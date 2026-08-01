@@ -55,32 +55,99 @@ def refuse_side_path(path_name, detail=None):
 
 
 def verify_blueprint_stages(blueprint):
-    """Hard checklist: multi-stage discovery actually ran with tools."""
+    """Hard checklist backed only by evidence present in this blueprint.
+
+    A declared module is not proof that a stage ran.  Every check below is
+    therefore fail-closed: missing fields never default to ``True``.
+    """
     stages = (blueprint or {}).get("stages") or {}
     disc = stages.get("research_discovery") or {}
+    probes = (blueprint or {}).get("probes") or {}
+    discovery_probe = probes.get("discovery") or {}
+    declared_modules = set(discovery_probe.get("modules") or [])
+    declared_roles = set(discovery_probe.get("roles") or [])
     checks = []
 
     def add(name, ok, note=""):
         checks.append({"check": name, "ok": bool(ok), "note": note})
 
-    add("has_research_discovery", bool(disc), "必须先跑研究发现")
+    add("has_research_discovery", isinstance(disc, dict) and bool(disc), "必须先跑研究发现")
+    add(
+        "research_discovery_completed",
+        isinstance(disc.get("ok"), bool)
+        and bool(disc.get("run_id"))
+        and isinstance(disc.get("n_survivors"), int)
+        and not isinstance(disc.get("n_survivors"), bool)
+        and disc.get("n_survivors") >= 0,
+        "必须有运行标识、明确结果和候选计数",
+    )
     pop = disc.get("population") or {}
-    add("committee_present", bool(pop.get("committee")), "异构委员会提交")
+    add("committee_present", isinstance(pop.get("committee"), dict) and bool(pop.get("committee")), "异构委员会提交")
     committee = pop.get("committee") or {}
-    add("mechanism_scientist", bool(committee.get("mechanism_scientist")), "机制研究者")
-    add("empirical_scientist", bool(committee.get("empirical_scientist")), "数据研究者")
-    add("symbolic_searcher", bool(committee.get("symbolic_searcher")), "非LLM符号搜索")
-    add("population_first", bool(pop.get("population_first", True)), "种群优先而非早期三选一")
-    add("trial_budget", bool(disc.get("trial_budget")), "实验注册表/试验预算")
-    add("no_early_pick_one", pop.get("early_pick_one") is not True, "种群而非三选一（由 discovery 强制）")
-    add("parameter_platform_module", True, "轻量参数平台已接入 discovery")
-    # probes from blueprint envelope
-    probes = (blueprint or {}).get("probes") or {}
-    add("discovery_probe", bool((probes.get("discovery") or {}).get("ok", True) or disc), "")
-    # Named auditor roles evidence (may be empty if zero survivors — still module present)
-    add("leakage_causal_execution_roles", True, "泄漏/因果边界/执行角色已定义并接线")
-    add("learning_loop", bool(disc.get("learning_loop") or True), "预测契约→归因→记分→预算闭环")
-    add("prediction_contract_module", True, "事前预测契约")
+    add("mechanism_scientist", isinstance(committee.get("mechanism_scientist"), dict), "机制研究者")
+    add("empirical_scientist", isinstance(committee.get("empirical_scientist"), dict), "数据研究者")
+    add("symbolic_searcher", isinstance(committee.get("symbolic_searcher"), dict), "非LLM符号搜索")
+    add("population_first", pop.get("population_first") is True, "种群优先而非早期三选一")
+    add("trial_budget", isinstance(disc.get("trial_budget"), dict) and bool(disc.get("trial_budget")), "实验注册表/试验预算")
+    add("no_early_pick_one", pop.get("early_pick_one") is False, "种群而非三选一（由 discovery 强制）")
+    add("discovery_probe", discovery_probe.get("ok") is True, "研究发现模块必须自检成功")
+    add(
+        "parameter_platform_module",
+        "parameter_platform" in declared_modules,
+        "轻量参数平台必须由 discovery 探针声明",
+    )
+    add(
+        "leakage_causal_execution_roles",
+        {"leakage_auditor", "causal_auditor", "execution_engineer"}.issubset(declared_roles),
+        "泄漏/因果边界/执行角色必须由 discovery 探针声明",
+    )
+    add(
+        "learning_loop_module",
+        "learning_loop" in declared_modules,
+        "学习闭环必须由 discovery 探针声明",
+    )
+    add(
+        "prediction_contract_module",
+        "prediction_contract" in declared_modules,
+        "事前预测契约必须由 discovery 探针声明",
+    )
+    candidate_claimed = bool(
+        (blueprint or {}).get("ok") is True
+        and (blueprint or {}).get("present_to_human") is True
+    )
+    if candidate_claimed:
+        contract = (
+            (blueprint or {}).get("research_contract")
+            or stages.get("research_contract")
+            or disc.get("contract")
+            or {}
+        )
+        multiple_testing = disc.get("multiple_testing") or {}
+        envelope = stages.get("admission_envelope") or {}
+        lineage = stages.get("assembly_lineage") or {}
+        selected_recipe_id = lineage.get("selected_recipe_id")
+        add("candidate_contract_valid", contract.get("valid") is True, "候选必须绑定有效研究契约")
+        add(
+            "candidate_discovery_admitted",
+            disc.get("ok") is True and int(disc.get("n_survivors") or 0) > 0,
+            "候选必须来自 discovery 幸存者",
+        )
+        add(
+            "candidate_multiple_testing_passed",
+            multiple_testing.get("passed") is True,
+            "至少一个候选必须通过逐候选DSR/PBO",
+        )
+        add(
+            "candidate_recipe_lineage_locked",
+            bool(
+                selected_recipe_id
+                and selected_recipe_id in (envelope.get("recipe_ids") or [])
+                and lineage.get("selected_is_in_admission_envelope") is True
+                and lineage.get("global_factor_mining_used") is False
+                and lineage.get("classic_or_unadmitted_switch_used") is False
+            ),
+            "最终recipe必须属于准入信封且未发生后置换机制",
+        )
     failed = [c for c in checks if not c["ok"]]
     return {
         "ok": len(failed) == 0,
@@ -91,6 +158,56 @@ def verify_blueprint_stages(blueprint):
             "蓝图多阶段硬门控通过" if not failed else
             ("蓝图阶段缺失: %s" % ",".join(c["check"] for c in failed))
         ),
+    }
+
+
+def _creation_outcome(blueprint, gate):
+    """Classify the research result independently from process completion."""
+    blueprint = blueprint if isinstance(blueprint, dict) else {}
+    error = str(blueprint.get("error") or "").strip().lower()
+    detail = blueprint.get("detail") or {}
+    detail_error = str(detail.get("error") or "").strip().lower() if isinstance(detail, dict) else ""
+    technical_failed = bool(
+        blueprint.get("outcome") == "technical_failed"
+        or error in ("creation_pipeline_exception", "technical_failed")
+    )
+    technical_completed = bool(blueprint) and not technical_failed
+    data_markers = (
+        "candle", "data_blocked", "data_missing", "no_data", "empty_data", "manifest_missing",
+        "store_unavailable", "research_candles", "bad_candle_shape",
+    )
+    data_blocked = technical_completed and (
+        blueprint.get("outcome") == "data_blocked"
+        or any(marker in (error + " " + detail_error) for marker in data_markers)
+    )
+    candidate_ready = bool(
+        technical_completed
+        and blueprint.get("ok") is True
+        and blueprint.get("present_to_human") is True
+        and (gate or {}).get("passed") is True
+    )
+    if technical_failed:
+        outcome = "technical_failed"
+    elif data_blocked:
+        outcome = "data_blocked"
+    elif candidate_ready:
+        outcome = "candidate_ready"
+    elif technical_completed and (
+        blueprint.get("ok") is False
+        or blueprint.get("present_to_human") is False
+        or bool(error)
+        or (gate or {}).get("passed") is False
+    ):
+        outcome = "research_rejected"
+    else:
+        outcome = "technical_completed" if technical_completed else "technical_failed"
+    return outcome, {
+        "technical_completed": technical_completed,
+        "technical_failed": outcome == "technical_failed",
+        "research_rejected": outcome == "research_rejected",
+        "data_blocked": outcome == "data_blocked",
+        "candidate_ready": outcome == "candidate_ready",
+        "review_submitted": False,
     }
 
 
@@ -107,16 +224,20 @@ def _create_strategy_unlocked(
     source="direct",
     research_direction="",
     out_dir=None,
+    research_contract=None,
+    mutation_contract=None,
+    data_version=None,
+    code_version=None,
 ):
     """Canonical creation. Always research-discovery blueprint first."""
-    from .creation_blueprint import run_creation_blueprint
+    from . import creation_blueprint as blueprint_module
 
     brief = str(brief or "").strip() or (
         "人类下达创造指令：在 %s %s 上寻找可证伪收益机制（研究发现优先，禁止先写完整策略）"
         % (symbol, timeframe)
     )
     mission_id = str(mission_id or unique_id("creation"))
-    blueprint = run_creation_blueprint(
+    blueprint_kwargs = dict(
         symbol=symbol,
         timeframe=timeframe,
         direction=direction,
@@ -126,11 +247,58 @@ def _create_strategy_unlocked(
         out_dir=out_dir,
         run_id=mission_id,
     )
+    # Optional contracts are forwarded only when supplied so deployments can
+    # roll this entry point out before the blueprint signature is upgraded.
+    if research_contract is not None:
+        blueprint_kwargs["research_contract"] = research_contract
+    if mutation_contract is not None:
+        blueprint_kwargs["mutation_contract"] = mutation_contract
+    if data_version is not None:
+        blueprint_kwargs["data_version"] = data_version
+    if code_version is not None:
+        blueprint_kwargs["code_version"] = code_version
+    try:
+        blueprint = blueprint_module.run_creation_blueprint(**blueprint_kwargs)
+    except Exception as exc:
+        # A model/schema/assembly exception is a technical failure, not a
+        # research rejection.  Persist bounded evidence so a later round can
+        # diagnose the exact failing component instead of leaving no artifact.
+        effective_contract = research_contract
+        try:
+            contract_constraints = blueprint_module.rh.default_return_constraints()
+            if research_contract:
+                contract_constraints["research_contract"] = research_contract
+            if mutation_contract:
+                contract_constraints["mutation_contract"] = mutation_contract
+            effective_contract = blueprint_module.discovery.compile_research_contract(
+                brief, symbol, timeframe, contract_constraints,
+                direction=direction, design_seed=None,
+                data_version=data_version, code_version=code_version,
+            )
+        except Exception:
+            pass
+        blueprint = {
+            "ok": False,
+            "schema": "qiyu_creation_blueprint_v1",
+            "present_to_human": False,
+            "outcome": "technical_failed",
+            "error": "creation_pipeline_exception",
+            "detail": {
+                "exception_type": type(exc).__name__,
+                "message": str(exc)[:500],
+                "stage_hint": "contract_data_meta_discovery_or_assembly",
+            },
+            "research_contract": effective_contract,
+            "stages": ({"research_contract": effective_contract}
+                       if isinstance(effective_contract, dict) else {}),
+            "run_id": mission_id,
+            "at": _now(),
+        }
+        blueprint["failure_artifact"] = blueprint_module._persist_failure_blueprint(
+            out_dir, symbol, timeframe, mission_id, blueprint,
+        )
     stages = (blueprint or {}).get("stages") or {}
-    gate = verify_blueprint_stages({
-        "stages": stages,
-        "probes": (blueprint or {}).get("probes") or {},
-    })
+    gate = verify_blueprint_stages(blueprint)
     if not stages.get("research_discovery"):
         gate = {
             "ok": False,
@@ -140,8 +308,21 @@ def _create_strategy_unlocked(
             "note_zh": "创造管道未进入研究发现阶段",
         }
 
+    outcome, outcome_status = _creation_outcome(blueprint, gate)
+    effective_research_contract = (
+        (blueprint or {}).get("research_contract")
+        or (stages.get("research_contract") if isinstance(stages, dict) else None)
+        or ((stages.get("research_discovery") or {}).get("contract") if isinstance(stages, dict) else None)
+        or research_contract
+    )
     out = {
-        "ok": bool(gate.get("passed")),
+        # Compatibility field, now intentionally means a reviewable candidate
+        # exists.  Process completion is exposed separately below.
+        "ok": outcome == "candidate_ready",
+        "technical_completed": bool(outcome_status.get("technical_completed")),
+        "outcome": outcome,
+        "status_code": outcome,
+        "outcome_status": outcome_status,
         "schema": SOLE_SCHEMA,
         "sole_entry": True,
         "symbol": symbol,
@@ -151,6 +332,10 @@ def _create_strategy_unlocked(
         "mission_id": mission_id,
         "source": str(source or "direct"),
         "research_direction": str(research_direction or brief)[:500],
+        "research_contract": effective_research_contract,
+        "mutation_contract": mutation_contract,
+        "data_version": data_version,
+        "code_version": code_version,
         "blueprint": blueprint,
         "pipeline_gate": gate,
         "present_to_human": bool(blueprint.get("present_to_human")),
@@ -171,6 +356,10 @@ def _create_strategy_unlocked(
         path = d / ("%s.json" % mission_id)
         slim = {
             "ok": out.get("ok"),
+            "technical_completed": out.get("technical_completed"),
+            "outcome": out.get("outcome"),
+            "status_code": out.get("status_code"),
+            "outcome_status": out.get("outcome_status"),
             "schema": out.get("schema"),
             "symbol": symbol,
             "timeframe": timeframe,
@@ -181,7 +370,14 @@ def _create_strategy_unlocked(
             "mission_id": mission_id,
             "source": str(source or "direct"),
             "research_direction": str(research_direction or brief)[:500],
+            "research_contract": effective_research_contract,
+            "mutation_contract": mutation_contract,
+            "data_version": data_version,
+            "code_version": code_version,
             "handoff_zh": out.get("handoff_zh"),
+            "blueprint_error": blueprint.get("error"),
+            "blueprint_detail": blueprint.get("detail"),
+            "fuses": blueprint.get("fuses"),
             "at": out.get("at"),
         }
         atomic_write_json(path, slim)
@@ -204,6 +400,10 @@ def create_strategy(
     source="direct",
     research_direction="",
     out_dir=None,
+    research_contract=None,
+    mutation_contract=None,
+    data_version=None,
+    code_version=None,
 ):
     """Canonical executor with a global maximum of two simultaneous missions."""
     kwargs = {
@@ -219,6 +419,10 @@ def create_strategy(
         "source": source,
         "research_direction": research_direction,
         "out_dir": out_dir,
+        "research_contract": research_contract,
+        "mutation_contract": mutation_contract,
+        "data_version": data_version,
+        "code_version": code_version,
     }
     # Queue workers already hold one of these locks for their whole lifetime.
     if os.environ.get("QIYU_CREATION_SLOT_HELD") in ("0", "1"):
@@ -232,6 +436,16 @@ def create_strategy(
             return out
     return {
         "ok": False,
+        "technical_completed": False,
+        "outcome": "technical_failed",
+        "status_code": "technical_failed",
+        "outcome_status": {
+            "technical_completed": False,
+            "research_rejected": False,
+            "data_blocked": False,
+            "candidate_ready": False,
+            "review_submitted": False,
+        },
         "schema": SOLE_SCHEMA,
         "error": "parallel_creation_capacity_full",
         "message_zh": "两个策略研究槽均在运行；请通过唯一任务入口排队，禁止启动第三条旁路。",

@@ -172,8 +172,15 @@ def _summary_from_returns(rets, indep_n, raw_n, cost_bp=15.0):
 def build_mechanism_cells(brief="", max_cells=80):
     """Stage-1 map: many cells, almost no compute — structured defs only."""
     from . import research_branch_manager as branch_mgr
+    from . import mechanism_graph as mechanism_graph
     cells = []
     trees = branch_mgr.trees_for_brief(brief) or list(branch_mgr.TREES)
+    mechanism_features = {
+        str(row.get("mechanism_id") or ""): list(
+            row.get("factor_hints") or row.get("observable_proxy") or []
+        )
+        for row in mechanism_graph.load_graph()
+    }
     # Fixed high-value exhaustion / squeeze proxy cells (report §九)
     extra = [
         {"cell_id": "impact_reversal", "family": "exhaustion", "prediction": "shock_then_reversal",
@@ -229,7 +236,9 @@ def build_mechanism_cells(brief="", max_cells=80):
                     "mechanism_id": mid,
                     "family": tree.get("tree_id"),
                     "prediction": br.get("title_zh") or bid,
-                    "features": [],
+                    # Never let a named mechanism silently fall back to the same
+                    # arbitrary factor as unrelated mechanisms.
+                    "features": mechanism_features.get(str(mid), []),
                     "cost_class": "cheap",
                     "task": br.get("task"),
                 })
@@ -244,35 +253,61 @@ def build_mechanism_cells(brief="", max_cells=80):
         ["breakout_acceptance", "trend_efficiency_12", "expansion_score"],
         ["micro_depth_imbalance", "micro_trade_flow_imbalance", "micro_half_spread_rate"],
     )
-    expanded = []
+    base_cells = []
+    seen_base = set()
     for c in cells:
-        expanded.append(c)
+        cid = str(c.get("cell_id") or "")
+        if cid and cid not in seen_base:
+            base_cells.append(c)
+            seen_base.add(cid)
+    expanded = list(base_cells)
+    # Add family-compatible variants only after every base mechanism has one
+    # chance.  The old cell-by-cell expansion exhausted max_cells on the first
+    # few mechanisms and produced dozens of identical fallback probes.
+    for c in base_cells:
         base = str(c.get("cell_id") or "cell")
-        for bi, feats in enumerate(feature_bundles):
+        blob = "%s %s %s" % (c.get("family"), c.get("prediction"), base)
+        blob = blob.lower()
+        if any(x in blob for x in ("exhaust", "衰竭", "panic", "liquid")):
+            bundle_ids = (0, 1, 2)
+        elif any(x in blob for x in ("squeeze", "break", "trend", "donchian", "突破", "压缩")):
+            bundle_ids = (3, 4)
+        else:
+            bundle_ids = (0, 1)
+        for bi in bundle_ids:
+            feats = feature_bundles[bi]
             row = dict(c)
             row["cell_id"] = "%s__fb%d" % (base, bi)
             row["features"] = list(feats)
             row["cost_class"] = "cheap"
             expanded.append(row)
-    # de-dupe by cell_id
+    # de-dupe by actual research signature, not presentation cell_id alone.
     seen = set()
     out = []
     for c in expanded:
-        cid = c.get("cell_id")
-        if cid in seen:
+        signature = (
+            str(c.get("mechanism_id") or c.get("cell_id") or ""),
+            str(c.get("prediction") or ""),
+            tuple(sorted(str(x) for x in (c.get("features") or []))),
+        )
+        if signature in seen:
             continue
-        seen.add(cid)
+        seen.add(signature)
         out.append(c)
         if len(out) >= int(max_cells):
             break
     return out
 
 
-def _pick_factor(factor_matrix, hints):
+def _pick_factor(factor_matrix, hints, allow_fallback=None):
     keys = list((factor_matrix or {}).keys())
     for h in hints or []:
         if h in (factor_matrix or {}) and any(_finite(x) is not None for x in (factor_matrix.get(h) or [])[:50]):
             return h
+    if allow_fallback is None:
+        allow_fallback = not bool(hints)
+    if not allow_fallback:
+        return None
     # fallbacks common on tiny VPS
     for h in (
         "close_z_20", "rsi_14", "exhaustion_score", "squeeze_persistence",
@@ -309,7 +344,7 @@ def evaluate_cheap_probe(cell, factor_matrix, candles, timeframe="5m",
             "at": _now(),
         }
 
-    factor = _pick_factor(factor_matrix, cell.get("features"))
+    factor = _pick_factor(factor_matrix, cell.get("features"), allow_fallback=False)
     if not factor:
         return {
             "probe_id": "P_%s" % cell.get("cell_id"),

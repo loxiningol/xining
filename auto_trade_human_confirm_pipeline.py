@@ -13,6 +13,7 @@ from __future__ import print_function
 
 from datetime import datetime
 from pathlib import Path
+import copy
 import json
 import os
 import tempfile
@@ -175,6 +176,8 @@ def _set_dsl_live(key, live):
         "supported_instruments", "entry", "exit", "max_hold_bars",
         "description", "origin", "version", "live_enabled",
         "approved_version_hash", "auto_trade_eligible",
+        "execution_mapping", "entry_condition_policy",
+        "protective_stop_pct", "execution_leverage",
     }
     found = False
     for i, row in enumerate(rows):
@@ -202,6 +205,8 @@ def _upsert_dsl(definition, live=False):
         "supported_instruments", "entry", "exit", "max_hold_bars",
         "description", "origin", "version", "live_enabled",
         "approved_version_hash", "auto_trade_eligible",
+        "execution_mapping", "entry_condition_policy",
+        "protective_stop_pct", "execution_leverage",
     }
     row = {k: v for k, v in definition.items() if k in ALLOWED}
     row["live_enabled"] = bool(live)
@@ -445,7 +450,15 @@ def _death_hard_fail(dsl):
 
 def _no_lookahead(dsl):
     """Reject obvious future-leak operators/features if any sneak in."""
-    text = json.dumps(dsl, ensure_ascii=False).lower()
+    # ``next_bar_open`` is an execution delay, not a future-data operand.  It
+    # is validated by the DSL enum and evaluated from a prior closed-bar signal.
+    # Remove only that validated top-level value before scanning all remaining
+    # content; a next_bar token smuggled into any other field still fails.
+    scan = copy.deepcopy(dsl or {})
+    mapping = str(scan.pop("execution_mapping", "bar_close") or "bar_close")
+    if mapping not in ("bar_close", "next_bar_open"):
+        return False, "execution_mapping:%s" % mapping
+    text = json.dumps(scan, ensure_ascii=False).lower()
     banned = ("future_", "lead(", "shift(-", "t+1", "next_bar", "lookahead")
     for b in banned:
         if b in text:

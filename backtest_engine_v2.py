@@ -2440,6 +2440,10 @@ def _dsl_entry_factory(definition):
         )
         return met, {"price": c[idx], "condition_checks": details,
                      "dsl_hash": dsl.dsl_hash(definition),
+                     "execution_mapping": definition.get("execution_mapping") or "bar_close",
+                     "_dsl_signal_index": idx,
+                     "_dsl_signal_bar_high": float(h[idx]),
+                     "_dsl_signal_bar_low": float(l[idx]),
                      "_dsl_entry_index": idx}
     return entry
 
@@ -2468,6 +2472,8 @@ def _dsl_exit_factory(definition):
             "price": entry_price,
             "peak_high": peak_high,
             "peak_low": peak_low,
+            "entry_bar_high": float(entry.get("_dsl_signal_bar_high") or peak_high),
+            "entry_bar_low": float(entry.get("_dsl_signal_bar_low") or peak_low),
             "mae_price_pct": entry["mae_price_pct"],
             "partial_taken": bool(entry.get("partial_taken")),
         }
@@ -2475,7 +2481,10 @@ def _dsl_exit_factory(definition):
             frame, idx, definition["exit"], explain=True,
             position=position, direction=direction,
         )
-        timed = idx - entry_idx >= int(definition["max_hold_bars"])
+        timed = dsl.holding_window_complete(
+            entry_idx, idx, definition["max_hold_bars"],
+            execution_mapping=definition.get("execution_mapping") or "bar_close",
+        )
         partial_rows, full_rows = dsl.classify_exit_details(details, position)
         structured_px = None
         exit_ops = set()
@@ -2675,6 +2684,20 @@ def run_backtest(
         entry_data = {}
         entry_size_frac = account_position_ratio
         entry_sizing = None
+        entry_signal_idx = 0
+        pending_dsl_entry = None
+        dsl_definition = DSL_STRATEGY_DEFINITIONS.get(strategy_name) or {}
+        execution_mapping = str(
+            dsl_definition.get("execution_mapping") or "bar_close"
+        )
+        if dsl_definition.get("execution_leverage") is not None and abs(
+            float(dsl_definition.get("execution_leverage")) - float(leverage)
+        ) > 1e-12:
+            return {"error": "DSL执行杠杆与已准入研究身份不一致"}
+        if dsl_definition.get("protective_stop_pct") is not None and abs(
+            float(dsl_definition.get("protective_stop_pct")) - float(stop_loss_pct)
+        ) > 1e-12:
+            return {"error": "DSL保护止损与已准入研究身份不一致"}
 
         # Optional Phase-4 ATR sizing helpers (research only)
         _dsl_size = None
@@ -2691,7 +2714,43 @@ def run_backtest(
             "actual_opens": 0,
             "actual_closes": 0,
             "params_loaded": len(params),
+            "execution_mapping": execution_mapping,
         }
+
+        def _entry_sizing_from_closed_signal(signal_i, fill_price):
+            size_frac = account_position_ratio
+            sizing = None
+            if dynamic_risk_sizing and _dsl_size is not None:
+                try:
+                    # The ATR sample stops at the closed signal bar.  A
+                    # next-open fill must not consume the entry bar's future
+                    # high/low/close while deciding its size.
+                    period = int(atr_size_period or 14)
+                    trs = []
+                    for j in range(max(1, signal_i - period + 1), signal_i + 1):
+                        tr = max(
+                            h[j] - l[j],
+                            abs(h[j] - c[j - 1]),
+                            abs(l[j] - c[j - 1]),
+                        )
+                        trs.append(tr)
+                    atr_v = (sum(trs) / float(len(trs))) if trs else fill_price * 0.01
+                    r_eff = _dsl_size.effective_risk_pct(
+                        risk_pct, account_cap, peak_equity, max_dd_so_far,
+                        dd_throttle_risk_pct=dd_throttle_risk_pct,
+                        dd_throttle_of_max_dd=dd_throttle_of_max_dd,
+                    )
+                    sizing = _dsl_size.atr_position_size(
+                        account_cap, r_eff, atr_v,
+                        target_multiplier=atr_target_multiplier,
+                        entry_price=fill_price,
+                    )
+                    size_frac = float(sizing.get("account_fraction") or 0.0)
+                    sizing["risk_pct_used"] = r_eff
+                except Exception:
+                    size_frac = account_position_ratio
+                    sizing = {"error": "atr_size_fallback"}
+            return size_frac, sizing
 
         for i in range(start_idx, len(c)):
             telemetry["bars_scanned"] += 1
@@ -2704,56 +2763,63 @@ def run_backtest(
                 raise TimeoutError("回测超时熔断")
 
             if pos is None:
-                met, info = entry_f(o, c, h, l, i, params, **kwargs)
-                entry_candle_filter = int(
-                    P(params, "entry_requires_directional_candle",
-                      0 if strategy_name in DSL_STRATEGY_DEFINITIONS else 1)
-                )
-                if entry_candle_filter == 0:
-                    entry_candle_ok = True
-                else:
-                    entry_candle_ok = (
-                        (direction == "long" and c[i] > o[i])
-                        or (direction == "short" and c[i] < o[i])
-                    )
-                if met and entry_candle_ok:
-                    telemetry["entry_conditions_met"] += 1
+                opened_at_next_bar_open = False
+                if pending_dsl_entry is not None:
+                    info = dict(pending_dsl_entry.get("info") or {})
+                    entry_signal_idx = int(pending_dsl_entry["signal_index"])
+                    pending_dsl_entry = None
                     pos = direction
-                    entry_p = float(info.get("price", c[i]))
+                    entry_p = float(o[i])
                     entry_idx = i
                     entry_data = info
-                    entry_size_frac = account_position_ratio
-                    entry_sizing = None
-                    if dynamic_risk_sizing and _dsl_size is not None:
-                        try:
-                            # ATR from recent bars (price units)
-                            period = int(atr_size_period or 14)
-                            trs = []
-                            for j in range(max(1, i - period + 1), i + 1):
-                                tr = max(
-                                    h[j] - l[j],
-                                    abs(h[j] - c[j - 1]),
-                                    abs(l[j] - c[j - 1]),
-                                )
-                                trs.append(tr)
-                            atr_v = (sum(trs) / float(len(trs))) if trs else entry_p * 0.01
-                            r_eff = _dsl_size.effective_risk_pct(
-                                risk_pct, account_cap, peak_equity, max_dd_so_far,
-                                dd_throttle_risk_pct=dd_throttle_risk_pct,
-                                dd_throttle_of_max_dd=dd_throttle_of_max_dd,
-                            )
-                            entry_sizing = _dsl_size.atr_position_size(
-                                account_cap, r_eff, atr_v,
-                                target_multiplier=atr_target_multiplier,
-                                entry_price=entry_p,
-                            )
-                            entry_size_frac = float(entry_sizing.get("account_fraction") or 0.0)
-                            entry_sizing["risk_pct_used"] = r_eff
-                        except Exception:
-                            entry_size_frac = account_position_ratio
-                            entry_sizing = {"error": "atr_size_fallback"}
+                    entry_data["price"] = entry_p
+                    entry_data["_dsl_signal_index"] = entry_signal_idx
+                    entry_data["_dsl_entry_index"] = entry_idx
+                    entry_data["execution_mapping"] = "next_bar_open"
+                    entry_size_frac, entry_sizing = _entry_sizing_from_closed_signal(
+                        entry_signal_idx, entry_p,
+                    )
                     telemetry["actual_opens"] += 1
-            else:
+                    opened_at_next_bar_open = True
+                else:
+                    met, info = entry_f(o, c, h, l, i, params, **kwargs)
+                    entry_candle_filter = int(
+                        P(params, "entry_requires_directional_candle",
+                          0 if strategy_name in DSL_STRATEGY_DEFINITIONS else 1)
+                    )
+                    if entry_candle_filter == 0:
+                        entry_candle_ok = True
+                    else:
+                        entry_candle_ok = (
+                            (direction == "long" and c[i] > o[i])
+                            or (direction == "short" and c[i] < o[i])
+                        )
+                    if met and entry_candle_ok:
+                        telemetry["entry_conditions_met"] += 1
+                        if execution_mapping == "next_bar_open":
+                            pending_dsl_entry = {
+                                "signal_index": i,
+                                "info": dict(info or {}),
+                            }
+                            continue
+                        pos = direction
+                        entry_p = float(info.get("price", c[i]))
+                        entry_idx = i
+                        entry_signal_idx = i
+                        entry_data = info
+                        entry_data["_dsl_signal_index"] = i
+                        entry_data["_dsl_entry_index"] = i
+                        entry_data["execution_mapping"] = "bar_close"
+                        entry_size_frac, entry_sizing = _entry_sizing_from_closed_signal(
+                            entry_signal_idx, entry_p,
+                        )
+                        telemetry["actual_opens"] += 1
+                    # Same-close fills cannot be exposed to an intrabar range
+                    # that completed before the fill; no signal means no work.
+                    continue
+                if not opened_at_next_bar_open:
+                    continue
+            if pos is not None:
                 sl_price = entry_p * (1 - stop_loss_pct) if direction == "long" else entry_p * (1 + stop_loss_pct)
                 is_sl = (l[i] <= sl_price) if direction == "long" else (h[i] >= sl_price)
                 exit_res = exit_f(c, h, l, i, entry_data, params, **kwargs)
@@ -2808,6 +2874,10 @@ def run_backtest(
 
                     _trade = {
                         "instrument": normalized_inst,
+                        "signal_index": int(entry_signal_idx),
+                        "entry_index": int(entry_idx),
+                        "exit_index": int(i),
+                        "signal_time": _display_time(ts[entry_signal_idx]),
                         "entry_time": _display_time(ts[entry_idx]),
                         "exit_time": _display_time(ts[i]),
                         "entry_price": float(entry_p),
@@ -2822,6 +2892,7 @@ def run_backtest(
                         "exit_type": exit_type,
                         "tp_class": tp_class,
                         "market_regime": market_regimes[entry_idx],
+                        "execution_mapping": execution_mapping,
                     }
                     if is_partial:
                         _trade["partial_exit"] = True
@@ -2886,6 +2957,7 @@ def run_backtest(
                 "friction_model": friction,
                 "returns_are_net_of_costs": True,
                 "account_position_ratio": account_position_ratio,
+                "execution_mapping": execution_mapping,
             }
         })
     except Exception as e:

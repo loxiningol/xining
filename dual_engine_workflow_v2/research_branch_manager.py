@@ -151,6 +151,7 @@ FAILURE_CODE_ZH = {
     "mechanism_contradicted": "机制预测被充分覆盖后反证",
     "family_exhausted": "机制空间已充分覆盖且整体无效",
     "near_miss": "接近门槛需诊断升级",
+    "formal_capability_blocked": "研究事件无法由当前正式执行器等价复现",
 }
 
 

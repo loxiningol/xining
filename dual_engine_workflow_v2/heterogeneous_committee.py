@@ -239,7 +239,10 @@ def run_symbolic_searcher(factor_matrix, fwd_returns, run_id):
     }
 
 
-def run_leakage_auditor(factor_values, fwd_returns, side="high", run_id=None):
+def run_leakage_auditor(factor_values, fwd_returns, side="high", run_id=None,
+                        precomputed_event_mask=False, candles=None, symbol=None,
+                        timeframe=None, horizon=3, trade_direction="long",
+                        execution_mapping="next_bar_open"):
     """Look-ahead / label leakage smell checks. Does not invent strategies."""
     issues = []
     f = list(factor_values or [])
@@ -257,11 +260,46 @@ def run_leakage_auditor(factor_values, fwd_returns, side="high", run_id=None):
             board.write(run_id, "leakage_auditor", "audit", out)
         return out
 
-    # Future-shift: if shifting factor forward improves edge → leakage smell
-    base = probes.evaluate_naked_probe(f[-n:], r[-n:], side=side)
+    aligned_f = f[-n:]
+    aligned_r = r[-n:]
+    aligned_candles = list(candles or [])[-n:] if candles else None
+
+    def evaluate(series):
+        if precomputed_event_mask:
+            return probes._evaluate_trial(
+                aligned_candles,
+                aligned_r,
+                {
+                    "event_id": "leakage_exact_event",
+                    "kind": "human_contract_exact",
+                    "terms": [{"factor": "precomputed_contract_event"}],
+                    "mask": [bool(value) for value in series],
+                },
+                int(horizon or 3),
+                -1 if str(trade_direction).lower() == "short" else 1,
+                execution_mapping or "next_bar_open",
+                symbol=symbol,
+                timeframe=timeframe,
+            )
+        direction = -1 if str(trade_direction or "long").lower() == "short" else 1
+        return probes.evaluate_naked_probe(
+            series,
+            aligned_r,
+            side=side,
+            candles=aligned_candles,
+            symbol=symbol,
+            timeframe=timeframe,
+            direction=direction,
+            execution_mapping=execution_mapping or "next_bar_open",
+            horizons=(int(horizon or 3),),
+        )
+
+    # Future-value alignment: if using t+2 signal information improves edge,
+    # the original feature/event construction may contain look-ahead leakage.
+    base = evaluate(aligned_f)
     base_net = float((base or {}).get("mean_net") or 0.0)
-    fwd_shift = [None, None] + f[-n:][:-2]
-    fut = probes.evaluate_naked_probe(fwd_shift, r[-n:], side=side)
+    fwd_shift = aligned_f[2:] + [None, None]
+    fut = evaluate(fwd_shift)
     fut_net = float((fut or {}).get("mean_net") or 0.0)
     if fut_net > base_net * 1.15 and fut_net > 0:
         issues.append("future_shift_improves_edge")
@@ -270,13 +308,13 @@ def run_leakage_auditor(factor_values, fwd_returns, side="high", run_id=None):
     same_bar_hits = 0
     checked = 0
     for i in range(n):
-        if f[i] is None or r[i] is None:
+        if aligned_f[i] is None or aligned_r[i] is None:
             continue
         checked += 1
         try:
-            if abs(float(f[i])) > 0 and abs(float(r[i])) > 0:
+            if abs(float(aligned_f[i])) > 0 and abs(float(aligned_r[i])) > 0:
                 # crude: factor equals fwd in magnitude often → smell
-                if abs(float(f[i]) - float(r[i])) < 1e-12:
+                if abs(float(aligned_f[i]) - float(aligned_r[i])) < 1e-12:
                     same_bar_hits += 1
         except Exception:
             pass
@@ -291,6 +329,8 @@ def run_leakage_auditor(factor_values, fwd_returns, side="high", run_id=None):
         "issues": issues,
         "base_net": base_net,
         "future_shift_net": fut_net,
+        "precomputed_event_mask": bool(precomputed_event_mask),
+        "event_mask_requantiled": False if precomputed_event_mask else None,
         "forbids_zh": ROLE_CONTRACTS["leakage_auditor"]["forbids_zh"],
         "note_zh": (
             "未发现明显泄漏气味" if passed else
@@ -349,7 +389,12 @@ def run_execution_engineer(probe_best, efr_pack=None, run_id=None, min_efr=1.5):
     """Cost/capacity feasibility. Does not invent trade logic."""
     best = probe_best or {}
     mean_net = float(best.get("mean_net") or 0.0)
-    n_hits = int(best.get("n_hits") or 0)
+    n_hits = int(
+        best.get("n_independent_events")
+        or best.get("n_filled_events")
+        or best.get("n_hits")
+        or 0
+    )
     efr = (efr_pack or {}).get("efr") if isinstance(efr_pack, dict) else efr_pack
     efr_val = None
     if isinstance(efr, dict):
@@ -377,6 +422,11 @@ def run_execution_engineer(probe_best, efr_pack=None, run_id=None, min_efr=1.5):
         "issues": issues,
         "mean_net": mean_net,
         "n_hits": n_hits,
+        "sample_field": (
+            "n_independent_events" if best.get("n_independent_events") is not None
+            else "n_filled_events" if best.get("n_filled_events") is not None
+            else "n_hits"
+        ),
         "efr": efr_val,
         "may_propose_strategy": False,
         "lean_installed": False,
@@ -397,7 +447,8 @@ def run_execution_engineer(probe_best, efr_pack=None, run_id=None, min_efr=1.5):
     return out
 
 
-def run_constructive_redteam(main_hyp, factor_matrix, fwd_returns, run_id):
+def run_constructive_redteam(main_hyp, factor_matrix, fwd_returns, run_id,
+                             main_probe_best=None):
     """Build opposing-family naked probe; compare mean_net vs main."""
     fam = (main_hyp or {}).get("family") or "data_driven"
     opp_fam = OPPOSING_FAMILY.get(fam, "mean_reversion")
@@ -417,7 +468,11 @@ def run_constructive_redteam(main_hyp, factor_matrix, fwd_returns, run_id):
         }
     opp["source"] = "constructive_redteam"
     opp_probe = probes.probe_hypothesis(opp, factor_matrix, fwd_returns)
-    main_probe = probes.probe_hypothesis(main_hyp, factor_matrix, fwd_returns)
+    main_probe = (
+        {"passed": bool((main_probe_best or {}).get("passed")), "best": main_probe_best}
+        if main_probe_best is not None
+        else probes.probe_hypothesis(main_hyp, factor_matrix, fwd_returns)
+    )
     main_net = float(((main_probe.get("best") or {}).get("mean_net") or -1e9))
     opp_net = float(((opp_probe.get("best") or {}).get("mean_net") or -1e9))
     main_beats = bool(main_probe.get("passed") and main_net > opp_net)
@@ -531,11 +586,17 @@ def judge_from_evidence(evidence_fields, run_id=None):
     if evidence_fields.get("bidirectional_hit"):
         score += 1.0
     deterministic_admit = bool(not missing and score >= 6.5)
-    # Kimi is called only after all deterministic research gates pass.  It
-    # may reject but can never turn a deterministic rejection into admission.
-    if str(os.environ.get("QIYU_KIMI_ENABLED") or "0").strip().lower() in (
+    # Kimi is called only after all deterministic research gates (including
+    # DSR/PBO supplied by the caller) pass.  Availability policy is explicit:
+    # optional judges may veto with a valid REJECT, but disabled/provider-error
+    # states no longer masquerade as evidence that the candidate failed.
+    kimi_enabled = str(os.environ.get("QIYU_KIMI_ENABLED") or "0").strip().lower() in (
         "1", "true", "yes", "on",
-    ):
+    )
+    kimi_required = str(os.environ.get("QIYU_KIMI_REQUIRED") or "0").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+    if kimi_enabled:
         if deterministic_admit:
             kimi_note = _kimi_evidence_judgment(evidence_fields, score)
         else:
@@ -548,18 +609,29 @@ def judge_from_evidence(evidence_fields, run_id=None):
         kimi_note = {
             "attempted": False,
             "enabled": False,
-            "ok": False,
-            "decision": "REJECT",
-            "note_zh": "Kimi Judge 未启用（QIYU_KIMI_ENABLED=0）；使用非LLM规则裁判。",
+            "ok": True,
+            "decision": "UNAVAILABLE" if kimi_required else "SKIPPED",
+            "note_zh": (
+                "Kimi为必需裁判但未启用，按配置失败关闭。"
+                if kimi_required else
+                "Kimi为可选独立否决层且未启用；保留本地确定性裁决并显式标记降级。"
+            ),
         }
-    kimi_admit = bool(
-        kimi_note.get("ok") and kimi_note.get("decision") == "ADMIT")
+    if kimi_required:
+        kimi_admit = bool(kimi_note.get("ok") and kimi_note.get("decision") == "ADMIT")
+    elif kimi_note.get("ok") and kimi_note.get("decision") == "REJECT":
+        kimi_admit = False
+    else:
+        kimi_admit = True
     admit = bool(deterministic_admit and kimi_admit)
     out = {
         "role": "judge",
         "admit_to_assembly": admit,
         "deterministic_admit": deterministic_admit,
         "kimi_admit": kimi_admit,
+        "kimi_required": kimi_required,
+        "judge_policy": "deterministic_then_required_kimi" if kimi_required else "deterministic_with_optional_kimi_veto",
+        "degraded": bool(not kimi_enabled or (kimi_note.get("attempted") and not kimi_note.get("ok"))),
         "score": score,
         "missing": missing,
         "evidence_fields": evidence_fields,

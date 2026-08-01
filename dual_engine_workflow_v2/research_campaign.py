@@ -95,6 +95,55 @@ def run_lean_campaign(
                 br, available_data, micro_meta,
             )
 
+    # The public discovery API historically allowed callers to provide an
+    # already aligned forward-return vector without candle rows.  The cheap
+    # campaign needs multiple real horizons and therefore cannot honestly
+    # reconstruct those horizons from one vector.  Skip only this optional
+    # tier, with an explicit audit record; the full probe path below still
+    # consumes the caller's fwd_returns.
+    if not candles:
+        result = {
+            "ok": True,
+            "schema": "qiyu_lean_research_campaign_v1",
+            "campaign_id": campaign_id,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "evidence_level": have_level,
+            "evidence_level_zh": ladder.LEVELS.get(have_level, {}).get("title_zh"),
+            "skipped": True,
+            "skip_reason": "candles_required_for_multi_horizon_cheap_probe",
+            "fwd_returns_preserved_for_full_probe": fwd_returns is not None,
+            "stages": {
+                "map": {
+                    "n_cells": len(cells),
+                    "path": str(map_path),
+                    "researchable_cells": sum(
+                        1 for c in cells if c.get("may_research") is not False
+                    ),
+                },
+                "cheap_stream": {
+                    "ok": True,
+                    "skipped": True,
+                    "skip_reason": "candles_required_for_multi_horizon_cheap_probe",
+                    "n_streamed_this_call": 0,
+                    "state_counts": {},
+                    "promote": [],
+                    "architecture_zh": "无K线时不伪造多周期前瞻收益；完整探针继续使用调用方对齐收益。",
+                },
+                "diagnostic": {"n": 0, "rows": []},
+                "execution_tier_shortlist": [],
+            },
+            "branch_policies": branch_policies,
+            "limits_zh": {
+                "cannot": ["无K线时重建多周期前瞻收益"],
+                "can": ["保留机制地图", "由完整探针消费调用方对齐收益"],
+            },
+            "policy_zh": ladder.contract_policy_zh(),
+            "at": _now(),
+        }
+        atomic_write_json(campaign_dir(campaign_id) / "campaign_result.json", result)
+        return result
+
     # Stage 2: streaming cheap probes
     stream = cheap.stream_cheap_probes(
         [c for c in cells if c.get("may_research") is not False],
@@ -144,6 +193,14 @@ def run_lean_campaign(
             "best_net": ((pr.get("best") or {}).get("mean_net")),
             "independent_events": ((pr.get("best") or {}).get("n_independent_events")),
             "claim_mode": hyp.get("claim_mode"),
+            # Keep the structured candidate so the execution shortlist can be
+            # promoted into the full discovery population.  Heavy returns stay
+            # out of this summary; the full probe is re-run under all gates.
+            "hypothesis": hyp,
+            "probe_best": {
+                k: v for k, v in ((pr.get("best") or {}).items())
+                if k != "trade_returns"
+            },
         })
 
     # Stage 4: execution tier — only CHEAP_PASS / EXECUTION_MAPPING near-misses

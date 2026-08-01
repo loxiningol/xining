@@ -774,6 +774,12 @@ def api_creation_submit():
             skip_llm=not bool(payload.get("with_llm")),
             max_loops=int(payload.get("max_loops") or 5),
             pipeline=payload.get("pipeline"),
+            research_contract=payload.get("research_contract"),
+            mutation_contract=payload.get("mutation_contract"),
+            data_version=payload.get("data_version"),
+            code_version=payload.get("code_version"),
+            cooldown_seconds=payload.get("cooldown_seconds"),
+            force=bool(payload.get("force")),
         )
         return jsonify(out), (200 if out.get("ok") else 400)
     except Exception as e:

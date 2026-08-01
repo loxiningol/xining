@@ -17,6 +17,12 @@ def _now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _string_list(value):
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
 # Forced divergence preamble — compensates for missing multi-agent debate.
 # Must lead every GLM meta-think prompt; also applied in local heuristic path.
 GLM_META_DIVERGENCE_INSTRUCTION = (
@@ -99,14 +105,23 @@ def _parse_constraints(brief):
     if m:
         out["max_daily_loss"] = float(m.group(1)) / 100.0
     # Return hardness from brief (optional overrides)
-    m = re.search(r"1\s*周[^0-9]{0,8}(\d+(?:\.\d+)?)\s*%", text)
-    if m:
-        out["minimum_weekly_return"] = float(m.group(1)) / 100.0
+    weekly_matches = list(re.finditer(
+        r"(?:1\s*周|周收益)[^0-9]{0,8}(\d+(?:\.\d+)?)\s*%", text,
+    ))
+    for weekly_match in weekly_matches:
+        context = text[max(0, weekly_match.start() - 14):weekly_match.end() + 8]
+        # A policy sentence such as “禁止周收益≥8%硬门” must never be
+        # re-parsed as the very hard target it revokes.
+        if any(token in context for token in (
+            "禁止", "不作", "不作为", "不要求", "不再要求", "无需", "无须",
+            "不需要", "取消", "撤销", "放弃", "不得", "不要", "非硬",
+            "不是硬门槛", "不设", "已撤销", "仅作诊断", "只作诊断",
+            "仅供诊断", "仅作观察",
+        )):
+            continue
+        out["minimum_weekly_return"] = float(weekly_match.group(1)) / 100.0
         out["raw_hints"].append("min_weekly_from_brief")
-    m = re.search(r"周收益[^0-9]{0,8}(\d+(?:\.\d+)?)\s*%", text)
-    if m and "minimum_weekly_return" not in out:
-        out["minimum_weekly_return"] = float(m.group(1)) / 100.0
-        out["raw_hints"].append("min_weekly_from_brief")
+        break
     if out["max_ann_vol"] is None:
         out["max_ann_vol"] = 0.35
     if out["max_drawdown"] is None:
@@ -382,8 +397,8 @@ def _role_risk(constraints):
             "QuantOracle VaR 超阈值立即否决",
             "Alphalens 换手过高/IC 衰减过快丢弃因子",
             "压力测试回撤超界后迭代不超过 5 次",
-            "周收益代理<8% 或 收益/回撤<1.0 → 收益硬度熔断",
-            "暴露<10% / 单笔<1bp / 窗内总收益<1% → 策略退化熔断并换视角",
+            "年化收益代理<6% 或 收益/回撤<1.0 → 收益硬度熔断",
+            "单笔<1bp 或 窗内总收益<1% → 策略退化熔断并换视角（不设暴露硬门）",
             "因子多空周收益(带杠杆)<3% → 丢弃（即使 IC 显著）",
         ],
     }
@@ -400,7 +415,7 @@ def _role_qa():
             "因子多空周收益(带杠杆)≥3%",
             "二次 Alphalens 筛选通过",
             "Backtrader 极端场景 + 红队攻击通过",
-            "收益硬度：周收益代理≥8%、收益/回撤≥1.0",
+            "收益硬度：年化收益代理≥6%、收益/回撤≥1.0（周收益仅诊断）",
             "无策略退化（暴露/单笔/窗内收益）",
             "初评胜率≥50%",
             "交付 strategy_code / params / risk_report 草稿",
@@ -424,11 +439,16 @@ def glm_meta_think_system_prompt():
         "{\n"
         "  \"perspectives\":[\n"
         "    {\"id\":\"P1\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\","
-        "\"max_annual_net_estimate\":0.12},\n"
+        "\"economic_actor\":[\"...\"],\"constraints\":[\"...\"],\"observable_proxy\":[\"feature_name\"],"
+        "\"factor_hints\":[\"feature_name\"],\"predicted_direction\":\"long|short|both\","
+        "\"horizon\":\"...\",\"who_pays\":\"...\",\"failure_conditions\":[\"...\"],"
+        "\"required_data\":[\"...\"],\"max_annual_net_estimate\":0.12},\n"
         "    {\"id\":\"P2\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\","
-        "\"max_annual_net_estimate\":0.08},\n"
+        "\"observable_proxy\":[\"...\"],\"factor_hints\":[\"...\"],\"who_pays\":\"...\","
+        "\"failure_conditions\":[\"...\"],\"max_annual_net_estimate\":0.08},\n"
         "    {\"id\":\"P3\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\","
-        "\"max_annual_net_estimate\":0.15}\n"
+        "\"observable_proxy\":[\"...\"],\"factor_hints\":[\"...\"],\"who_pays\":\"...\","
+        "\"failure_conditions\":[\"...\"],\"max_annual_net_estimate\":0.15}\n"
         "  ],\n"
         "  \"selected_id\":\"P?\",\n"
         "  \"selection_reason_zh\":\"...\",\n"
@@ -440,7 +460,8 @@ def glm_meta_think_system_prompt():
         "  \"invalidation_zh\":\"...\"\n"
         "}\n"
         "三种视角必须来自不同微观结构机制（库存回归 / 流动性sweep / 波动状态切换 / 趋势回撤等），"
-        "不得彼此只改参数。每个视角必须给出 max_annual_net_estimate。"
+        "不得彼此只改参数。每个视角必须给出可直接映射到现有数据列的 observable_proxy/factor_hints、"
+        "方向、周期、支付者、失效条件、required_data 与 max_annual_net_estimate。"
         "禁止编造夏普/胜率数字。禁止声称已过复核。"
         "禁止设计靠极低仓位刷低回撤、总收益近零的策略。"
     )
@@ -485,7 +506,8 @@ def _optional_glm_enrich(design_doc, skip_llm=True):
         }
 
 
-def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True):
+def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True,
+                   research_contract=None, mutation_contract=None):
     constraints = _parse_constraints(brief)
     divergence = _diverge_then_select(brief, symbol, timeframe)
     roles = [
@@ -501,6 +523,8 @@ def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True):
             symbol.split("-")[0], timeframe, architect["mechanism_family"]
         ),
         "human_brief": brief,
+        "research_contract": research_contract,
+        "mutation_contract": mutation_contract,
         "symbol": symbol,
         "timeframe": timeframe,
         "direction": direction,
@@ -536,7 +560,35 @@ def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True):
         g = enrich["glm"]
         # Prefer GLM's own three-lens divergence when present
         if isinstance(g.get("perspectives"), list) and len(g["perspectives"]) >= 3:
-            design["divergence"]["perspectives_glm"] = g["perspectives"][:3]
+            local = list(design["divergence"].get("perspectives") or [])
+            local_by_family = {str(p.get("family") or ""): p for p in local}
+            normalized = []
+            for i, raw in enumerate(g["perspectives"][:5]):
+                if not isinstance(raw, dict):
+                    continue
+                row = dict(raw)
+                fallback = local_by_family.get(str(row.get("family") or "")) or (
+                    local[i] if i < len(local) else {}
+                )
+                hints = _string_list(
+                    row.get("factor_hints") or row.get("observable_proxy")
+                ) or _string_list(fallback.get("factor_hints"))
+                row["factor_hints"] = hints
+                row["observable_proxy"] = _string_list(row.get("observable_proxy")) or hints
+                row["failure_conditions"] = _string_list(row.get("failure_conditions"))
+                row["required_data"] = _string_list(row.get("required_data")) or ["derived_ohlcv_proxy"]
+                row["structured_for_discovery"] = bool(
+                    row.get("family") and hints
+                    and row.get("predicted_direction") in ("long", "short", "both")
+                    and row.get("horizon") and row.get("who_pays")
+                    and row.get("failure_conditions")
+                )
+                if row["structured_for_discovery"]:
+                    normalized.append(row)
+            if len(normalized) >= 3:
+                design["divergence"]["perspectives_glm"] = normalized
+            else:
+                design["glm_enrichment"]["schema_rejected"] = "fewer_than_3_testable_perspectives"
             if g.get("selected_id"):
                 design["divergence"]["selected_id"] = g["selected_id"]
             if g.get("selection_reason_zh"):
@@ -544,7 +596,32 @@ def run_meta_think(brief, symbol, timeframe, direction="long", skip_llm=True):
         if g.get("refined_logic_zh"):
             design["core_logic_zh"] = g["refined_logic_zh"]
         if g.get("refined_hypotheses"):
-            design["hypotheses"] = g["refined_hypotheses"]
+            refined = []
+            if isinstance(g.get("refined_hypotheses"), list):
+                for index, raw_hypothesis in enumerate(g["refined_hypotheses"][:12]):
+                    if not isinstance(raw_hypothesis, dict):
+                        continue
+                    row = dict(raw_hypothesis)
+                    hints = _string_list(
+                        row.get("testable_factor_hints")
+                        or row.get("factor_hints")
+                        or row.get("observable_proxy")
+                    )
+                    statement = str(
+                        row.get("statement_zh") or row.get("statement") or ""
+                    ).strip()
+                    if not statement or not hints:
+                        continue
+                    row["id"] = row.get("id") or "H_glm_%s" % (index + 1)
+                    row["statement_zh"] = statement
+                    row["testable_factor_hints"] = hints
+                    refined.append(row)
+            if refined:
+                design["hypotheses"] = refined
+            else:
+                design["glm_enrichment"]["refined_hypotheses_rejected"] = (
+                    "no_machine_testable_hypotheses"
+                )
         if g.get("expected_annual_return_range"):
             design["expected_annual_return_range"] = g["expected_annual_return_range"]
             design["constraints"]["expected_annual_return_range"] = g[

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Mechanism-preserving probe protocol used before strategy assembly.
 
-The probe is intentionally simple: no stop-loss, take-profit, sizing or complex
-exit is allowed.  Unlike the legacy probe it does not confuse one failed factor
+The probe is intentionally simple: the production 0.9% protective stop and a
+fixed-horizon close are mandatory; tuned take-profit/sizing/complex exits are
+not allowed.  Unlike the legacy probe it does not confuse one failed factor
 quantile with a dead mechanism family.  It records three independent evidence
 axes (statistical, economic and execution), uses real forward horizons and
 clusters adjacent signals into independent events.
@@ -14,6 +15,8 @@ import hashlib
 import math
 import random
 from datetime import datetime
+
+from . import recipe_policy
 
 
 RESEARCH_STATES_ZH = {
@@ -35,6 +38,8 @@ RESEARCH_STATES_ZH = {
 DEFAULT_HORIZONS = (1, 3, 6, 12)
 DEFAULT_QUANTILES = (0.80, 0.90)
 MIN_INDEPENDENT_EVENTS = 12
+CAUSAL_QUANTILE_WINDOW = 240
+CAUSAL_QUANTILE_MIN_HISTORY = 80
 
 
 def _now():
@@ -110,7 +115,9 @@ def _quantile(xs, q):
     return vals[pos]
 
 
-def _causal_quantile_mask(values, side="high", q=0.8, window=240, min_history=80):
+def _causal_quantile_mask(values, side="high", q=0.8,
+                          window=CAUSAL_QUANTILE_WINDOW,
+                          min_history=CAUSAL_QUANTILE_MIN_HISTORY):
     """Prior-only rolling quantile mask; current/future values never set threshold."""
     values = list(values or [])
     out = [False] * len(values)
@@ -141,8 +148,14 @@ def signal_from_factor(factor_values, side="high", q=0.8):
 
 
 def _direction_candidates(hypothesis):
+    locked = bool((hypothesis or {}).get("trade_direction_locked"))
+    declared = str((hypothesis or {}).get("predicted_direction") or "").strip().lower()
+    if locked and declared in ("long", "buy", "positive_shift"):
+        return (1,)
+    if locked and declared in ("short", "sell", "negative_shift"):
+        return (-1,)
     text = " ".join([
-        str((hypothesis or {}).get("predicted_direction") or ""),
+        declared,
         str((hypothesis or {}).get("statement_zh") or ""),
         str((hypothesis or {}).get("family") or ""),
     ]).lower()
@@ -166,14 +179,86 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
             cache[key] = _causal_quantile_mask(factor_matrix.get(name) or [], side, q)
         return cache[key]
 
+    def quantile_term(name, side, q):
+        # The rolling estimator is executable identity, not an implementation
+        # default.  Persist it in every admitted recipe so formal compilation
+        # can reproduce the exact research event.
+        return {
+            "factor": name,
+            "side": side,
+            "q": q,
+            "window": CAUSAL_QUANTILE_WINDOW,
+            "min_history": CAUSAL_QUANTILE_MIN_HISTORY,
+            "threshold_source": "prior_only_rolling_quantile",
+        }
+
+    # Exact human-contract comparisons take precedence over generic quantiles.
+    # The contract compiler already rejects missing required features; this
+    # branch preserves numeric thresholds and AND/OR structure during probing.
+    required_conditions = [
+        row for row in ((hypothesis or {}).get("required_event_conditions") or [])
+        if isinstance(row, dict)
+    ]
+    if required_conditions:
+        exact_mask = None
+        exact_terms = []
+        n = min([
+            len((factor_matrix or {}).get(row.get("feature") or row.get("indicator")) or [])
+            for row in required_conditions
+        ] or [0])
+        for index, condition in enumerate(required_conditions):
+            feature = condition.get("feature") or condition.get("indicator")
+            values = list((factor_matrix or {}).get(feature) or [])[:n]
+            op = str(condition.get("operator") or "")
+            threshold = _finite(condition.get("value"))
+            current = []
+            for value in values:
+                value = _finite(value)
+                if value is None or threshold is None:
+                    current.append(False)
+                elif op == ">=":
+                    current.append(value >= threshold)
+                elif op == "<=":
+                    current.append(value <= threshold)
+                elif op == ">":
+                    current.append(value > threshold)
+                elif op == "<":
+                    current.append(value < threshold)
+                elif op in ("=", "=="):
+                    current.append(value == threshold)
+                else:
+                    current.append(False)
+            if exact_mask is None:
+                exact_mask = current
+            elif str(condition.get("join") or "and").lower() == "or":
+                exact_mask = [bool(exact_mask[i] or current[i]) for i in range(n)]
+            else:
+                exact_mask = [bool(exact_mask[i] and current[i]) for i in range(n)]
+            exact_terms.append({
+                "factor": feature,
+                "op": op,
+                "value": threshold,
+                "timeframe": condition.get("timeframe"),
+                "join": condition.get("join") or ("root" if index == 0 else "and"),
+            })
+        specs.append({
+            "event_id": "research_contract_exact_event",
+            "terms": exact_terms,
+            "mask": exact_mask or [],
+            "kind": "human_contract_exact",
+            "logic": "ordered_joins",
+        })
+        return specs[: int(max_specs)], available
+
     for name in available:
         for q in DEFAULT_QUANTILES:
             for side in ("high", "low"):
                 specs.append({
                     "event_id": "%s_%s_q%s" % (name, side, int(q * 100)),
-                    "terms": [{"factor": name, "side": side, "q": q}],
+                    "terms": [quantile_term(name, side, q)],
                     "mask": mask(name, side, q),
                     "kind": "single_proxy",
+                    "logic": "all",
                 })
 
     # Intersections preserve a mechanism better than stripping it to one proxy.
@@ -188,11 +273,12 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
             specs.append({
                 "event_id": "%s_%s_AND_%s_%s" % (a, sa, b, sb),
                 "terms": [
-                    {"factor": a, "side": sa, "q": 0.8},
-                    {"factor": b, "side": sb, "q": 0.8},
+                    quantile_term(a, sa, 0.8),
+                    quantile_term(b, sb, 0.8),
                 ],
                 "mask": [bool(ma[k] and mb[k]) for k in range(n)],
                 "kind": "mechanism_intersection",
+                "logic": "all",
             })
 
     # Specialised, still-minimal mechanism events. These remain probes, not strategies.
@@ -221,10 +307,11 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
         n = min(len(ma), len(mb))
         specs.insert(0, {
             "event_id": name,
-            "terms": [{"factor": a, "side": sa, "q": 0.8},
-                      {"factor": b, "side": sb, "q": 0.8}],
+            "terms": [quantile_term(a, sa, 0.8),
+                      quantile_term(b, sb, 0.8)],
             "mask": [bool(ma[k] and mb[k]) for k in range(n)],
             "kind": "mechanism_preserving",
+            "logic": "all",
         })
 
     # Stable order and bounded diagnostic budget.
@@ -376,8 +463,29 @@ def _trade_observation(candles, signal_i, horizon, direction, mapping):
         entry = signal_close
     else:
         entry = _finite(rows[entry_i].get("open"))
-    exit_price = _finite(rows[exit_i].get("close"))
-    if not entry or exit_price is None:
+    planned_exit_i = exit_i
+    if not entry:
+        return None
+    stop_pct = recipe_policy.PROTECTIVE_STOP_PCT
+    stop_price = entry * (1.0 - stop_pct if direction > 0 else 1.0 + stop_pct)
+    exit_reason = "fixed_horizon_close"
+    exit_price = None
+    for index in range(entry_i, planned_exit_i + 1):
+        high = _finite(rows[index].get("high"))
+        low = _finite(rows[index].get("low"))
+        stopped = bool(
+            (direction > 0 and low is not None and low <= stop_price)
+            or (direction < 0 and high is not None and high >= stop_price)
+        )
+        if stopped:
+            exit_i = index
+            exit_price = stop_price
+            exit_reason = "protective_stop"
+            break
+    if exit_price is None:
+        exit_price = _finite(rows[planned_exit_i].get("close"))
+        exit_i = planned_exit_i
+    if exit_price is None:
         return None
     ret = float(direction) * (exit_price / entry - 1.0)
     highs = [_finite(rows[j].get("high")) for j in range(entry_i, exit_i + 1)]
@@ -391,7 +499,12 @@ def _trade_observation(candles, signal_i, horizon, direction, mapping):
         mfe = (1.0 - min(lows) / entry) if lows else ret
         mae = (1.0 - max(highs) / entry) if highs else ret
     return {"return": ret, "mfe": mfe, "mae": mae,
-            "signal_index": signal_i, "entry_index": entry_i, "exit_index": exit_i}
+            "signal_index": signal_i, "entry_index": entry_i, "exit_index": exit_i,
+            "planned_exit_index": planned_exit_i, "exit_reason": exit_reason,
+            "protective_stop_price": stop_price,
+            "signal_ts": rows[signal_i].get("ts"),
+            "entry_ts": rows[entry_i].get("ts"),
+            "exit_ts": rows[exit_i].get("ts")}
 
 
 def _newey_west_t(xs):
@@ -496,14 +609,54 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
             if i < len(rr) and _finite(rr[i]) is not None:
                 obs.append({"return": direction * float(rr[i]), "mfe": None, "mae": None,
                             "signal_index": i, "entry_index": i, "exit_index": i})
-    rets = [x["return"] for x in obs]
+    gross_rets = [x["return"] for x in obs]
+    gross = _mean(gross_rets)
+    costs = _cost_scenarios(symbol, horizon)
+    primary = "maker_taker" if mapping == "pullback_limit" else "taker_taker"
+    primary_cost = float((costs.get(primary) or {}).get("total_friction") or 0.0)
+    # Every statistical gate must see realizable post-cost returns.  Keeping
+    # gross returns here made DSR/PBO significant even when friction erased the
+    # edge.
+    leverage = recipe_policy.EXECUTION_LEVERAGE
+    # DSR/PBO and final formal execution now consume the same account-return
+    # basis: full-size 20x gross PnL minus the same leveraged friction estimate.
+    rets = [
+        (float(value) - primary_cost) * float(leverage)
+        for value in gross_rets
+    ]
+    # PBO must compare candidates on one market clock.  Keep trade-level returns
+    # for DSR and a separate full bar-clock PnL vector for cross-candidate PBO.
+    if candles:
+        bar_timestamps = [row.get("ts") for row in candles]
+        bar_returns = [0.0] * len(candles)
+        for item in obs:
+            idx = int(item.get("exit_index") or 0)
+            if 0 <= idx < len(bar_returns):
+                bar_returns[idx] += (
+                    float(item.get("return") or 0.0) - primary_cost
+                ) * float(leverage)
+        if all(ts is not None for ts in bar_timestamps) and len(set(bar_timestamps)) == len(bar_timestamps):
+            pbo_returns = {"timestamps": bar_timestamps, "returns": bar_returns}
+        else:
+            # All candidates in this discovery share the same candle array, so
+            # equal-length bar positions are an explicit common-clock fallback.
+            pbo_returns = bar_returns
+    else:
+        bar_returns = [0.0] * len(fallback_returns or [])
+        for item in obs:
+            idx = int(item.get("exit_index") or 0)
+            if 0 <= idx < len(bar_returns):
+                bar_returns[idx] += (
+                    float(item.get("return") or 0.0) - primary_cost
+                ) * float(leverage)
+        pbo_returns = bar_returns
     mfes = [x["mfe"] for x in obs if x.get("mfe") is not None]
     maes = [x["mae"] for x in obs if x.get("mae") is not None]
-    gross = _mean(rets)
     ci = _block_bootstrap_ci(rets, "%s:%s:%s:%s" % (
         event.get("event_id"), horizon, direction, mapping))
     t = _newey_west_t(rets)
-    event_abs = [abs(float(x)) for x in rets]
+    gross_t = _newey_west_t(gross_rets)
+    event_abs = [abs(float(x)) for x in gross_rets]
     control_abs = _control_absolute_moves(
         candles, event.get("mask") or [], horizon, mapping, gap,
     )
@@ -512,17 +665,19 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         len(event_abs) >= MIN_INDEPENDENT_EVENTS and len(control_abs) >= 20 and
         (_mean(event_abs) or 0.0) > (_mean(control_abs) or 0.0) and volatility_t >= 1.64
     )
-    costs = _cost_scenarios(symbol, horizon)
     scenario_rows = {}
     for name, pack in costs.items():
         total = float((pack or {}).get("total_friction") or 0.0)
         scenario_rows[name] = dict(pack or {})
         scenario_rows[name]["mean_net"] = None if gross is None else gross - total
         scenario_rows[name]["efr"] = None if gross is None or total <= 0 else gross / total
-    primary = "maker_taker" if mapping == "pullback_limit" else "taker_taker"
     pp = scenario_rows.get(primary) or {}
     n = len(rets)
-    statistical = bool(n >= MIN_INDEPENDENT_EVENTS and gross is not None and gross > 0 and t >= 1.64)
+    net_mean = _mean(rets)
+    statistical = bool(
+        n >= MIN_INDEPENDENT_EVENTS and net_mean is not None
+        and net_mean > 0 and t >= 1.64
+    )
     economic = bool(gross is not None and gross > 0 and (_mean(mfes) or 0.0) >=
                     float((costs.get("maker_taker") or {}).get("total_friction") or 0.0))
     execution = bool((pp.get("mean_net") or -1.0) > 0 and (pp.get("efr") or 0.0) >= 1.20)
@@ -533,13 +688,13 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         state = "READY_FOR_ASSEMBLY"
     elif statistical and economic:
         state = "EXECUTION_MAPPING_FAILURE"
-    elif regime_conditional and (statistical or (gross is not None and gross > 0 and t >= 1.0)):
+    elif regime_conditional and (statistical or (net_mean is not None and net_mean > 0 and t >= 1.0)):
         state = "STATE_CONDITIONAL"
     elif statistical:
         state = "DIRECTIONAL_BUT_SMALL"
     elif volatility_effect:
         state = "VOLATILITY_EFFECT_ONLY"
-    elif gross is not None and gross > 0 and (t >= 1.0 or ((pp.get("mean_net") or -1) > -0.0005)):
+    elif net_mean is not None and net_mean > 0 and (t >= 1.0 or ((pp.get("mean_net") or -1) > -0.0005)):
         state = "NEAR_MISS_DIAGNOSTIC"
     else:
         state = "NO_DIRECTIONAL_EFFECT"
@@ -558,6 +713,7 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         "regime_split": regime_pack,
         "event_id": event.get("event_id"),
         "event_kind": event.get("kind"),
+        "event_logic": event.get("logic"),
         "terms": event.get("terms"),
         "factor": ((event.get("terms") or [{}])[0]).get("factor"),
         "side": ((event.get("terms") or [{}])[0]).get("side"),
@@ -573,10 +729,11 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         "n_filled_events": n,
         "effective_sample_size": n,
         "mean_hit": gross,
-        "mean_net": pp.get("mean_net"),
+        "mean_net": net_mean,
         "mean_mfe": mean_mfe,
         "mean_mae": mean_mae,
         "hac_t_stat": t,
+        "gross_hac_t_stat": gross_t,
         "volatility_effect_t_stat": volatility_t,
         "mean_event_absolute_move": _mean(event_abs),
         "mean_control_absolute_move": _mean(control_abs),
@@ -589,21 +746,52 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         },
         "cost_scenarios": scenario_rows,
         "primary_cost_scenario": primary,
-        "trade_returns": rets[:300],
+        "primary_cost_per_trade": primary_cost,
+        "statistical_returns_are_post_cost": True,
+        "exit_policy": {
+            "mode": recipe_policy.EXIT_POLICY_MODE,
+            "exit_bar": "entry_plus_horizon_minus_1",
+            "price": "bar_close",
+            "allow_early_take_profit": False,
+        },
+        "protective_stop_policy": {
+            "mode": recipe_policy.PROTECTIVE_STOP_MODE,
+            "price_pct": recipe_policy.PROTECTIVE_STOP_PCT,
+            "applies_from": "entry_bar",
+            "precedence": "protective_stop_before_time_exit",
+        },
+        "protective_stop_evaluated": bool(candles),
+        "execution_leverage": leverage,
+        "statistical_return_basis": recipe_policy.STATISTICAL_RETURN_BASIS,
+        # DSR/assembly must see the same complete independent-event sample as
+        # the reported n_filled_events.  Truncating the first 300 observations
+        # silently changed both sample size and market regime.
+        "trade_returns": rets,
+        "n_statistical_returns": len(rets),
+        "pbo_bar_returns": pbo_returns,
+        "event_mask": list(event.get("mask") or []),
     }
 
 
 def evaluate_naked_probe(factor_values, fwd_returns, side="high", q=0.8,
                          hold_bars=None, horizons=DEFAULT_HORIZONS,
                          round_trip_cost=0.001, candles=None, symbol=None,
-                         direction=1, execution_mapping="next_bar_open"):
+                         direction=1, execution_mapping="next_bar_open",
+                         timeframe=None):
     """Compatibility API backed by the new real-horizon evaluator."""
     event = {"event_id": "single_factor_%s_q%s" % (side, int(q * 100)),
-             "terms": [{"factor": "factor", "side": side, "q": q}],
+             "terms": [{
+                 "factor": "factor", "side": side, "q": q,
+                 "window": CAUSAL_QUANTILE_WINDOW,
+                 "min_history": CAUSAL_QUANTILE_MIN_HISTORY,
+                 "threshold_source": "prior_only_rolling_quantile",
+             }],
              "mask": _causal_quantile_mask(factor_values, side, q),
-             "kind": "single_proxy"}
-    rows = [_evaluate_trial(candles, fwd_returns, event, h, direction,
-                            execution_mapping, symbol=symbol) for h in horizons]
+             "kind": "single_proxy", "logic": "all"}
+    rows = [_evaluate_trial(
+        candles, fwd_returns, event, h, direction,
+        execution_mapping, symbol=symbol, timeframe=timeframe,
+    ) for h in horizons]
     rows.sort(key=lambda x: (1 if x.get("passed") else 0,
                              float(x.get("mean_net") or -1e9)), reverse=True)
     best = rows[0] if rows else {"ok": False, "passed": False,
@@ -611,8 +799,11 @@ def evaluate_naked_probe(factor_values, fwd_returns, side="high", q=0.8,
     best["side"] = side
     best["q"] = q
     best["round_trip_cost"] = round_trip_cost
-    best["horizon_results"] = [{k: v for k, v in r.items() if k != "trade_returns"}
+    best["horizon_results"] = [{k: v for k, v in r.items() if k not in ("trade_returns", "pbo_bar_returns", "event_mask")}
                                 for r in rows]
+    best["hard_rule_zh"] = (
+        "三轴未同时通过时禁止组装；单个窄探针失败不得宣判整个机制族死亡。"
+    )
     return best
 
 
@@ -677,8 +868,26 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
         }
 
     rows = []
-    mappings = ("next_bar_open", "delayed_confirmation", "pullback_limit")
-    horizons = DEFAULT_HORIZONS if candles else (3,)
+    timing_mode = str(
+        (((hypothesis or {}).get("required_entry_timing") or {}).get("mode"))
+        or "unspecified"
+    ).strip().lower()
+    if timing_mode in ("bar_close", "next_bar_open"):
+        # A signal is evaluated only after the triggering candle is complete;
+        # the first realizable fill is the next candle open.  Do not let a
+        # delayed or pullback mapping win when timing is contract-locked.
+        mappings = ("next_bar_open",)
+    else:
+        mappings = ("next_bar_open", "delayed_confirmation", "pullback_limit")
+    holding = (hypothesis or {}).get("holding_contract") or {}
+    horizons = tuple((hypothesis or {}).get("required_horizons_bars") or ())
+    if not horizons:
+        horizons = tuple(holding.get("allowed_horizons_bars") or ())
+    if not horizons:
+        horizons = DEFAULT_HORIZONS if candles else (3,)
+    horizons = tuple(sorted(set(
+        int(value) for value in horizons if 1 <= int(value) <= 240
+    )))
     budget = max(1, int(max_trials))
     # Round-robin coverage: first cover distinct event definitions, then horizons,
     # then alternate execution mappings.  A small budget therefore stays diverse.
@@ -766,9 +975,21 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
                 float(row.get("mean_net") or -1e9),
                 int(row.get("n_independent_events") or 0))
     ordered = sorted(rows, key=rank, reverse=True)
-    best = ordered[0] if ordered else None
+    # Only an execution mapping implemented by the formal DSL may become the
+    # admitted recipe.  Other mappings remain valuable diagnostics, but
+    # allowing one to win here creates a candidate that can never be submitted
+    # without changing its execution identity downstream.
+    contract = (hypothesis or {}).get("research_contract") or {}
+    for row in ordered:
+        capability = recipe_policy.capability_from_row(row, contract)
+        row["formal_capability"] = capability
+    formally_executable = [
+        row for row in ordered if (row.get("formal_capability") or {}).get("ok")
+    ]
+    best = formally_executable[0] if formally_executable else None
+    diagnostic_best = ordered[0] if ordered else None
     passed = bool(best and best.get("passed"))
-    state = (best or {}).get("research_state") or "SAMPLE_INADEQUATE"
+    state = (best or diagnostic_best or {}).get("research_state") or "SAMPLE_INADEQUATE"
 
     # Hypothesis-level contradiction under leaf coverage (NOT family exhaustion).
     event_n = len(set(r.get("event_id") for r in rows if r.get("event_id")))
@@ -832,11 +1053,26 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
         "hypothesis_id": hypothesis.get("hypothesis_id"),
         "research_state": state,
         "research_state_zh": RESEARCH_STATES_ZH.get(state, state),
-        "failure_codes": list((best or {}).get("failure_codes") or []),
+        "failure_codes": list((best or diagnostic_best or {}).get("failure_codes") or []) + (
+            ["formal_capability_blocked"]
+            if best is None and diagnostic_best is not None else []
+        ),
         "n_probes": len(rows),
         "best": best,
-        "probes": [{k: v for k, v in r.items() if k != "trade_returns"} for r in ordered],
+        "diagnostic_best": (
+            {k: v for k, v in (diagnostic_best or {}).items()
+             if k not in ("trade_returns", "pbo_bar_returns", "event_mask")}
+            if diagnostic_best is not None else None
+        ),
+        "formal_execution_mappings": ["next_bar_open"],
+        "formal_capability_reasons": sorted(set(
+            reason for row in ordered
+            for reason in ((row.get("formal_capability") or {}).get("reasons") or [])
+        )),
+        "probes": [{k: v for k, v in r.items() if k not in ("trade_returns", "pbo_bar_returns", "event_mask")} for r in ordered],
         "coverage": coverage,
+        "required_entry_timing": (hypothesis or {}).get("required_entry_timing") or {},
+        "entry_timing_mapping_locked": timing_mode in ("bar_close", "next_bar_open"),
         "family_closed": False,
         "hard_rule_zh": "三轴未同时通过时禁止组装；单个窄探针失败不得宣判整个机制族死亡。",
         "at": _now(),
@@ -847,7 +1083,12 @@ def probe():
     return {
         "ok": True,
         "provider": "mechanism_preserving_probe_v2",
-        "forbids": ["stop_loss", "take_profit", "position_sizing", "complex_exit"],
+        "forbids": ["tuned_take_profit", "position_sizing", "complex_exit"],
+        "mandatory_exit_identity": {
+            "exit_policy": recipe_policy.EXIT_POLICY_MODE,
+            "protective_stop_pct": recipe_policy.PROTECTIVE_STOP_PCT,
+            "execution_leverage": recipe_policy.EXECUTION_LEVERAGE,
+        },
         "evidence_axes": ["统计方向", "经济幅度", "执行可行性"],
         "research_states": RESEARCH_STATES_ZH,
         "uses_real_horizons": True,

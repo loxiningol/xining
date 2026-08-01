@@ -18,6 +18,7 @@ from __future__ import print_function
 
 import json
 import os
+import math
 from datetime import datetime
 from pathlib import Path
 
@@ -158,7 +159,35 @@ def _mine_with_specs(symbol, timeframe, specs, horizon=3, top_k=6):
     return mine
 
 
-def _certify_factors(factors, max_daily_loss=0.05):
+def _certification_evidence(cert, required=False):
+    """Return an honest, machine-checkable certification provenance record."""
+    source = str((cert or {}).get("source") or "").strip().lower()
+    cert_ok = bool((cert or {}).get("ok"))
+    if source == "quantoracle":
+        authority = "quantoracle_remote"
+        source_known = True
+        quantoracle_claim_allowed = cert_ok
+    elif source == "local_fallback":
+        authority = "local_reproducible_fallback"
+        source_known = True
+        quantoracle_claim_allowed = False
+    else:
+        authority = "unverified"
+        source_known = False
+        quantoracle_claim_allowed = False
+    accepted = bool(cert_ok and source_known)
+    return {
+        "required_by_meta": bool(required),
+        "cert_ok": cert_ok,
+        "accepted": accepted,
+        "source": source or None,
+        "authority": authority,
+        "quantoracle_claim_allowed": quantoracle_claim_allowed,
+        "local_fallback": source == "local_fallback",
+    }
+
+
+def _certify_factors(factors, max_daily_loss=0.05, require_quantoracle=False):
     certified = []
     for fac in factors or []:
         st = fac.get("stats") or {}
@@ -169,7 +198,11 @@ def _certify_factors(factors, max_daily_loss=0.05):
             avg_loss=st.get("avg_loss"),
             equity_curve=fac.get("equity_curve"),
         )
-        row = {
+        evidence = _certification_evidence(cert, required=require_quantoracle)
+        # Certification annotates the admitted candidate; it must not rebuild a
+        # lossy factor-only row that drops recipe/hypothesis/mechanism identity.
+        row = dict(fac)
+        row.update({
             "factor": fac.get("factor"),
             "rule": fac.get("rule"),
             "thesis_zh": fac.get("thesis_zh"),
@@ -182,13 +215,25 @@ def _certify_factors(factors, max_daily_loss=0.05):
                 "certified": cert.get("certified"),
                 "error": cert.get("error"),
                 "note_zh": cert.get("note_zh"),
+                "evidence": evidence,
             },
-        }
+            "certification_evidence": evidence,
+        })
+        if require_quantoracle and not evidence.get("accepted"):
+            row["rejected"] = True
+            row["reject_reason"] = (
+                "quantoracle_certification_failed"
+                if not evidence.get("cert_ok") else
+                "quantoracle_certification_source_unverified"
+            )
+            row.setdefault("reject_reasons", []).append(row["reject_reason"])
         fuse = dsf.risk_fuse_var(row, max_daily_loss=max_daily_loss)
         row["var_fuse"] = fuse
         if fuse.get("triggered"):
             row["rejected"] = True
-            row["reject_reason"] = "var_fuse"
+            if not row.get("reject_reason"):
+                row["reject_reason"] = "var_fuse"
+            row.setdefault("reject_reasons", []).append("var_fuse")
         certified.append(row)
     survivors = [r for r in certified if not r.get("rejected")]
     return certified, survivors
@@ -360,6 +405,421 @@ def describe():
     return paths, params
 
 
+def _persist_failure_blueprint(out_dir, symbol, timeframe, run_id, payload):
+    """Persist exact pre-review failure evidence; never leave an empty artifact dir."""
+    try:
+        target = Path(out_dir) if out_dir is not None else (
+            _root() / "auto_trade" / "dual_engine" / "creation_blueprint"
+        )
+        target.mkdir(parents=True, exist_ok=True)
+        safe_symbol = str(symbol or "UNKNOWN").lower().replace("-", "_")
+        safe_tf = str(timeframe or "unknown").lower().replace("/", "_")
+        path = target / ("%s_%s_%s_failed_blueprint.json" % (
+            safe_symbol, safe_tf, str(run_id or "unknown")[:80],
+        ))
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        return str(path)
+    except Exception as exc:
+        return "failure_artifact_write_failed:%s" % str(exc)[:160]
+
+
+def _finite_returns(values):
+    out = []
+    for value in values or []:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(number):
+            out.append(number)
+    return out
+
+
+def _candidate_from_admitted_payload(payload):
+    recipe = dict((payload or {}).get("recipe") or {})
+    hypothesis = dict((payload or {}).get("hypothesis") or {})
+    returns = _finite_returns((payload or {}).get("probe_returns") or [])
+    wins = [value for value in returns if value > 0]
+    losses = [value for value in returns if value <= 0]
+    mean = sum(returns) / float(len(returns)) if returns else None
+    avg_win = sum(wins) / float(len(wins)) if wins else 0.0
+    avg_loss = sum(losses) / float(len(losses)) if losses else 0.0
+    equity = [1.0]
+    for value in returns:
+        equity.append(equity[-1] * (1.0 + value))
+    return {
+        "factor": recipe.get("factor") or recipe.get("event_id"),
+        "rule": "admitted_exact_recipe:%s" % (recipe.get("recipe_id") or "missing"),
+        "thesis_zh": hypothesis.get("statement_zh"),
+        "score": ((payload or {}).get("probe") or {}).get("mean_net"),
+        "stats": {
+            "n": len(returns),
+            "win_rate": len(wins) / float(len(returns)) if returns else None,
+            "mean_net": mean,
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "payoff": avg_win / abs(avg_loss) if avg_loss < 0 else None,
+        },
+        "returns": returns,
+        "equity_curve": equity,
+        "statistical_returns_are_post_cost": bool(
+            recipe.get("statistical_returns_are_post_cost")
+        ),
+        "hypothesis_id": hypothesis.get("hypothesis_id"),
+        "mechanism_id": hypothesis.get("mechanism_id"),
+        "family": hypothesis.get("family"),
+        "recipe_id": recipe.get("recipe_id"),
+        "recipe": recipe,
+        "admission_evidence": {
+            "multiple_testing_gate": (payload or {}).get("multiple_testing_gate") or {},
+            "judge": (payload or {}).get("judge") or {},
+            "feasibility": (payload or {}).get("feasibility") or {},
+            "execution": (payload or {}).get("execution") or {},
+            "antifalsify": (payload or {}).get("antifalsify") or {},
+        },
+    }
+
+
+def _creation_probes():
+    return {
+        "meta": meta.probe(),
+        "alphalens": al.probe(),
+        "easyquant": eq.probe_easyquant(),
+        "quantoracle": qo.probe(),
+        "stress": stress.probe(),
+        "research_candles": rcs.probe(),
+        "return_hardness": {"ok": True, "module": "creation_return_hardness"},
+        "causal_counterfactual": causal_cf.probe(),
+        "socratic": socratic.probe(),
+        "knowledge_distill": {"ok": True, "module": "creation_knowledge_distill"},
+        "multiverse": multiverse.probe(),
+        "discovery": discovery.probe(),
+        "ledger": ledger.probe(),
+    }
+
+
+def _assemble_admitted_population(symbol, timeframe, direction, brief, data, stages,
+                                  disc, compiled_contract, run_id, out_dir):
+    """Post-discovery assembly that cannot invent or swap a mechanism.
+
+    Each input recipe already passed the full research admission path.  This
+    function may reject it on risk/stress/presentation gates or try the next
+    admitted peer; it may never mine a new factor, change direction/horizon,
+    or switch to a classic perspective.
+    """
+    payloads = list(disc.get("assembly_payload") or [])[:8]
+    recipe_ids = [str(row.get("recipe_id") or "") for row in payloads if row.get("recipe_id")]
+    stages["admission_envelope"] = {
+        "schema": "qiyu_admission_envelope_v1",
+        "research_contract_id": compiled_contract.get("contract_id"),
+        "recipe_ids": recipe_ids,
+        "n_admitted": len(payloads),
+        "identity_locked": True,
+        "post_discovery_mechanism_mutation_allowed": False,
+        "candidates": [
+            {
+                "recipe_id": row.get("recipe_id"),
+                "hypothesis_id": ((row.get("hypothesis") or {}).get("hypothesis_id")),
+                "mechanism_id": ((row.get("hypothesis") or {}).get("mechanism_id")),
+                "multiple_testing_passed": bool(
+                    (row.get("multiple_testing_gate") or {}).get("passed")
+                ),
+                "judge_admitted": bool((row.get("judge") or {}).get("admit_to_assembly")),
+                "recipe": row.get("recipe") or {},
+            }
+            for row in payloads
+        ],
+    }
+
+    design = ((stages.get("meta") or {}).get("design_doc") or {})
+    constraints = rh.merge_constraints(design.get("constraints") or {})
+    risk_bounds = design.get("risk_bounds") or {}
+    require_quantoracle = bool(risk_bounds.get("require_quantoracle") is True)
+    max_dd = -abs(float(constraints.get("max_drawdown") or 0.18))
+    max_daily = float(constraints.get("max_daily_loss") or 0.05)
+    candles = data.get("candles") or []
+    first_ts = candles[0].get("ts") if candles else None
+    last_ts = candles[-1].get("ts") if candles else None
+    span_days = rh.span_days_from_ts(first_ts, last_ts)
+    attempts = []
+    selected = None
+    selected_stages = None
+
+    for rank, payload in enumerate(payloads, 1):
+        attempt = {
+            "rank": rank,
+            "recipe_id": payload.get("recipe_id"),
+            "hypothesis_id": ((payload.get("hypothesis") or {}).get("hypothesis_id")),
+            "passed": False,
+            "failed_gate": None,
+        }
+        recipe = dict(payload.get("recipe") or {})
+        integrity_ok, expected_id = discovery.verify_assembly_recipe(recipe)
+        if not integrity_ok or payload.get("recipe_id") != expected_id:
+            attempt.update({"failed_gate": "recipe_integrity", "expected_recipe_id": expected_id})
+            attempts.append(attempt)
+            continue
+        if recipe.get("research_contract_id") != compiled_contract.get("contract_id"):
+            attempt["failed_gate"] = "research_contract_lineage"
+            attempts.append(attempt)
+            continue
+        if recipe.get("trade_direction") != direction:
+            attempt["failed_gate"] = "trade_direction_lineage"
+            attempts.append(attempt)
+            continue
+        if not (payload.get("multiple_testing_gate") or {}).get("passed"):
+            attempt["failed_gate"] = "multiple_testing_not_admitted"
+            attempts.append(attempt)
+            continue
+        if not (payload.get("judge") or {}).get("admit_to_assembly"):
+            attempt["failed_gate"] = "committee_not_admitted"
+            attempts.append(attempt)
+            continue
+
+        candidate = _candidate_from_admitted_payload(payload)
+        if len(candidate.get("returns") or []) < 8:
+            attempt["failed_gate"] = "post_cost_returns_insufficient"
+            attempts.append(attempt)
+            continue
+
+        if require_quantoracle:
+            certified_all, certified = _certify_factors(
+                [candidate], max_daily_loss=max_daily,
+                require_quantoracle=True,
+            )
+        else:
+            # Keep the historical two-argument call shape for design documents
+            # that did not explicitly request the certification gate.
+            certified_all, certified = _certify_factors(
+                [candidate], max_daily_loss=max_daily,
+            )
+        if not certified:
+            reject_reason = (
+                certified_all[0].get("reject_reason") if certified_all else None
+            )
+            attempt["failed_gate"] = (
+                "quantoracle_required_certification"
+                if require_quantoracle and str(reject_reason or "").startswith(
+                    "quantoracle_certification_"
+                ) else
+                "quantoracle_or_var"
+            )
+            attempt["certification_evidence"] = (
+                certified_all[0].get("certification_evidence")
+                if certified_all else None
+            )
+            attempt["var_fuse"] = (certified_all[0].get("var_fuse") if certified_all else None)
+            attempts.append(attempt)
+            continue
+        candidate = certified[0]
+
+        # The discovery return series is already post-cost.  Do not subtract a
+        # second round-trip fee in this legacy hardness diagnostic.
+        ls_pack = rh.factor_ls_weekly_lev(
+            candidate.get("returns") or [], span_days,
+            lev_scale=float(constraints.get("factor_lev_scale") or rh.FACTOR_LEV_SCALE),
+            round_trip_cost=0.0,
+        )
+        ls_floor = float(
+            constraints.get("minimum_factor_weekly_lev") or rh.MIN_FACTOR_WEEKLY_LEV
+        )
+        if not ls_pack.get("ok") or float(ls_pack.get("weekly_lev") or -1e9) < ls_floor:
+            attempt["failed_gate"] = "post_cost_factor_return_hardness"
+            attempt["ls_weekly"] = ls_pack
+            attempts.append(attempt)
+            continue
+
+        stress_pack = stress.run_stress(candidate.get("returns") or [], max_dd_limit=max_dd)
+        if not stress_pack.get("passed"):
+            attempt["failed_gate"] = "stress"
+            attempt["stress"] = {
+                "passed": stress_pack.get("passed"),
+                "human_banner_zh": stress_pack.get("human_banner_zh"),
+            }
+            attempts.append(attempt)
+            continue
+
+        stats = candidate.get("stats") or {}
+        total_return = rh.equity_total_return(candidate.get("returns") or [])
+        stress_mdd = (stress_pack.get("backtrader") or {}).get("full_max_drawdown")
+        prelim_pack = prelim.prelim_eval(
+            {
+                "win_rate": stats.get("win_rate"),
+                "n_trades": stats.get("n"),
+                "total_return": total_return,
+                "max_drawdown": stress_mdd,
+                "sharpe_ann_proxy": (
+                    ((candidate.get("quantoracle") or {}).get("certified") or {}).get("sharpe_ratio")
+                ),
+            },
+            first_ts=first_ts, last_ts=last_ts, n_bars=data.get("n_bars"),
+            timeframe=timeframe, min_win_rate=MIN_PRESENT_WR, min_trades=8,
+        )
+        if not prelim_pack.get("present_to_human"):
+            attempt["failed_gate"] = "preliminary_presentation"
+            attempt["prelim"] = prelim_pack
+            attempts.append(attempt)
+            continue
+
+        hardness_pack = rh.evaluate_return_hardness(
+            trade_returns=candidate.get("returns") or [],
+            total_return=total_return,
+            max_drawdown=(
+                stress_mdd if stress_mdd is not None
+                else rh.max_drawdown_from_returns(candidate.get("returns") or [])
+            ),
+            first_ts=first_ts, last_ts=last_ts,
+            n_bars=data.get("n_bars"),
+            hold_bars=max(int(recipe.get("horizon_bars") or 1), 1),
+            constraints=constraints,
+        )
+        if not hardness_pack.get("passed"):
+            attempt["failed_gate"] = "return_hardness"
+            attempt["return_hardness"] = hardness_pack
+            attempts.append(attempt)
+            continue
+
+        attempt["passed"] = True
+        attempts.append(attempt)
+        selected = candidate
+        selected_stages = {
+            "certify": {
+                "n_certified": len(certified_all), "n_survivors": len(certified),
+                "source": ((candidate.get("quantoracle") or {}).get("source")),
+                "require_quantoracle": require_quantoracle,
+                "certification_evidence": candidate.get("certification_evidence"),
+            },
+            "ls_weekly_filter": {
+                "n_in": 1, "n_kept": 1, "floor": ls_floor,
+                "post_cost_input": True, "result": ls_pack,
+            },
+            "stress": stress_pack,
+            "prelim": prelim_pack,
+            "return_hardness": {
+                key: value for key, value in hardness_pack.items() if key != "degeneration"
+            },
+            "degeneration": hardness_pack.get("degeneration"),
+        }
+        break
+
+    stages["assembly_lineage"] = {
+        "schema": "qiyu_locked_assembly_lineage_v1",
+        "attempts": attempts,
+        "selected_recipe_id": selected.get("recipe_id") if selected else None,
+        "selected_is_in_admission_envelope": bool(
+            selected and selected.get("recipe_id") in recipe_ids
+        ),
+        "global_factor_mining_used": False,
+        "classic_or_unadmitted_switch_used": False,
+        "next_step_if_exhausted": "new_discovery_round_with_parent_mutation_contract",
+    }
+
+    if selected is None:
+        failed = {
+            "ok": False,
+            "schema": "qiyu_creation_blueprint_v1",
+            "present_to_human": False,
+            "outcome": "research_rejected",
+            "error": "admitted_population_exhausted",
+            "detail": {
+                "reason": "all_admitted_recipes_failed_post_discovery_gates",
+                "next_step": "new_discovery_round_with_parent_mutation_contract",
+                "attempts": attempts,
+            },
+            "symbol": symbol, "timeframe": timeframe, "direction": direction,
+            "brief": brief, "research_contract": compiled_contract,
+            "stages": stages,
+            "fuses": {"abort_reason": "admitted_population_exhausted"},
+            "probes": _creation_probes(),
+            "run_id": run_id,
+            "data": stages.get("data"),
+            "handoff_zh": "已准入候选在后置风险门全部失败；禁止切换未验证因子，须以父失败门开启新研究轮。",
+            "at": _now(),
+        }
+        failed["failure_artifact"] = _persist_failure_blueprint(
+            out_dir, symbol, timeframe, run_id, failed,
+        )
+        return failed
+
+    if selected.get("recipe_id") not in recipe_ids:
+        raise RuntimeError("assembly_lineage_violation:selected_recipe_not_admitted")
+    stages.update(selected_stages or {})
+    hypothesis = next(
+        (row.get("hypothesis") or {} for row in payloads
+         if row.get("recipe_id") == selected.get("recipe_id")),
+        {},
+    )
+    design = dict(design)
+    design["pre_discovery_hypotheses"] = design.get("hypotheses") or []
+    design["hypotheses"] = [hypothesis]
+    design["mechanism_family"] = selected.get("family")
+    design["factor_hints"] = [selected.get("factor")]
+    design["discovery_locked"] = True
+    stages["meta"]["design_doc"] = design
+    stages["selected"] = {
+        "factor": selected.get("factor"), "rule": selected.get("rule"),
+        "stats": selected.get("stats"), "quantoracle": selected.get("quantoracle"),
+        "hypothesis_id": selected.get("hypothesis_id"),
+        "mechanism_id": selected.get("mechanism_id"),
+        "recipe_id": selected.get("recipe_id"),
+        "recipe": selected.get("recipe"),
+    }
+    best_factor = {
+        key: value for key, value in selected.items()
+        if key not in ("returns", "equity_curve")
+    }
+    blueprint = {
+        "ok": True,
+        "present_to_human": True,
+        "outcome": "candidate_ready",
+        "schema": "qiyu_creation_blueprint_v1",
+        "symbol": symbol, "timeframe": timeframe, "direction": direction,
+        "brief": brief, "research_contract": compiled_contract,
+        "loops": {"hypothesis": len(attempts), "stress": len(attempts)},
+        "fuses": {"iteration": False, "abort_reason": None},
+        "classic_tried": [], "perspectives_tried": [],
+        "prelim": selected_stages["prelim"],
+        "return_hardness": selected_stages["return_hardness"],
+        "stages": stages,
+        "best_factor": best_factor,
+        "probes": _creation_probes(),
+        "run_id": run_id,
+        "data": stages.get("data"),
+        "handoff_zh": "候选身份已锁定且属于 discovery admission envelope，可进入后续四阶段复核。",
+        "at": _now(),
+    }
+    paths, params = _write_deliverables(out_dir, symbol, timeframe, blueprint)
+    blueprint["deliverables"] = paths
+    blueprint["params"] = params
+    blueprint["glm_research_brief"] = {
+        "schema": "qiyu_creation_blueprint_brief_v2",
+        "design_doc": {
+            "mechanism_family": selected.get("family"),
+            "core_logic_zh": hypothesis.get("statement_zh"),
+            "hypotheses": [hypothesis],
+            "constraints": constraints,
+        },
+        "research_contract": compiled_contract,
+        "admission_envelope": stages.get("admission_envelope"),
+        "selected_recipe_id": selected.get("recipe_id"),
+        "selected_recipe": selected.get("recipe"),
+        "best_factor": best_factor,
+        "prelim": selected_stages["prelim"],
+        "stress_passed": bool(selected_stages["stress"].get("passed")),
+        "instructions_zh": "只能实现 selected_recipe；禁止替换机制、方向、周期、事件或执行映射。",
+        "built_at": _now(),
+    }
+    # Persist only after deliverables and formal handoff fields are complete.
+    Path(paths["blueprint_json"]).write_text(
+        json.dumps(blueprint, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
+    return blueprint
+
+
 def run_creation_blueprint(
     symbol,
     timeframe,
@@ -370,20 +830,67 @@ def run_creation_blueprint(
     max_loops=MAX_LOOP,
     out_dir=None,
     run_id=None,
+    research_contract=None,
+    mutation_contract=None,
+    data_version=None,
+    code_version=None,
 ):
     """Execute stages ①–⑤ with fuses. Returns blueprint envelope for GLM / collab."""
     loops = {"hypothesis": 0, "stress": 0}
     fuses = {"iteration": False, "overfit_drops": 0, "var_rejects": 0, "abort_reason": None}
     stages = {}
-    data = _load_matrix(symbol, timeframe, horizon=horizon)
-    if not data.get("ok"):
-        return {
+    run_id = run_id or ledger.new_run_id("blueprint")
+
+    # Compile a provisional contract before touching data.  This makes target,
+    # direction and mutation-contract errors observable even when the candle
+    # store is unavailable, and gives data failures an auditable intent record.
+    discovery_constraints = rh.default_return_constraints()
+    if research_contract:
+        discovery_constraints["research_contract"] = research_contract
+    if mutation_contract:
+        discovery_constraints["mutation_contract"] = mutation_contract
+    compiled_contract = discovery.compile_research_contract(
+        brief, symbol, timeframe, discovery_constraints,
+        direction=direction, design_seed=None,
+        data_version=data_version, code_version=code_version,
+    )
+    stages["research_contract"] = compiled_contract
+    if not compiled_contract.get("valid"):
+        failed = {
             "ok": False,
             "schema": "qiyu_creation_blueprint_v1",
-            "error": "candle_cache_missing",
-            "detail": data,
+            "present_to_human": False,
+            "outcome": "research_rejected",
+            "error": "invalid_research_contract",
+            "detail": {"validation_errors": compiled_contract.get("validation_errors") or []},
+            "research_contract": compiled_contract,
+            "stages": stages,
+            "run_id": run_id,
             "at": _now(),
         }
+        failed["failure_artifact"] = _persist_failure_blueprint(
+            out_dir, symbol, timeframe, run_id, failed,
+        )
+        return failed
+
+    data = _load_matrix(symbol, timeframe, horizon=horizon)
+    if not data.get("ok"):
+        failed = {
+            "ok": False,
+            "schema": "qiyu_creation_blueprint_v1",
+            "present_to_human": False,
+            "outcome": "data_blocked",
+            "error": "candle_cache_missing",
+            "detail": data,
+            "research_contract": compiled_contract,
+            "stages": stages,
+            "run_id": run_id,
+            "at": _now(),
+        }
+        failed["failure_artifact"] = _persist_failure_blueprint(
+            out_dir, symbol, timeframe, run_id, failed,
+        )
+        return failed
     stages["data"] = {
         "n_bars": data.get("n_bars"),
         "path": data.get("path"),
@@ -392,17 +899,63 @@ def run_creation_blueprint(
         "note_zh": data.get("note_zh"),
     }
 
-    run_id = run_id or ledger.new_run_id("blueprint")
-    # --- Research discovery FIRST (population → naked probe → antifalsify → EFR) ---
+    if not data_version:
+        candles_for_version = data.get("candles") or []
+        first_ts = (candles_for_version[0] or {}).get("ts") if candles_for_version else None
+        last_ts = (candles_for_version[-1] or {}).get("ts") if candles_for_version else None
+        data_version = "%s:%s:%s" % (first_ts, last_ts, len(candles_for_version))
+
+    # Bind the immutable contract to the actual candle snapshot once known.
+    compiled_contract = discovery.compile_research_contract(
+        brief, symbol, timeframe, discovery_constraints,
+        direction=direction, design_seed=None,
+        data_version=data_version, code_version=code_version,
+    )
+    stages["research_contract"] = compiled_contract
+    if not compiled_contract.get("valid"):
+        failed = {
+            "ok": False,
+            "schema": "qiyu_creation_blueprint_v1",
+            "present_to_human": False,
+            "outcome": "research_rejected",
+            "error": "invalid_research_contract",
+            "detail": {"validation_errors": compiled_contract.get("validation_errors") or []},
+            "research_contract": compiled_contract,
+            "stages": stages,
+            "run_id": run_id,
+            "at": _now(),
+        }
+        failed["failure_artifact"] = _persist_failure_blueprint(
+            out_dir, symbol, timeframe, run_id, failed,
+        )
+        return failed
+
+    # --- Structured/AI mechanism design BEFORE deterministic discovery. ---
+    # The design is a hypothesis source, not a judge; every generated row must
+    # still pass naked probes, antifalsification, execution and statistics.
+    meta_pack = meta.run_meta_think(
+        brief=brief, symbol=symbol, timeframe=timeframe,
+        direction=direction, skip_llm=skip_llm,
+        research_contract=compiled_contract,
+        mutation_contract=mutation_contract,
+    )
+    stages["meta"] = meta_pack
+
+    # --- Research discovery (population → naked probe → antifalsify → EFR) ---
     disc = discovery.run_discovery(
         symbol=symbol,
         timeframe=timeframe,
+        direction=direction,
         brief=brief,
         factor_matrix=data.get("matrix"),
         fwd_returns=data.get("fwd"),
         candles=data.get("candles"),
-        constraints=rh.default_return_constraints(),
+        constraints=discovery_constraints,
         run_id=run_id,
+        design_seed=meta_pack,
+        research_contract=compiled_contract,
+        data_version=data_version,
+        code_version=code_version,
     )
     stages["research_discovery"] = {
         "ok": disc.get("ok"),
@@ -415,13 +968,25 @@ def run_creation_blueprint(
         "population": (disc.get("stages") or {}).get("population"),
         "contract": (disc.get("stages") or {}).get("contract"),
         "human_banner_zh": disc.get("human_banner_zh"),
+        "outcome": disc.get("outcome"),
+        "error": disc.get("error"),
+        "detail": disc.get("detail"),
+        "research_state_counts": (disc.get("stages") or {}).get("research_state_counts"),
+        "failure_lineage": (disc.get("stages") or {}).get("failure_lineage"),
+        "near_miss_diagnostics": (disc.get("stages") or {}).get("near_miss_diagnostics"),
+        "lean_campaign": (disc.get("stages") or {}).get("lean_campaign"),
     }
     if not disc.get("present_to_assembly"):
-        return {
+        failed = {
             "ok": False,
             "schema": "qiyu_creation_blueprint_v1",
             "present_to_human": False,
             "error": "no_credible_discovery_candidate",
+            "outcome": disc.get("outcome") or (
+                "data_blocked" if ((disc.get("detail") or {}).get("data_blocked"))
+                else "research_rejected"
+            ),
+            "detail": disc.get("detail"),
             "stages": stages,
             "fuses": {"abort_reason": "research_discovery_empty"},
             "probes": {
@@ -433,15 +998,34 @@ def run_creation_blueprint(
             "run_id": run_id,
             "at": _now(),
         }
+        failed["failure_artifact"] = _persist_failure_blueprint(
+            out_dir, symbol, timeframe, run_id, failed,
+        )
+        return failed
 
     handoff = disc.get("handoff") or {}
 
-    # ① Meta-think (annotation only; hints seeded from discovery handoff)
-    meta_pack = meta.run_meta_think(
-        brief=brief, symbol=symbol, timeframe=timeframe,
-        direction=direction, skip_llm=skip_llm,
+    # Discovery admission is now a hard identity boundary.  Assembly consumes
+    # only exact admitted recipes and their post-cost returns.  The legacy
+    # re-mining/mutation block below is intentionally unreachable for v4
+    # discovery results because it could swap in an untested classic factor.
+    return _assemble_admitted_population(
+        symbol=symbol,
+        timeframe=timeframe,
+        direction=direction,
+        brief=brief,
+        data=data,
+        stages=stages,
+        disc=disc,
+        compiled_contract=compiled_contract,
+        run_id=run_id,
+        out_dir=(out_dir if out_dir is not None else (
+            _root() / "auto_trade" / "dual_engine" / "creation_blueprint"
+        )),
     )
-    stages["meta"] = meta_pack
+
+    # ① Meta-think was already run before discovery; now overlay evidence-backed
+    # handoff data without issuing a second model call.
     design = meta_pack.get("design_doc") or {}
     # Overlay discovery-backed mechanism onto design doc
     if handoff.get("family"):
@@ -975,11 +1559,13 @@ def run_creation_blueprint(
     blueprint = {
         "ok": ok,
         "present_to_human": presentable,
+        "outcome": "candidate_ready" if (ok and presentable) else "research_rejected",
         "schema": "qiyu_creation_blueprint_v1",
         "symbol": symbol,
         "timeframe": timeframe,
         "direction": direction,
         "brief": brief,
+        "research_contract": (stages.get("research_discovery") or {}).get("contract"),
         "loops": loops,
         "fuses": fuses,
         "classic_tried": classic_tried,
@@ -1041,6 +1627,7 @@ def run_creation_blueprint(
                 "constraints": design.get("constraints"),
                 "failure_scenarios_zh": design.get("failure_scenarios_zh"),
             },
+            "research_contract": blueprint.get("research_contract"),
             "best_factor": blueprint.get("best_factor"),
             "hypothesis_passed": (stages.get("hypothesis") or {}).get("passed"),
             "rescreen": stages.get("rescreen"),
