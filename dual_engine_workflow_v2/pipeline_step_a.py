@@ -1698,7 +1698,10 @@ def codex_implement_from_spec(spec_pack):
             ])
         entry_leaves.append({"id": "e_vol_ok", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 0.3}})
         entry = {"all": entry_leaves}
-    elif any(k in fam for k in ("vol_regime", "volatility_expansion", "atr_regime", "vol_break")):
+    elif any(k in fam for k in (
+        "vol_regime", "volatility_expansion", "atr_regime", "vol_break",
+        "volume_anomaly_breakout",
+    )):
         entry_leaves.extend([
             {"id": "e_atr_expand", "left": {"feature": "atr14"}, "op": "gt", "right": {"value": 0.002}},
             {"id": "e_vol_expand", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.2}},

@@ -289,8 +289,19 @@ def _diverge_then_select(brief, symbol, timeframe):
 
     perspectives = [dict(p) for p in _DEFAULT_PERSPECTIVES]
 
+    if any(k in text_l for k in (
+        "成交量异动", "异常成交量", "放量突破", "volume anomaly",
+    )):
+        perspectives[0] = {
+            "id": "P1_volume_anomaly_directional_breakout",
+            "lens_zh": "异常成交量与价格方向性位移共振",
+            "thesis_zh": "成交量相对自身历史突然放大，且价格脱离近期分布后只跟随同方向延续",
+            "family": "volume_anomaly_breakout",
+            "factor_hints": ["volume_z", "close_z_20"],
+        }
+
     # Optional swap when brief clearly asks trend
-    if any(k in text_l for k in ("突破", "breakout", "趋势", "momentum", "顺势", "pullback", "回撤切入")):
+    elif any(k in text_l for k in ("突破", "breakout", "趋势", "momentum", "顺势", "pullback", "回撤切入")):
         perspectives[0] = {
             "id": "P1_trend_pullback",
             "lens_zh": "趋势回撤 / 惯性延续",
@@ -306,6 +317,8 @@ def _diverge_then_select(brief, symbol, timeframe):
         selected_idx = 1
     elif any(k in text for k in ("压缩", "squeeze", "波动扩张", "低波")):
         selected_idx = 2
+    elif any(k in text_l for k in ("成交量异动", "异常成交量", "放量突破", "volume anomaly")):
+        selected_idx = 0
     elif any(k in text_l for k in ("突破", "breakout", "趋势", "momentum", "顺势", "pullback")):
         selected_idx = 0
 

@@ -103,6 +103,7 @@ OPPOSING_FAMILY = {
     "vol_squeeze_break": "mean_reversion",
     "liquidity_sweep": "vol_squeeze_break",
     "trend_pullback": "mean_reversion",
+    "volume_anomaly_breakout": "mean_reversion",
     "crowding_fade": "vol_squeeze_break",
     "liquidation_bounce": "vol_squeeze_break",
     "data_driven": "mean_reversion",

@@ -353,6 +353,8 @@ def stable_contract_payload(contract):
     # Keep v2 contracts created before performance gates hash-compatible.
     if row.get("performance_contract"):
         payload["performance_contract"] = row.get("performance_contract")
+    if row.get("family_hints_enforced"):
+        payload["family_hints_enforced"] = True
     return payload
 
 
@@ -528,7 +530,19 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
     if stop_pct is None or abs(float(stop_pct) - PRODUCTION_PROTECTIVE_STOP_PCT) > 1e-12:
         errors.append("protective_stop_policy_must_equal_0p9pct")
 
-    family_hints = _uniq(_list(supplied.get("family_hints")) + _family_hints(text))
+    explicit_family_hints = _uniq(_list(supplied.get("family_hints")))
+    # Structured mechanism families are an allowlist, not a suggestion.  Text
+    # such as "confirm continuation rather than reversal" must not silently
+    # add trend/mean-reversion families to a volume-anomaly contract.
+    family_hints = explicit_family_hints or _family_hints(text)
+    if "family_hints_enforced" in supplied:
+        family_hints_enforced = bool(supplied.get("family_hints_enforced"))
+    elif supplied.get("immutable") is True:
+        # Backward-compatible normalized contracts had inferred hints but no
+        # enforcement provenance; do not reinterpret them as a new allowlist.
+        family_hints_enforced = False
+    else:
+        family_hints_enforced = bool(explicit_family_hints)
     session_window = (
         event_in.get("session_window") or event_in.get("time_window")
         or constraints.get("session_window") or constraints.get("time_window")
@@ -641,6 +655,7 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
         "family_hints": family_hints,
         "brief": text,
     }
+    stable["family_hints_enforced"] = bool(family_hints_enforced)
     if performance_contract:
         stable["performance_contract"] = performance_contract
     contract_id = "rc_%s" % _canonical_hash(stable_contract_payload(stable))
@@ -702,6 +717,7 @@ def apply_to_hypothesis(hypothesis, contract):
     row["factor_hints"] = _uniq(hints)
     families = set(contract.get("family_hints") or [])
     row["contract_family_match"] = not families or str(row.get("family") or "") in families
+    row["contract_family_enforced"] = bool(contract.get("family_hints_enforced"))
     row["contract_priority"] = 5.0 if row["contract_family_match"] else 0.0
     return row
 

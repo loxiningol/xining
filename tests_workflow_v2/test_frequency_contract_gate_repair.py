@@ -13,11 +13,16 @@ class FrequencyContractGateRepairTests(unittest.TestCase):
         return research_contract.compile_contract(
             "所有周期；必须平均周交易量大于0.75",
             "BTC-USDT-SWAP", "5m", direction="long",
+            constraints={"research_contract": {
+                "family_hints": ["volume_anomaly_breakout"],
+            }},
         )
 
     def test_weekly_frequency_is_immutable_and_recompile_stable(self):
         contract = self._contract()
         self.assertTrue(contract["valid"])
+        self.assertEqual(["volume_anomaly_breakout"], contract["family_hints"])
+        self.assertTrue(contract["family_hints_enforced"])
         self.assertEqual(
             {
                 "metric": "theoretical_weekly_opens",
@@ -36,6 +41,11 @@ class FrequencyContractGateRepairTests(unittest.TestCase):
         )
         self.assertEqual(contract["contract_id"], recompiled["contract_id"])
         self.assertTrue(research_contract.verify_contract_integrity(recompiled)["ok"])
+        off_family = research_contract.apply_to_hypothesis(
+            {"family": "mean_reversion"}, contract,
+        )
+        self.assertFalse(off_family["contract_family_match"])
+        self.assertTrue(off_family["contract_family_enforced"])
 
         tampered = copy.deepcopy(contract)
         tampered["performance_contract"]["threshold"] = 0.50

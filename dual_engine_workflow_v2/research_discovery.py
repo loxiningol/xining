@@ -1138,6 +1138,10 @@ def run_discovery(
             # Defense in depth.  probe_hypothesis already excludes this row,
             # but assembly must independently refuse identity drift.
             continue
+        if contract.get("family_hints_enforced") and not h.get("contract_family_match"):
+            # Opposing families remain useful antifalsification controls, but
+            # they cannot become a strategy under an explicit human family.
+            continue
         row["recipe"] = assembly_recipe(h, best, contract)
         row["recipe_id"] = row["recipe"]["recipe_id"]
         survivors.append(row)

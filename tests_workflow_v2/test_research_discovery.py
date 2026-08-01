@@ -30,6 +30,20 @@ class TestResearchDiscovery(unittest.TestCase):
         good = mg.load_graph()[0]
         self.assertTrue(mg.completeness_check(good)["passed"])
 
+    def test_volume_anomaly_direction_has_exact_formal_factors(self):
+        selected = mg.select_for_brief(
+            "成交量异动 + 放量突破，确认方向延续而非反转",
+            symbol="BTC-USDT-SWAP", timeframe="5m", limit=12,
+        )
+        rows = [
+            row for row in selected["mechanisms"]
+            if row.get("family") == "volume_anomaly_breakout"
+        ]
+        self.assertTrue(rows)
+        self.assertEqual(
+            ["volume_z", "close_z_20"], rows[0]["factor_hints"],
+        )
+
     def test_phenomenon_scan_finds_shift(self):
         n = 200
         factor = [float(i) for i in range(n)]

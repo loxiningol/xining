@@ -80,6 +80,33 @@ SEED_MECHANISMS = (
         "factor_hints": ["range_pct", "atr_pct_14", "ret_12", "volume_z"],
     },
     {
+        "mechanism_id": "volume_anomaly_directional_breakout_001",
+        "economic_actor": ["informed_large_trader", "momentum_follower"],
+        "constraint": ["urgent_size_execution", "limited_displayed_liquidity"],
+        "forced_trade": "abnormal_participation_pushes_price_away_from_its_recent_distribution",
+        "observable_proxy": ["volume_z", "close_z_20"],
+        "predicted_effect": {
+            "direction": "continuation_in_signed_breakout_direction",
+            "horizon": "5m-4h",
+            "conditional_on": [
+                "volume_z_and_price_displacement_agree",
+                "next_closed_bar_does_not_fully_reverse",
+            ],
+        },
+        "who_pays": "late_faders_against_persistent_informed_flow",
+        "alternative_explanations": [
+            "liquidation_spike_then_reversal", "news_jump_without_follow_through",
+            "wash_volume_or_bad_volume_timestamp",
+        ],
+        "capacity_limit": "medium_to_high",
+        "known_failure_modes": [
+            "volume_without_direction", "single_bar_exhaustion", "choppy_two_sided_flow",
+        ],
+        "family": "volume_anomaly_breakout",
+        # Both factors have an exact research→formal DSL mapping.
+        "factor_hints": ["volume_z", "close_z_20"],
+    },
+    {
         "mechanism_id": "funding_crowding_fade_001",
         "economic_actor": ["perp_speculator", "basis_arb"],
         "constraint": ["funding_payment", "margin"],
@@ -649,6 +676,13 @@ def select_for_brief(brief, symbol=None, timeframe=None, limit=12):
                 score += 1.2
             if m.get("family") == "mean_reversion":
                 score -= 0.3  # opposing fade risk after true expansion
+        if any(k in text for k in (
+            "成交量异动", "异常成交量", "放量突破", "volume anomaly",
+        )):
+            if m.get("family") == "volume_anomaly_breakout":
+                score += 6.0
+            elif "volume_z" in (m.get("observable_proxy") or []):
+                score += 0.8
         if mid in prefer:
             score += 4.0
         gate = completeness_check(m)
