@@ -465,9 +465,20 @@ def stream_cheap_probes(cells, factor_matrix, candles, campaign_id,
             "VOLATILITY_EFFECT_ONLY", "DIRECTIONAL_BUT_SMALL",
         ):
             promote.append(s)
+    # Prefer cells whose tree/family matches the campaign focus (first cell's tree
+    # if homogeneous; else prefer non-null tree_id matching majority).
+    focus_trees = {}
+    for s in summaries:
+        tid = s.get("tree_id") or s.get("family")
+        if tid:
+            focus_trees[tid] = int(focus_trees.get(tid) or 0) + 1
+    primary_tree = None
+    if focus_trees:
+        primary_tree = sorted(focus_trees.items(), key=lambda kv: -kv[1])[0][0]
     promote.sort(
         key=lambda r: (
             1 if r.get("failure_state") == "CHEAP_PASS" else 0,
+            1 if primary_tree and (r.get("tree_id") == primary_tree or r.get("family") == primary_tree) else 0,
             abs(float(r.get("t_hac") or 0)),
             float(r.get("gross_mean_bp") or -1e9),
         ),

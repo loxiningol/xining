@@ -155,21 +155,35 @@ FAILURE_CODE_ZH = {
 
 
 def trees_for_brief(brief=""):
-    text = str(brief or "").lower()
+    """Select mechanism trees from research intent — not from policy boilerplate.
+
+    Bare tokens like 「清算」often appear in data-gap notes and must NOT pull the
+    exhaustion tree into an unrelated Donchian/breakout campaign.
+    """
+    text = str(brief or "")
+    # Strip common contract/policy sections that mention missing data feeds.
+    cut_markers = ("## 研究契约", "## 约束", "研究契约约束", "proxy_policy", "缺清算", "缺订单簿")
+    intent = text
+    for m in cut_markers:
+        if m in intent:
+            intent = intent.split(m, 1)[0]
+    intent_l = intent.lower()
     out = []
-    if any(k in text for k in ("衰竭", "回收", "exhaust", "panic", "清算", "超跌")):
+    if any(k in intent for k in (
+        "衰竭回收", "恐慌衰竭", "强制平仓", "超跌反弹", "卖压衰减",
+    )) or any(k in intent_l for k in ("exhaustion", "panic flush", "forced liquidation")):
         out.append(EXHAUSTION_TREE)
-    if any(k in text for k in (
-        "唐奇安", "donchian", "通道突破", "趋势突破", "假突破", "有效突破",
-        "主趋势", "中频突破",
-    )):
+    donchian_hit = any(k in intent for k in (
+        "唐奇安", "通道突破", "趋势突破", "假突破", "有效突破", "主趋势启动", "中频突破",
+    )) or any(k in intent_l for k in ("donchian", "channel break", "trend break"))
+    if donchian_hit:
         out.append(DONCHIAN_TREE)
-    if any(k in text for k in ("收缩", "扩张", "squeeze", "压缩", "波动率", "突破")):
-        # Avoid double-adding squeeze when Donchian brief already covers breakout context.
-        if DONCHIAN_TREE not in out:
-            out.append(SQUEEZE_TREE)
-        elif any(k in text for k in ("收缩", "扩张", "squeeze", "压缩")):
-            out.append(SQUEEZE_TREE)
+    squeeze_hit = any(k in intent for k in ("波动率收缩", "波动收缩", "收缩扩张", "波动压缩")) or any(
+        k in intent_l for k in ("squeeze", "vol compression", "vol expansion")
+    )
+    # Generic「突破」alone is not enough when Donchian already owns the brief.
+    if squeeze_hit or (not donchian_hit and ("突破" in intent or "breakout" in intent_l)):
+        out.append(SQUEEZE_TREE)
     return out
 
 
