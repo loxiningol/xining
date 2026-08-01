@@ -26,6 +26,9 @@ from . import research_blackboard as board
 from . import research_branch_manager as branch_mgr
 from . import research_ledger as ledger
 from . import microstructure_bridge as micro
+from . import data_evidence_ladder as ladder
+from . import research_campaign as campaign
+from . import cheap_probe_stream as cheap
 from . import symbolic_searcher as sym
 
 
@@ -64,9 +67,10 @@ def compile_research_contract(brief, symbol, timeframe, constraints=None):
             "level2_order_book", "open_interest", "liquidation_flow",
             "historical_funding", "cross_exchange_basis",
         ],
-        "proxy_policy_zh": (
-            "OHLCV衍生量只可标为代理证据；缺少直接数据时返回数据不足，"
-            "不得用代理失败宣判对应微观机制死亡。"
+        "proxy_policy_zh": ladder.contract_policy_zh(),
+        "architecture_zh": (
+            "不能安全地一次性并行物化100–500个完整回测；"
+            "通过流式廉价探针、摘要落盘、分级筛选与可恢复调度覆盖约100–500个机制格子。"
         ),
         "forbidden_info": ["future_bars", "unrealized_label_leak"],
         "max_complexity": "probe_then_assemble",
@@ -268,6 +272,76 @@ def run_discovery(
             "mechanism_id": h.get("mechanism_id"),
             "bidirectional_hit": h.get("bidirectional_hit"),
         }, run_id=run_id)
+
+    # Lean campaign: map + streaming cheap probes (summary-only) before heavy probes.
+    # This separates candidate count from resident memory.
+    lean = campaign.run_lean_campaign(
+        brief=brief,
+        symbol=symbol,
+        timeframe=timeframe,
+        factor_matrix=factor_matrix,
+        candles=candles,
+        fwd_returns=fwd_returns,
+        available_data=contract.get("available_data"),
+        micro_meta=stages.get("microstructure") or {},
+        campaign_id="lean_%s" % run_id,
+        max_cells=int((constraints or {}).get("max_mechanism_cells") or 96),
+        max_cheap_probes=int((constraints or {}).get("max_cheap_probes") or 160),
+        max_diagnostic=int((constraints or {}).get("max_diagnostic") or 8),
+        max_exec_tier=int((constraints or {}).get("max_exec_tier") or 4),
+        batch_size=6,
+    )
+    stages["lean_campaign"] = {
+        "campaign_id": lean.get("campaign_id"),
+        "evidence_level": lean.get("evidence_level"),
+        "n_cells": ((lean.get("stages") or {}).get("map") or {}).get("n_cells"),
+        "cheap": {
+            "n_streamed": ((lean.get("stages") or {}).get("cheap_stream") or {}).get("n_streamed_this_call"),
+            "state_counts": ((lean.get("stages") or {}).get("cheap_stream") or {}).get("state_counts"),
+            "summaries_path": ((lean.get("stages") or {}).get("cheap_stream") or {}).get("summaries_path"),
+            "architecture_zh": ((lean.get("stages") or {}).get("cheap_stream") or {}).get("architecture_zh"),
+        },
+        "diagnostic_n": ((lean.get("stages") or {}).get("diagnostic") or {}).get("n"),
+        "branch_policies": lean.get("branch_policies"),
+        "limits_zh": lean.get("limits_zh"),
+        "policy_zh": lean.get("policy_zh"),
+    }
+    ledger.append_event({
+        "event_type": "lean_campaign",
+        "campaign_id": lean.get("campaign_id"),
+        "n_cells": stages["lean_campaign"]["n_cells"],
+        "cheap_n": stages["lean_campaign"]["cheap"].get("n_streamed"),
+        "cheap_states": stages["lean_campaign"]["cheap"].get("state_counts"),
+        "evidence_level": lean.get("evidence_level"),
+    }, run_id=run_id)
+    promote_mids = set()
+    for row in (((lean.get("stages") or {}).get("cheap_stream") or {}).get("promote") or []):
+        if row.get("mechanism_id"):
+            promote_mids.add(str(row.get("mechanism_id")))
+        promote_mids.add(str(row.get("cell_id") or ""))
+    # Annotate population with evidence-ladder claim mode (proxy vs strong block).
+    annotated_pop = []
+    for h in (pop.get("hypotheses") or []):
+        row = ladder.annotate_hypothesis(
+            h, contract.get("available_data"), stages.get("microstructure") or {},
+        )
+        if str(row.get("mechanism_id") or "") in promote_mids:
+            row["priority_boost"] = float(row.get("priority_boost") or 0) + 3.0
+            row["lean_promote"] = True
+        annotated_pop.append(row)
+    annotated_pop.sort(
+        key=lambda x: (
+            1 if x.get("lean_promote") else 0,
+            1 if x.get("may_research") is not False else 0,
+            float(x.get("priority_boost") or 0),
+        ),
+        reverse=True,
+    )
+    pop["hypotheses"] = annotated_pop
+    stages["population"]["lean_promote_n"] = sum(1 for h in annotated_pop if h.get("lean_promote"))
+    stages["population"]["claim_proxy_n"] = sum(
+        1 for h in annotated_pop if h.get("claim_mode") == "proxy_claim"
+    )
 
     archive = {}
     survivors = []
@@ -702,10 +776,9 @@ def run_discovery(
         ),
         "micro_coverage_ratio": micro_cov,
         "reason_zh": (
-            "当前覆盖可评价具体代理与执行映射；若仅有OHLCV或前向盘口快照、"
-            "仍缺持仓量/清算/资金费率，则禁止 FAMILY_EXHAUSTED。"
-            if micro_cov < 0.35 else
-            "已有前向微观快照重叠；仍缺 OI/清算/funding 时不得关闭依赖这些维度的机制族。"
+            "缺清算/OI/历史L2 时仅阻断对应强声明，OHLCV代理与前向微观校准继续；"
+            "禁止把强声明阻断写成家族死亡。当前实现用流式廉价探针覆盖机制格子，"
+            "而非一次性并行物化全部完整回测。"
         ),
     }
     stages["research_state_counts"] = state_counts
@@ -920,7 +993,7 @@ def probe():
             "multiple_testing", "edge_friction", "creation_multiverse",
             "parameter_platform", "prediction_contract", "outcome_attribution",
             "generator_scorecard", "mechanism_beliefs", "budget_allocator",
-            "shadow_feedback", "learning_loop", "research_branch_manager", "microstructure_bridge",
+            "shadow_feedback", "learning_loop", "research_branch_manager", "microstructure_bridge", "data_evidence_ladder", "cheap_probe_stream", "research_campaign",
         ],
         "roles": list(committee.ROLE_CONTRACTS.keys()),
         "learning_mvp": learn.probe().get("mvp"),

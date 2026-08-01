@@ -26,8 +26,14 @@ EXHAUSTION_TREE = {
                 "liquidation_flow_exhaustion_direct_002",
                 "forced_liquidation_bounce_001",
             ],
+            # Strong liquidation claim needs L2 derivatives; proxy path cells remain L0.
             "requires_micro_data": True,
             "requires_data": ["liquidation_flow", "open_interest"],
+            "proxy_mechanism_ids": [
+                "panic_exhaustion_recovery_001",
+                "exhaustion_absorption_reclaim_002",
+            ],
+            "strong_claim": "liquidation_exhaustion",
         },
         "B_liquidity_vacuum": {
             "title_zh": "流动性真空后恢复",
@@ -221,9 +227,26 @@ def evaluate_family_closures(failure_lineage, coverage, contract=None, brief="")
                 )
             )
             data_ready = _branch_data_ready(branch)
-            if tested == 0:
+            # Evidence ladder: strong-claim block ≠ stop all research on the branch.
+            try:
+                from . import data_evidence_ladder as _ladder
+                pol = _ladder.branch_research_policy(branch, available, None)
+            except Exception:
+                pol = {"status": "open" if data_ready else "data_blocked"}
+            ladder_status = pol.get("status")
+            if tested == 0 and ladder_status == "proxy_open":
+                status = "proxy_open_untested"
+            elif tested == 0:
                 status = "untested"
-            elif not data_ready:
+            elif ladder_status == "proxy_open" and not data_ready:
+                # Strong claim blocked, but proxy leaves were tested / open.
+                if near > 0:
+                    status = "proxy_open_near_miss"
+                elif contradicted >= max(1, int(0.7 * max(tested, 1))):
+                    status = "proxy_branch_contradicted"
+                else:
+                    status = "proxy_open"
+            elif not data_ready and ladder_status != "proxy_open":
                 status = "data_blocked"
             elif proxy_or_data and not any(
                 s not in ("PROXY_INADEQUATE", "DATA_INADEQUATE", "SAMPLE_INADEQUATE")
@@ -244,7 +267,9 @@ def evaluate_family_closures(failure_lineage, coverage, contract=None, brief="")
                 "proxy_or_data": proxy_or_data,
                 "requires_micro_data": bool(branch.get("requires_micro_data")),
                 "data_ready": data_ready,
+                "ladder_status": ladder_status,
                 "title_zh": branch.get("title_zh"),
+                "note_zh": pol.get("note_zh"),
             }
             branch_reports.append({
                 "tree_id": tree_id, "branch_id": bid, **branch_states[bid],
@@ -307,7 +332,8 @@ def evaluate_family_closures(failure_lineage, coverage, contract=None, brief="")
         "micro_data_available": micro_ok,
         "rule_zh": (
             "只有充分机制空间覆盖且可评价分支被独立证据重复证伪，才可关闭机制族；"
-            "缺订单簿/OI/清算等数据时禁止 FAMILY_EXHAUSTED。"
+            "缺清算/OI/历史L2 时仅阻断强声明，不得终止仍可做 OHLCV/前向微观代理研究的家族；"
+            "禁止 FAMILY_EXHAUSTED。"
         ),
         "at": _now(),
     }
