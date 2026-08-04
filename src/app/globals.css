@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #071512;
+  --ink-soft: #0f2420;
+  --mist: #eef3f0;
+  --mist-2: #dce7e1;
+  --paper: #f7faf8;
+  --teal: #0f6b57;
+  --teal-bright: #14a07a;
+  --signal: #d97706;
+  --signal-soft: #f59e0b;
+  --gain: #0d9f6e;
+  --loss: #d64545;
+  --line: rgba(15, 36, 32, 0.12);
+  --glow: rgba(20, 160, 122, 0.28);
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-mist: var(--mist);
+  --color-mist-2: var(--mist-2);
+  --color-paper: var(--paper);
+  --color-teal: var(--teal);
+  --color-teal-bright: var(--teal-bright);
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-line: var(--line);
+  --font-sans: var(--font-manrope);
+  --font-display: var(--font-syne);
+  --font-mono: var(--font-jetbrains);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-manrope), var(--font-noto), "Noto Sans SC", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(20, 160, 122, 0.25);
+}
+
+.font-display {
+  font-family: var(--font-syne), var(--font-noto), "Noto Sans SC", sans-serif;
+}
+
+.font-mono-num {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.atmosphere {
+  background:
+    radial-gradient(1200px 700px at 80% -10%, rgba(20, 160, 122, 0.22), transparent 55%),
+    radial-gradient(900px 600px at -10% 20%, rgba(217, 119, 6, 0.14), transparent 50%),
+    linear-gradient(160deg, #0a1c18 0%, #102820 42%, #0b1614 100%);
+}
+
+.atmosphere-light {
+  background:
+    radial-gradient(900px 500px at 100% 0%, rgba(20, 160, 122, 0.12), transparent 55%),
+    radial-gradient(700px 420px at 0% 30%, rgba(217, 119, 6, 0.08), transparent 50%),
+    linear-gradient(180deg, #f7faf8 0%, #eef3f0 100%);
+}
+
+.grid-overlay {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -1.5%, 0) scale(1.03);
+  }
+}
+
+@keyframes pulse-line {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-rise {
+  animation: rise-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-rise-delay-1 {
+  animation: rise-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.animate-rise-delay-2 {
+  animation: rise-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+}
+
+.animate-drift {
+  animation: drift 14s ease-in-out infinite;
+}
+
+.animate-pulse-line {
+  animation: pulse-line 3.2s ease-in-out infinite;
+}
+
+.chart-shell {
+  background: linear-gradient(180deg, rgba(15, 36, 32, 0.03), transparent);
+}
