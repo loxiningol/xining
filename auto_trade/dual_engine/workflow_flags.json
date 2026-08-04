@@ -1,0 +1,25 @@
+{
+  "schema": "qiyu_workflow_flags_v1",
+  "workflow_version": "v1",
+  "creation_entry": "legacy",
+  "migration_version": "001",
+  "upgrade_status": "implementing",
+  "acceptance": {
+    "A": null,
+    "B": null,
+    "C": null,
+    "D": null,
+    "E": null,
+    "F": null,
+    "G": null,
+    "H": null
+  },
+  "acceptance_passed_at": null,
+  "switched_at": null,
+  "pause": {
+    "non_live_creation": true,
+    "evolve_timer": true
+  },
+  "notes": [],
+  "updated_at": "2026-08-02 22:33:18"
+}

@@ -19,6 +19,11 @@ FEATURES = {
     "ema17", "ema19", "ema21", "ema23", "ema32", "ema38", "ema53",
     "ema75", "ema95", "ema200", "k", "d", "j", "cci", "macd_stick",
     "atr14", "rsi14", "z20", "vol_z20", "prev_high20", "prev_low20",
+    # Research↔formal aligned factors (creation GENERIC_FACTOR_TO_DSL)
+    "ret_3", "trend_bias_50_200", "donchian20_break_up", "donchian20_break_dn",
+    "reclaim_strength",
+    # Bollinger (20,2) aligned with research bb_* factors
+    "bb_lower_dist", "bb_upper_dist", "bb_mid_reclaim", "bb_width",
     # Rolling 4H-on-5m (48×5m) liquidity box + mild volume ratio
     "prev_high48", "prev_low48", "prev_mid48", "vol_ma20_ratio",
     # Rolling 24H-on-5m (288×5m) sweep box
@@ -32,6 +37,7 @@ FEATURES = {
     # NY Open Liquidity Hole Fade: London box [08:00,12:30) UTC + session VWAP
     "london_high", "london_low", "london_mid", "vwap",
 }
+ENTRY_SNAPSHOT_FEATURES = {"k", "d", "j"}
 # Research / DSL allowlist — liquid OKX USDT-SWAP universe (expanded 2026-07-25).
 INSTRUMENTS = {
     # majors
@@ -52,9 +58,12 @@ INSTRUMENTS = {
 }
 OPS = {"lt", "lte", "gt", "gte", "eq", "between", "cross_above", "cross_below"}
 LOGICAL = {"all", "any", "not"}
+# P2 sequence support: causal "was true in prior 1..bars" (excludes current bar).
+TEMPORAL = {"was_true_within"}
 MAX_DEPTH = 6
 MAX_LEAVES = 32
 MAX_LOOKBACK = 240
+WAS_TRUE_WITHIN_BARS_MAX = 60
 EXECUTION_MAPPINGS = {"bar_close", "next_bar_open"}
 ENTRY_POLICY_SOURCE = "qiyu_research_contract_v2"
 ENTRY_POLICY_MODE = "exact_human_contract"
@@ -172,6 +181,17 @@ def _logic_skeleton(node, nums=None):
     nums = nums if nums is not None else []
     if not isinstance(node, dict):
         return None
+    if "was_true_within" in node:
+        pack = node.get("was_true_within") or {}
+        try:
+            nums.append(float(pack.get("bars")))
+        except Exception:
+            pass
+        return {
+            "op": "was_true_within",
+            "bars": pack.get("bars"),
+            "child": _logic_skeleton(pack.get("expr"), nums),
+        }
     logical = [k for k in LOGICAL if k in node]
     if logical:
         op = logical[0]
@@ -199,13 +219,17 @@ def _logic_skeleton(node, nums=None):
         return leaf
     left = node.get("left") or {}
     right = node.get("right") or {}
+    left_tiered = left.get("entry_tiered") or {}
+    right_tiered = right.get("entry_tiered") or {}
     role = node.get("role")
     leaf = {
         "left": left.get("feature"),
+        "left_entry_tiered_feature": left_tiered.get("feature"),
         "left_quantile_of": left.get("quantile_of"),
         "left_offset": int(left.get("offset") or 0),
         "op": node.get("op"),
         "right_feature": right.get("feature"),
+        "right_entry_tiered_feature": right_tiered.get("feature"),
         "right_quantile_of": right.get("quantile_of"),
         "right_quantile_window": right.get("window"),
         "right_quantile_min_history": right.get("min_history"),
@@ -218,6 +242,13 @@ def _logic_skeleton(node, nums=None):
             nums.append(float(right.get("value")))
         except Exception:
             pass
+    for spec in (left_tiered, right_tiered):
+        if spec:
+            for field in ("split", "lt", "gt"):
+                try:
+                    nums.append(float(spec.get(field)))
+                except Exception:
+                    pass
     if "quantile_of" in right:
         try:
             nums.append(float(right.get("q")))
@@ -333,7 +364,7 @@ def _offset(value):
     return value
 
 
-def _validate_operand(operand):
+def _validate_operand(operand, phase=None):
     if not isinstance(operand, dict):
         raise DSLValidationError("operand must be object")
     keys = set(operand)
@@ -353,6 +384,25 @@ def _validate_operand(operand):
         if keys != {"value"}:
             raise DSLValidationError("constant operand contains unknown fields")
         _number(operand.get("value"))
+        return
+    if "entry_tiered" in operand:
+        if keys != {"entry_tiered"}:
+            raise DSLValidationError("entry_tiered operand contains unknown fields")
+        if phase != "exit":
+            raise DSLValidationError("entry_tiered operand is only valid in exits")
+        spec = operand.get("entry_tiered")
+        if not isinstance(spec, dict):
+            raise DSLValidationError("entry_tiered must be an object")
+        if set(spec) != {"feature", "split", "lt", "gt"}:
+            raise DSLValidationError(
+                "entry_tiered requires feature, split, lt and gt")
+        feature = str(spec.get("feature") or "")
+        if feature not in ENTRY_SNAPSHOT_FEATURES:
+            raise DSLValidationError(
+                "unsupported entry snapshot feature: %s" % feature)
+        _number(spec.get("split"))
+        _number(spec.get("lt"))
+        _number(spec.get("gt"))
         return
     if "quantile_of" in operand:
         allowed = {"quantile_of", "q", "window", "min_history"}
@@ -423,6 +473,25 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
     seen_ids = seen_ids if seen_ids is not None else set()
     if depth > MAX_DEPTH or not isinstance(node, dict):
         raise DSLValidationError("expression depth/type invalid")
+    if "was_true_within" in node:
+        if set(node.keys()) != {"was_true_within"}:
+            raise DSLValidationError("was_true_within node must contain only was_true_within")
+        pack = node["was_true_within"]
+        if not isinstance(pack, dict):
+            raise DSLValidationError("was_true_within requires object payload")
+        try:
+            bars = int(pack.get("bars"))
+        except Exception:
+            raise DSLValidationError("was_true_within.bars must be int")
+        if bars < 1 or bars > WAS_TRUE_WITHIN_BARS_MAX:
+            raise DSLValidationError(
+                "was_true_within.bars outside 1..%d" % WAS_TRUE_WITHIN_BARS_MAX
+            )
+        expr = pack.get("expr")
+        if not isinstance(expr, dict):
+            raise DSLValidationError("was_true_within.expr required")
+        _walk(expr, depth + 1, counter, seen_ids, phase=phase)
+        return
     logical = [key for key in LOGICAL if key in node]
     if logical:
         if len(logical) != 1 or len(node) != 1:
@@ -561,13 +630,13 @@ def _walk(node, depth=0, counter=None, seen_ids=None, phase=None):
     op = str(node.get("op") or "")
     if op not in OPS:
         raise DSLValidationError("unsupported operator: %s" % op)
-    _validate_operand(node.get("left"))
+    _validate_operand(node.get("left"), phase=phase)
     if op == "between":
         _number(node.get("lower")); _number(node.get("upper"))
         if float(node["lower"]) > float(node["upper"]):
             raise DSLValidationError("between lower exceeds upper")
     else:
-        _validate_operand(node.get("right"))
+        _validate_operand(node.get("right"), phase=phase)
     role = node.get("role")
     if role is not None:
         if phase != "exit":
@@ -644,9 +713,24 @@ def _series(frame, feature):
     return frame[feature]
 
 
-def _operand(frame, index, operand, extra_offset=0):
+def _operand(frame, index, operand, extra_offset=0, position=None):
     if "value" in operand:
         return float(operand["value"])
+    if "entry_tiered" in operand:
+        if not isinstance(position, dict):
+            raise ValueError("entry snapshot requires position context")
+        spec = operand["entry_tiered"]
+        feature = str(spec["feature"])
+        snapshot = position.get("entry_features") or {}
+        if feature not in snapshot:
+            raise ValueError("entry snapshot feature unavailable: %s" % feature)
+        entry_value = float(snapshot[feature])
+        split = float(spec["split"])
+        if entry_value < split:
+            return float(spec["lt"])
+        if entry_value > split:
+            return float(spec["gt"])
+        raise ValueError("entry snapshot equals strict split: %s" % split)
     if "quantile_of" in operand:
         # The threshold uses only bars strictly before the evaluated bar.  For
         # cross operators, ``extra_offset=1`` also shifts the history boundary,
@@ -982,6 +1066,33 @@ def classify_exit_details(exit_details, position=None):
 
 def evaluate_expression(frame, index, node, explain=False,
                         position=None, direction=None):
+    if "was_true_within" in node:
+        pack = node["was_true_within"] or {}
+        bars = int(pack.get("bars") or 1)
+        expr = pack.get("expr") or {}
+        # Causal lookback: prior bars only (1..bars), never current index.
+        passed = False
+        details = []
+        lo = max(0, int(index) - bars)
+        for k in range(lo, int(index)):
+            ok, child_details = evaluate_expression(
+                frame, k, expr, explain=explain,
+                position=position, direction=direction,
+            )
+            if explain:
+                details.extend(child_details)
+            if ok:
+                passed = True
+                break
+        if explain:
+            details = [{
+                "condition_id": "was_true_within",
+                "passed": bool(passed),
+                "bars": bars,
+                "index": index,
+                "children": details,
+            }]
+        return bool(passed), details
     if "all" in node:
         children = [evaluate_expression(frame, index, child, explain=explain,
                                         position=position, direction=direction)
@@ -1017,24 +1128,28 @@ def evaluate_expression(frame, index, node, explain=False,
         return passed, details
     op = node["op"]
     try:
-        left = _operand(frame, index, node["left"])
+        left = _operand(frame, index, node["left"], position=position)
         if op == "between":
             right = [float(node["lower"]), float(node["upper"])]
             passed = right[0] <= left <= right[1]
         else:
-            right = _operand(frame, index, node["right"])
+            right = _operand(frame, index, node["right"], position=position)
             if op == "lt": passed = left < right
             elif op == "lte": passed = left <= right
             elif op == "gt": passed = left > right
             elif op == "gte": passed = left >= right
             elif op == "eq": passed = abs(left-right) <= 1e-12
             elif op == "cross_above":
-                previous_left = _operand(frame, index, node["left"], 1)
-                previous_right = _operand(frame, index, node["right"], 1)
+                previous_left = _operand(
+                    frame, index, node["left"], 1, position=position)
+                previous_right = _operand(
+                    frame, index, node["right"], 1, position=position)
                 passed = previous_left <= previous_right and left > right
             elif op == "cross_below":
-                previous_left = _operand(frame, index, node["left"], 1)
-                previous_right = _operand(frame, index, node["right"], 1)
+                previous_left = _operand(
+                    frame, index, node["left"], 1, position=position)
+                previous_right = _operand(
+                    frame, index, node["right"], 1, position=position)
                 passed = previous_left >= previous_right and left < right
             else:
                 passed = False
@@ -1347,6 +1462,10 @@ def backtest_dsl(frame, strategy, leverage=20, stop_loss_pct=0.009,
             # bar when execution_mapping=next_bar_open.
             "entry_bar_high": float(frame["high"].iloc[signal_index]),
             "entry_bar_low": float(frame["low"].iloc[signal_index]),
+            "entry_features": {
+                feature: float(frame[feature].iloc[signal_index])
+                for feature in ENTRY_SNAPSHOT_FEATURES
+            },
             "mae_price_pct": 0.0,
             "size_meta": size_meta,
             "execution_mapping": execution_mapping,

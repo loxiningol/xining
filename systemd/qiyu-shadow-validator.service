@@ -1,0 +1,13 @@
+[Unit]
+Description=Qiyu read-only seven-day strategy shadow validator
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+ExecStart=/usr/bin/flock -n -E 75 /root/auto_trade/shadow_validator.lock /usr/bin/python3 /root/auto_trade_shadow_validator.py
+Nice=17
+CPUQuota=30%
+MemoryMax=160M
+TimeoutStartSec=4min
+

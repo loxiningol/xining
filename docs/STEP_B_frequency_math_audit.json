@@ -1,0 +1,107 @@
+{
+  "schema": "qiyu_step_b_frequency_math_audit_v2",
+  "updated_at": "2026-08-03 12:55:00",
+  "formula": "expected_weekly_fills = n_fills × 7 / honest_span_days",
+  "formula_module": "auto_trade_ai_consensus.compute_weekly_open_frequency",
+  "note_zh": "v2：统一诚实观测跨度；禁止虚构730当分母。ADA5旧值0.15来自weak_prior或trades/730错误，已替换为诚实短窗密度。sample_2y_ok=false表示未满足近2年样本门禁，但不伪造周开仓数字。",
+  "supersedes": "qiyu_step_b_frequency_math_audit_v1",
+  "live_numbers": {
+    "simple_sum_weekly": 5.648,
+    "correlation_adjusted_weekly": 5.648,
+    "conflict_adjusted_weekly": null,
+    "final_fillable_weekly": null,
+    "final_fillable_daily": null,
+    "per_strategy_weekly": [
+      {
+        "strategy_key": "ng5_exhaustion_fade_short_ai",
+        "expected_weekly_fills": 1.308,
+        "symbol": "NG-USDT-SWAP",
+        "mechanism_family": "exhaustion_fade_short",
+        "method": "legacy_carried",
+        "note": "pre-v2 carry; recompute on next live audit"
+      },
+      {
+        "strategy_key": "frost_xrp_rescue_h20_t45",
+        "expected_weekly_fills": 0.5,
+        "symbol": "XRP-USDT-SWAP",
+        "mechanism_family": "exhaustion_fade_short",
+        "method": "legacy_carried"
+      },
+      {
+        "strategy_key": "ltc5_exhaustion_fade_short_ai",
+        "expected_weekly_fills": 0.5,
+        "symbol": "LTC-USDT-SWAP",
+        "mechanism_family": "exhaustion_fade_short",
+        "method": "legacy_carried"
+      },
+      {
+        "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+        "expected_weekly_fills": 3.19,
+        "symbol": "ADA-USDT-SWAP",
+        "mechanism_family": "session_trend_pullback",
+        "n_trades": 17,
+        "span_days": 37.3,
+        "span_source": "capped_claimed_730_to_37.3",
+        "method": "backtest_sample_lt_2y",
+        "sample_2y_ok": false,
+        "stale_wrong_value": 0.15,
+        "stale_reason": "weak_prior_new_mount_or_trades_over_730"
+      },
+      {
+        "strategy_key": "frost3_btc1h_xrpport_exhaustion_fade_slope",
+        "expected_weekly_fills": 0.28,
+        "symbol": "BTC-USDT-SWAP",
+        "mechanism_family": "exhaustion_fade_short",
+        "span_days": 259.0,
+        "method": "backtest_sample_lt_2y",
+        "sample_2y_ok": false,
+        "stale_wrong_value": 0.15,
+        "stale_reason": "weak_prior_or_trades_over_730",
+        "note": "aligned to honest short/medium window ~0.28 from mounted retest"
+      }
+    ]
+  },
+  "closeout_baseline_reference": {
+    "note": "prior closeout at 2026-07-26; ADA5 0.15 in that era is frequency_stale",
+    "frequency_stale": true,
+    "superseded_by": "docs/STEP_B_frequency_math_audit.json#v2",
+    "simple_sum_weekly": 2.258,
+    "correlation_adjusted_weekly": 2.258,
+    "conflict_adjusted_weekly": 2.1647,
+    "final_fillable_weekly": 2.1647,
+    "final_fillable_daily": 0.3092
+  },
+  "formulas": {
+    "density": "n_fills × 7 / honest_span_days via compute_weekly_open_frequency",
+    "honest_span": "min(frame_span, trade_span, bars_span); claimed≥600 without physical → rejected",
+    "simple_sum": "Σ_i w_i where w_i = expected_weekly_fills of can_open strategies with countable methods (excludes weak_prior/insufficient)",
+    "correlation_adjusted_mean": "E[Σ X_i] = Σ E[X_i] = Σ p_i for ANY dependence structure. Therefore correlation_adjusted_weekly := simple_sum_weekly (mean-invariant). Correlation only changes Var(Σ X_i), co_signal_prob, co_silence_prob.",
+    "conflict_adjusted": "Simulate correlated Bernoulli daily triggers (family ρ=0.55, cross ρ=0.15). Then apply (1) same-symbol mutex max 1 fill/day and (2) same-family co-fire arbitration keeping highest p only. Scale sim conflict rate by target_daily * (conflict_daily_raw / indep_daily). final_fillable := conflict_adjusted.",
+    "why_corr_mean_equals_simple_sum": "E[sum_i X_i] = sum_i E[X_i] for any dependence; correlation changes distribution / co-fire probability, not the mean. Conflict adjustment THEN reduces mean via same-symbol mutex + same-family arbitration."
+  },
+  "bootstrap": {
+    "n_weekly_samples": 57,
+    "median_7d": 2.1237,
+    "interval_50pct": [
+      1.0618,
+      3.1855
+    ],
+    "interval_80pct": [
+      1.0618,
+      3.1855
+    ],
+    "interval_95pct": [
+      0.0,
+      5.3091
+    ],
+    "p_3day_no_fill": 0.3657,
+    "p_7day_below_target": 0.8947,
+    "target_weekly_lo": 3.5,
+    "note": "bootstrap still from prior era; rerun after next live portfolio audit"
+  },
+  "assumptions": {
+    "family_correlation": 0.55,
+    "cross_family_correlation": 0.15,
+    "method": "honest_span_density_v2"
+  }
+}

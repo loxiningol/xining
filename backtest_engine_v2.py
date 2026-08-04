@@ -425,6 +425,7 @@ def precompute_indicators(df, timeframe="1h"):
     c = df["close"].astype(float)
     h = df["high"].astype(float)
     l = df["low"].astype(float)
+    o = df["open"].astype(float)
 
     for span in [6, 7, 8, 16, 17, 19, 21, 23, 32, 38, 53, 75, 95, 200]:
         df[f"ema{span}"] = c.ewm(span=span, adjust=False).mean()
@@ -463,8 +464,28 @@ def precompute_indicators(df, timeframe="1h"):
     mean20 = c.rolling(20,min_periods=20).mean()
     std20 = c.rolling(20,min_periods=20).std()
     df["z20"] = (c-mean20)/std20.replace(0,np.nan)
+    # Bollinger(20,2): distance / reclaim / width — aligned with research bb_*.
+    bb_lower = mean20 - 2.0 * std20
+    bb_upper = mean20 + 2.0 * std20
+    df["bb_lower_dist"] = (c - bb_lower) / c.replace(0, np.nan)
+    df["bb_upper_dist"] = (bb_upper - c) / c.replace(0, np.nan)
+    df["bb_mid_reclaim"] = (c - mean20) / c.replace(0, np.nan)
+    df["bb_width"] = (bb_upper - bb_lower) / mean20.replace(0, np.nan)
     df["prev_high20"] = h.shift(1).rolling(20,min_periods=20).max()
     df["prev_low20"] = l.shift(1).rolling(20,min_periods=20).min()
+    # Creation-research aligned continuous factors (no lookahead).
+    df["ret_3"] = c / c.shift(3) - 1.0
+    sma50 = c.rolling(50, min_periods=50).mean()
+    sma200 = c.rolling(200, min_periods=200).mean()
+    df["trend_bias_50_200"] = (sma50 - sma200) / c.replace(0, np.nan)
+    df["donchian20_break_up"] = c / df["prev_high20"].replace(0, np.nan) - 1.0
+    df["donchian20_break_dn"] = df["prev_low20"] / c.replace(0, np.nan) - 1.0
+    bar_range = (h - l).replace(0, np.nan)
+    close_location = (c - l) / bar_range
+    lower_wick = (pd.concat([o, c], axis=1).min(axis=1) - l) / c.replace(0, np.nan)
+    df["reclaim_strength"] = (
+        (close_location - 0.5).clip(lower=0.0) * (1.0 + (lower_wick * 100.0).clip(lower=0.0))
+    )
     # Rolling N-bar box (no lookahead): prior completed bars only.
     # On 5m, N=48 ⇒ past 4 hours — Rolling 4H Sweep Fade anchor.
     df["prev_high48"] = h.shift(1).rolling(48, min_periods=48).max()
@@ -684,13 +705,16 @@ def _build_kwargs(df):
     for col in [
         "k","d","j","cci","macd_stick","open","high","low","close",
         "atr14","h1_ema19","h1_ema53","h1_atr14",
-        "rsi14","z20","prev_high20","prev_low20","prev_high48","prev_low48","prev_mid48",
+        "rsi14","z20","bb_lower_dist","bb_upper_dist","bb_mid_reclaim","bb_width",
+        "prev_high20","prev_low20","prev_high48","prev_low48","prev_mid48",
         "h24_high","h24_low","h24_mid",
         "h1_slope4",
         "vol_z20","vol_ma20_ratio","pdh","pdl","pdc","h4_high24","h4_low24",
         "hour_utc","asia_high","asia_low","asia_mid","asia_range",
         "asia_range_atr_ratio",
         "london_high","london_low","london_mid","vwap",
+        "ret_3","trend_bias_50_200","donchian20_break_up","donchian20_break_dn",
+        "reclaim_strength",
     ]:
         if col in df.columns:
             try:
@@ -2201,6 +2225,19 @@ def entry_ng5_exhaustion_fade_short_ai_p(o,c,h,l,idx,params,**kw):
 
 
 def exit_ng5_exhaustion_fade_short_ai_p(c,h,l,idx,entry,params,**kw):
+    k_arr = kw.get("k_arr")
+    try:
+        k_value = float(k_arr[idx])
+        k_threshold = P(params,"take_profit_k_max",20)
+        if np.isfinite(k_value) and k_value <= k_threshold:
+            return True, {
+                "price":float(c[idx]),
+                "exit_type":"K指标止盈",
+                "k":k_value,
+                "take_profit_k_max":float(k_threshold),
+            }
+    except (IndexError,TypeError,ValueError):
+        pass
     return _exit_intraday_fixed(c,h,l,idx,entry,params,"short")
 
 
@@ -2432,15 +2469,66 @@ STRATEGIES_BY_TIMEFRAME = {
 DSL_STRATEGY_DEFINITIONS = {}
 
 
+_DSL_ENTRY_SNAPSHOT_FEATURES = ("k", "d", "j")
+
+
+def _dsl_entry_feature_snapshot(frame, index):
+    """Freeze trigger-candle K/D/J for entry-dependent exit rules."""
+    if frame is None:
+        return {}
+    snapshot = {}
+    for feature in _DSL_ENTRY_SNAPSHOT_FEATURES:
+        try:
+            value = float(frame[feature].iloc[int(index)])
+            if math.isfinite(value):
+                snapshot[feature] = value
+        except Exception:
+            continue
+    return snapshot
+
+
+def _dsl_recover_entry_feature_snapshot(frame, entry):
+    snapshot = dict(entry.get("_dsl_signal_features") or {})
+    if all(feature in snapshot for feature in _DSL_ENTRY_SNAPSHOT_FEATURES):
+        return snapshot
+    signal_index = None
+    signal_ts = entry.get("entry_signal_ts")
+    if signal_ts not in (None, "") and frame is not None:
+        try:
+            wanted = int(float(signal_ts))
+            for index, timestamp in enumerate(frame.index):
+                if int(pd.Timestamp(timestamp).timestamp() * 1000) == wanted:
+                    signal_index = index
+                    break
+        except Exception:
+            signal_index = None
+    if signal_index is None:
+        try:
+            candidate = int(entry.get("_dsl_signal_index"))
+            if frame is not None and 0 <= candidate < len(frame):
+                signal_index = candidate
+        except Exception:
+            signal_index = None
+    if signal_index is not None:
+        snapshot.update(_dsl_entry_feature_snapshot(frame, signal_index))
+    return snapshot
+
+
 def _dsl_entry_factory(definition):
     def entry(o, c, h, l, idx, params, **kw):
         import auto_trade_strategy_dsl as dsl
+        frame = kw.get("_dsl_frame")
         met, details = dsl.evaluate_expression(
-            kw.get("_dsl_frame"), idx, definition["entry"], explain=True
+            frame, idx, definition["entry"], explain=True
         )
+        signal_features = _dsl_entry_feature_snapshot(frame, idx)
         return met, {"price": c[idx], "condition_checks": details,
                      "dsl_hash": dsl.dsl_hash(definition),
                      "execution_mapping": definition.get("execution_mapping") or "bar_close",
+                     "_dsl_signal_features": signal_features,
+                     "trigger_k": signal_features.get("k"),
+                     "trigger_d": signal_features.get("d"),
+                     "trigger_j": signal_features.get("j"),
                      "_dsl_signal_index": idx,
                      "_dsl_signal_bar_high": float(h[idx]),
                      "_dsl_signal_bar_low": float(l[idx]),
@@ -2474,6 +2562,7 @@ def _dsl_exit_factory(definition):
             "peak_low": peak_low,
             "entry_bar_high": float(entry.get("_dsl_signal_bar_high") or peak_high),
             "entry_bar_low": float(entry.get("_dsl_signal_bar_low") or peak_low),
+            "entry_features": _dsl_recover_entry_feature_snapshot(frame, entry),
             "mae_price_pct": entry["mae_price_pct"],
             "partial_taken": bool(entry.get("partial_taken")),
         }

@@ -659,11 +659,22 @@ def select_for_brief(brief, symbol=None, timeframe=None, limit=12):
             "扫损", "sweep", "止损", "动量", "trend",
             "衰竭", "超卖", "rsi", "回收", "恐慌", "飞刀", "exhaust",
             "唐奇安", "donchian", "通道", "趋势突破", "假突破", "有效突破",
+            "胜率", "高胜率", "分散", "dense", "distributed", "正期望",
         ):
             if token in text and token in blob:
                 score += 1.5
             elif token in text:
                 score += 0.2
+        # Prefer denser, higher-hit-rate families unless the brief explicitly
+        # demands rare breakout / donchian structures.
+        if not any(k in text for k in ("唐奇安", "donchian", "通道突破", "放量突破")):
+            if m.get("family") == "mean_reversion":
+                score += 1.2
+            if m.get("family") == "trend_pullback":
+                score += 0.6
+            if m.get("family") in ("vol_squeeze_break", "donchian_trend_break",
+                                  "volume_anomaly_breakout"):
+                score -= 0.4
         if any(k in text for k in ("唐奇安", "donchian", "通道突破", "趋势突破", "假突破")):
             if "donchian" in mid or m.get("family") == "donchian_trend_break":
                 score += 4.0

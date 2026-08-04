@@ -1,0 +1,11 @@
+[Unit]
+Description=Qiyu Strategy Breath Controller
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/root
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_strategy_breath.py --force
+
+[Install]
+WantedBy=multi-user.target

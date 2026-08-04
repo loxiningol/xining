@@ -1,0 +1,10 @@
+{
+  "audit_only_is_not_notification": true,
+  "bind_mode": "existing_real_wxpusher_common_send_wx",
+  "created_by": "stage8_23_final_safe",
+  "enabled": true,
+  "fake_local_file_channel": false,
+  "notify_function": "send_wx",
+  "notify_module_path": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/common.py",
+  "verified_send_mode": "direct_wxpusher_http_using_common_token_uid"
+}

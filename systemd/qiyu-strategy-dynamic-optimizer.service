@@ -1,0 +1,9 @@
+[Unit]
+Description=Qiyu Strategy Dynamic Optimizer (daily explore for live S/A/B)
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/root
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_strategy_dynamic_optimizer.py --daily
+Nice=10

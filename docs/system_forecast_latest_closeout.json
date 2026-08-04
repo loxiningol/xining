@@ -1,0 +1,753 @@
+{
+  "active_strategy_count": 5,
+  "ai_explain_deferred": true,
+  "ai_status": {
+    "all_ok": false,
+    "chatgpt_ok": false,
+    "deepseek_ok": false,
+    "errors": {
+      "deepseek": null,
+      "glm": null,
+      "qwen": null
+    },
+    "qwen_ok": false,
+    "used_local_baseline": true
+  },
+  "calibration": {
+    "calibration_stage": {
+      "banner_zh": "预测模型尚处于校准期，当前数值为统计估计，不代表已验证精度。",
+      "complete_periods": 0,
+      "scientifically_validated": false,
+      "stage": "初步校准",
+      "ui_must_show_calibration_banner": true
+    },
+    "period_metrics": {
+      "Bias": null,
+      "MAE": null,
+      "MedAE": null,
+      "brier_p_3day_no_entry": null,
+      "complete_periods": 0,
+      "coverage_80pct": null,
+      "total_persisted_rows": 4
+    },
+    "rows": [
+      {
+        "error": null,
+        "expected_daily_fills": 0.32,
+        "expected_weekly_fills": 2.26,
+        "generated_at": "2026-07-26 18:40:06",
+        "method": "statistical_baseline_plus_regime",
+        "realized_weekly_fills": null,
+        "weekly_interval": [
+          -3,
+          4
+        ]
+      },
+      {
+        "error": null,
+        "expected_daily_fills": 0.32,
+        "expected_weekly_fills": 2.26,
+        "generated_at": "2026-07-26 18:41:41",
+        "method": "statistical_baseline_plus_regime",
+        "realized_weekly_fills": null,
+        "weekly_interval": [
+          0,
+          4
+        ]
+      },
+      {
+        "error": null,
+        "expected_daily_fills": 0.3679,
+        "expected_weekly_fills": 2.5752,
+        "generated_at": "2026-07-26 19:34:16",
+        "method": "statistical_baseline_regime_correlation_mutex",
+        "realized_weekly_fills": null,
+        "weekly_interval": [
+          0,
+          4
+        ]
+      },
+      {
+        "error": null,
+        "expected_daily_fills": 0.3092,
+        "expected_weekly_fills": 2.1647,
+        "generated_at": "2026-07-26 19:35:25",
+        "method": "statistical_baseline_regime_correlation_mutex",
+        "realized_weekly_fills": null,
+        "weekly_interval": [
+          0,
+          4
+        ]
+      }
+    ],
+    "updated_at": "2026-07-26 19:35:25"
+  },
+  "calibration_banner_zh": "预测模型尚处于校准期，当前数值为统计估计，不代表已验证精度。",
+  "calibration_period_metrics": {
+    "Bias": null,
+    "MAE": null,
+    "MedAE": null,
+    "brier_p_3day_no_entry": null,
+    "complete_periods": 0,
+    "coverage_80pct": null,
+    "total_persisted_rows": 3
+  },
+  "calibration_stage": {
+    "banner_zh": "预测模型尚处于校准期，当前数值为统计估计，不代表已验证精度。",
+    "complete_periods": 0,
+    "scientifically_validated": false,
+    "stage": "初步校准",
+    "ui_must_show_calibration_banner": true
+  },
+  "can_open_strategy_count": 5,
+  "creation_brief": {
+    "avoid_duplicate_families": [
+      "exhaustion_fade_short"
+    ],
+    "do_not_force_open": true,
+    "do_not_loosen_entries": true,
+    "positive_expectancy_gap_daily": 0.5,
+    "positive_expectancy_gap_weekly": 3.5,
+    "prefer_new_families": [
+      "mean_reversion_non_fade",
+      "session_breakout",
+      "microstructure_reclaim"
+    ],
+    "prioritize_positive_expectancy_gap": true,
+    "summary_zh": "组合成交(冲突修正后)日均0.309、周2.165；已校准正期望周频率0.000。策略创造应优先填补正期望频率缺口(周+3.500)，禁止放宽入场或强制开仓。",
+    "target_incremental_weekly_fills": 1.242
+  },
+  "frequency_gap": {
+    "basis": "final_fillable_after_correlation_and_mutex",
+    "expected_daily_fills": 0.3092,
+    "expected_weekly_fills": 2.1647,
+    "gap_daily_to_band": 0.1908,
+    "gap_weekly_to_band": 1.3353,
+    "status": "shortfall",
+    "target_daily": [
+      0.5,
+      1.0
+    ],
+    "target_weekly": [
+      3.5,
+      7.0
+    ]
+  },
+  "generated_at": "2026-07-26 19:35:25",
+  "is_current": true,
+  "key_assumptions": [
+    "波动率大致维持当前水平",
+    "无极端宏观/政策冲击（系统暂无宏观日历硬数据）",
+    "现有自动交易挂载策略集合不发生大规模增减"
+  ],
+  "mechanism_families": {
+    "independent_niche_count": 2,
+    "note": "NG/LTC/XRP exhaustion fades count as one family when present",
+    "saturated": [
+      "exhaustion_fade_short"
+    ],
+    "weights_weekly": {
+      "exhaustion_fade_short": 2.108,
+      "session_trend_pullback": 0.15
+    }
+  },
+  "openable_grade_counts": {
+    "A": 0,
+    "B": 5,
+    "C": 0,
+    "S": 0
+  },
+  "overall": {
+    "ai_explain_bundle": {
+      "deepseek": {
+        "ok": false,
+        "summary": null
+      },
+      "glm": {
+        "ok": false,
+        "summary": null
+      },
+      "qwen": {
+        "ok": false,
+        "summary": null
+      }
+    },
+    "ai_narrative_zh": "当前共有5个可开仓策略，0个s级策略 0个a级策略 5个b级策略 0个c级策略 预计本周总开仓待估。",
+    "ai_role": "explain_only",
+    "conflict_adjusted_weekly": 2.1647,
+    "correlation_adjusted_weekly": 2.258,
+    "daily_opens_expected": 0.3092,
+    "daily_opens_range": [
+      0.0,
+      0.57
+    ],
+    "frequency_method": "statistical_baseline_regime_correlation_mutex",
+    "regime_basis": [
+      "default_regime=1.0"
+    ],
+    "regime_factor": 1.0,
+    "simple_sum_weekly_opens_expected": 2.258,
+    "summary_zh": "当前共有5个可开仓策略，0个s级策略 0个a级策略 5个b级策略 0个c级策略 预计本周总开仓待估。",
+    "used_local_baseline": true,
+    "used_statistical_baseline": true,
+    "weekly_contributors_zh": "每周主要贡献: NG 5分钟冲高衰竭回落（AI创造）(≈1.308), LTC 5分钟冲高衰竭回落（AI创造）(≈0.5), ADA5顺势回升·0725T3(≈0.15)",
+    "weekly_opens_expected": 2.1647,
+    "weekly_opens_range": [
+      0,
+      4
+    ]
+  },
+  "paused_strategy_count": 0,
+  "per_strategy": [
+    {
+      "activity": "mid",
+      "ai_explain": {
+        "deepseek": null,
+        "glm": "AI未单独返回，已按快照补齐",
+        "qwen": null,
+        "role": "explain_only_not_numeric_source"
+      },
+      "ai_theoretical_wr_avg": 60.0,
+      "baseline_weekly_fills": 1.308,
+      "calibrated_expected_win_rate_pct": 64.71,
+      "can_open": true,
+      "clearly_positive_after_cost": false,
+      "confidence": "high",
+      "credibility": null,
+      "daily_opens_expected": 0.187,
+      "daily_opens_range": [
+        0.0,
+        0.429
+      ],
+      "expected_daily_fills": 0.187,
+      "expected_weekly_fills": 1.308,
+      "forecast_contribution": 57.9,
+      "frequency_class": {
+        "auto_kill": false,
+        "class": "moderate_frequency",
+        "credibility": 0.729,
+        "fills_per_week": 1.308,
+        "note": "低频≠劣质；仅作分类与缺口规划，不自动淘汰"
+      },
+      "frequency_method": "research_accepted_density",
+      "from_baseline": true,
+      "funnel_7d": {
+        "attempts": 1,
+        "blocked": 0,
+        "event_funnel_available": true,
+        "exits": 0,
+        "fills": 0,
+        "legacy_fallback": true,
+        "note": "LEGACY FALLBACK — strategy_events empty/unavailable; not a complete taxonomy funnel",
+        "primary": false,
+        "signal_currently_true": true,
+        "signals": 1,
+        "source": "legacy_signal_files_plus_fills",
+        "window_days": 7
+      },
+      "grade": "B",
+      "max_position_ratio": 0.3,
+      "mechanism_family": "exhaustion_fade_short",
+      "metric_status": {
+        "expectancy": "ok",
+        "win_rate": "ok"
+      },
+      "net_expectancy_equity_pct": -0.7922,
+      "net_expectancy_margin_pct": -2.6407,
+      "note": "统计基线×regime(1.00)；AI仅解释。漏斗 信号/尝试/成交/平仓/阻断=1/1/0/0/0",
+      "opens_7d_actual": 0,
+      "pause_new_entries": false,
+      "regime_factor": 1.0,
+      "share_pct": 57.9,
+      "strategy_key": "ng5_exhaustion_fade_short_ai",
+      "strategy_name": "NG 5分钟冲高衰竭回落",
+      "strategy_title": "NG 5分钟冲高衰竭回落",
+      "symbol": "NG-USDT-SWAP",
+      "timeframe": "5m",
+      "weekly_opens_expected": 1.308,
+      "weekly_opens_high": 3,
+      "weekly_opens_low": 0
+    },
+    {
+      "activity": "low",
+      "ai_explain": {
+        "deepseek": null,
+        "glm": "AI未单独返回，已按快照补齐",
+        "qwen": null,
+        "role": "explain_only_not_numeric_source"
+      },
+      "ai_theoretical_wr_avg": 60.5,
+      "baseline_weekly_fills": 0.5,
+      "calibrated_expected_win_rate_pct": 70.12,
+      "can_open": true,
+      "clearly_positive_after_cost": false,
+      "confidence": "high",
+      "credibility": null,
+      "daily_opens_expected": 0.071,
+      "daily_opens_range": [
+        0.0,
+        0.143
+      ],
+      "expected_daily_fills": 0.071,
+      "expected_weekly_fills": 0.5,
+      "forecast_contribution": 22.1,
+      "frequency_class": {
+        "auto_kill": false,
+        "class": "moderate_frequency",
+        "credibility": 0.703,
+        "fills_per_week": 0.5,
+        "note": "低频≠劣质；仅作分类与缺口规划，不自动淘汰"
+      },
+      "frequency_method": "live_14d_fill_rate",
+      "from_baseline": true,
+      "funnel_7d": {
+        "attempts": 1,
+        "blocked": 0,
+        "event_funnel_available": true,
+        "exits": 1,
+        "fills": 1,
+        "legacy_fallback": true,
+        "note": "LEGACY FALLBACK — strategy_events empty/unavailable; not a complete taxonomy funnel",
+        "primary": false,
+        "signal_currently_true": true,
+        "signals": 1,
+        "source": "legacy_signal_files_plus_fills",
+        "window_days": 7
+      },
+      "grade": "B",
+      "max_position_ratio": 0.3,
+      "mechanism_family": "exhaustion_fade_short",
+      "metric_status": {
+        "expectancy": "ok",
+        "win_rate": "ok"
+      },
+      "net_expectancy_equity_pct": 0.0001,
+      "net_expectancy_margin_pct": 0.0003,
+      "note": "统计基线×regime(1.00)；AI仅解释。漏斗 信号/尝试/成交/平仓/阻断=1/1/1/1/0",
+      "opens_7d_actual": 1,
+      "pause_new_entries": false,
+      "regime_factor": 1.0,
+      "share_pct": 22.1,
+      "strategy_key": "ltc5_exhaustion_fade_short_ai",
+      "strategy_name": "LTC 5分钟冲高衰竭回落",
+      "strategy_title": "LTC 5分钟冲高衰竭回落",
+      "symbol": "LTC-USDT-SWAP",
+      "timeframe": "5m",
+      "weekly_opens_expected": 0.5,
+      "weekly_opens_high": 1,
+      "weekly_opens_low": 0
+    },
+    {
+      "activity": "low",
+      "ai_explain": {
+        "deepseek": null,
+        "glm": "AI未单独返回，已按快照补齐",
+        "qwen": null,
+        "role": "explain_only_not_numeric_source"
+      },
+      "ai_theoretical_wr_avg": 74.333,
+      "baseline_weekly_fills": 0.15,
+      "calibrated_expected_win_rate_pct": null,
+      "can_open": true,
+      "clearly_positive_after_cost": false,
+      "confidence": "low",
+      "credibility": null,
+      "daily_opens_expected": 0.021,
+      "daily_opens_range": [
+        0.0,
+        0.0
+      ],
+      "expected_daily_fills": 0.021,
+      "expected_weekly_fills": 0.15,
+      "forecast_contribution": 6.6,
+      "frequency_class": {
+        "auto_kill": false,
+        "class": "low_frequency",
+        "credibility": 0.0,
+        "fills_per_week": 0.15,
+        "note": "低频≠劣质；仅作分类与缺口规划，不自动淘汰"
+      },
+      "frequency_method": "weak_prior_new_mount",
+      "from_baseline": true,
+      "funnel_7d": {
+        "attempts": 1,
+        "blocked": 0,
+        "event_funnel_available": true,
+        "exits": 0,
+        "fills": 0,
+        "legacy_fallback": true,
+        "note": "LEGACY FALLBACK — strategy_events empty/unavailable; not a complete taxonomy funnel",
+        "primary": false,
+        "signal_currently_true": true,
+        "signals": 1,
+        "source": "legacy_signal_files_plus_fills",
+        "window_days": 7
+      },
+      "grade": "B",
+      "max_position_ratio": 0.3,
+      "mechanism_family": "session_trend_pullback",
+      "metric_status": {
+        "expectancy": "missing",
+        "win_rate": "missing"
+      },
+      "net_expectancy_equity_pct": null,
+      "net_expectancy_margin_pct": null,
+      "note": "统计基线×regime(1.00)；AI仅解释。漏斗 信号/尝试/成交/平仓/阻断=1/1/0/0/0",
+      "opens_7d_actual": 0,
+      "pause_new_entries": false,
+      "regime_factor": 1.0,
+      "share_pct": 6.6,
+      "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+      "strategy_name": "ADA5顺势回升",
+      "strategy_title": "ADA5顺势回升",
+      "symbol": "ADA-USDT-SWAP",
+      "timeframe": "5m",
+      "weekly_opens_expected": 0.15,
+      "weekly_opens_high": 0,
+      "weekly_opens_low": 0
+    },
+    {
+      "activity": "low",
+      "ai_explain": {
+        "deepseek": null,
+        "glm": "AI未单独返回，已按快照补齐",
+        "qwen": null,
+        "role": "explain_only_not_numeric_source"
+      },
+      "ai_theoretical_wr_avg": 76.0,
+      "baseline_weekly_fills": 0.15,
+      "calibrated_expected_win_rate_pct": null,
+      "can_open": true,
+      "clearly_positive_after_cost": false,
+      "confidence": "low",
+      "credibility": null,
+      "daily_opens_expected": 0.021,
+      "daily_opens_range": [
+        0.0,
+        0.0
+      ],
+      "expected_daily_fills": 0.021,
+      "expected_weekly_fills": 0.15,
+      "forecast_contribution": 6.6,
+      "frequency_class": {
+        "auto_kill": false,
+        "class": "low_frequency",
+        "credibility": 0.0,
+        "fills_per_week": 0.15,
+        "note": "低频≠劣质；仅作分类与缺口规划，不自动淘汰"
+      },
+      "frequency_method": "weak_prior_new_mount",
+      "from_baseline": true,
+      "funnel_7d": {
+        "attempts": 1,
+        "blocked": 0,
+        "event_funnel_available": true,
+        "exits": 0,
+        "fills": 0,
+        "legacy_fallback": true,
+        "note": "LEGACY FALLBACK — strategy_events empty/unavailable; not a complete taxonomy funnel",
+        "primary": false,
+        "signal_currently_true": true,
+        "signals": 1,
+        "source": "legacy_signal_files_plus_fills",
+        "window_days": 7
+      },
+      "grade": "B",
+      "max_position_ratio": 0.3,
+      "mechanism_family": "exhaustion_fade_short",
+      "metric_status": {
+        "expectancy": "missing",
+        "win_rate": "missing"
+      },
+      "net_expectancy_equity_pct": null,
+      "net_expectancy_margin_pct": null,
+      "note": "统计基线×regime(1.00)；AI仅解释。漏斗 信号/尝试/成交/平仓/阻断=1/1/0/0/0",
+      "opens_7d_actual": 0,
+      "pause_new_entries": false,
+      "regime_factor": 1.0,
+      "share_pct": 6.6,
+      "strategy_key": "frost3_btc1h_xrpport_exhaustion_fade_slope",
+      "strategy_name": "寒霜叁-BTC-1h-exhaustion_fade_xrpport",
+      "strategy_title": "寒霜叁-BTC-1h-exhaustion_fade_xrpport",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "1h",
+      "weekly_opens_expected": 0.15,
+      "weekly_opens_high": 0,
+      "weekly_opens_low": 0
+    },
+    {
+      "activity": "low",
+      "ai_explain": {
+        "deepseek": null,
+        "glm": "AI未单独返回，已按快照补齐",
+        "qwen": null,
+        "role": "explain_only_not_numeric_source"
+      },
+      "ai_theoretical_wr_avg": 79.0,
+      "baseline_weekly_fills": 0.15,
+      "calibrated_expected_win_rate_pct": null,
+      "can_open": true,
+      "clearly_positive_after_cost": false,
+      "confidence": "low",
+      "credibility": null,
+      "daily_opens_expected": 0.021,
+      "daily_opens_range": [
+        0.0,
+        0.0
+      ],
+      "expected_daily_fills": 0.021,
+      "expected_weekly_fills": 0.15,
+      "forecast_contribution": 6.6,
+      "frequency_class": {
+        "auto_kill": false,
+        "class": "low_frequency",
+        "credibility": 0.0,
+        "fills_per_week": 0.15,
+        "note": "低频≠劣质；仅作分类与缺口规划，不自动淘汰"
+      },
+      "frequency_method": "weak_prior_new_mount",
+      "from_baseline": true,
+      "funnel_7d": {
+        "attempts": 1,
+        "blocked": 0,
+        "event_funnel_available": true,
+        "exits": 0,
+        "fills": 0,
+        "legacy_fallback": true,
+        "note": "LEGACY FALLBACK — strategy_events empty/unavailable; not a complete taxonomy funnel",
+        "primary": false,
+        "signal_currently_true": true,
+        "signals": 1,
+        "source": "legacy_signal_files_plus_fills",
+        "window_days": 7
+      },
+      "grade": "B",
+      "max_position_ratio": 0.3,
+      "mechanism_family": "exhaustion_fade_short",
+      "metric_status": {
+        "expectancy": "missing",
+        "win_rate": "missing"
+      },
+      "net_expectancy_equity_pct": null,
+      "net_expectancy_margin_pct": null,
+      "note": "统计基线×regime(1.00)；AI仅解释。漏斗 信号/尝试/成交/平仓/阻断=1/1/0/0/0",
+      "opens_7d_actual": 0,
+      "pause_new_entries": false,
+      "regime_factor": 1.0,
+      "share_pct": 6.6,
+      "strategy_key": "frost_xrp_rescue_h20_t45",
+      "strategy_name": "寒霜-XRP-15m-exhaustion_fade",
+      "strategy_title": "寒霜-XRP-15m-exhaustion_fade",
+      "symbol": "XRP-USDT-SWAP",
+      "timeframe": "15m",
+      "weekly_opens_expected": 0.15,
+      "weekly_opens_high": 0,
+      "weekly_opens_low": 0
+    }
+  ],
+  "portfolio_frequency": {
+    "co_signal_prob": 0.055,
+    "co_silence_prob": 0.72,
+    "conflict_adjusted_daily": 0.3092,
+    "conflict_adjusted_weekly": 2.1647,
+    "correlation_adjusted_daily": 0.3226,
+    "correlation_adjusted_weekly": 2.258,
+    "cross_family_correlation_assumed": 0.15,
+    "family_correlation_assumed": 0.55,
+    "final_fillable_daily": 0.3092,
+    "final_fillable_weekly": 2.1647,
+    "method": "mean_invariant_corr_plus_family_symbol_arbitration",
+    "mutex_frequency_loss_weekly": 0.0933,
+    "note": "E[sum] invariant to correlation; final_fillable applies same-symbol mutex + same-family co-fire arbitration (priority keeps one).",
+    "same_direction_overlap_day_rate": 0.0,
+    "schema": "qiyu_portfolio_frequency_v1",
+    "simple_sum_daily": 0.3226,
+    "simple_sum_weekly": 2.258,
+    "strategies": [
+      {
+        "family": "exhaustion_fade_short",
+        "p_daily": 0.18685714285714286,
+        "side": "short",
+        "strategy_key": "ng5_exhaustion_fade_short_ai",
+        "symbol": "NG-USDT-SWAP",
+        "weekly": 1.308
+      },
+      {
+        "family": "exhaustion_fade_short",
+        "p_daily": 0.07142857142857142,
+        "side": "short",
+        "strategy_key": "ltc5_exhaustion_fade_short_ai",
+        "symbol": "LTC-USDT-SWAP",
+        "weekly": 0.5
+      },
+      {
+        "family": "session_trend_pullback",
+        "p_daily": 0.02142857142857143,
+        "side": "short",
+        "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+        "symbol": "ADA-USDT-SWAP",
+        "weekly": 0.15
+      },
+      {
+        "family": "exhaustion_fade_short",
+        "p_daily": 0.02142857142857143,
+        "side": "short",
+        "strategy_key": "frost3_btc1h_xrpport_exhaustion_fade_slope",
+        "symbol": "BTC-USDT-SWAP",
+        "weekly": 0.15
+      },
+      {
+        "family": "exhaustion_fade_short",
+        "p_daily": 0.02142857142857143,
+        "side": "short",
+        "strategy_key": "frost_xrp_rescue_h20_t45",
+        "symbol": "XRP-USDT-SWAP",
+        "weekly": 0.15
+      }
+    ]
+  },
+  "positive_expectancy_frequency": {
+    "calibrated_positive_E_daily": 0.0,
+    "calibrated_positive_E_weekly": 0.0,
+    "min_credibility": 0.35,
+    "near_zero_E_weekly": 0.5,
+    "near_zero_threshold_equity_pct": 0.05,
+    "negative_E_weekly": 1.308,
+    "per_strategy": [
+      {
+        "bucket": "negative_E",
+        "credibility": null,
+        "expected_daily_fills": 0.187,
+        "expected_weekly_fills": 1.308,
+        "mechanism_family": "exhaustion_fade_short",
+        "net_expectancy_equity_pct": -0.7922,
+        "strategy_key": "ng5_exhaustion_fade_short_ai"
+      },
+      {
+        "bucket": "near_zero_E",
+        "credibility": null,
+        "expected_daily_fills": 0.071,
+        "expected_weekly_fills": 0.5,
+        "mechanism_family": "exhaustion_fade_short",
+        "net_expectancy_equity_pct": 0.0001,
+        "strategy_key": "ltc5_exhaustion_fade_short_ai"
+      },
+      {
+        "bucket": "uncalibrated",
+        "credibility": null,
+        "expected_daily_fills": 0.021,
+        "expected_weekly_fills": 0.15,
+        "mechanism_family": "session_trend_pullback",
+        "net_expectancy_equity_pct": null,
+        "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14"
+      },
+      {
+        "bucket": "uncalibrated",
+        "credibility": null,
+        "expected_daily_fills": 0.021,
+        "expected_weekly_fills": 0.15,
+        "mechanism_family": "exhaustion_fade_short",
+        "net_expectancy_equity_pct": null,
+        "strategy_key": "frost3_btc1h_xrpport_exhaustion_fade_slope"
+      },
+      {
+        "bucket": "uncalibrated",
+        "credibility": null,
+        "expected_daily_fills": 0.021,
+        "expected_weekly_fills": 0.15,
+        "mechanism_family": "exhaustion_fade_short",
+        "net_expectancy_equity_pct": null,
+        "strategy_key": "frost_xrp_rescue_h20_t45"
+      }
+    ],
+    "positive_expectancy_frequency_gap": {
+      "gap_daily_to_band": 0.5,
+      "gap_weekly_to_band": 3.5,
+      "note": "creation must prioritize positive-E gap, not raw open-count gap",
+      "status": "shortfall",
+      "target_daily": [
+        0.5,
+        1.0
+      ],
+      "target_weekly": [
+        3.5,
+        7.0
+      ]
+    },
+    "schema": "qiyu_positive_expectancy_frequency_v1",
+    "total_forecasted_daily": 0.3226,
+    "total_forecasted_weekly": 2.258,
+    "uncalibrated_weekly": 0.45,
+    "updated_at": "2026-07-26 19:35:25"
+  },
+  "positive_expectancy_frequency_gap": {
+    "gap_daily_to_band": 0.5,
+    "gap_weekly_to_band": 3.5,
+    "note": "creation must prioritize positive-E gap, not raw open-count gap",
+    "status": "shortfall",
+    "target_daily": [
+      0.5,
+      1.0
+    ],
+    "target_weekly": [
+      3.5,
+      7.0
+    ]
+  },
+  "raw_ai": {
+    "deepseek": {},
+    "glm": {
+      "note": "chatgpt_failed_used_baseline"
+    },
+    "local_baseline": {
+      "daily_opens_expected": null,
+      "weekly_opens_expected": null
+    },
+    "qwen": {}
+  },
+  "refresh_mode": "lightweight_statistical",
+  "risk_warnings": [
+    "重大数据发布或突发波动可能显著改变触发频率",
+    "策略降级/暂停会降低周开仓次数",
+    "市场结构突变导致适用环境消失"
+  ],
+  "schema": "qiyu_system_forecast_v2_statistical",
+  "snapshot_at": "2026-07-26 19:35:25",
+  "snapshot_persist_path": "/root/auto_trade/forecast_snapshots/snapshot_20260726_193525_641994c8b0.json",
+  "stale": false,
+  "stale_cleared_at": "2026-07-26 19:35:25",
+  "strategy_pool_mounted_count": 5,
+  "strategy_pool_version": "a51a90ee3c993ebe",
+  "top_contributors": [
+    {
+      "mechanism_family": "exhaustion_fade_short",
+      "share_pct": 57.9,
+      "strategy_key": "ng5_exhaustion_fade_short_ai",
+      "weekly_opens_expected": 1.308
+    },
+    {
+      "mechanism_family": "exhaustion_fade_short",
+      "share_pct": 22.1,
+      "strategy_key": "ltc5_exhaustion_fade_short_ai",
+      "weekly_opens_expected": 0.5
+    },
+    {
+      "mechanism_family": "session_trend_pullback",
+      "share_pct": 6.6,
+      "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+      "weekly_opens_expected": 0.15
+    },
+    {
+      "mechanism_family": "exhaustion_fade_short",
+      "share_pct": 6.6,
+      "strategy_key": "frost3_btc1h_xrpport_exhaustion_fade_slope",
+      "weekly_opens_expected": 0.15
+    },
+    {
+      "mechanism_family": "exhaustion_fade_short",
+      "share_pct": 6.6,
+      "strategy_key": "frost_xrp_rescue_h20_t45",
+      "weekly_opens_expected": 0.15
+    }
+  ]
+}

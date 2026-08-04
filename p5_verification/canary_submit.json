@@ -1,0 +1,278 @@
+{
+  "ok": true,
+  "n_submitted": 9,
+  "jobs": [
+    {
+      "canary_id": "rsi_bb_exhaustion",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "5m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_814016_28b99175",
+        "job_key": "c563cadd8c238c8bc218bf4f",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary RSI超卖衰竭后布林下轨触及并回收中轨做多 | BTC-USDT-SWAP 5m",
+        "pipeline": 1,
+        "pipeline_label": "管道1",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_814016_28b99175.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道1",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.8141015
+        },
+        "data_version": "manifest-959e48af028fbfd7",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    },
+    {
+      "canary_id": "rsi_bb_exhaustion",
+      "symbol": "ETH-USDT-SWAP",
+      "timeframe": "5m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_829536_9aaeb10a",
+        "job_key": "64acf626020f077f718a2245",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary RSI超卖衰竭后布林下轨触及并回收中轨做多 | ETH-USDT-SWAP 5m",
+        "pipeline": 2,
+        "pipeline_label": "管道2",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_829536_9aaeb10a.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道2",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.8296158
+        },
+        "data_version": "manifest-344c3d181563bbbc",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    },
+    {
+      "canary_id": "rsi_bb_exhaustion",
+      "symbol": "SOL-USDT-SWAP",
+      "timeframe": "15m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_841829_14c460d3",
+        "job_key": "d9f1f23664d65033d25aa0b6",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary RSI超卖衰竭后布林下轨触及并回收中轨做多 | SOL-USDT-SWAP 15m",
+        "pipeline": 1,
+        "pipeline_label": "管道1",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_841829_14c460d3.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道1",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.8419223
+        },
+        "data_version": "manifest-49e20b70de896935",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    },
+    {
+      "canary_id": "vol_squeeze_break",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "5m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_853406_81bff580",
+        "job_key": "267ba832dd365e9faab17d37",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary 波动率收缩后突破扩张做多 | BTC-USDT-SWAP 5m",
+        "pipeline": 2,
+        "pipeline_label": "管道2",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_853406_81bff580.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道2",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.8534937
+        },
+        "data_version": "manifest-959e48af028fbfd7",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    },
+    {
+      "canary_id": "vol_squeeze_break",
+      "symbol": "ETH-USDT-SWAP",
+      "timeframe": "5m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_876783_46f9286f",
+        "job_key": "8c6c2469d1b290a5418db164",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary 波动率收缩后突破扩张做多 | ETH-USDT-SWAP 5m",
+        "pipeline": 1,
+        "pipeline_label": "管道1",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_876783_46f9286f.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道1",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.8768752
+        },
+        "data_version": "manifest-344c3d181563bbbc",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    },
+    {
+      "canary_id": "vol_squeeze_break",
+      "symbol": "SOL-USDT-SWAP",
+      "timeframe": "15m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_891756_110c018a",
+        "job_key": "96a630b91c8381fd9269bc23",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary 波动率收缩后突破扩张做多 | SOL-USDT-SWAP 15m",
+        "pipeline": 2,
+        "pipeline_label": "管道2",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_891756_110c018a.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道2",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.8918438
+        },
+        "data_version": "manifest-49e20b70de896935",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    },
+    {
+      "canary_id": "trend_pullback",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "5m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_907163_9ad3eaec",
+        "job_key": "d432b35f3ac36f4aa18070e0",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary 趋势回撤延续做多 | BTC-USDT-SWAP 5m",
+        "pipeline": 1,
+        "pipeline_label": "管道1",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_907163_9ad3eaec.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道1",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.9072435
+        },
+        "data_version": "manifest-959e48af028fbfd7",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    },
+    {
+      "canary_id": "trend_pullback",
+      "symbol": "ETH-USDT-SWAP",
+      "timeframe": "5m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_924955_dfa07790",
+        "job_key": "cf0dde7f8bc623f5ae7ed218",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary 趋势回撤延续做多 | ETH-USDT-SWAP 5m",
+        "pipeline": 2,
+        "pipeline_label": "管道2",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_924955_dfa07790.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道2",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.9250338
+        },
+        "data_version": "manifest-344c3d181563bbbc",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    },
+    {
+      "canary_id": "trend_pullback",
+      "symbol": "SOL-USDT-SWAP",
+      "timeframe": "15m",
+      "submit": {
+        "ok": true,
+        "accepted": true,
+        "deduplicated": false,
+        "job_id": "creation_20260804_074148_939872_952e3a8b",
+        "job_key": "fccc2b00f090bfe46c91175b",
+        "status": "等待研究",
+        "source": "cursor",
+        "research_direction": "P5 canary 趋势回撤延续做多 | SOL-USDT-SWAP 15m",
+        "pipeline": 1,
+        "pipeline_label": "管道1",
+        "queue_path": "/root/auto_trade/dual_engine/parallel_creation/pending/creation_20260804_074148_939872_952e3a8b.json",
+        "workers_woken": true,
+        "progress": {
+          "stage": "queued",
+          "stage_zh": "排队等待",
+          "detail": "已进入唯一创造入口排队 · 指定管道1",
+          "percent": 0,
+          "updated_at": "2026-08-04 07:41:48",
+          "updated_ts": 1785800508.9399507
+        },
+        "data_version": "manifest-49e20b70de896935",
+        "code_version": "src-81ad7e65ce65d7f4",
+        "parent_evidence_hash": null
+      }
+    }
+  ],
+  "with_llm": false,
+  "at": "2026-08-04 07:41:49"
+}

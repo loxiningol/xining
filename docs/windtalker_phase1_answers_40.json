@@ -1,0 +1,166 @@
+{
+  "generated_at": "2026-07-27 23:05:21",
+  "answers": {
+    "1": "完整第一阶段",
+    "2": "是",
+    "3": "是 gap=3.5",
+    "4": "是 priority=positive_expectancy_frequency_gap",
+    "5": "是",
+    "6": "是",
+    "7": 14,
+    "8": 8,
+    "9": 8,
+    "10": [],
+    "11": {
+      "mech_liquidity_failed_breakout_high_xrp15m": "breakout momentum buyers who entered on wick above range high20 and are now underwater",
+      "mech_mr_vwap_dev_btc15m": "trend_following_buyers_panic_closing_or_trapped",
+      "mech_ts_session_break_long_btc5m": "overnight range trapped counter-parties forced to unwind at open",
+      "mech_tc_thrust_retest_sol5m": "momentum_fade_scalpers",
+      "mech_vr03_eth15m": "range_bound_short_sellers",
+      "mech_low_break_fail_reclaim_long_ada5m": "breakdown_shorts",
+      "mech_mr_rsi_extreme_sol1h": "late momentum chasers trapped at top",
+      "mech_mr_zscore_dislocation_sol15m": "forced_liquidators"
+    },
+    "12": [
+      {
+        "idea_id": "ca_01",
+        "family": "cross_asset_btc_lead_proxy",
+        "reason": "data_unavailable"
+      },
+      {
+        "idea_id": "ca_02",
+        "family": "cross_asset_corr_break_proxy",
+        "reason": "data_unavailable"
+      }
+    ],
+    "13": [
+      "mech_liquidity_failed_breakout_high_xrp15m",
+      "mech_mr_vwap_dev_btc15m",
+      "mech_ts_session_break_long_btc5m",
+      "mech_tc_thrust_retest_sol5m",
+      "mech_vr03_eth15m",
+      "mech_low_break_fail_reclaim_long_ada5m",
+      "mech_mr_rsi_extreme_sol1h",
+      "mech_mr_zscore_dislocation_sol15m"
+    ],
+    "14": [],
+    "15": [
+      "mech_liquidity_failed_breakout_high_xrp15m",
+      "mech_mr_vwap_dev_btc15m",
+      "mech_ts_session_break_long_btc5m",
+      "mech_tc_thrust_retest_sol5m",
+      "mech_vr03_eth15m",
+      "mech_low_break_fail_reclaim_long_ada5m",
+      "mech_mr_rsi_extreme_sol1h",
+      "mech_mr_zscore_dislocation_sol15m"
+    ],
+    "16": [],
+    "17": [],
+    "18": [],
+    "19": [],
+    "20": [],
+    "21": false,
+    "22": 25,
+    "23": false,
+    "24": false,
+    "25": false,
+    "26": false,
+    "27": false,
+    "28": false,
+    "29": false,
+    "30": false,
+    "31": 2.3472,
+    "32": 0.0,
+    "33": 3.5,
+    "34": false,
+    "35": "0%",
+    "36": "0%",
+    "37": false,
+    "38": false,
+    "39": "Use failure KB; new independent families; no revive archived bodies",
+    "40": "PASS"
+  },
+  "criteria": {
+    "checks": [
+      {
+        "id": "1_read_positive_E_gap",
+        "pass": true
+      },
+      {
+        "id": "2_ge_8_formal_specs",
+        "pass": true
+      },
+      {
+        "id": "3_ge_5_independent_families",
+        "pass": true
+      },
+      {
+        "id": "4_immutable_specs",
+        "pass": true
+      },
+      {
+        "id": "5_fidelity_diffs",
+        "pass": true
+      },
+      {
+        "id": "6_dedup_review",
+        "pass": true
+      },
+      {
+        "id": "7_gate_entered",
+        "pass": true
+      },
+      {
+        "id": "8_repair_le_3_archived",
+        "pass": true
+      },
+      {
+        "id": "9_failure_kb_added",
+        "pass": true
+      },
+      {
+        "id": "10_pools_and_family_stats",
+        "pass": true
+      },
+      {
+        "id": "11_no_loosened_forged_results",
+        "pass": true
+      },
+      {
+        "id": "12_trade_chain_not_weakened",
+        "pass": true
+      }
+    ],
+    "pass_n": 12,
+    "total": 12,
+    "verdict": "PASS"
+  },
+  "classification": {
+    "implemented": [
+      "mech_liquidity_failed_breakout_high_xrp15m",
+      "mech_mr_vwap_dev_btc15m",
+      "mech_ts_session_break_long_btc5m",
+      "mech_tc_thrust_retest_sol5m",
+      "mech_vr03_eth15m",
+      "mech_low_break_fail_reclaim_long_ada5m",
+      "mech_mr_rsi_extreme_sol1h",
+      "mech_mr_zscore_dislocation_sol15m"
+    ],
+    "fidelity_fail": [],
+    "entered_gate3": [
+      "mech_liquidity_failed_breakout_high_xrp15m",
+      "mech_mr_vwap_dev_btc15m",
+      "mech_ts_session_break_long_btc5m",
+      "mech_tc_thrust_retest_sol5m",
+      "mech_vr03_eth15m",
+      "mech_low_break_fail_reclaim_long_ada5m",
+      "mech_mr_rsi_extreme_sol1h",
+      "mech_mr_zscore_dislocation_sol15m"
+    ],
+    "passed_gate3": [],
+    "completed_gate4_20": [],
+    "completed_gate5": [],
+    "completed_gate6": [],
+    "human_confirm_pending": []
+  }
+}

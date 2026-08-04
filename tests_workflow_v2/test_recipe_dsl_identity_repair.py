@@ -311,11 +311,14 @@ class GenericAdmittedRecipeCompilationTests(unittest.TestCase):
                 _quantile_term("volume_z", "low"),
             ],
         )
+        # Account-quality vector required by formal-review bridge hard floor.
+        account_returns = [0.04] * 12 + [-0.01] * 4
         identity = {
             "recipe_id": recipe["recipe_id"],
             "recipe": recipe,
             "hypothesis_id": recipe["hypothesis_id"],
             "mechanism_id": recipe["mechanism_id"],
+            "returns": list(account_returns),
         }
         blueprint = {
             "ok": True,

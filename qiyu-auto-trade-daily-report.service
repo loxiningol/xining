@@ -1,0 +1,9 @@
+[Unit]
+Description=Send Qiyu daily automatic trading report
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_daily_report.py --send
+

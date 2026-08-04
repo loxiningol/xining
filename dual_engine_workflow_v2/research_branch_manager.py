@@ -172,7 +172,13 @@ def trees_for_brief(brief=""):
     out = []
     if any(k in intent for k in (
         "衰竭回收", "恐慌衰竭", "强制平仓", "超跌反弹", "卖压衰减",
-    )) or any(k in intent_l for k in ("exhaustion", "panic flush", "forced liquidation")):
+        # RSI/布林超卖类 brief 必须命中衰竭树，否则 family_hints 严格过滤会清空种群
+        "超卖衰竭", "超卖", "衰竭", "布林", "布林带", "下轨", "中轨回收",
+        "RSI14", "RSI", "rsi",
+    )) or any(k in intent_l for k in (
+        "exhaustion", "panic flush", "forced liquidation",
+        "bollinger", "bb_", "oversold", "mean reversion",
+    )):
         out.append(EXHAUSTION_TREE)
     donchian_hit = any(k in intent for k in (
         "唐奇安", "通道突破", "趋势突破", "假突破", "有效突破", "主趋势启动", "中频突破",

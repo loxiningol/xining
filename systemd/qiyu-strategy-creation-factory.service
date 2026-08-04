@@ -1,0 +1,11 @@
+[Unit]
+Description=Qiyu 三AI协同策略创造工厂（每日协同轮次）
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/root
+Environment=VECTOR_ROOT=/root
+EnvironmentFile=-/root/auto_trade/ai_ecosystem.env
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_strategy_creation_factory.py --daily
+Nice=5

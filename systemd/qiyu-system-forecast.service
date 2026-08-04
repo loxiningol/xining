@@ -1,0 +1,11 @@
+[Unit]
+Description=Qiyu System Planning Forecast (3AI weekly open-frequency projection)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=PYTHONPATH=/root
+Environment=VECTOR_ROOT=/root
+EnvironmentFile=-/root/auto_trade/ai_ecosystem.env
+ExecStart=/usr/bin/python3 /root/scripts/monday_morning_wx_bundle.py
+Nice=10

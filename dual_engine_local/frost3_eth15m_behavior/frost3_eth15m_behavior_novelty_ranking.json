@@ -1,0 +1,146 @@
+{
+  "artifact_key": "frost3_eth15m_behavior_novelty_ranking",
+  "report_title": "Novelty Ranking — ETH15m Market Behaviour Edges",
+  "created_at": "2026-07-26T11:13:00+08:00",
+  "key_prefix": "frost3_eth15m_behavior_",
+  "method": {
+    "scores": {
+      "behaviour_purity": "0-25: edge is auction/flow/positioning/session, not RSI/EMA/MACD/ADX",
+      "collision_distance": "0-25: distance from ETH15m fade / ETH1h breakout / BNB session reclaim / CL exhaustion",
+      "proxy_honesty": "0-15: proxies documented; no fake funding/OI",
+      "stability_fit": "0-20: expected opens/day in [0.5,1.0]; stop-cluster awareness",
+      "implementability": "0-15: OHLCV-only vs needs external funding/OI"
+    },
+    "total_max": 100
+  },
+  "ranking": [
+    {
+      "rank": 1,
+      "id": "D05",
+      "logic_class": "effort_result_absorption_fade",
+      "direction": "short",
+      "novelty_score": 92,
+      "breakdown": {"behaviour_purity": 24, "collision_distance": 23, "proxy_honesty": 14, "stability_fit": 17, "implementability": 14},
+      "why_zh": "Wyckoff effort/result 在现有 frost3 车道几乎空白；与 fade/breakout 正交"
+    },
+    {
+      "rank": 2,
+      "id": "D11",
+      "logic_class": "asia_inventory_transfer_dump",
+      "direction": "short",
+      "novelty_score": 90,
+      "breakdown": {"behaviour_purity": 23, "collision_distance": 24, "proxy_honesty": 13, "stability_fit": 17, "implementability": 13},
+      "why_zh": "跨会话库存移交是明确行为边；时钟条件天然控频"
+    },
+    {
+      "rank": 3,
+      "id": "D08",
+      "logic_class": "cvd_price_divergence_release",
+      "direction": "long",
+      "novelty_score": 88,
+      "breakdown": {"behaviour_purity": 23, "collision_distance": 22, "proxy_honesty": 12, "stability_fit": 16, "implementability": 15},
+      "why_zh": "delta路径背离；需硬约束禁止退化成RSI背离"
+    },
+    {
+      "rank": 4,
+      "id": "D01",
+      "logic_class": "session_auction_imbalance",
+      "direction": "long",
+      "novelty_score": 86,
+      "breakdown": {"behaviour_purity": 22, "collision_distance": 21, "proxy_honesty": 14, "stability_fit": 18, "implementability": 11},
+      "why_zh": "开盘拍卖接受；实现简单、频率适中"
+    },
+    {
+      "rank": 5,
+      "id": "D02",
+      "logic_class": "vwap_acceptance_continuation",
+      "direction": "long",
+      "novelty_score": 85,
+      "breakdown": {"behaviour_purity": 22, "collision_distance": 20, "proxy_honesty": 12, "stability_fit": 19, "implementability": 12},
+      "why_zh": "接受≠回归；需防审查时被误判为VWAP均值回归"
+    },
+    {
+      "rank": 6,
+      "id": "D14",
+      "logic_class": "poc_migration_follow",
+      "direction": "long",
+      "novelty_score": 84,
+      "breakdown": {"behaviour_purity": 21, "collision_distance": 21, "proxy_honesty": 12, "stability_fit": 18, "implementability": 12},
+      "why_zh": "价值迁移跟随；与EMA ribbon 叙事需划清"
+    },
+    {
+      "rank": 7,
+      "id": "D03",
+      "logic_class": "value_area_edge_rejection",
+      "direction": "short",
+      "novelty_score": 83,
+      "breakdown": {"behaviour_purity": 21, "collision_distance": 19, "proxy_honesty": 13, "stability_fit": 17, "implementability": 13},
+      "why_zh": "VA边缘拒绝；碰撞风险=被看成fade，须零RSI骨架"
+    },
+    {
+      "rank": 8,
+      "id": "D06",
+      "logic_class": "ny_overlap_participation_pulse",
+      "direction": "long",
+      "novelty_score": 81,
+      "breakdown": {"behaviour_purity": 20, "collision_distance": 20, "proxy_honesty": 14, "stability_fit": 18, "implementability": 9},
+      "why_zh": "重叠窗参与度；稳频但略偏session共性"
+    },
+    {
+      "rank": 9,
+      "id": "D04",
+      "logic_class": "liquidity_sweep_reclaim",
+      "direction": "long",
+      "novelty_score": 78,
+      "breakdown": {"behaviour_purity": 20, "collision_distance": 16, "proxy_honesty": 13, "stability_fit": 16, "implementability": 13},
+      "why_zh": "与BNB session_v_reclaim 有家族相近风险；靠无macd/z dump区分"
+    },
+    {
+      "rank": 10,
+      "id": "D07",
+      "logic_class": "opening_range_failed_break",
+      "direction": "short",
+      "novelty_score": 77,
+      "breakdown": {"behaviour_purity": 21, "collision_distance": 22, "proxy_honesty": 14, "stability_fit": 10, "implementability": 10},
+      "why_zh": "反突破叙事新颖，但频率可能<0.5/日 → 样本饥渴风险"
+    },
+    {
+      "rank": 11,
+      "id": "D12",
+      "logic_class": "compression_release_inside_value",
+      "direction": "long",
+      "novelty_score": 74,
+      "breakdown": {"behaviour_purity": 18, "collision_distance": 14, "proxy_honesty": 13, "stability_fit": 18, "implementability": 11},
+      "why_zh": "易滑向ETH1h vol-contraction breakout；必须硬禁破位入场"
+    },
+    {
+      "rank": 12,
+      "id": "D13",
+      "logic_class": "one_sided_book_exhaust_proxy",
+      "direction": "short",
+      "novelty_score": 72,
+      "breakdown": {"behaviour_purity": 19, "collision_distance": 12, "proxy_honesty": 13, "stability_fit": 16, "implementability": 12},
+      "why_zh": "形态耗尽接近fade语义；仅当零传统指标时存活"
+    },
+    {
+      "rank": 13,
+      "id": "D09",
+      "logic_class": "funding_crowding_unwind",
+      "direction": "short",
+      "novelty_score": 70,
+      "breakdown": {"behaviour_purity": 24, "collision_distance": 23, "proxy_honesty": 15, "stability_fit": 8, "implementability": 0},
+      "why_zh": "概念最强之一，但依赖funding可取；实现分=0直至数据确认"
+    },
+    {
+      "rank": 14,
+      "id": "D10",
+      "logic_class": "oi_expansion_price_stall",
+      "direction": "short",
+      "novelty_score": 68,
+      "breakdown": {"behaviour_purity": 24, "collision_distance": 23, "proxy_honesty": 15, "stability_fit": 8, "implementability": -2},
+      "why_zh": "同D09；无OI则Death Test直接死"
+    }
+  ],
+  "promote_to_death_test": ["D05", "D11", "D08", "D01", "D02", "D14", "D03", "D06", "D04", "D07", "D12", "D13", "D09", "D10"],
+  "note_zh": "全部14条进入Death Test；不因novelty低跳过——数据门控方向需显式处决记录。"
+}

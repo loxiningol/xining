@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu Adaptive Engine Timer
+
+[Timer]
+OnCalendar=*-*-* *:40:00
+Persistent=true
+Unit=qiyu-adaptive-engine.service
+
+[Install]
+WantedBy=timers.target

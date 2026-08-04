@@ -1,0 +1,112 @@
+{
+  "ok": false,
+  "task_id": "wsa_20260727_014053_d405",
+  "stage": "archived",
+  "reason": "spec_incomplete",
+  "gate_results": {
+    "schema": "qiyu_step_a_v1",
+    "artifact": "gate_results",
+    "code_version": "step_a_strategy_creation_20260726",
+    "task_id": "wsa_20260727_014053_d405",
+    "created_at": "2026-07-27 01:42:00",
+    "gates": [
+      {
+        "gate_id": "gate0_mechanism_integrity",
+        "name": "机制完整性",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "spec_complete": false,
+          "counterparty_clear": false,
+          "edge_decay_clear": false,
+          "not_indicator_soup": true,
+          "family_present": false
+        },
+        "notes": [],
+        "at": "2026-07-27 01:42:00"
+      },
+      {
+        "gate_id": "gate1_code_fidelity",
+        "name": "gate1_code_fidelity",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:42:00"
+      },
+      {
+        "gate_id": "gate2_base_backtest",
+        "name": "gate2_base_backtest",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:42:00"
+      },
+      {
+        "gate_id": "gate3_walk_forward",
+        "name": "gate3_walk_forward",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:42:00"
+      },
+      {
+        "gate_id": "gate4_split_destruction",
+        "name": "gate4_split_destruction",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:42:00"
+      },
+      {
+        "gate_id": "gate5_mc_friction",
+        "name": "gate5_mc_friction",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:42:00"
+      },
+      {
+        "gate_id": "gate6_multi_ai_review",
+        "name": "gate6_multi_ai_review",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:42:00"
+      },
+      {
+        "gate_id": "gate7_human_confirm",
+        "name": "gate7_human_confirm",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:42:00"
+      }
+    ],
+    "all_gates_pass": false,
+    "first_fail_gate": "gate0_mechanism_integrity",
+    "passed_count": 0,
+    "total_gates": 8,
+    "production_mounted": false
+  }
+}

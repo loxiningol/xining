@@ -1,0 +1,772 @@
+{
+  "schema": "qiyu_step_a_v1",
+  "artifact": "failure_knowledgebase",
+  "updated_at": "2026-07-29 23:55:57",
+  "blocked_paths": [
+    "gate1|['fidelity']",
+    "validate|['engineering']",
+    "repair_round3|['viability']",
+    "glm_incomplete_spec|SOL-USDT-SWAP|5m",
+    "gate0|['immutable_spec']",
+    "family|liquidity_failed_breakout_high",
+    "family|absorption_climax_reclaim",
+    "family|selective_session_thrust",
+    "family|confirmed_vol_release",
+    "funnel_l1_micro_screen|['micro_screen']",
+    "funnel_l1_micro_screen|micro_screen"
+  ],
+  "blocked_families": [
+    "breakout_trap_reversal",
+    "liquidity_failed_breakout_high",
+    "mean_reversion_vwap_deviation",
+    "time_structure_session_breakout",
+    "trend_continuation_thrust_retest",
+    "vol_regime_compression_release",
+    "liquidity_failed_breakout_low",
+    "mean_reversion_rsi_extreme",
+    "mean_reversion_zscore_dislocation",
+    "absorption_climax_reclaim",
+    "selective_session_thrust",
+    "confirmed_vol_release",
+    "cascade_trap_proxy",
+    "vacuum_fill_impulse",
+    "vol_accepted_donchian_h1_continuation",
+    "compression_release_structural_breakout",
+    "atr_decline_htf_range_break",
+    "htf_ema_align_ltf_cci_vol_pullback",
+    "stop_hunt_range_reclaim"
+  ],
+  "lessons": [
+    "fidelity/gate1 fail",
+    "strategy contains unknown top-level fields",
+    "no infinite retune; no disguised mechanism swap",
+    "GLM must emit full mechanism_spec fields; aliases+retry exhausted",
+    "unsupported feature: vol_z20",
+    "refuse_overwrite_immutable_spec:mech_liquidity_failed_breakout_high_xrp15m_mechanism_spec.json existing_hash=c697a3f5d225efd82842d5814185b94db9cd77952cf393660787c9d09de9e269 new_hash=5171992462bdc219157ab585522193535679ea885b7dc57668f12b88f2017fb7",
+    "refuse_overwrite_immutable_spec:mech_mr_vwap_dev_btc15m_mechanism_spec.json existing_hash=af5a617e97e98a8c039e9e67692d940efcb2aba7f26302fe4cc53894907bf2a6 new_hash=ecfd246b74746aec8471cd92c06b69dc1bea085d4aa8dfb98768d82449ca054a",
+    "refuse_overwrite_immutable_spec:mech_ts_session_break_long_btc5m_mechanism_spec.json existing_hash=4a57ecdb31871cd80dedfe5a680d325e786d045528af4cc325150358d7f0a889 new_hash=e829a3b10bc8af635821cbdc78a352fb6a156f46c4ab388b643b1be82b85f848",
+    "refuse_overwrite_immutable_spec:mech_tc_thrust_retest_sol5m_mechanism_spec.json existing_hash=b6ba9db05dc9c7cd4d94d993b9baa4f5439aa24541b8a659b96f420c3079f83b new_hash=20e5bbe03ddb56b39b338835d4e7a352f48c2db53186c9af1545c53cac6674a0",
+    "refuse_overwrite_immutable_spec:mech_vr03_eth15m_mechanism_spec.json existing_hash=9f78b7782010feadfd2b13b6016430f634ac88821e821b929c7ac4448c4d8a9d new_hash=f0734f1aa255101fbbda5301005c27c70d50d3e941a42970a9eb9e51ba94b683",
+    "refuse_overwrite_immutable_spec:mech_low_break_fail_reclaim_long_ada5m_mechanism_spec.json existing_hash=38956823c1a18409d55334bd36f2f5298ba083c3b40929bc3db2082f1a52b370 new_hash=43b30f9df2ca31b974e7406200cb69e6b01a4962cf5c78470d572582b68c7696",
+    "refuse_overwrite_immutable_spec:mech_mr_rsi_extreme_sol1h_mechanism_spec.json existing_hash=4ef210c6f1b73a6ac6dac10e1daf0a11cfc95e181c1e17aa105b60a93481c177 new_hash=f0197e344e292ca7bae82ebb85cc2c62d56ce18a3897278e7185c05696231423",
+    "refuse_overwrite_immutable_spec:mech_mr_zscore_dislocation_sol15m_mechanism_spec.json existing_hash=bfd02c7ba5e789c5ca9f1023d53828a3546156df76273f2ba19e752ade3aee7f new_hash=77dbe6c86aaa8710daa1c311a6f1fc3ed87208045c3745e7cc7cb1d141c4555a",
+    "failure KB blocked family liquidity_failed_breakout_high (blocked_family)",
+    "failure KB blocked family absorption_climax_reclaim (blocked_family)",
+    "failure KB blocked family selective_session_thrust (blocked_family)",
+    "failure KB blocked family confirmed_vol_release (blocked_family)",
+    "L1 micro-screen reject: sample_payoff_le_1.2",
+    "sample_payoff_le_1.2",
+    "failure KB blocked family compression_release_structural_breakout (blocked_family)",
+    {
+      "at": "2026-07-29 20:41:36",
+      "note": "Unblocked compression_release_structural_breakout: prior L1 sample_payoff fail must not family-block; calibrated v2 retry allowed"
+    },
+    "refuse_overwrite_immutable_spec:atr_squeeze_structural_breakout_v1_mechanism_spec.json existing_hash=b76721fa82f6611304ee4d9ad95d45fb42100d54383a0b75ebdf9ec13aa29c78 new_hash=3fb6fe06a104cf04412ea40cd141f14ba279276d6db6a19279aaaafe7ccc6de8",
+    "L1 micro-screen reject: sample_filled_entries_lt_5,sample_payoff_le_1.2",
+    "sample_filled_entries_lt_5",
+    "L1 micro-screen reject: sample_payoff_le_1.2,severe_mae_gt_2.5x_avg_win",
+    "severe_mae_gt_2.5x_avg_win",
+    "L1 micro-screen reject: sample_filled_entries_lt_5",
+    "L1 micro-screen reject: sample_filled_entries_lt_5,sample_payoff_le_1.2,severe_mae_gt_2.5x_avg_win",
+    "L1 micro-screen reject: sample_filled_entries_lt_5,severe_mae_gt_2.5x_avg_win"
+  ],
+  "records": [
+    {
+      "task_id": "wsa_20260726_235259_bae0",
+      "stage": "gate1",
+      "family": "liquidity_sweep_reversal",
+      "verdict": "code_fidelity_fail",
+      "at": "2026-07-26 23:53:25",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260726_235259_bae0_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_013520_52ed",
+      "stage": "validate",
+      "family": "orderbook_imbalance_snapback",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 01:36:35",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_013520_52ed_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_013842_ca6c",
+      "stage": "repair_round3",
+      "family": "breakout_trap_reversal",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 01:40:42",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_013842_ca6c_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_014053_d405",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "representation_failure_after_retry",
+      "at": "2026-07-27 01:42:00",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_014053_d405_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_224606_479c",
+      "stage": "validate",
+      "family": "liquidity_failed_breakout_high",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 22:46:06",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_224606_479c_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_224606_5ed7",
+      "stage": "validate",
+      "family": "mean_reversion_vwap_deviation",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 22:46:06",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_224606_5ed7_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_224606_9712",
+      "stage": "validate",
+      "family": "time_structure_session_breakout",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 22:46:06",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_224606_9712_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_224607_c4c6",
+      "stage": "validate",
+      "family": "trend_continuation_thrust_retest",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 22:46:07",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_224607_c4c6_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_224607_480f",
+      "stage": "validate",
+      "family": "vol_regime_compression_release",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 22:46:07",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_224607_480f_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_224607_203b",
+      "stage": "validate",
+      "family": "liquidity_failed_breakout_low",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 22:46:07",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_224607_203b_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_224607_40e1",
+      "stage": "validate",
+      "family": "mean_reversion_rsi_extreme",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 22:46:07",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_224607_40e1_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_224607_aee1",
+      "stage": "validate",
+      "family": "mean_reversion_zscore_dislocation",
+      "verdict": "dsl_validate_fail",
+      "at": "2026-07-27 22:46:08",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_224607_aee1_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225209_349c",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-27 22:52:09",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225209_349c_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225209_84ab",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-27 22:52:09",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225209_84ab_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225209_8db8",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-27 22:52:10",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225209_8db8_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225210_0536",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-27 22:52:10",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225210_0536_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225210_ba27",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-27 22:52:10",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225210_ba27_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225210_3593",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-27 22:52:10",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225210_3593_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225210_d4d1",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-27 22:52:10",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225210_d4d1_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225210_a5f8",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-27 22:52:11",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225210_a5f8_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225332_dbd7",
+      "stage": "repair_round3",
+      "family": "liquidity_failed_breakout_high",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:54:10",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225332_dbd7_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225419_cce6",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "blocked_by_failure_kb",
+      "at": "2026-07-27 22:54:24",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225419_cce6_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225410_58ca",
+      "stage": "repair_round3",
+      "family": "mean_reversion_vwap_deviation",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:54:34",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225410_58ca_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225434_6fc8",
+      "stage": "repair_round3",
+      "family": "time_structure_session_breakout",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:55:24",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225434_6fc8_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225524_c811",
+      "stage": "repair_round3",
+      "family": "trend_continuation_thrust_retest",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:56:13",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225524_c811_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225613_f668",
+      "stage": "repair_round3",
+      "family": "vol_regime_compression_release",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:56:31",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225613_f668_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225631_4f2d",
+      "stage": "repair_round3",
+      "family": "liquidity_failed_breakout_low",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:57:01",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225631_4f2d_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225701_fc41",
+      "stage": "repair_round3",
+      "family": "mean_reversion_rsi_extreme",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:57:13",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225701_fc41_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225713_5871",
+      "stage": "repair_round3",
+      "family": "mean_reversion_zscore_dislocation",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:58:07",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225713_5871_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260728_153205_5737",
+      "stage": "repair_round3",
+      "family": "absorption_climax_reclaim",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-28 15:32:54",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260728_153205_5737_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260728_153254_eb2e",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "blocked_by_failure_kb",
+      "at": "2026-07-28 15:32:54",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260728_153254_eb2e_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260728_153254_8fed",
+      "stage": "repair_round3",
+      "family": "selective_session_thrust",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-28 15:32:58",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260728_153254_8fed_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260728_153258_6f4e",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "blocked_by_failure_kb",
+      "at": "2026-07-28 15:32:59",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260728_153258_6f4e_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260728_153259_d0b6",
+      "stage": "repair_round3",
+      "family": "confirmed_vol_release",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-28 15:33:16",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260728_153259_d0b6_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260728_153316_42cb",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "blocked_by_failure_kb",
+      "at": "2026-07-28 15:33:17",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260728_153316_42cb_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260728_153317_b9ef",
+      "stage": "repair_round3",
+      "family": "cascade_trap_proxy",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-28 15:33:53",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260728_153317_b9ef_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260728_153353_af30",
+      "stage": "repair_round3",
+      "family": "vacuum_fill_impulse",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-28 15:34:21",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260728_153353_af30_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_194021_5ad2",
+      "stage": "funnel_l1_micro_screen",
+      "family": "compression_release_structural_breakout",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 19:40:41",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_194021_5ad2_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_194021_5ad2",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 19:40:41",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_194021_5ad2_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_200111_c691",
+      "stage": "funnel_l1_micro_screen",
+      "family": "vol_accepted_donchian_h1_continuation",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 20:01:42",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_200111_c691_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_200111_c691",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 20:01:52",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_200111_c691_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_204005_3366",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "blocked_by_failure_kb",
+      "at": "2026-07-29 20:40:19",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_204005_3366_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_204208_be46",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "immutable_spec_conflict",
+      "at": "2026-07-29 20:42:32",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_204208_be46_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_204421_a119",
+      "stage": "funnel_l1_micro_screen",
+      "family": "compression_release_structural_breakout",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 20:47:30",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_204421_a119_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_204421_a119",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 20:47:30",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_204421_a119_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_212122_9050",
+      "stage": "funnel_l1_micro_screen",
+      "family": "compression_release_structural_breakout",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 21:23:26",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_212122_9050_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_212122_9050",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 21:23:26",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_212122_9050_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_212328_7156",
+      "stage": "repair_round3",
+      "family": "compression_release_structural_breakout",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-29 21:25:04",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_212328_7156_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_212443_2d03",
+      "stage": "repair_round3",
+      "family": "atr_decline_htf_range_break",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-29 21:28:12",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_212443_2d03_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_231706_cc9d",
+      "stage": "funnel_l1_micro_screen",
+      "family": "htf_ema_align_ltf_cci_vol_pullback",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:18:14",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_231706_cc9d_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_231706_cc9d",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:18:14",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_231706_cc9d_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234828_2f3d",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:49:19",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234828_2f3d_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234828_2f3d",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:49:19",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234828_2f3d_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234920_19a6",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:49:36",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234920_19a6_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234920_19a6",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:49:36",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234920_19a6_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234936_522e",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:49:38",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234936_522e_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234936_522e",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:49:38",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234936_522e_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234938_b83d",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:49:39",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234938_b83d_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234938_b83d",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:49:39",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234938_b83d_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234939_b6e0",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:49:41",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234939_b6e0_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234939_b6e0",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:49:41",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234939_b6e0_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234941_7e92",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:49:42",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234941_7e92_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234941_7e92",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:49:42",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234941_7e92_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234942_9fa1",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:49:44",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234942_9fa1_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234942_9fa1",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:49:44",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234942_9fa1_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234944_b612",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:50:46",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234944_b612_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_234944_b612",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:50:46",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_234944_b612_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235046_b487",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:50:47",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235046_b487_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235046_b487",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:50:47",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235046_b487_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235047_32e8",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:50:48",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235047_32e8_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235047_32e8",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:50:48",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235047_32e8_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235048_8763",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:50:48",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235048_8763_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235048_8763",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:50:48",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235048_8763_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235048_be42",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:50:49",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235048_be42_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235048_be42",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:50:49",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235048_be42_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235049_9b4b",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:50:50",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235049_9b4b_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235049_9b4b",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:50:50",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235049_9b4b_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235050_dfd3",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:50:50",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235050_dfd3_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235050_dfd3",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:50:50",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235050_dfd3_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235050_41c1",
+      "stage": "funnel_l1_micro_screen",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:50:51",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235050_41c1_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235050_41c1",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:50:51",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235050_41c1_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235403_619f",
+      "stage": "funnel_l1_micro_screen",
+      "family": "htf_ema_align_ltf_cci_vol_pullback",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:54:30",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235403_619f_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235403_619f",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:54:30",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235403_619f_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235430_aa12",
+      "stage": "funnel_l1_micro_screen",
+      "family": "htf_ema_align_ltf_cci_vol_pullback",
+      "verdict": "funnel_l1_cull",
+      "at": "2026-07-29 23:54:31",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235430_aa12_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235430_aa12",
+      "stage": "funnel_l1_micro_screen",
+      "family": "",
+      "verdict": "phase5_auto_reject_funnel_l1_micro_screen",
+      "at": "2026-07-29 23:54:31",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235430_aa12_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235431_9e9c",
+      "stage": "repair_round3",
+      "family": "htf_ema_align_ltf_cci_vol_pullback",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-29 23:55:48",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235431_9e9c_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260729_235423_19c1",
+      "stage": "repair_round3",
+      "family": "stop_hunt_range_reclaim",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-29 23:55:57",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260729_235423_19c1_strategy_failure_record.json"
+    }
+  ],
+  "counterexamples": []
+}

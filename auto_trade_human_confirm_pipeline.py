@@ -2,10 +2,10 @@
 """Human-confirm strategy pipeline (designer rule, 2026-07-24).
 
 Create → machine screen → WxPusher push → human confirm → B(30%) live
-→ auto B/C stop-loss monitor (Wx notify on open/downgrade/delete).
+→ automatic S/A/B/C outcome monitor (Wx notify on every grade change/delete).
 
 Grades (equity ratio, leverage fixed 20x):
-  S=70%  A=50%  B=30%  C=15%
+  S=70%  A=50%  B=30%  C=10%
 
 Never auto-live without human confirm. E/D mass probes are frozen.
 """
@@ -27,10 +27,17 @@ DSL_CONFIG_PATH = ROOT / "strategy_configs" / "ai_dsl_strategies.json"
 AUDIT_PATH = AUTO_DIR / "human_confirm_pipeline_audit.jsonl"
 STATE_PATH = AUTO_DIR / "human_confirm_pipeline_state.json"
 MASS_FREEZE_FLAG = AUTO_DIR / "mass_engine_frozen.json"
+GRADE_NOTIFICATION_OUTBOX = AUTO_DIR / "strategy_grade_notification_outbox.json"
 
-GRADE_RATIO = {"S": 0.70, "A": 0.50, "B": 0.30, "C": 0.15}
+GRADE_RATIO = {"S": 0.70, "A": 0.50, "B": 0.30, "C": 0.10}
+GRADE_POLICY_VERSION = "qiyu_trade_outcome_grade_v2"
+GRADE_MANAGER = "trade_outcome_state_machine"
+PROMOTION_WINDOW_SIZE = 4
+PROMOTION_MIN_WINS = 3
+DEMOTION_WINDOW_SIZE = 3
+DEMOTION_MIN_STOPS = 2
 LEVERAGE = 20
-STOP_LOSS_PCT = 0.009
+STOP_LOSS_PCT = 0.005
 MAX_DD = 0.40
 MIN_TRADES_SCREEN = 10  # designer 2026-07-24: sample ≥10
 MIN_WIN_RATE_SCREEN = 50.0  # designer: wr ≥50% under real cost
@@ -42,6 +49,192 @@ TRIPLE_FRICTION_SCENARIO = "severe"
 TRIPLE_FRICTION_TIP_WX_ENABLED = False
 TRIPLE_FRICTION_TIP_WX_KIND = "strategy_triple_friction_tip"
 TRIPLE_FRICTION_TIP_WX_MARKER = "三倍摩擦风险提示"
+
+# Only sole pipeline → STEP A four-review artifacts may enter pending human confirm.
+VERIFIED_THREE_AI_SCHEMA = "qiyu_three_ai_theoretical_review_v2"
+FOUR_REVIEW_ADMISSION_SCHEMA = "qiyu_four_review_admission_v2"
+ALLOWED_PENDING_SOURCE_PREFIXES = (
+    "dual_engine_step_a",
+    "auto_driver_review_pipeline",
+)
+LEGACY_PENDING_SOURCES = frozenset({
+    "frost2",
+    "dual_engine_factory",
+    "creation_feature_tp_recovery",
+    "frost",
+    "dual_engine",
+    "codex_manual",
+    "corridor",
+    "creator",
+})
+
+
+def _four_review_reviews_from_admission(admission):
+    admission = admission if isinstance(admission, dict) else {}
+    reviews = admission.get("reviews")
+    if isinstance(reviews, dict):
+        return reviews
+    out = {}
+    for key in ("r1", "r2", "r3", "r4", "review1", "review2", "review3", "review4"):
+        if admission.get(key):
+            norm = key if key.startswith("r") else "r%s" % key[-1]
+            out[norm] = admission.get(key)
+    return out
+
+
+def verify_four_review_admission_for_pending(ai_review=None, source=None):
+    """Hard gate aligned with website 四阶段复核 board.
+
+    Required path: 人类指令 → 管道1/2 sole 创造 → 第一至第三次复核 → 第四次复核(三AI) → Wx 待签发.
+    Legacy frost/factory/codex bypass paths must never enqueue.
+
+    Manufacture slim mode (user lock 2026-08-03): skip deterministic R1–R3 / Gate*
+    and keep only multi-AI average thresholds.
+    """
+    reasons = []
+    src = str(source or "").strip().lower()
+    if src in LEGACY_PENDING_SOURCES:
+        reasons.append("legacy_review_source_blocked:%s" % src)
+    if not any(src.startswith(prefix) for prefix in ALLOWED_PENDING_SOURCE_PREFIXES):
+        reasons.append("pending_source_not_from_sole_pipeline:%s" % (src or "-"))
+
+    ai_review = ai_review if isinstance(ai_review, dict) else {}
+    admission = ai_review.get("four_review_admission") or {}
+    try:
+        from dual_engine_workflow_v2 import manufacture_batch_policy as _mfg
+        slim_only = bool(_mfg.slim_multiai_review_only()) or bool(
+            ai_review.get("slim_multiai_only")
+            or admission.get("slim_multiai_only")
+            or admission.get("review_mode") == "slim_multiai_average_only"
+        )
+    except Exception:
+        slim_only = bool(
+            ai_review.get("slim_multiai_only")
+            or admission.get("slim_multiai_only")
+            or admission.get("review_mode") == "slim_multiai_average_only"
+        )
+
+    if slim_only:
+        if admission.get("schema") not in (
+            FOUR_REVIEW_ADMISSION_SCHEMA,
+            "qiyu_slim_multiai_admission_v1",
+        ):
+            # Allow slim path when admission is stamped on the review payload.
+            if not (
+                ai_review.get("schema") == VERIFIED_THREE_AI_SCHEMA
+                and ai_review.get("approved")
+            ):
+                reasons.append("slim_multiai_admission_missing")
+        elif not admission.get("pass"):
+            reasons.append("slim_multiai_aggregate_not_pass")
+    elif admission.get("schema") != FOUR_REVIEW_ADMISSION_SCHEMA:
+        reasons.append("four_review_admission_missing")
+    else:
+        reviews = _four_review_reviews_from_admission(admission)
+        for n, label in ((1, "r1"), (2, "r2"), (3, "r3"), (4, "r4")):
+            row = reviews.get(label) or {}
+            if not row.get("pass"):
+                reasons.append("four_review_fail:%s" % label)
+        if not admission.get("pass"):
+            reasons.append("four_review_aggregate_not_pass")
+
+    try:
+        import auto_trade_ai_consensus as _consensus
+        verification = _consensus.validate_theoretical_review_result(ai_review)
+    except Exception as exc:
+        verification = {"ok": False, "reasons": [str(exc)[:160]]}
+    if not verification.get("ok"):
+        reasons.extend(list(verification.get("reasons") or []))
+
+    ok = not reasons
+    return {
+        "ok": ok,
+        "approved": ok,
+        "reasons": reasons,
+        "verification": verification,
+        "four_review_admission": admission,
+        "slim_multiai_only": slim_only,
+    }
+
+
+def verify_three_ai_review_for_pending(ai_review=None, source=None):
+    """Backward-compatible alias — enforces full four-review admission."""
+    return verify_four_review_admission_for_pending(ai_review, source=source)
+
+
+def _pending_item_passes_verified_three_ai(item):
+    """Confirm-time guard; rejects rows that skipped sole pipeline / 四阶段复核."""
+    if not item:
+        return False, "not_awaiting_confirm"
+    if not item.get("ai_review_verified"):
+        return False, "verified_four_review_required"
+    if item.get("ai_review_schema") != VERIFIED_THREE_AI_SCHEMA:
+        return False, "legacy_or_missing_review_schema"
+    src = str(item.get("source") or "").strip().lower()
+    if src in LEGACY_PENDING_SOURCES:
+        return False, "legacy_review_source_blocked:%s" % src
+    if not any(src.startswith(prefix) for prefix in ALLOWED_PENDING_SOURCE_PREFIXES):
+        return False, "pending_source_not_from_sole_pipeline:%s" % (src or "-")
+    admission = item.get("four_review_admission") or {}
+    slim_only = bool(
+        item.get("slim_multiai_only")
+        or admission.get("slim_multiai_only")
+        or admission.get("review_mode") == "slim_multiai_average_only"
+    )
+    if slim_only:
+        if admission.get("schema") not in (
+            FOUR_REVIEW_ADMISSION_SCHEMA,
+            "qiyu_slim_multiai_admission_v1",
+        ) and not item.get("ai_review_verified"):
+            return False, "slim_multiai_admission_missing_or_fail"
+        if admission and not admission.get("pass"):
+            return False, "slim_multiai_aggregate_not_pass"
+    else:
+        if admission.get("schema") != FOUR_REVIEW_ADMISSION_SCHEMA or not admission.get("pass"):
+            return False, "four_review_admission_missing_or_fail"
+        reviews = _four_review_reviews_from_admission(admission)
+        for label in ("r1", "r2", "r3", "r4"):
+            if not (reviews.get(label) or {}).get("pass"):
+                return False, "four_review_fail:%s" % label
+    verification = item.get("ai_review_verification") or {}
+    if not verification.get("ok"):
+        return False, "review_verification_not_ok"
+    wr_by = item.get("ai_theoretical_wr_by_provider") or {}
+    try:
+        import auto_trade_ai_consensus as _ai
+        need = tuple(_ai.PROVIDERS)
+    except Exception:
+        need = ("deepseek", "qwen", "glm", "kimi")
+    for provider in need:
+        if provider not in wr_by:
+            return False, "multi_ai_votes_incomplete"
+    return True, None
+
+
+def purge_unverified_pending_items(reason="legacy_pending_purged"):
+    """Mark awaiting_confirm rows without verified 3AI as rejected."""
+    pending = load_pending()
+    changed = []
+    for row in pending.get("items") or []:
+        if row.get("status") != "awaiting_confirm":
+            continue
+        ok, why = _pending_item_passes_verified_three_ai(row)
+        if ok:
+            continue
+        row["status"] = "rejected"
+        row["rejected_at"] = _now()
+        row["reject_reason"] = reason
+        row["reject_detail"] = why
+        changed.append({"key": row.get("key"), "reason": why})
+    if changed:
+        save_pending(pending)
+        _append_audit({
+            "time": _now(),
+            "event": "purge_unverified_pending",
+            "reason": reason,
+            "items": changed,
+        })
+    return {"ok": True, "purged": changed, "count": len(changed)}
 
 
 def _now():
@@ -103,6 +296,84 @@ def _wx(text, kind="human_confirm_pipeline", meta=None):
         _append_audit({"time": _now(), "event": "wx_fail", "error": str(exc),
                        "text_head": str(text)[:200]})
         return {"ok": False, "error": str(exc)}
+
+
+def _notification_delivered(result):
+    """Treat test doubles as delivered; production requires an explicit send."""
+    if not isinstance(result, dict):
+        return True
+    return bool(result.get("sent") or result.get("wxpusher_success"))
+
+
+def _queue_grade_notification(event_id, text, kind, meta, result=None):
+    doc = _read(GRADE_NOTIFICATION_OUTBOX, {"items": []})
+    items = list(doc.get("items") or [])
+    if not any(str(item.get("event_id")) == str(event_id) for item in items):
+        items.append({
+            "event_id": str(event_id),
+            "text": str(text),
+            "kind": str(kind),
+            "meta": dict(meta or {}),
+            "queued_at": _now(),
+            "attempts": 1,
+            "last_result": result if isinstance(result, dict) else None,
+        })
+    _atomic(GRADE_NOTIFICATION_OUTBOX, {
+        "schema": "qiyu_strategy_grade_notification_outbox_v1",
+        "updated_at": _now(),
+        "items": items[-1000:],
+    })
+
+
+def _send_grade_notification(event_id, text, kind, meta=None):
+    """Durably deliver every grade transition/removal through WxPusher."""
+    result = _wx(text, kind=kind, meta=meta or {})
+    delivered = _notification_delivered(result)
+    _append_audit({
+        "time": _now(),
+        "event": "grade_notification_sent" if delivered else "grade_notification_queued",
+        "event_id": str(event_id),
+        "kind": str(kind),
+        "delivered": delivered,
+        "result": result if isinstance(result, dict) else None,
+    })
+    if not delivered:
+        _queue_grade_notification(event_id, text, kind, meta or {}, result=result)
+    return {"delivered": delivered, "result": result}
+
+
+def _retry_grade_notifications(limit=20):
+    doc = _read(GRADE_NOTIFICATION_OUTBOX, {"items": []})
+    items = list(doc.get("items") or [])
+    if not items:
+        return {"retried": 0, "delivered": 0, "pending": 0}
+    kept = []
+    retried = delivered_n = 0
+    for item in items:
+        if retried >= int(limit):
+            kept.append(item)
+            continue
+        retried += 1
+        result = _wx(item.get("text"), kind=item.get("kind"),
+                     meta=item.get("meta") or {})
+        if _notification_delivered(result):
+            delivered_n += 1
+            _append_audit({
+                "time": _now(), "event": "grade_notification_retry_sent",
+                "event_id": item.get("event_id"), "kind": item.get("kind"),
+            })
+            continue
+        failed = dict(item)
+        failed["attempts"] = int(failed.get("attempts") or 0) + 1
+        failed["last_attempt_at"] = _now()
+        failed["last_result"] = result if isinstance(result, dict) else None
+        kept.append(failed)
+    _atomic(GRADE_NOTIFICATION_OUTBOX, {
+        "schema": "qiyu_strategy_grade_notification_outbox_v1",
+        "updated_at": _now(), "items": kept[-1000:],
+    })
+    return {"retried": retried, "delivered": delivered_n,
+            "pending": len(kept)}
 
 
 # ─── Freeze mass / E-D probes ─────────────────────────────────────────
@@ -232,12 +503,16 @@ def _daemon_config_name(symbol, timeframe):
         ("BTC-USDT-SWAP", "15m"): "formal_daemon_config_btc_15m.json",
         ("BTC-USDT-SWAP", "5m"): "formal_daemon_config_btc_5m.json",
         ("BTC-USDT-SWAP", "1h"): "formal_daemon_config.json",
+        ("ETH-USDT-SWAP", "5m"): "formal_daemon_config_eth_5m.json",
+        ("SOL-USDT-SWAP", "1h"): "formal_daemon_config_sol.json",
+        ("SOL-USDT-SWAP", "5m"): "formal_daemon_config_sol_5m.json",
         ("NG-USDT-SWAP", "5m"): "formal_daemon_config_ng_5m.json",
         ("ADA-USDT-SWAP", "5m"): "formal_daemon_config_ada_5m.json",
         ("XAG-USDT-SWAP", "5m"): "formal_daemon_config_xag_5m.json",
         ("XAU-USDT-SWAP", "15m"): "formal_daemon_config_xau_15m.json",
         ("CL-USDT-SWAP", "5m"): "formal_daemon_config_cl_5m.json",
         ("LTC-USDT-SWAP", "5m"): "formal_daemon_config_ltc_5m.json",
+        ("XRP-USDT-SWAP", "5m"): "formal_daemon_config_xrp_5m.json",
         ("XRP-USDT-SWAP", "15m"): "formal_daemon_config_xrp_15m.json",
     }
     return mapping.get((symbol, timeframe))
@@ -786,16 +1061,16 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None,
            or cand.get("strategy_key") or "unknown")
     ai_review = ai_review or {}
     try:
-        import auto_trade_ai_consensus as _consensus
-        review_verification = _consensus.validate_theoretical_review_result(ai_review)
+        review_verification = verify_four_review_admission_for_pending(
+            ai_review, source=source)
     except Exception as exc:
         review_verification = {"ok": False, "reasons": [str(exc)[:160]]}
     if not review_verification.get("ok"):
         _append_audit({"time": _now(), "event": "pending_confirm_rejected",
-                       "reason": "verified_three_ai_review_required",
+                       "reason": "verified_four_review_required",
                        "verification": review_verification,
                        "source": source, "key": key})
-        return {"ok": False, "reason": "verified_three_ai_review_required",
+        return {"ok": False, "reason": "verified_four_review_required",
                 "review_verification": review_verification, "key": key,
                 "production_mounted": False}
     wr_map = (ai_review.get("ai_theoretical_wr_by_provider")
@@ -860,6 +1135,13 @@ def enqueue_for_human(cand, metrics, source="unknown", ai_review=None,
         "ai_review_schema": ai_review.get("schema"),
         "ai_review_verified": True,
         "ai_review_verification": review_verification,
+        "four_review_admission": ai_review.get("four_review_admission"),
+        "slim_multiai_only": bool(
+            ai_review.get("slim_multiai_only")
+            or (ai_review.get("four_review_admission") or {}).get("slim_multiai_only")
+            or (ai_review.get("four_review_admission") or {}).get("review_mode")
+            == "slim_multiai_average_only"
+        ),
         "statistical_weekly_opens": ai_review.get("statistical_weekly_opens"),
         "statistical_weekly_opens_expected": ai_review.get(
             "statistical_weekly_opens_expected"),
@@ -1097,19 +1379,16 @@ def ingest_and_screen(cand, source="creator", ai_review=None, require_ai_review=
                 "production_mounted": False}
     verification = {"ok": not require_ai_review, "reasons": []}
     if require_ai_review:
-        try:
-            import auto_trade_ai_consensus as _consensus
-            verification = _consensus.validate_theoretical_review_result(ai_review or {})
-        except Exception as exc:
-            verification = {"ok": False, "reasons": [str(exc)[:160]]}
+        verification = verify_four_review_admission_for_pending(
+            ai_review or {}, source=source)
     if require_ai_review and not verification.get("ok"):
         return {
             "ok": False,
-            "reason": "verified_three_ai_review_required",
+            "reason": "verified_four_review_required",
             "metrics": metrics,
             "review_verification": verification,
             "production_mounted": False,
-            "hint": "use auto_trade_codex_strategy_review.py --submit",
+            "hint": "submit via sole pipeline → STEP A four-review only",
         }
     if ai_review:
         metrics = dict(metrics)
@@ -1153,8 +1432,9 @@ def confirm(key, confirmed_by="codex_human"):
             break
     if not item:
         return {"ok": False, "error": "not_awaiting_confirm", "key": key}
-    if not item.get("ai_review_verified"):
-        return {"ok": False, "error": "verified_three_ai_review_required",
+    passes, why = _pending_item_passes_verified_three_ai(item)
+    if not passes:
+        return {"ok": False, "error": why or "verified_four_review_required",
                 "key": key, "production_mounted": False}
     weekly = item.get("ai_theoretical_weekly_opens_avg")
     weekly_anchor = item.get("statistical_weekly_opens_expected")
@@ -1198,6 +1478,9 @@ def confirm(key, confirmed_by="codex_human"):
         "human_confirmed_at": _now(),
         "human_confirmed_by": confirmed_by,
         "human_confirm_pipeline": True,
+        "grade_managed_by": GRADE_MANAGER,
+        "grade_policy_version": GRADE_POLICY_VERSION,
+        "grade_started_at": _now(),
         "grade_window": "B_first3",
         "grade_window_closed": [],
         "automatic_live_restoration": False,
@@ -1241,6 +1524,11 @@ def confirm(key, confirmed_by="codex_human"):
     item["confirmed_at"] = _now()
     item["assignment_id"] = aid
     save_pending(pending)
+    try:
+        import auto_trade_dual_engine_factory as dual
+        dual.sync_formal_submit_status(key, "已上线", note="human_confirm_b")
+    except Exception:
+        pass
 
     name = item.get("name") or key
     try:
@@ -1248,7 +1536,8 @@ def confirm(key, confirmed_by="codex_human"):
         name = titles.resolve_strategy_name(key, name)
     except Exception:
         pass
-    _wx(
+    _send_grade_notification(
+        "%s|initial_b|%s" % (aid, row.get("human_confirmed_at")),
         "【B级策略已上线】\n"
         "名称: %s\n"
         "标的/周期: %s / %s\n"
@@ -1266,11 +1555,17 @@ def confirm(key, confirmed_by="codex_human"):
         unit_map = {
             ("BTC-USDT-SWAP", "15m"): "qiyu-formal-auto-trade-btc-15m.service",
             ("BTC-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-btc-5m.service",
+            ("ETH-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-eth-5m.service",
+            ("SOL-USDT-SWAP", "1h"): "qiyu-formal-auto-trade-sol.service",
+            ("SOL-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-sol-5m.service",
             ("NG-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-ng-5m.service",
             ("ADA-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-ada-5m.service",
             ("XAG-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-xag-5m.service",
             ("XAU-USDT-SWAP", "15m"): "qiyu-formal-auto-trade-xau-15m.service",
             ("CL-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-cl-5m.service",
+            ("LTC-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-ltc-5m.service",
+            ("XRP-USDT-SWAP", "5m"): "qiyu-formal-auto-trade-xrp-5m.service",
+            ("XRP-USDT-SWAP", "15m"): "qiyu-formal-auto-trade-xrp-15m.service",
         }
         unit = unit_map.get((symbol, timeframe))
         if unit:
@@ -1292,6 +1587,11 @@ def reject(key, reason="human_reject"):
             found = True
     save_pending(pending)
     if found:
+        try:
+            import auto_trade_dual_engine_factory as dual
+            dual.sync_formal_submit_status(key, "已拒绝", note=reason)
+        except Exception:
+            pass
         try:
             import auto_trade_strategy_titles as titles
             shown = titles.resolve_strategy_name(key, key)
@@ -1326,7 +1626,16 @@ def _nested(obj, *keys):
     return cur
 
 
-def _account_return_pct(row):
+def _number(value, default=None):
+    try:
+        if value in (None, ""):
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
+def _account_return_pct(row, pnl_override=None):
     """Total-equity return % for one closed trade (designer rule)."""
     try:
         existing = row.get("account_return_pct")
@@ -1348,40 +1657,73 @@ def _account_return_pct(row):
                     break
         except Exception:
             continue
-    pnl = row.get("pnl")
+    pnl = pnl_override
     if pnl is None:
-        pnl = row.get("net_pnl")
-    try:
-        pnl = float(pnl)
-    except Exception:
+        pnl = _number(row.get("pnl"), _number(row.get("net_pnl")))
+    if pnl is None:
         return None
     if equity in (None, 0):
         return None
     return (pnl / equity) * 100.0
 
 
-def _closed_trades_for(strategy_key, limit=40, after=None):
-    """Prefer formal daemon history; include stop/profit/equity-return."""
+def _closed_trades_for(strategy_key, limit=40, after=None, symbol=None,
+                       timeframe=None):
+    """Read exchange-derived net PnL and return trades oldest-first.
+
+    Strategy exits usually store realised PnL under
+    close_order.filled.order, while exchange-side stops also mirror PnL at
+    the top level.  Reading only the top level used to turn normal take-profit
+    fills into zero-PnL losses and made promotions practically impossible.
+    """
     out = []
-    for path in list(AUTO_DIR.glob("formal_v6_state*.json")):
+    seen = set()
+    symbol = str(symbol or "").upper()
+    timeframe = str(timeframe or "").lower()
+    for path in sorted(AUTO_DIR.glob("formal_v6_state*.json")):
         state = _read(path, {})
-        for row in list(state.get("history") or [])[::-1]:
+        for row in list(state.get("history") or []):
             if not isinstance(row, dict):
                 continue
             if str(row.get("strategy_key") or "") != str(strategy_key):
                 continue
             if not row.get("closed_at"):
                 continue
-            if after and str(row.get("closed_at")) < str(after):
+            if after and str(row.get("closed_at")) <= str(after):
                 continue
-            try:
-                pnl = float(row.get("pnl"))
-            except Exception:
-                pnl = 0.0
-            acct = _account_return_pct(row)
-            profit = (acct > 0) if acct is not None else (pnl > 0)
+            open_fill = _nested(row, "open_order", "filled", "order") or {}
+            close_fill = (
+                _nested(row, "close_order", "filled", "order")
+                or _nested(row, "last_close_attempt", "close_order", "filled", "order")
+                or {})
+            row_symbol = str(row.get("symbol") or open_fill.get("instId")
+                             or close_fill.get("instId") or "").upper()
+            row_timeframe = str(
+                row.get("timeframe")
+                or _nested(row, "entry_data", "timeframe") or "").lower()
+            if symbol and row_symbol and row_symbol != symbol:
+                continue
+            if timeframe and row_timeframe and row_timeframe != timeframe:
+                continue
+            token = str(close_fill.get("ordId") or row.get("execution_id")
+                        or "%s|%s|%s" % (
+                            row.get("opened_at"), row.get("closed_at"),
+                            strategy_key))
+            if token in seen:
+                continue
+            seen.add(token)
+            top_pnl = _number(row.get("pnl"), _number(row.get("net_pnl")))
+            gross_pnl = _number(close_fill.get("pnl"), top_pnl)
+            open_fee = _number(open_fill.get("fee"), 0.0) or 0.0
+            close_fee = _number(close_fill.get("fee"), 0.0) or 0.0
+            pnl = (gross_pnl + open_fee + close_fee
+                   if gross_pnl is not None else None)
+            acct = _account_return_pct(row, pnl_override=pnl)
+            profit = ((acct > 0) if acct is not None
+                      else ((pnl > 0) if pnl is not None else None))
             out.append({
                 "pnl": pnl,
+                "gross_pnl": gross_pnl,
                 "account_return_pct": acct,
                 "profit": profit,
                 "stop": _is_stop_trade(row),
@@ -1389,22 +1731,33 @@ def _closed_trades_for(strategy_key, limit=40, after=None):
                 "opened_at": row.get("opened_at"),
                 "close_type": (row.get("close_type") or row.get("close_reason")
                                or ""),
+                "token": token,
+                # Old monitor versions persisted this token.  Keep it as an
+                # alias so correcting nested PnL cannot replay old windows.
+                "legacy_token": "%s|%s" % (
+                    row.get("closed_at"), top_pnl if top_pnl is not None else 0.0),
             })
-            if len(out) >= limit:
-                return out
-    return out
+    out.sort(key=lambda item: (
+        str(item.get("closed_at") or ""), str(item.get("opened_at") or ""),
+        str(item.get("token") or "")))
+    return out[-max(1, int(limit or 40)):]
 
 
 def _trade_token(t):
-    return "%s|%s" % (t.get("closed_at"), t.get("pnl"))
+    return str(t.get("token") or "%s|%s" % (
+        t.get("closed_at"), t.get("pnl")))
+
+
+def _trade_token_aliases(t):
+    return {str(value) for value in (
+        _trade_token(t), t.get("legacy_token")) if value not in (None, "")}
 
 
 def _next_window(trades, consumed, size):
     seen = set(consumed or [])
     window = []
     for t in trades:
-        token = _trade_token(t)
-        if token in seen:
+        if _trade_token_aliases(t) & seen:
             continue
         window.append(t)
         if len(window) >= size:
@@ -1422,12 +1775,84 @@ def _save_assignment(aid, row):
     return row
 
 
+def _active_auto_assignments():
+    """Return every enabled auto-open daemon assignment, including legacy."""
+    rows = {}
+    for path in sorted(AUTO_DIR.glob("formal_daemon_config*.json")):
+        cfg = _read(path, {})
+        if not isinstance(cfg, dict) or not cfg.get("enabled"):
+            continue
+        if not cfg.get("allow_auto_open"):
+            continue
+        symbol = str(cfg.get("symbol") or "").upper()
+        timeframe = str(cfg.get("timeframe") or "1h").lower()
+        for key in cfg.get("strategy_keys") or []:
+            key = str(key or "")
+            if not symbol or not key:
+                continue
+            aid = "%s|%s|%s" % (symbol, timeframe, key)
+            rows[aid] = {
+                "symbol": symbol, "timeframe": timeframe,
+                "strategy_key": key, "source_config": str(path),
+            }
+    return rows
+
+
+def _ensure_active_grade_controls():
+    """Make runtime controls the sole S/A/B/C source; new live rows start B."""
+    controls = _read(CONTROL_PATH, {"assignments": {}})
+    assignments = controls.setdefault("assignments", {})
+    active = _active_auto_assignments()
+    changed = False
+    initialized = []
+    for aid, base in active.items():
+        old = assignments.get(aid)
+        row = dict(old or {})
+        terminal = str(row.get("lifecycle_grade") or "").lower() in (
+            "deleted", "shadow", "replaced")
+        if terminal or row.get("pause_new_entries"):
+            continue
+        grade = str(row.get("lifecycle_grade") or "").upper()
+        if grade not in GRADE_RATIO:
+            grade = "B"
+            row["lifecycle_grade"] = "B"
+            row["max_grade"] = "B"
+            initialized.append(aid)
+        row.update({key: row.get(key) or value for key, value in base.items()})
+        row["max_position_ratio"] = GRADE_RATIO[grade]
+        row["grade_managed_by"] = GRADE_MANAGER
+        row["grade_policy_version"] = GRADE_POLICY_VERSION
+        row.setdefault("grade_window", {
+            "S": "S_run", "A": "A_run", "B": "B_first3", "C": "C_next3",
+        }[grade])
+        row.setdefault("grade_started_at", (
+            row.get("human_confirmed_at") or row.get("reactivated_at")
+            or row.get("restored_at") or row.get("updated_at") or _now()))
+        row.setdefault("pause_new_entries", False)
+        row.setdefault("new_entries_allowed", True)
+        if row != old:
+            assignments[aid] = row
+            changed = True
+    if changed:
+        controls["updated_at"] = _now()
+        controls["updated_by"] = "human_confirm_pipeline.grade_control_reconcile"
+        _atomic(CONTROL_PATH, controls)
+        _append_audit({
+            "time": _now(), "event": "grade_control_reconciled",
+            "active_count": len(active), "initialized_b": initialized,
+            "policy": GRADE_POLICY_VERSION,
+        })
+    return controls, active, initialized
+
+
 def _set_grade(row, grade, window_name):
     grade = str(grade).upper()
     row = dict(row)
     row["lifecycle_grade"] = grade
     row["max_grade"] = grade
-    row["max_position_ratio"] = GRADE_RATIO.get(grade, 0.15)
+    row["max_position_ratio"] = GRADE_RATIO.get(grade, 0.10)
+    row["grade_managed_by"] = GRADE_MANAGER
+    row["grade_policy_version"] = GRADE_POLICY_VERSION
     row["grade_window"] = window_name
     row["grade_changed_at"] = _now()
     row["promote_window_closed"] = []
@@ -1478,7 +1903,8 @@ def _delete_strategy(aid, row, reason, trades):
         name = titles.resolve_strategy_name(key, name)
     except Exception:
         pass
-    _wx(
+    _send_grade_notification(
+        "%s|deleted|%s" % (aid, row.get("deleted_at")),
         "【%s 已删除】\n"
         "原因: %s\n"
         "标的/周期: %s / %s\n"
@@ -1507,7 +1933,9 @@ def _promote(aid, row, to_grade, reason):
         name = titles.resolve_strategy_name(key, name)
     except Exception:
         pass
-    _wx(
+    _send_grade_notification(
+        "%s|%s_to_%s|%s" % (
+            aid, from_g, to_grade, row.get("grade_changed_at")),
         "【%s 晋升至%s级，%s】\n"
         "仓位: %s级 %s%%（杠杆20x）\n"
         "时间: %s" % (
@@ -1548,7 +1976,9 @@ def _demote(aid, row, to_grade, reason, window_trades=None):
         name = titles.resolve_strategy_name(key, name)
     except Exception:
         pass
-    _wx(
+    _send_grade_notification(
+        "%s|%s_to_%s|%s" % (
+            aid, from_g, to_grade, row.get("grade_changed_at")),
         "【%s 降级至%s级】\n"
         "原因: %s\n"
         "仓位: %s级 %s%%\n"
@@ -1600,10 +2030,18 @@ def monitor_live_grades():
 
 
 def _monitor_live_grades_unlocked():
-    controls = _read(CONTROL_PATH, {"assignments": {}})
+    retry_state = _retry_grade_notifications(limit=20)
+    controls, active_assignments, initialized = _ensure_active_grade_controls()
     actions = []
+    if initialized:
+        actions.append({"action": "initialized_b", "assignments": initialized})
     for aid, row in list((controls.get("assignments") or {}).items()):
-        if not row.get("human_confirm_pipeline") and not row.get("human_confirmed"):
+        # All mounted automatic strategies use the same state machine.  Keep
+        # human-confirm rows in scope for backwards-compatible unit/offline
+        # operation even when their daemon config is not present.
+        if (aid not in active_assignments
+                and not row.get("human_confirm_pipeline")
+                and not row.get("human_confirmed")):
             continue
         if row.get("pause_new_entries") and str(row.get("audit_state") or "") in (
                 "eliminated_pending_archive", "failed_closed"):
@@ -1615,8 +2053,13 @@ def _monitor_live_grades_unlocked():
         after = (row.get("grade_changed_at")
                  or row.get("downgraded_to_c_at")
                  or row.get("promoted_at")
-                 or row.get("human_confirmed_at"))
-        trades = _closed_trades_for(key, limit=40, after=after)
+                 or row.get("human_confirmed_at")
+                 or row.get("grade_started_at"))
+        parts = str(aid).split("|", 2)
+        symbol = row.get("symbol") or (parts[0] if len(parts) == 3 else None)
+        timeframe = row.get("timeframe") or (parts[1] if len(parts) == 3 else None)
+        trades = _closed_trades_for(
+            key, limit=40, after=after, symbol=symbol, timeframe=timeframe)
         window_name = str(row.get("grade_window") or "")
         if not window_name:
             window_name = {
@@ -1683,13 +2126,14 @@ def _monitor_live_grades_unlocked():
                     actions.append({"action": "c_window_ok", "aid": aid,
                                     "stops": stops})
 
-        elif grade in ("S", "A"):
+        elif grade in ("S", "A") or (
+                grade == "B" and window_name == "B_promote"):
             window = _next_window(trades, row.get("stop_window_closed"), 3)
             if window:
                 stops = sum(1 for t in window if t.get("stop"))
                 tokens = [_trade_token(t) for t in window]
                 if stops >= 2:
-                    to_g = "A" if grade == "S" else "B"
+                    to_g = {"S": "A", "A": "B", "B": "C"}[grade]
                     reason = "3单2止损"
                     row = _demote(aid, row, to_g, reason, window)
                     actions.append({"action": "downgrade_%s" % to_g.lower(),
@@ -1710,7 +2154,27 @@ def _monitor_live_grades_unlocked():
         # ── promotion (windows of 4) ──
         grade = str(row.get("lifecycle_grade") or "").upper()
         window_name = str(row.get("grade_window") or "")
-        if grade == "B" and window_name == "B_promote":
+        if grade == "C" and window_name in ("C_next3", "C_run", ""):
+            window = _next_window(
+                trades, row.get("promote_window_closed"),
+                PROMOTION_WINDOW_SIZE)
+            if window:
+                wins = sum(1 for t in window if t.get("profit") is True)
+                tokens = [_trade_token(t) for t in window]
+                if wins >= PROMOTION_MIN_WINS:
+                    row = _promote(aid, row, "B", "4单3盈")
+                    actions.append({"action": "promote_b", "aid": aid,
+                                    "wins": wins})
+                else:
+                    row = dict(row)
+                    row["promote_window_closed"] = (
+                        list(row.get("promote_window_closed") or [])
+                        + tokens)[-40:]
+                    _save_assignment(aid, row)
+                    actions.append({"action": "promote_window_fail",
+                                    "aid": aid, "wins": wins})
+
+        elif grade == "B" and window_name == "B_promote":
             window = _next_window(trades, row.get("promote_window_closed"), 4)
             if window:
                 wins = sum(1 for t in window if t.get("profit"))
@@ -1759,7 +2223,14 @@ def _monitor_live_grades_unlocked():
     if tip_actions:
         actions.extend(tip_actions)
 
-    state = {"ok": True, "time": _now(), "actions": actions}
+    state = {
+        "ok": True, "time": _now(), "actions": actions,
+        "grade_policy_version": GRADE_POLICY_VERSION,
+        "grade_ratios": GRADE_RATIO,
+        "promotion_rule": "4单3盈升级一级；A升S另需平均总本金收益率>5%",
+        "demotion_rule": "3单2止损降级一级；C再次触发则删除",
+        "notification_retry": retry_state,
+    }
     _atomic(STATE_PATH, state)
     return state
 
@@ -1905,6 +2376,10 @@ if __name__ == "__main__":
     parser.add_argument("--monitor", action="store_true")
     parser.add_argument("--tick", action="store_true")
     parser.add_argument("--list-pending", action="store_true")
+    parser.add_argument("--reconcile-formal-display", action="store_true",
+                        help="Sync formal_submits with live/pending; reject obsolete SOL 1h frost rows")
+    parser.add_argument("--purge-unverified-pending", action="store_true",
+                        help="Reject awaiting_confirm rows without verified 3AI review")
     args = parser.parse_args()
     if args.freeze_mass:
         print(json.dumps(freeze_mass_and_ed_probes(), ensure_ascii=False, indent=2))
@@ -1926,6 +2401,11 @@ if __name__ == "__main__":
         print(json.dumps(monitor_live_grades(), ensure_ascii=False, indent=2))
     elif args.list_pending:
         print(json.dumps(load_pending(), ensure_ascii=False, indent=2))
+    elif args.reconcile_formal_display:
+        import auto_trade_dual_engine_factory as dual
+        print(json.dumps(dual.reconcile_formal_display(), ensure_ascii=False, indent=2))
+    elif args.purge_unverified_pending:
+        print(json.dumps(purge_unverified_pending_items(), ensure_ascii=False, indent=2))
     elif args.tick:
         print(json.dumps(run_screen_tick(), ensure_ascii=False, indent=2, default=str))
     else:

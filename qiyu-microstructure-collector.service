@@ -1,0 +1,21 @@
+[Unit]
+Description=Qiyu read-only minute microstructure feature collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+ExecStart=/usr/bin/flock -n -E 75 /root/auto_trade/microstructure_collector.lock /usr/bin/python3 /root/auto_trade_microstructure_collector.py
+User=root
+Nice=17
+CPUAccounting=true
+CPUQuota=25%
+MemoryAccounting=true
+MemoryMax=96M
+TimeoutStartSec=50
+SuccessExitStatus=75
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Qiyu read-only forward shadow watch for evidence-insufficient legacy strategies
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+ExecStart=/usr/bin/flock -n -E 75 /root/auto_trade/legacy_shadow_watch.lock /usr/bin/python3 /root/auto_trade_legacy_shadow_watch.py
+User=root
+Nice=15
+CPUAccounting=true
+CPUQuota=25%
+MemoryAccounting=true
+MemoryHigh=420M
+MemoryMax=560M
+TimeoutStartSec=45min
+SuccessExitStatus=75

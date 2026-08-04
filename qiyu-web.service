@@ -1,0 +1,13 @@
+[Unit]
+Description=Qiyu trading dashboard web service
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/web_server.py
+Restart=always
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target

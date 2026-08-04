@@ -1,0 +1,30 @@
+{
+  "schema": "qiyu_legacy_forward_shadow_plan_v1",
+  "created_at": "2026-07-23 12:00:00",
+  "automatic_live_restoration": false,
+  "plans": [
+    {
+      "assignment_id": "BTC-USDT-SWAP|15m|btc15_dual_cycle_downtrend_reentry_short_ai",
+      "classification": "evidence_insufficient_not_logically_dead",
+      "enabled": true,
+      "started_at": "2026-07-23 12:00:00",
+      "minimum_days": 180,
+      "minimum_closed_trades": 20,
+      "interim_review_days": 90,
+      "interim_review_minimum_trades": 5,
+      "estimated_days_for_20_trades_from_historical_rate": 574,
+      "new_entries_allowed": false,
+      "automatic_live_restoration": false,
+      "final_requirements": [
+        "exact triple-actual friction mean > 0",
+        "exact triple-actual compounded full-margin return > 0",
+        "bootstrap probability of positive mean >= 0.80",
+        "profit factor >= 1.20",
+        "max drawdown <= 35%",
+        "max consecutive losses <= 3",
+        "contemporaneous micro snapshot coverage >= 80%",
+        "fresh three-AI review and Codex/manual approval"
+      ]
+    }
+  ]
+}

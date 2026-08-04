@@ -1,0 +1,417 @@
+{
+  "schema": "WINDTALKER_PHASE4_DATA_PROMOTION_READINESS",
+  "generated_at": "2026-07-28 13:45:28",
+  "phase3_evidence_reaudit": {
+    "WINDTALKER_PHASE3_SPEC_TO_CODE_SEMANTIC_MAP.json": {
+      "exists": true,
+      "sha256": "2acf1bc104beeae8b2b6cae1d5cc167c9b464914ce182beb19c0e47001e861a9"
+    },
+    "WINDTALKER_PHASE3_COLLAPSE_ROOT_CAUSE.json": {
+      "exists": true,
+      "sha256": "d1b1b878c630eaeae301e00de3425fb623661572426d2a254b1c68b43b3384ee"
+    },
+    "WINDTALKER_PHASE3_BEHAVIORAL_COLLAPSE_MATRIX.json": {
+      "exists": true,
+      "sha256": "ead66a9a4b3093ec57acd2319b1761d6ee0aea44df18e75a03831b64e97ba3a8"
+    },
+    "WINDTALKER_PHASE3_DATA_CAPABILITY_MATRIX.json": {
+      "exists": true,
+      "sha256": "eb443be479020bbf54230c80c8c73e1756a8d7cc73fa1f1b8dc4fb79ef8cfdb3"
+    },
+    "WINDTALKER_PHASE3_DSL_CAPABILITY_SPEC.json": {
+      "exists": true,
+      "sha256": "0a36f31312e3ad5e17e1bd68eb970ba5fe36a5b7c7b1ed7edfef427e02531d87"
+    },
+    "WINDTALKER_PHASE3_CAUSAL_FIDELITY_FRAMEWORK.json": {
+      "exists": true,
+      "sha256": "108d0fdc67bdd19f4c4cba04b3f8d5da3aac7938f82477ed0960074a6691eabb"
+    },
+    "WINDTALKER_PHASE3_PROBES_SUMMARY.json": {
+      "exists": true,
+      "sha256": "7eee5b644c98b5922ad746d6d20cdd58f180f4fc2efb53c6d77476b6a5f9149a"
+    },
+    "WINDTALKER_PHASE3_PRODUCTION_ISOLATION.json": {
+      "exists": true,
+      "sha256": "927412590af02eeab2982f569e856b71fd17d3d7d67d21a8d0ae8580f527f439"
+    }
+  },
+  "config_hash_wording_correction": {
+    "config_hash_unchanged_check_pass": true,
+    "phase3_isolation_now_hash": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+    "phase3_isolation_backup_hash": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+    "current_production_config_hash": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+    "config_hash_kept_unchanged": true,
+    "config_hash_changed": false,
+    "wording_error": {
+      "location": "WINDTALKER_PHASE3_final_report.md Q35",
+      "incorrect_statement": "config hash是否变化？ → True",
+      "correct_statement": "config hash是否变化？ → False（保持不变）",
+      "explanation": "Q35 将 isolation check 名 config_hash_unchanged.pass=True 误写成『是否变化=True』。真实含义是 hash 未变化（unchanged.pass=true）。Phase3 期间 production auto_trade_config.json SHA256 与 backup 一致。",
+      "authoritative_hash": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754"
+    }
+  },
+  "coverage_sample_semantics": {
+    "definition": "Each coverage_sample field is the non-missing rate of that feature column on the research frame: count(isfinite(x))/n_bars. It is NOT a sample value, NOT a feature magnitude, NOT a quality score, and NOT a replay-window ratio.",
+    "code_path": "/root/auto_trade/windtalker_phase3/scripts/windtalker_phase3_data_layer.py::cov",
+    "fields": {
+      "funding_rate": {
+        "value": 1.0,
+        "meaning": "non_missing_rate of funding_rate column (asof-aligned)",
+        "is_actual_data_coverage": true,
+        "is_sample_value": false,
+        "is_feature_magnitude": false,
+        "is_quality_score": false,
+        "is_replay_window_ratio": false
+      },
+      "oi": {
+        "value": 0.1464,
+        "meaning": "non_missing_rate of oi column (asof-aligned OKX rubik OI history+cache)",
+        "is_actual_data_coverage": true,
+        "is_sample_value": false,
+        "is_feature_magnitude": false,
+        "is_quality_score": false,
+        "is_replay_window_ratio": false
+      },
+      "basis_bps": {
+        "value": 0.2136,
+        "meaning": "non_missing_rate of basis_bps column",
+        "is_actual_data_coverage": true,
+        "is_sample_value": false,
+        "is_feature_magnitude": false,
+        "is_quality_score": false,
+        "is_replay_window_ratio": false
+      },
+      "taker_imbalance": {
+        "value": 0.4107,
+        "meaning": "non_missing_rate of taker_imbalance column",
+        "is_actual_data_coverage": true,
+        "is_sample_value": false,
+        "is_feature_magnitude": false,
+        "is_quality_score": false,
+        "is_replay_window_ratio": false
+      },
+      "cross_sync_score": {
+        "value": 0.9857,
+        "meaning": "non_missing_rate of cross_sync_score column",
+        "is_actual_data_coverage": true,
+        "is_sample_value": false,
+        "is_feature_magnitude": false,
+        "is_quality_score": false,
+        "is_replay_window_ratio": false
+      },
+      "flow_imbalance": {
+        "value": 1.0,
+        "meaning": "non_missing_rate of flow_imbalance (microstructure) column",
+        "is_actual_data_coverage": true,
+        "is_sample_value": false,
+        "is_feature_magnitude": false,
+        "is_quality_score": false,
+        "is_replay_window_ratio": false
+      }
+    }
+  },
+  "capabilities": {
+    "OI": {
+      "capability": "OI",
+      "status": "data_not_promotion_ready",
+      "data_not_promotion_ready": true,
+      "wf_windows_data_sufficient": 3,
+      "wf_windows_required": 10,
+      "per_fold": [
+        {
+          "fold": 0,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 1,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 2,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 3,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 4,
+          "n": 140,
+          "non_missing_rate": 0.3714,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "n": 140,
+          "non_missing_rate": 0.3857,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 7,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 8,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 9,
+          "n": 140,
+          "non_missing_rate": 0.7071,
+          "data_sufficient": true
+        }
+      ],
+      "sources": {
+        "ok": true,
+        "n": 200,
+        "source": "okx_rubik_oi_history+cache"
+      },
+      "notes": [
+        "OI non_missing_rate overall=0.1464",
+        "OI appears in sparse segments; many early WF folds have 0 coverage",
+        "Cannot honestly support 10 Gate3 windows without fabricating zeros"
+      ],
+      "historical_coverage_range": "sparse segments within 1400 bars",
+      "non_missing_ratio": 0.1464,
+      "timestamp_precision": "ms asof align past-only",
+      "symbol_coverage": [
+        "BTC-USDT-SWAP"
+      ],
+      "timeframe_support": [
+        "5m"
+      ],
+      "stale_policy_ms": 1800000,
+      "can_complete_ge10_wf_windows": false
+    },
+    "Cross_asset_sync": {
+      "capability": "Cross_asset_sync",
+      "status": "promotion_ready",
+      "data_not_promotion_ready": false,
+      "wf_windows_data_sufficient": 10,
+      "wf_windows_required": 10,
+      "per_fold": [
+        {
+          "fold": 0,
+          "n": 140,
+          "non_missing_rate": 0.8571,
+          "data_sufficient": true
+        },
+        {
+          "fold": 1,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 2,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 3,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 4,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 5,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 6,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        }
+      ],
+      "sources": {
+        "ok": true,
+        "lead_symbol": "ETH-USDT-SWAP",
+        "lead_bars": 1440,
+        "source": "okx_market_candles"
+      },
+      "notes": [
+        "cross_sync_score non_missing_rate=0.9857",
+        "BTC/ETH bar-aligned lead-lag from okx candles; replayable asof",
+        "reference interrupt → NaN fail-closed"
+      ],
+      "btc_target_sync_rate": 0.9857,
+      "time_align_error": "bar_index_aligned (5m)",
+      "missing_bar_handling": "NaN fail-closed",
+      "lead_lag_history_bars": 1400,
+      "reference_interrupt": "NaN → no signal",
+      "replayable": true,
+      "can_complete_ge10_wf_windows": true
+    },
+    "Taker_flow": {
+      "capability": "Taker_flow",
+      "status": "data_not_promotion_ready",
+      "data_not_promotion_ready": true,
+      "wf_windows_data_sufficient": 4,
+      "wf_windows_required": 10,
+      "per_fold": [
+        {
+          "fold": 0,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 1,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 2,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 3,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 4,
+          "n": 140,
+          "non_missing_rate": 0.0,
+          "data_sufficient": false
+        },
+        {
+          "fold": 5,
+          "n": 140,
+          "non_missing_rate": 0.1071,
+          "data_sufficient": false
+        },
+        {
+          "fold": 6,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 7,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 8,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        },
+        {
+          "fold": 9,
+          "n": 140,
+          "non_missing_rate": 1.0,
+          "data_sufficient": true
+        }
+      ],
+      "sources": {
+        "ok": true,
+        "n": 576,
+        "source": "okx_rubik_taker_volume"
+      },
+      "notes": [
+        "taker_imbalance non_missing_rate=0.4107",
+        "Source: okx_rubik_taker_volume aggregate; no direction label reverse detected in Phase3",
+        "Early folds may be data_insufficient; must mark not fake-0"
+      ],
+      "aggressive_buy_sell_source": "okx_rubik_taker_volume",
+      "aggregation": "5m bucket",
+      "timestamp_rule": "asof past-only",
+      "non_missing_ratio": 0.4107,
+      "direction_label_reversed": false,
+      "can_complete_ge10_wf_windows": false
+    },
+    "Funding_Basis": {
+      "status": "excluded_from_bridge",
+      "reason": "Phase3 causal fidelity FAIL on probe_funding_basis_unwind_btc_5m",
+      "not_a_bridge_candidate": true
+    }
+  },
+  "overall_pass_probes": [
+    "probe_oi_price_crowding_fade_btc_5m",
+    "probe_btc_lead_lag_eth_5m",
+    "probe_taker_absorption_btc_5m"
+  ],
+  "bridge_eligible_probes": [
+    "probe_oi_price_crowding_fade_btc_5m",
+    "probe_btc_lead_lag_eth_5m",
+    "probe_taker_absorption_btc_5m"
+  ],
+  "probe_artifacts": {
+    "probe_oi_price_crowding_fade_btc_5m": {
+      "strategy_exists": true,
+      "result_exists": true,
+      "strategy_sha": "90da21cc13765ac4cc7ec533b51da6466bcca8b3e5f37783619e3155a8cfa331"
+    },
+    "probe_btc_lead_lag_eth_5m": {
+      "strategy_exists": true,
+      "result_exists": true,
+      "strategy_sha": "b0eb5e835a3eebf1a4a264f72b342978f2056172b7b7e68d2c7aa3a5a59b8981"
+    },
+    "probe_taker_absorption_btc_5m": {
+      "strategy_exists": true,
+      "result_exists": true,
+      "strategy_sha": "d16f2c20c4da0ac1957286067a11a375fa84f74d5a8e3b7d35d7ab7f6cf8f5ad"
+    },
+    "probe_funding_basis_unwind_btc_5m": {
+      "strategy_exists": true,
+      "result_exists": true,
+      "strategy_sha": "cd9ce72eece483e26fb2572a7844dcb3ed6408071c6c5b63e47d8fb330d2f593"
+    }
+  },
+  "production_config_hash_now": "4f9e604894cb8d90e91fecfabd83ee1f0fd5382fc38cf7ba26942f92dd0b3754",
+  "risk_hash_now": "b6706810a56727e0c5e887245ca7efd35337a6c77f03ed5fb11c4d5be9a30156",
+  "step_a_hash_now": "0abe4e09b039a5dfab946736e666242ba4afaac683f7e8d4c1ef2114caf37cef"
+}

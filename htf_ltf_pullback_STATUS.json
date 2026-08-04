@@ -1,0 +1,64 @@
+{
+  "artifact": "htf_ltf_pullback_step_a_closeout",
+  "at": "2026-07-29",
+  "goal": "Gate7 pending + WxPusher",
+  "achieved": false,
+  "wx_sent": false,
+  "pending_key": null,
+  "confirm_cli": null,
+  "auto_mount": false,
+  "confirm_used": false,
+  "formal_daemons_restarted": false,
+  "family": "htf_ema_align_ltf_cci_vol_pullback",
+  "family_now_kb_blocked": true,
+  "submits": [
+    {
+      "pack": "strategy_htf_ltf_pullback_v1.json",
+      "task_id": "wsa_20260729_231706_cc9d",
+      "gate0": true,
+      "gate1": true,
+      "fail": "funnel_l1_fail",
+      "l1_reasons": ["sample_payoff_le_1.2"],
+      "l1_payoff": 0.843,
+      "note": "same-bar CCI OR ema21-touch nearly vacuous on reclaim"
+    },
+    {
+      "pack": "strategy_htf_ltf_pullback_v2.json",
+      "task_ids": [
+        "wsa_20260729_235403_619f",
+        "wsa_20260729_235430_aa12",
+        "wsa_20260729_235431_9e9c"
+      ],
+      "best_task_id": "wsa_20260729_235431_9e9c",
+      "gate0": true,
+      "gate1": true,
+      "l1": "passed on try3 (seed-sensitive retries)",
+      "fail": "repair_exhausted_or_drift / gate2_phase2_multi_objective_fitness",
+      "gate2_fitness": {
+        "payoff_ratio": 1.072,
+        "calmar": -1.036,
+        "expectancy_factor": 0.303,
+        "failed_checks": [
+          "calmar_ge_1_5",
+          "payoff_ge_2_5",
+          "expectancy_factor_ge_1_0",
+          "mae_dead_hold_clear"
+        ]
+      },
+      "gate3": "walk_forward_1_of_10 + null_hypothesis fail_closed"
+    }
+  ],
+  "feature_map": {
+    "EMA50": "ema53 (no ema50 in FEATURES)",
+    "EMA200": "ema200",
+    "HTF_1h": "h1_ema19 > h1_ema53",
+    "authorized": ["cci", "ema21", "ema53", "ema200", "h1_ema19", "h1_ema53"]
+  },
+  "exits": {
+    "atr_trailing": "v1=3.5 / v2=4.0 × ATR_14",
+    "protective_sl": 0.009,
+    "fixed_pct_tp": false
+  },
+  "max_full_submits_policy": 2,
+  "stopped_reason": "max 2 full submits exhausted; Gate2 payoff/calmar floors not met; family KB-blocked after viability archive"
+}

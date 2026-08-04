@@ -1,0 +1,37 @@
+{
+  "allow_auto_close": true,
+  "allow_auto_open": true,
+  "cooldown_sec_after_open": 3600,
+  "enabled": true,
+  "fee_buffer_usdt": 0,
+  "formal_auto_trading_authorized": true,
+  "full_position_ratio": 0.28,
+  "gate_authorized_auto_trading": true,
+  "last_open_ts": 1784300408.2681918,
+  "last_signal_candle_id": "conventional_down_arrangement_bottom_up_long:BTC-USDT-SWAP:1H:1784296800000",
+  "last_signal_candle_ids": {
+    "conventional_down_arrangement_bottom_up_long": "conventional_down_arrangement_bottom_up_long:BTC-USDT-SWAP:1H:1784296800000"
+  },
+  "leverage": 20,
+  "notification_enabled": true,
+  "position_mode": "full_balance",
+  "protective_close_if_attached_sl_invalid": true,
+  "reserve_usdt": 0,
+  "stop_loss_pct": 0.009,
+  "strategy_key": "conventional_up_break_long",
+  "strategy_keys": [
+    "conventional_up_break_long",
+    "early_downtrend_ema6_ema75_short",
+    "conventional_down_arrangement_bottom_up_long",
+    "cci_75_100",
+    "ema53_liquidity_sweep_reclaim_long",
+    "conventional_up_arrangement_valid_death_cross_short"
+  ],
+  "symbol": "BTC-USDT-SWAP",
+  "sz": "0.01",
+  "take_profit_mode": "authoritative_strategy",
+  "take_profit_on_signal_invalidated": false,
+  "take_profit_pct": 0.009,
+  "tick_interval_sec": 60,
+  "timeframe": "1h"
+}

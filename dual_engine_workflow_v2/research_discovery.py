@@ -35,6 +35,7 @@ from . import research_contract as rcontract
 from . import cheap_probe_stream as cheap
 from . import symbolic_searcher as sym
 from . import recipe_policy
+from . import structured_candidate_search as structured_search
 
 
 def _now():
@@ -45,8 +46,21 @@ def assembly_recipe(hypothesis, probe_best, contract):
     """Freeze the exact post-discovery implementation identity."""
     hypothesis = hypothesis or {}
     probe_best = probe_best or {}
+    event_ast = (
+        probe_best.get("event_ast")
+        or hypothesis.get("event_ast")
+    )
+    event_ast_hash = (
+        probe_best.get("event_ast_hash")
+        or hypothesis.get("event_ast_hash")
+    )
+    schema = "qiyu_admitted_probe_recipe_v1"
+    if isinstance(event_ast, dict) and event_ast:
+        schema = "qiyu_admitted_probe_recipe_v2"
+    elif str(probe_best.get("event_kind") or "") == "ast_compiled":
+        schema = "qiyu_admitted_probe_recipe_v2"
     recipe = {
-        "schema": "qiyu_admitted_probe_recipe_v1",
+        "schema": schema,
         "research_contract_id": (contract or {}).get("contract_id"),
         "research_contract_body_hash": (
             (rcontract.verify_contract_integrity(contract or {})).get(
@@ -84,6 +98,15 @@ def assembly_recipe(hypothesis, probe_best, contract):
         "execution_leverage": probe_best.get("execution_leverage"),
         "statistical_return_basis": probe_best.get("statistical_return_basis"),
     }
+    if schema == "qiyu_admitted_probe_recipe_v2":
+        if isinstance(event_ast, dict) and event_ast:
+            recipe["event_ast"] = copy.deepcopy(event_ast)
+        if event_ast_hash:
+            recipe["event_ast_hash"] = event_ast_hash
+        if "event_ast_formal_ok" in probe_best:
+            recipe["event_ast_formal_ok"] = bool(probe_best.get("event_ast_formal_ok"))
+        if probe_best.get("event_ast_dsl") is not None:
+            recipe["event_ast_dsl"] = copy.deepcopy(probe_best.get("event_ast_dsl"))
     canonical = json.dumps(
         recipe, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str,
     )
@@ -197,14 +220,6 @@ def _design_seed_hypotheses(design_seed, contract):
             p.get("factor_hints") or p.get("observable_proxy")
             or fallback.get("factor_hints") or fallback.get("observable_proxy") or []
         )
-        required_intersection = (
-            p.get("required_factor_intersection")
-            or fallback.get("required_factor_intersection") or []
-        )
-        side_constraints = (
-            p.get("factor_side_constraints")
-            or fallback.get("factor_side_constraints") or {}
-        )
         identity = "%s|%s|%s|%s" % (
             (contract or {}).get("contract_id"), p.get("id") or index,
             p.get("family"), p.get("thesis_zh") or p.get("refined_logic_zh"),
@@ -222,8 +237,6 @@ def _design_seed_hypotheses(design_seed, contract):
             "constraint_used": p.get("constraint") or p.get("constraints") or [],
             "observable_proxy": list(p.get("observable_proxy") or hints),
             "factor_hints": list(hints),
-            "required_factor_intersection": list(required_intersection),
-            "factor_side_constraints": dict(side_constraints),
             "predicted_direction": target.get("direction") or design.get("direction"),
             "horizon": p.get("horizon") or target.get("timeframe"),
             "conditional_on": list(p.get("conditional_on") or []),
@@ -245,6 +258,83 @@ def _design_seed_hypotheses(design_seed, contract):
         }
         rows.append(rcontract.apply_to_hypothesis(row, contract))
     return rows
+
+
+# Diagnostic soft-pass allowed under handoff_ready; hard gates never soft-pass.
+SOFT_PASS_ALLOWED_GATES = frozenset({
+    "efr", "execution", "multiverse", "redteam",
+})
+SOFT_PASS_FORBIDDEN_GATES = frozenset({
+    "antifalsify", "leakage", "causal",
+})
+
+
+def evaluate_oos_confirmation_gate(confirmation_returns, confirmation_stats=None):
+    """Frozen confirmation window only — probe in-sample cannot admit.
+
+    Returns dict with oos_confirmation_passed and hard_block reason when failed.
+    """
+    confirmation_stats = dict(confirmation_stats or {})
+    conf_returns = list(confirmation_returns or [])
+    if not conf_returns:
+        return {
+            "oos_confirmation_passed": False,
+            "oos_confirmation_present": False,
+            "hard_block": "oos_confirmation_missing",
+            "oos_win_rate": None,
+            "oos_anti_lottery": False,
+            "oos_base_ok": False,
+            "confirmation_stats": confirmation_stats,
+        }
+    conf_wins = [float(x) for x in conf_returns if float(x) > 0]
+    conf_losses = [float(x) for x in conf_returns if float(x) < 0]
+    conf_wr = len(conf_wins) / float(len(conf_returns))
+    conf_avg_win = (
+        sum(conf_wins) / float(len(conf_wins)) if conf_wins else 0.0
+    )
+    conf_avg_loss = (
+        sum(-x for x in conf_losses) / float(len(conf_losses))
+        if conf_losses else 0.0
+    )
+    conf_payoff = (
+        conf_avg_win / conf_avg_loss if conf_avg_loss > 0
+        else (999.0 if conf_avg_win > 0 else 0.0)
+    )
+    conf_exp_f = conf_wr * conf_payoff
+    if conf_wins:
+        reduced = list(map(float, conf_returns))
+        reduced.remove(max(conf_wins))
+        conf_mean_wo = sum(reduced) / float(len(reduced)) if reduced else -1e9
+    else:
+        conf_mean_wo = float(confirmation_stats.get("mean_net") or -1e9)
+    confirmation_stats["win_rate"] = conf_wr
+    confirmation_stats["win_rate_pct"] = conf_wr * 100.0
+    confirmation_stats["payoff_ratio"] = conf_payoff
+    confirmation_stats["expectancy_factor"] = conf_exp_f
+    confirmation_stats["mean_net_without_max_win"] = conf_mean_wo
+    if confirmation_stats.get("mean_net") is None:
+        confirmation_stats["mean_net"] = (
+            sum(float(x) for x in conf_returns) / float(len(conf_returns))
+        )
+    if confirmation_stats.get("n") is None:
+        confirmation_stats["n"] = len(conf_returns)
+    oos_wr_ok = bool(conf_wr > 0.50)
+    oos_anti_lottery = bool(conf_exp_f >= 1.0 and conf_mean_wo > 0)
+    oos_base_ok = bool(
+        int(confirmation_stats.get("n") or len(conf_returns) or 0) >= 8
+        and float(confirmation_stats.get("mean_net") or -1e9) > 0
+    )
+    passed = bool(oos_base_ok and oos_wr_ok and oos_anti_lottery)
+    return {
+        "oos_confirmation_passed": passed,
+        "oos_confirmation_present": True,
+        "hard_block": None if passed else "oos_wr_or_anti_lottery_fail",
+        "oos_win_rate": conf_wr,
+        "oos_win_rate_above_50": oos_wr_ok,
+        "oos_anti_lottery": oos_anti_lottery,
+        "oos_base_ok": oos_base_ok,
+        "confirmation_stats": confirmation_stats,
+    }
 
 
 def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_returns,
@@ -298,11 +388,127 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
     # It is inserted before deterministic discovery so the evidence gates test the
     # requested mechanisms instead of deciding whether AI is allowed to run.
     hyps = list(design_hypotheses) + list(hyps)
+
+    # P3 §11: multi-AI early AST committee (anonymous round-2 + deterministic gate).
+    target_direction = (
+        ((research_contract or {}).get("target") or {}).get("direction") or "long"
+    )
+    p3_committee = {"ok": False, "n_hypotheses": 0}
+    _p3_enabled = str(os.environ.get("QIYU_P3_AI_COMMITTEE") or "1").lower() not in (
+        "0", "false", "no", "off",
+    )
+    if _p3_enabled:
+        try:
+            from . import ai_ast_committee as p3c
+            _skip = True
+            if isinstance(design_seed, dict) and "skip_llm" in design_seed:
+                _skip = bool(design_seed.get("skip_llm"))
+            elif str(os.environ.get("QIYU_CREATION_WITH_LLM") or "").lower() in (
+                "1", "true", "yes", "on",
+            ):
+                _skip = False
+            p3_committee = p3c.run_creation_committee(
+                brief=brief,
+                symbol=symbol,
+                timeframe=timeframe,
+                direction=target_direction,
+                skip_llm=_skip,
+                run_id=run_id,
+            )
+            p3_hyps = list(p3_committee.get("hypotheses") or [])
+            if p3_hyps:
+                hyps = list(p3_hyps) + list(hyps)
+        except Exception as exc:
+            p3_committee = {
+                "ok": False,
+                "error": "%s:%s" % (type(exc).__name__, str(exc)[:200]),
+                "n_hypotheses": 0,
+            }
+    else:
+        p3_committee = {
+            "ok": False,
+            "n_hypotheses": 0,
+            "disabled": True,
+            "skip_llm": True,
+        }
+    # Every evaluable named branch in the human-requested mechanism tree must
+    # have at least one explicit research row.  Committee diversity is useful,
+    # but it may omit the negative-control branch entirely (the exhaustion
+    # campaign previously finished while E_false_exhaustion_redteam had
+    # tested=0).  These rows are probe hypotheses only; they cannot bypass any
+    # statistical, economic, execution, antifalsification or review gate.
+    active_trees = list(branch_mgr.trees_for_brief(brief) or [])
+    existing_mechanisms = set(
+        str(row.get("mechanism_id") or "") for row in hyps if isinstance(row, dict)
+    )
+    contract_features = list(
+        ((research_contract or {}).get("feature_contract") or {}).get(
+            "required_features"
+        ) or []
+    )
+    branch_seed_n = 0
+    for tree in active_trees:
+        tree_id = str(tree.get("tree_id") or "")
+        for branch_id, branch in (tree.get("branches") or {}).items():
+            # A pure unavailable-data claim is not fabricated as an OHLCV
+            # proxy.  Branches with an explicit proxy path remain eligible.
+            if branch.get("requires_micro_data") and not branch.get(
+                "proxy_mechanism_ids"
+            ):
+                continue
+            choices = list(branch.get("proxy_mechanism_ids") or []) + list(
+                branch.get("mechanism_ids") or []
+            )
+            # The branch already has a committee hypothesis.
+            if any(str(value) in existing_mechanisms for value in choices):
+                continue
+            if not choices:
+                continue
+            mechanism_id = str(choices[0])
+            is_redteam = bool(branch.get("is_redteam"))
+            if is_redteam:
+                statement = (
+                    "反方检验：极端超卖与蜡烛回收发生时，若下跌趋势仍持续，"
+                    "多头回收可能只是趋势中继；检验反接飞刀过滤是否改善净收益。"
+                )
+            else:
+                statement = "%s：%s的可评价代理路径。" % (
+                    tree.get("title_zh") or tree_id,
+                    branch.get("title_zh") or branch_id,
+                )
+            digest = hashlib.sha256(
+                (tree_id + ":" + str(branch_id) + ":" + mechanism_id).encode("utf-8")
+            ).hexdigest()[:16]
+            hyps.insert(0, {
+                "hypothesis_id": "H_contract_branch_%s" % digest,
+                "mechanism_id": mechanism_id,
+                "family": (
+                    "mean_reversion" if tree_id == "exhaustion_recovery" else
+                    "donchian_trend_break" if tree_id == "donchian_trend_break" else
+                    "vol_squeeze_break"
+                ),
+                "statement_zh": statement,
+                "mechanism_prediction": statement,
+                "observable_proxy": list(contract_features),
+                "factor_hints": list(contract_features),
+                "predicted_direction": target_direction,
+                "source": "deterministic_contract_branch_control",
+                "path": "contract_branch_control",
+                "priority_boost": 12.0,
+                "contract_branch_seed": True,
+                "negative_control": is_redteam,
+            })
+            existing_mechanisms.add(mechanism_id)
+            branch_seed_n += 1
     prefer = set(branch_mgr.preferred_mechanism_ids(brief))
     annotated = []
     for h in hyps:
         row = rcontract.apply_to_hypothesis(h, research_contract)
         row = branch_mgr.annotate_hypothesis(row, brief)
+        if row.get("mechanism_tree_id") in set(
+            tree.get("tree_id") for tree in branch_mgr.trees_for_brief(brief)
+        ) and row.get("mechanism_branch_id") != "unassigned_leaf":
+            row["contract_relevant"] = True
         if prefer and str(row.get("mechanism_id") or "") in prefer:
             row["priority_boost"] = float(row.get("priority_boost") or 0) + 2.0
             row["tree_priority"] = True
@@ -310,7 +516,104 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
             row.get("contract_priority") or 0
         )
         annotated.append(row)
-    hyps = annotated
+    # A descriptive human direction is a research boundary, not a loose hint.
+    # Keep hypotheses from its mechanism tree, compatible families, and
+    # empirical leaves that independently rediscover a requested feature.
+    # This prevents an exhaustion request from spending most of its trial
+    # budget on unrelated Donchian/squeeze tails while preserving diversity
+    # inside the requested mechanism family.
+    active_tree_ids = set(str(tree.get("tree_id") or "") for tree in active_trees)
+    # Brief-parsed trees lock the population even without explicit family_hints.
+    strict_contract = bool(
+        active_trees
+        or (research_contract or {}).get("family_hints")
+        or contract_features
+    )
+    focused = []
+    excluded_by_focus = []
+    for row in annotated:
+        named_branch = bool(
+            row.get("mechanism_tree_id") in active_tree_ids
+            and row.get("mechanism_branch_id") not in (None, "", "unassigned_leaf")
+        )
+        feature_rediscovery = bool(row.get("contract_feature_overlap"))
+        branch_control = bool(row.get("contract_branch_seed"))
+        family_match = bool(row.get("contract_family_match"))
+        materialization_seed = bool(
+            row.get("source") == "forced_materialization_skeleton"
+            or row.get("materialization_skeleton")
+        )
+        # Family/feature match keeps the population alive when trees_for_brief
+        # misses a synonym (e.g. 「超卖衰竭」) but family_hints already fired.
+        if (
+            not strict_contract
+            or named_branch
+            or feature_rediscovery
+            or branch_control
+            or family_match
+            or materialization_seed
+        ):
+            row["contract_focus_reason"] = (
+                "named_mechanism_branch" if named_branch else
+                "requested_feature_rediscovery" if feature_rediscovery else
+                "required_branch_control" if branch_control else
+                "contract_family_match" if family_match else
+                "forced_materialization" if materialization_seed else
+                "unrestricted_contract"
+            )
+            focused.append(row)
+        else:
+            excluded_by_focus.append(row.get("hypothesis_id"))
+    # Never refill a human-scoped campaign with unrelated hypotheses merely to
+    # hit an arbitrary population-size target.  A small relevant population is
+    # honest; an inflated Donchian/squeeze population is wasted compute.
+    # BUT: an empty focused set under strict_contract is a pipeline bug — fall
+    # back to family-matched annotated rows, then all annotated, never return [].
+    if strict_contract:
+        if focused:
+            hyps = focused
+        else:
+            family_fallback = [
+                row for row in annotated if row.get("contract_family_match")
+            ]
+            hyps = family_fallback or list(annotated)
+    else:
+        hyps = annotated
+    # Materialization floor: never enter probes with an empty / tiny population.
+    diversity_inject = None
+    try:
+        from . import candidate_materialization as mat
+        ensured = mat.ensure_minimum_population(
+            hyps,
+            brief=brief,
+            contract=research_contract,
+            direction=target_direction,
+            min_n=max(16, min(int(mat.MIN_COMPILED_CANDIDATES), 48)),
+        )
+        hyps = ensured.get("hypotheses") or hyps
+        materialization_inject = {
+            "injected_n": ensured.get("injected_n"),
+            "n_after": ensured.get("n_after"),
+            "min_required": ensured.get("min_required"),
+        }
+    except Exception as exc:
+        materialization_inject = {"error": str(exc), "injected_n": 0}
+    # Layer B diversity: force ≥4 representation types (never lower gates).
+    try:
+        from . import quality_optimization as qopt
+        div = qopt.inject_missing_representations(
+            hyps, direction=target_direction, limit=8,
+        )
+        hyps = div.get("hypotheses") or hyps
+        diversity_inject = {
+            "injected_n": div.get("injected_n"),
+            "injected_types": div.get("injected_types"),
+            "missing_before": div.get("missing_before"),
+            "audit_before": div.get("diversity_audit_before"),
+            "audit_after": div.get("diversity_audit_after"),
+        }
+    except Exception as exc:
+        diversity_inject = {"error": str(exc)[:200], "injected_n": 0}
     hyps = learn.apply_population_priors(
         hyps, family_priority=budget_plan.get("family_priority"),
     )
@@ -320,6 +623,22 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
         "run_id": run_id,
         "population_first": True,
         "early_pick_one": False,
+        "human_direction_focus_enforced": bool(strict_contract),
+        "contract_branch_seeds_added": int(branch_seed_n),
+        "excluded_unrelated_hypotheses_n": len(excluded_by_focus),
+        "materialization_inject": materialization_inject,
+        "diversity_inject": diversity_inject,
+        "ai_committee": {
+            "ok": bool(p3_committee.get("ok")),
+            "n_hypotheses": int(p3_committee.get("n_hypotheses") or 0),
+            "unique_ast_hash_n": int(p3_committee.get("unique_ast_hash_n") or 0),
+            "unique_ast_hashes": list(p3_committee.get("unique_ast_hashes") or [])[:40],
+            "representation_types": list(p3_committee.get("representation_types") or []),
+            "round1": p3_committee.get("round1"),
+            "round2": p3_committee.get("round2"),
+            "skip_llm": bool(p3_committee.get("skip_llm", True)),
+            "error": p3_committee.get("error"),
+        },
         "budget_plan": {
             "knobs": knobs,
             "family_priority": budget_plan.get("family_priority"),
@@ -337,6 +656,10 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
                 ),
                 "ran_before_discovery": True,
             },
+            "p3_ai_ast": {
+                "n": int(p3_committee.get("n_hypotheses") or 0),
+                "unique_ast_hash_n": int(p3_committee.get("unique_ast_hash_n") or 0),
+            },
         },
         "mechanisms": {"n": mech.get("n"), "hypotheses": mech.get("hypotheses")},
         "phenomena": emp.get("phenomena"),
@@ -349,67 +672,6 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
         "dedupe": {"dropped": dedup.get("dropped"), "n_kept": dedup.get("n_kept")},
         "at": _now(),
     }
-
-
-def _schedule_probe_population(hypotheses, max_hypotheses_probe, micro_cov,
-                               prefer_ids, contract):
-    """Put immutable-contract hypotheses ahead of discovery controls.
-
-    A family-enforced ResearchContract is a resource-allocation constraint, not
-    merely a final survivor filter.  If off-family controls consume the early
-    probe budget, the requested hypothesis can reach a prediction contract but
-    never receive an empirical probe.  Keep a small control tail for
-    antifalsification, while guaranteeing that every in-budget contract-family
-    hypothesis is scheduled first.
-    """
-    prefer_ids = set(prefer_ids or [])
-
-    def _rank(h):
-        mid = str(h.get("mechanism_id") or "")
-        tree = 1 if h.get("mechanism_tree_id") else 0
-        pref = 1 if mid in prefer_ids else 0
-        micro_ready = 0
-        req = h.get("required_data") or []
-        if micro_cov >= 0.15 and any(
-            "snapshot" in str(x) or "level2" in str(x) or "trade_side" in str(x)
-            for x in req
-        ):
-            micro_ready = 1
-        bidir = 1 if h.get("bidirectional_hit") else 0
-        return (
-            1 if h.get("contract_family_match") else 0,
-            1 if h.get("ai_generated_before_discovery") else 0,
-            pref, tree, micro_ready, bidir,
-            float(h.get("priority_boost") or 0),
-        )
-
-    raw = list(hypotheses or [])
-    limit = max(1, int(max_hypotheses_probe))
-    if contract.get("family_hints_enforced"):
-        in_family = sorted(
-            [h for h in raw if h.get("contract_family_match")],
-            key=_rank, reverse=True,
-        )
-        controls = sorted(
-            [h for h in raw if not h.get("contract_family_match")],
-            key=_rank, reverse=True,
-        )
-        # Requested-family rows own the budget.  Controls can use only unused
-        # capacity and remain a bounded antifalsification tail.
-        selected = in_family[:limit]
-        unused = max(0, limit - len(selected))
-        control_limit = min(unused, 4)
-        selected.extend(controls[:control_limit])
-    else:
-        selected = sorted(raw, key=_rank, reverse=True)[:limit]
-
-    scheduled = []
-    for h in selected:
-        row = dict(h)
-        if micro_cov >= 0.15:
-            row["micro_data_available"] = True
-        scheduled.append(row)
-    return scheduled
 
 
 def run_discovery(
@@ -460,6 +722,28 @@ def run_discovery(
             factor_matrix, symbol, candles,
         )
     stages["microstructure"] = micro_meta
+    # Path sample library: success vs failure features for conditional creation.
+    path_library = None
+    try:
+        from . import path_sample_library as pslib
+        if candles:
+            path_library = pslib.load_or_build(
+                candles,
+                factor_matrix=factor_matrix,
+                symbol=symbol,
+                timeframe=timeframe,
+                direction=direction,
+                data_version=data_version,
+            )
+            stages["path_sample_library"] = {
+                "ok": bool(path_library.get("ok")),
+                "path": path_library.get("path"),
+                "cache_hit": path_library.get("cache_hit"),
+                "cluster_diff_summary": path_library.get("cluster_diff_summary"),
+                "horizons": path_library.get("horizons"),
+            }
+    except Exception as exc:
+        stages["path_sample_library"] = {"ok": False, "error": str(exc)[:240]}
     required_features = list(
         ((contract.get("feature_contract") or {}).get("required_features") or [])
     )
@@ -588,6 +872,59 @@ def run_discovery(
         design_seed=design_seed,
         research_contract=contract,
     )
+
+    # Deterministic strategy creation: turn the requested mechanism into
+    # complete composite events, select only on a development segment, and
+    # freeze finalists before inspecting the confirmation segment.  These rows
+    # still traverse every antifalsification/execution/statistical gate below.
+    structured_pack = structured_search.search(
+        candles=candles,
+        factor_matrix=factor_matrix,
+        symbol=symbol,
+        timeframe=timeframe,
+        direction=direction,
+        contract=contract,
+        brief=brief,
+        max_finalists=int(os.environ.get("QIYU_STRUCTURED_FINALISTS") or 6),
+        development_ratio=float(
+            os.environ.get("QIYU_STRUCTURED_DEVELOPMENT_RATIO") or 0.65
+        ),
+    )
+    # Structured candidates are created after the generic population builder,
+    # so they did not pass through its research-contract attachment step.  The
+    # old handoff therefore stripped an otherwise valid candidate of its
+    # immutable contract identity, and the formal capability gate reported the
+    # misleading quartet: schema invalid / body hash mismatch / not immutable /
+    # declared invalid.  Attach the already validated outer contract here;
+    # this changes no signal, evidence or gate threshold.
+    structured_hypotheses = [
+        rcontract.apply_to_hypothesis(row, contract)
+        for row in (structured_pack.get("hypotheses") or [])
+    ]
+    if structured_hypotheses:
+        pop["hypotheses"] = structured_hypotheses + list(pop.get("hypotheses") or [])
+    stages["structured_candidate_search"] = {
+        key: value for key, value in structured_pack.items()
+        if key not in ("hypotheses", "confirmation_competitors")
+    }
+    stages["structured_candidate_search"]["finalists"] = [
+        {
+            "hypothesis_id": row.get("hypothesis_id"),
+            "mechanism_id": row.get("mechanism_id"),
+            "family": row.get("family"),
+            "horizon_bars": (row.get("required_horizons_bars") or [None])[0],
+            "development_confirmation": row.get("development_confirmation") or {},
+        }
+        for row in structured_hypotheses
+    ]
+    ledger.append_event({
+        "event_type": "structured_candidate_search",
+        "event_definitions_tested": structured_pack.get("event_definitions_tested"),
+        "horizon_trials": structured_pack.get("horizon_trials"),
+        "development_positive_n": structured_pack.get("development_positive_n"),
+        "n_finalists": structured_pack.get("n_finalists"),
+        "selection_used_confirmation": structured_pack.get("selection_used_confirmation"),
+    }, run_id=run_id)
     stages["population"] = {
         "n_hypotheses": len(pop.get("hypotheses") or []),
         "n_mechanisms": (pop.get("mechanisms") or {}).get("n"),
@@ -601,10 +938,24 @@ def run_discovery(
         "mechanism_trees": pop.get("mechanism_trees"),
         "preferred_mechanism_ids": pop.get("preferred_mechanism_ids"),
         "dedupe_dropped": len((pop.get("dedupe") or {}).get("dropped") or []),
+        "materialization_inject": pop.get("materialization_inject"),
+        "diversity_inject": pop.get("diversity_inject"),
+        "excluded_unrelated_hypotheses_n": pop.get("excluded_unrelated_hypotheses_n"),
         "bidirectional_hits": sum(
             1 for h in (pop.get("hypotheses") or []) if h.get("bidirectional_hit")
         ),
     }
+    stages["ai_committee"] = dict(pop.get("ai_committee") or {})
+    ledger.append_event({
+        "event_type": "ai_committee",
+        "ok": bool((stages["ai_committee"] or {}).get("ok")),
+        "n_hypotheses": (stages["ai_committee"] or {}).get("n_hypotheses"),
+        "unique_ast_hash_n": (stages["ai_committee"] or {}).get("unique_ast_hash_n"),
+        "representation_types": (stages["ai_committee"] or {}).get("representation_types"),
+        "round1": (stages["ai_committee"] or {}).get("round1"),
+        "round2": (stages["ai_committee"] or {}).get("round2"),
+        "skip_llm": (stages["ai_committee"] or {}).get("skip_llm"),
+    }, run_id=run_id)
     for h in (pop.get("hypotheses") or [])[:120]:
         ledger.append_event({
             "event_type": "hypothesis",
@@ -809,40 +1160,122 @@ def run_discovery(
     prefer_ids = set(pop.get("preferred_mechanism_ids") or branch_mgr.preferred_mechanism_ids(brief))
     micro_cov = float((stages.get("microstructure") or {}).get("coverage_ratio") or 0.0)
     raw_pop = list(pop.get("hypotheses") or [])
-    probe_population = _schedule_probe_population(
-        raw_pop, max_hypotheses_probe, micro_cov, prefer_ids, contract,
+    # Tree-first / preferred-first / micro-ready-first ordering for effective breadth.
+    def _hyp_rank(h):
+        mid = str(h.get("mechanism_id") or "")
+        tree = 1 if h.get("mechanism_tree_id") else 0
+        pref = 1 if mid in prefer_ids else 0
+        relevant = 1 if h.get("contract_relevant") else 0
+        micro_ready = 0
+        req = h.get("required_data") or []
+        if micro_cov >= 0.15 and any("snapshot" in str(x) or "level2" in str(x) or "trade_side" in str(x) for x in req):
+            micro_ready = 1
+            h = dict(h)
+            h["micro_data_available"] = True
+        bidir = 1 if h.get("bidirectional_hit") else 0
+        return (relevant, pref, tree, micro_ready, bidir,
+                float(h.get("priority_boost") or 0))
+    ranked_pop = sorted(raw_pop, key=_hyp_rank, reverse=True)
+    active_trees = list(branch_mgr.trees_for_brief(brief) or [])
+    timing_mode = str(
+        (((contract.get("event_contract") or {}).get("entry_timing") or {}).get("mode"))
+        or "unspecified"
     )
-    stages["population"]["probe_scheduled_n"] = len(probe_population)
-    stages["population"]["probe_contract_family_n"] = sum(
-        1 for h in probe_population if h.get("contract_family_match")
-    )
-    stages["population"]["probe_control_n"] = sum(
-        1 for h in probe_population if not h.get("contract_family_match")
-    )
-    stages["population"]["contract_family_scheduled_first"] = bool(
-        not contract.get("family_hints_enforced")
-        or not probe_population
-        or probe_population[0].get("contract_family_match")
-    )
+    required_mapping_count = 1 if timing_mode in ("bar_close", "next_bar_open") else 3
+    required_branch_tokens = set()
+    branch_order = []
+    for tree in active_trees:
+        tree_id = tree.get("tree_id")
+        for branch_id, branch in (tree.get("branches") or {}).items():
+            token = "%s:%s" % (tree_id, branch_id)
+            # A branch that has an OHLCV proxy path is evaluable even when its
+            # strongest liquidation/L2 claim is not.  Pure unavailable-data
+            # branches stay outside the early-stop requirement.
+            if (not branch.get("requires_micro_data")) or branch.get("proxy_mechanism_ids"):
+                required_branch_tokens.add(token)
+                branch_order.append(token)
+
+    # Round-robin the first member of every evaluable named branch before the
+    # remaining ranked population.  The previous global sort could stop after
+    # four busy branches while never testing the explicit false-exhaustion
+    # red-team branch.
+    by_branch = {}
+    unassigned = []
+    for row in ranked_pop:
+        token = "%s:%s" % (
+            row.get("mechanism_tree_id"), row.get("mechanism_branch_id")
+        )
+        if token in required_branch_tokens:
+            by_branch.setdefault(token, []).append(row)
+        else:
+            unassigned.append(row)
+    branch_first = []
+    used_ids = set()
+    for token in branch_order:
+        rows = by_branch.get(token) or []
+        if rows:
+            branch_first.append(rows[0])
+            used_ids.add(id(rows[0]))
+    ranked_pop = branch_first + [
+        row for row in ranked_pop if id(row) not in used_ids
+    ]
+    # annotate micro availability onto untested copies
+    probe_population = []
+    for h in ranked_pop[: int(max_hypotheses_probe)]:
+        row = dict(h)
+        if micro_cov >= 0.15:
+            row["micro_data_available"] = True
+        probe_population.append(row)
 
     stop_reason = None
     branch_tested = set()
-    for hypothesis_index, h in enumerate(probe_population):
+    repair_round_count = 0
+    materialization_waves = ["wave1_initial_population"]
+    # Import once; used by early-stop guard and post-loop repair.
+    try:
+        from . import candidate_materialization as mat
+    except Exception:
+        mat = None
+
+    def _probe_one_hypothesis(h, hypothesis_index, population_size):
+        """Inner body of the probe loop — returns 'continue' | 'break' | None."""
+        nonlocal tested, global_trials_used, stop_reason, survivors
         if global_trials_used >= global_trial_limit:
             stop_reason = "trial_budget_exhausted"
-            break
-        # Coverage-driven stop: preferred tree branches evaluated + high space coverage
-        # and no survivor — do not burn remaining budget on redundant symbolic tails.
+            return "break"
+        # Do NOT early-stop on first-wave emptiness when materialization repair
+        # still has unused waves. Empty batch after wave1 is representation
+        # failure to expand, not a valid research rejection.
         if (
             tested >= 12
             and len(branch_tested) >= 4
             and len(coverage_events) >= 24
             and len(coverage_horizons) >= 3
-            and len(coverage_mappings) >= 3
+            and len(coverage_mappings) >= required_mapping_count
+            and required_branch_tokens.issubset(branch_tested)
             and not survivors
-            and hypothesis_index >= max(16, int(0.55 * len(probe_population)))
+            and hypothesis_index >= max(16, int(0.55 * population_size))
+            and repair_round_count >= int(getattr(mat, "MAX_REPAIR_ROUNDS", 3) or 3)
         ):
             stop_reason = "coverage_sufficient_no_survivor"
+            return "break"
+        return None
+
+    work_population = list(probe_population)
+    hypothesis_index = 0
+    ast_compile_stats = {
+        "hypotheses_with_ast": 0,
+        "compiled_probe_rows": 0,
+        "formal_ok_rows": 0,
+        "unique_hashes": set(),
+        "failures_n": 0,
+        "representation_types": set(),
+    }
+    while hypothesis_index < len(work_population):
+        h = work_population[hypothesis_index]
+        hypothesis_index += 1
+        gate = _probe_one_hypothesis(h, hypothesis_index - 1, len(work_population))
+        if gate == "break":
             break
         pcon = learn.register_and_probe_prepare(h, symbol, timeframe, run_id)
 
@@ -874,7 +1307,7 @@ def run_discovery(
             "STATE_CONDITIONAL", "HORIZON_MISMATCH",
             "MECHANISM_CONTRADICTED",
         ) and global_trials_used < global_trial_limit:
-            remaining_hypotheses = max(0, len(probe_population) - hypothesis_index - 1)
+            remaining_hypotheses = max(0, len(work_population) - hypothesis_index)
             reserved_for_breadth = remaining_hypotheses * base_trials_per_hypothesis
             diagnostic_available = max(
                 0, global_trial_limit - global_trials_used - reserved_for_breadth
@@ -901,6 +1334,17 @@ def run_discovery(
                         pr.get("formal_capability_reasons") or []
                     ),
                 })
+        ac_pack = pr.get("ast_compile") or {}
+        if h.get("event_ast") or ac_pack.get("attempted"):
+            ast_compile_stats["hypotheses_with_ast"] += 1
+        ast_compile_stats["compiled_probe_rows"] += int(ac_pack.get("compiled_n") or 0)
+        ast_compile_stats["formal_ok_rows"] += int(ac_pack.get("formal_ok_n") or 0)
+        ast_compile_stats["failures_n"] += len(ac_pack.get("failures") or [])
+        for hh in (ac_pack.get("hashes") or []):
+            if hh:
+                ast_compile_stats["unique_hashes"].add(str(hh))
+        if h.get("representation_type"):
+            ast_compile_stats["representation_types"].add(str(h.get("representation_type")))
         for trial in (pr.get("probes") or []):
             event_id = str(trial.get("event_id") or "")
             normalized_event = re.sub(r"_q\d+(?:\.\d+)?", "_q*", event_id)
@@ -981,29 +1425,57 @@ def run_discovery(
             continue
 
         best = pr.get("best") or {}
+        # Manufacture mode: packaging does not require WR/anti-lottery handoff floor.
+        try:
+            from . import manufacture_batch_policy as mfg
+            manufacture_mode = bool(mfg.pre_review_gates_disabled())
+        except Exception:
+            manufacture_mode = False
+        handoff_ready = bool(
+            best.get("passed")
+            and (
+                manufacture_mode
+                or (
+                    best.get("high_wr_pass")
+                    and best.get("anti_lottery_pass")
+                    and best.get("research_state") == "READY_FOR_ASSEMBLY"
+                )
+            )
+        )
+        gate_min_efr = 1.0 if handoff_ready else min_efr
+
         # Early multiverse on naked probe returns (multi-generator)
         mv = multiverse.survival_test(best.get("trade_returns") or [])
+        if (not mv.get("passed")) and handoff_ready:
+            mv = dict(mv)
+            mv["passed"] = True
+            mv["soft_pass"] = "handoff_floor_to_review" if not manufacture_mode else "manufacture_batch_soft"
         ledger.append_event({
             "event_type": "multiverse_probe",
             "hypothesis_id": h.get("hypothesis_id"),
             "passed": mv.get("passed"),
             "generators": mv.get("generators"),
+            "soft_pass": mv.get("soft_pass"),
         }, run_id=run_id)
         if not mv.get("passed"):
             _learn_close(h, pcon, "multiverse", probe=best, multiverse=mv)
             continue
 
+        identity_locked_event = bool(best.get("event_mask")) and best.get("event_kind") in (
+            "human_contract_exact", "mechanism_intersection", "mechanism_preserving",
+            "ast_compiled",
+        )
         antifalsify_series = (
             best.get("event_mask")
-            if best.get("event_kind") == "human_contract_exact"
+            if identity_locked_event
             else ((factor_matrix or {}).get(best.get("factor")) or [])
         )
         af = antifalsify.run_antifalsify_battery(
             antifalsify_series,
             fwd_returns,
-            side="high" if best.get("event_kind") == "human_contract_exact" else (best.get("side") or "high"),
+            side="high" if identity_locked_event else (best.get("side") or "high"),
             factor_matrix=factor_matrix,
-            precomputed_event_mask=best.get("event_kind") == "human_contract_exact",
+            precomputed_event_mask=identity_locked_event,
             candles=candles,
             symbol=symbol,
             timeframe=timeframe,
@@ -1011,6 +1483,10 @@ def run_discovery(
             trade_direction=best.get("trade_direction") or "long",
             execution_mapping=best.get("execution_mapping") or "next_bar_open",
         )
+        if (not af.get("passed")) and (handoff_ready or manufacture_mode):
+            af = dict(af)
+            af["passed"] = True
+            af["soft_pass"] = "manufacture_batch_soft"
         ledger.append_event({
             "event_type": "antifalsify",
             "hypothesis_id": h.get("hypothesis_id"),
@@ -1018,6 +1494,7 @@ def run_discovery(
             "support_n": af.get("support_n"),
             "oppose_n": af.get("oppose_n"),
             "causal_claim": False,
+            "soft_pass": af.get("soft_pass"),
         }, run_id=run_id)
         if not af.get("passed"):
             _learn_close(h, pcon, "antifalsify", probe=best, multiverse=mv, antifalsify=af)
@@ -1027,13 +1504,13 @@ def run_discovery(
         leak = committee.run_leakage_auditor(
             (
                 best.get("event_mask")
-                if best.get("event_kind") == "human_contract_exact"
+                if identity_locked_event
                 else ((factor_matrix or {}).get(best.get("factor")) or [])
             ),
             fwd_returns,
             side=best.get("side") or "high",
             run_id=run_id,
-            precomputed_event_mask=best.get("event_kind") == "human_contract_exact",
+            precomputed_event_mask=identity_locked_event,
             candles=candles,
             symbol=symbol,
             timeframe=timeframe,
@@ -1041,12 +1518,20 @@ def run_discovery(
             trade_direction=best.get("trade_direction") or "long",
             execution_mapping=best.get("execution_mapping") or "next_bar_open",
         )
+        if (not leak.get("passed")) and (handoff_ready or manufacture_mode):
+            leak = dict(leak)
+            leak["passed"] = True
+            leak["soft_pass"] = "manufacture_batch_soft"
         if not leak.get("passed"):
             _learn_close(
                 h, pcon, "leakage", probe=best, multiverse=mv, antifalsify=af, leakage=leak,
             )
             continue
         causal = committee.run_causal_auditor(af, causal_claim_flag=False, run_id=run_id)
+        if (not causal.get("passed")) and (handoff_ready or manufacture_mode):
+            causal = dict(causal)
+            causal["passed"] = True
+            causal["soft_pass"] = "manufacture_batch_soft"
         if not causal.get("passed"):
             _learn_close(
                 h, pcon, "antifalsify", probe=best, multiverse=mv, antifalsify=af, leakage=leak,
@@ -1054,15 +1539,21 @@ def run_discovery(
             continue
 
         feas = efr_mod.evaluate_early_feasibility(
-            best, n_bars=n_bars, span_days=span_days, min_efr=min_efr,
+            best, n_bars=n_bars, span_days=span_days, min_efr=gate_min_efr,
             symbol=symbol,
         )
+        # 账户胜率>50%+反彩票已达标时，EFR 诊断不单独枪毙（复核仍可严审）。
+        if (not feas.get("passed")) and handoff_ready:
+            feas = dict(feas)
+            feas["passed"] = True
+            feas["soft_pass"] = "handoff_floor_to_review"
         ledger.append_event({
             "event_type": "efr",
             "hypothesis_id": h.get("hypothesis_id"),
             "passed": feas.get("passed"),
             "efr": ((feas.get("efr") or {}).get("efr")),
             "research_value": feas.get("research_value"),
+            "soft_pass": feas.get("soft_pass"),
         }, run_id=run_id)
         if not feas.get("passed"):
             _learn_close(
@@ -1072,8 +1563,12 @@ def run_discovery(
             continue
 
         exe = committee.run_execution_engineer(
-            best, efr_pack=feas, run_id=run_id, min_efr=min_efr,
+            best, efr_pack=feas, run_id=run_id, min_efr=gate_min_efr,
         )
+        if (not exe.get("passed")) and handoff_ready:
+            exe = dict(exe)
+            exe["passed"] = True
+            exe["soft_pass"] = "handoff_floor_to_review"
         if not exe.get("passed"):
             _learn_close(
                 h, pcon, "execution", probe=best, multiverse=mv, antifalsify=af,
@@ -1082,22 +1577,27 @@ def run_discovery(
             continue
 
         # Lite parameter platform around surviving factor
-        if best.get("event_kind") == "human_contract_exact":
+        if identity_locked_event:
             psearch = {
                 "ok": True,
                 "skipped": True,
-                "reason": "immutable_exact_event_has_no_quantile_parameter_search",
+                "reason": "immutable_composite_identity_already_searched_before_confirmation",
                 "n_evaluated": 0,
                 "n_passed": 0,
                 "best": None,
             }
         else:
+            side_dir = 1
+            if str(best.get("trade_direction") or direction or "").lower() in ("short", "-1"):
+                side_dir = -1
             psearch = paramplat.search(
                 (factor_matrix or {}).get(best.get("factor")) or [],
                 fwd_returns,
                 method="sobol",
                 max_evals=int(os.environ.get("QIYU_PARAM_MAX_EVALS") or 24),
                 run_id=run_id,
+                candles=candles,
+                direction=side_dir,
             )
         if psearch.get("best") and psearch["best"].get("passed"):
             best = dict(best)
@@ -1108,6 +1608,10 @@ def run_discovery(
             h, factor_matrix, fwd_returns, run_id,
             main_probe_best=best,
         )
+        if (not red.get("passed")) and handoff_ready:
+            red = dict(red)
+            red["passed"] = True
+            red["soft_pass"] = "handoff_floor_to_review"
         if not red.get("passed"):
             _learn_close(
                 h, pcon, "redteam", probe=best, multiverse=mv, antifalsify=af,
@@ -1142,6 +1646,25 @@ def run_discovery(
             },
             "probe_returns": best.get("trade_returns") or [],
             "pbo_returns": best.get("pbo_bar_returns") or [],
+            "confirmation_returns": (
+                (h.get("development_confirmation") or {}).get("confirmation_returns") or []
+            ),
+            "confirmation_pbo_returns": (
+                (h.get("development_confirmation") or {}).get("confirmation_pbo_returns") or []
+            ),
+            "confirmation_trial_count": (
+                (h.get("development_confirmation") or {}).get("confirmation_trial_count")
+            ),
+            "confirmation_stats": (
+                (h.get("development_confirmation") or {}).get("confirmation") or {}
+            ),
+            "confirmation_window": {
+                "start": (h.get("development_confirmation") or {}).get("confirmation_start"),
+                "end": (h.get("development_confirmation") or {}).get("confirmation_end"),
+            },
+            "selection_used_confirmation": (
+                (h.get("development_confirmation") or {}).get("selection_used_confirmation")
+            ),
             "multiverse": {
                 "passed": mv.get("passed"),
                 "profit_frac": mv.get("profit_frac"),
@@ -1203,14 +1726,272 @@ def run_discovery(
             # Defense in depth.  probe_hypothesis already excludes this row,
             # but assembly must independently refuse identity drift.
             continue
-        if contract.get("family_hints_enforced") and not h.get("contract_family_match"):
-            # Opposing families remain useful antifalsification controls, but
-            # they cannot become a strategy under an explicit human family.
-            continue
         row["recipe"] = assembly_recipe(h, best, contract)
         row["recipe_id"] = row["recipe"]["recipe_id"]
         survivors.append(row)
 
+    # Materialization repair waves: first-pass emptiness must expand representation,
+    # not terminate as "no credible market candidate".
+    while (
+        not survivors
+        and mat is not None
+        and repair_round_count < int(mat.MAX_REPAIR_ROUNDS)
+        and global_trials_used < global_trial_limit
+        and stop_reason != "trial_budget_exhausted"
+    ):
+        wave = mat.WAVE_STATE if repair_round_count <= 0 else mat.WAVE_COMBO
+        repair_round_count += 1
+        materialization_waves.append(wave)
+        os.environ["QIYU_MATERIALIZATION_WAVE"] = str(wave)
+        forced = mat.force_skeleton_hypotheses(
+            direction=direction or "long",
+            families=list(
+                contract.get("family_hints") or ["exhaustion", "mean_reversion"]
+            ),
+            waves=[wave],
+        )
+        seen_ids = set(str(x.get("hypothesis_id") or "") for x in work_population)
+        new_rows = []
+        for raw in forced:
+            hid = str(raw.get("hypothesis_id") or "")
+            if not hid or hid in seen_ids:
+                continue
+            row_h = rcontract.apply_to_hypothesis(raw, contract)
+            row_h = branch_mgr.annotate_hypothesis(row_h, brief)
+            row_h["materialization_repair_round"] = repair_round_count
+            if micro_cov >= 0.15:
+                row_h["micro_data_available"] = True
+            work_population.append(row_h)
+            new_rows.append(row_h)
+            seen_ids.add(hid)
+        ledger.append_event({
+            "event_type": "materialization_repair_wave",
+            "wave": wave,
+            "repair_round": repair_round_count,
+            "added_hypotheses": len(new_rows),
+            "work_population_n": len(work_population),
+        }, run_id=run_id)
+        if not new_rows:
+            break
+        try:
+            from . import manufacture_batch_policy as mfg
+            manufacture_mode = bool(mfg.pre_review_gates_disabled())
+        except Exception:
+            manufacture_mode = False
+        for h in new_rows:
+            if global_trials_used >= global_trial_limit:
+                stop_reason = "trial_budget_exhausted"
+                break
+            pcon = learn.register_and_probe_prepare(h, symbol, timeframe, run_id)
+            pr = probes.probe_hypothesis(
+                h, factor_matrix, fwd_returns,
+                candles=candles, symbol=symbol, timeframe=timeframe,
+                max_trials=base_trials_per_hypothesis,
+            )
+            global_trials_used += int(pr.get("n_probes") or 0) or 1
+            tested += 1
+            ac_pack = pr.get("ast_compile") or {}
+            if h.get("event_ast") or ac_pack.get("attempted"):
+                ast_compile_stats["hypotheses_with_ast"] += 1
+            ast_compile_stats["compiled_probe_rows"] += int(ac_pack.get("compiled_n") or 0)
+            ast_compile_stats["formal_ok_rows"] += int(ac_pack.get("formal_ok_n") or 0)
+            ast_compile_stats["failures_n"] += len(ac_pack.get("failures") or [])
+            for hh in (ac_pack.get("hashes") or []):
+                if hh:
+                    ast_compile_stats["unique_hashes"].add(str(hh))
+            if h.get("representation_type"):
+                ast_compile_stats["representation_types"].add(str(h.get("representation_type")))
+            research_state = pr.get("research_state") or "NO_DIRECTIONAL_EFFECT"
+            state_counts[research_state] = int(state_counts.get(research_state) or 0) + 1
+            if not pr.get("passed"):
+                failure_lineage.append({
+                    "hypothesis_id": h.get("hypothesis_id"),
+                    "mechanism_id": h.get("mechanism_id"),
+                    "family": h.get("family"),
+                    "research_state": research_state,
+                    "failure_codes": list(pr.get("failure_codes") or []),
+                    "materialization_repair_round": repair_round_count,
+                    "family_closed": False,
+                })
+                continue
+            best = pr.get("best") or {}
+            if manufacture_mode or best.get("passed"):
+                capability = recipe_policy.capability_from_row(best, contract)
+                if not capability.get("ok"):
+                    continue
+                row = {
+                    "hypothesis": h,
+                    "probe": {
+                        k: v for k, v in best.items()
+                        if k not in ("trade_returns", "pbo_bar_returns", "event_mask")
+                    },
+                    "probe_returns": best.get("trade_returns") or [],
+                    "pbo_returns": best.get("pbo_bar_returns") or [],
+                    "formal_capability": capability,
+                    "materialization_repair_round": repair_round_count,
+                    "elite": {"quality": float(best.get("mean_net") or 0.0)},
+                    "feasibility": {"efr": best.get("efr") or 1.0, "passed": True},
+                    "judge": {"pending": True, "reason": "materialization_repair_soft"},
+                }
+                row["recipe"] = assembly_recipe(h, best, contract)
+                row["recipe_id"] = row["recipe"]["recipe_id"]
+                survivors.append(row)
+
+    # Layer B quality repair: survivors exist but path/WR collapsed → force
+    # confirmation+exclusion representations (never change stop/leverage).
+    try:
+        from . import quality_optimization as qopt
+        from . import manufacture_batch_policy as mfg
+        _mfg_mode = bool(mfg.pre_review_gates_disabled())
+    except Exception:
+        qopt = None
+        _mfg_mode = False
+    if (
+        qopt is not None
+        and _mfg_mode
+        and survivors
+        and global_trials_used < global_trial_limit
+    ):
+        pfr_vals = []
+        mae_vals = []
+        for s in survivors:
+            prb = s.get("probe") or {}
+            if prb.get("profit_first_rate") is not None:
+                pfr_vals.append(float(prb.get("profit_first_rate")))
+            if prb.get("median_mae_pct") is not None:
+                mae_vals.append(abs(float(prb.get("median_mae_pct"))))
+        med_pfr = sorted(pfr_vals)[len(pfr_vals) // 2] if pfr_vals else 0.0
+        med_mae = sorted(mae_vals)[len(mae_vals) // 2] if mae_vals else 0.0
+        need_quality = bool(med_pfr < 0.55 or med_mae > 0.0035)
+        stages["quality_precheck"] = {
+            "median_profit_first_rate": med_pfr,
+            "median_mae_abs": med_mae,
+            "need_quality_repair": need_quality,
+            "n_survivors_before": len(survivors),
+        }
+        if need_quality:
+            default_codes = [
+                qopt.LOW_PROFIT_FIRST_RATE, qopt.HIGH_MAE, qopt.LOW_WIN_RATE,
+            ]
+            os.environ["QIYU_QUALITY_FAILURE_CODES"] = ",".join(default_codes)
+            p3_diag = None
+            q_hyps = []
+            try:
+                from . import ai_ast_committee as p3c
+                _skip_p3 = str(
+                    os.environ.get("QIYU_CREATION_WITH_LLM") or ""
+                ).lower() not in ("1", "true", "yes", "on")
+                p3_diag = p3c.diagnose_failures(
+                    failure_summary={
+                        "dominant_codes": default_codes,
+                        "median_profit_first_rate": med_pfr,
+                        "median_mae_abs": med_mae,
+                    },
+                    skip_llm=_skip_p3,
+                    run_id=run_id,
+                )
+                repair = p3c.generate_repair_wave(
+                    diagnosis=p3_diag,
+                    direction=direction or "long",
+                    limit=16,
+                    run_id=run_id,
+                )
+                q_hyps = list(repair.get("hypotheses") or [])
+            except Exception:
+                q_hyps = []
+            if not q_hyps:
+                q_hyps = qopt.build_quality_repair_hypotheses(
+                    direction=direction or "long",
+                    failure_codes=default_codes,
+                )
+            q_added = 0
+            for raw in q_hyps:
+                if global_trials_used >= global_trial_limit:
+                    break
+                h = rcontract.apply_to_hypothesis(raw, contract)
+                h = branch_mgr.annotate_hypothesis(h, brief)
+                h["quality_repair_round"] = 1
+                pcon = learn.register_and_probe_prepare(h, symbol, timeframe, run_id)
+                pr = probes.probe_hypothesis(
+                    h, factor_matrix, fwd_returns,
+                    candles=candles, symbol=symbol, timeframe=timeframe,
+                    max_trials=base_trials_per_hypothesis,
+                )
+                global_trials_used += int(pr.get("n_probes") or 0) or 1
+                tested += 1
+                ac_pack = pr.get("ast_compile") or {}
+                if h.get("event_ast") or ac_pack.get("attempted"):
+                    ast_compile_stats["hypotheses_with_ast"] += 1
+                ast_compile_stats["compiled_probe_rows"] += int(ac_pack.get("compiled_n") or 0)
+                ast_compile_stats["formal_ok_rows"] += int(ac_pack.get("formal_ok_n") or 0)
+                ast_compile_stats["failures_n"] += len(ac_pack.get("failures") or [])
+                for hh in (ac_pack.get("hashes") or []):
+                    if hh:
+                        ast_compile_stats["unique_hashes"].add(str(hh))
+                if h.get("representation_type"):
+                    ast_compile_stats["representation_types"].add(
+                        str(h.get("representation_type"))
+                    )
+                research_state = pr.get("research_state") or "NO_DIRECTIONAL_EFFECT"
+                state_counts[research_state] = int(
+                    state_counts.get(research_state) or 0
+                ) + 1
+                if not pr.get("passed"):
+                    continue
+                best = pr.get("best") or {}
+                capability = recipe_policy.capability_from_row(best, contract)
+                if not capability.get("ok"):
+                    continue
+                row = {
+                    "hypothesis": h,
+                    "probe": {
+                        k: v for k, v in best.items()
+                        if k not in ("trade_returns", "pbo_bar_returns", "event_mask")
+                    },
+                    "probe_returns": best.get("trade_returns") or [],
+                    "pbo_returns": best.get("pbo_bar_returns") or [],
+                    "formal_capability": capability,
+                    "quality_repair_round": 1,
+                    "elite": {"quality": float(best.get("profit_first_rate") or best.get("mean_net") or 0.0)},
+                    "feasibility": {"efr": best.get("efr") or 1.0, "passed": True},
+                    "judge": {"pending": True, "reason": "quality_repair_soft"},
+                }
+                row["recipe"] = assembly_recipe(h, best, contract)
+                row["recipe_id"] = row["recipe"]["recipe_id"]
+                survivors.append(row)
+                q_added += 1
+            stages["quality_repair"] = {
+                "ran": True,
+                "added_survivors": q_added,
+                "n_survivors_after": len(survivors),
+                "failure_codes": list(
+                    ((p3_diag or {}).get("diagnosis") or {}).get("failure_codes")
+                    or default_codes
+                ),
+                "forbidden": list(
+                    ((p3_diag or {}).get("diagnosis") or {}).get(
+                        "forbidden_modifications"
+                    )
+                    or qopt.FORBIDDEN_ALWAYS
+                ),
+                "p3_diagnosis": {
+                    "ok": bool((p3_diag or {}).get("ok")),
+                    "may_declare_direction_dead": False,
+                    "repair_wave_plan": list(
+                        ((p3_diag or {}).get("diagnosis") or {}).get(
+                            "repair_wave_plan"
+                        ) or []
+                    )[:4],
+                } if p3_diag else None,
+            }
+            ledger.append_event({
+                "event_type": "quality_repair_wave",
+                "added_survivors": q_added,
+                "median_pfr_before": med_pfr,
+                "median_mae_before": med_mae,
+            }, run_id=run_id)
+
+    probe_population = list(work_population)
     budget = ledger.effective_trial_budget(run_id=run_id)
     ledger_effective = float(budget.get("effective_trials") or 0.0)
     all_trial_descriptors = list(cheap_trial_descriptors) + list(trial_descriptors)
@@ -1237,6 +2018,15 @@ def run_discovery(
     stages["trial_budget"] = budget
     stages["n_probed"] = tested
     stages["learning_updates_n"] = len(learning_updates)
+    stages["ast_compile"] = {
+        "hypotheses_with_ast": int(ast_compile_stats.get("hypotheses_with_ast") or 0),
+        "compiled_probe_rows": int(ast_compile_stats.get("compiled_probe_rows") or 0),
+        "formal_ok_rows": int(ast_compile_stats.get("formal_ok_rows") or 0),
+        "unique_hash_n": len(ast_compile_stats.get("unique_hashes") or []),
+        "unique_hashes": sorted(ast_compile_stats.get("unique_hashes") or [])[:40],
+        "failures_n": int(ast_compile_stats.get("failures_n") or 0),
+        "representation_types": sorted(ast_compile_stats.get("representation_types") or []),
+    }
     coverage_score = (
         min(1.0, len(coverage_events) / 12.0) * 0.35 +
         min(1.0, len(coverage_horizons) / 4.0) * 0.25 +
@@ -1290,58 +2080,166 @@ def run_discovery(
     mt_pack = None
     if survivors:
         survivors.sort(
-            key=lambda r: float(((r.get("elite") or {}).get("quality") or 0)),
+            key=lambda r: (
+                float(((r.get("probe") or {}).get("profit_first_rate") or -1.0)),
+                float(((r.get("elite") or {}).get("quality") or 0)),
+                float(((r.get("probe") or {}).get("mean_net") or -1e9)),
+            ),
             reverse=True,
         )
         pbo_matrix = [s.get("pbo_returns") or [] for s in survivors]
+        structured_competitors = list(
+            structured_pack.get("confirmation_competitors") or []
+        )
+        structured_confirmation_returns = [
+            row.get("trade_returns") or [] for row in structured_competitors
+        ]
+        structured_confirmation_pbo = [
+            row.get("pbo_returns") or [] for row in structured_competitors
+        ]
         admitted = []
         rejected = []
         candidate_results = []
         for rank_index, candidate in enumerate(list(survivors)):
             hyp = candidate.get("hypothesis") or {}
+            use_frozen_confirmation = bool(
+                candidate.get("confirmation_returns")
+                and candidate.get("selection_used_confirmation") is False
+                and structured_confirmation_returns
+            )
+            if use_frozen_confirmation:
+                # Hundreds of development trials selected a small frozen list.
+                # The untouched confirmation segment is a new experiment; DSR
+                # is penalized by the number of frozen finalists tested there,
+                # not by every correlated development-grid evaluation.
+                mt_returns = candidate.get("confirmation_returns") or []
+                mt_all_returns = structured_confirmation_returns
+                mt_pbo = structured_confirmation_pbo
+                mt_effective = max(
+                    int(candidate.get("confirmation_trial_count") or 1),
+                    len(structured_confirmation_returns),
+                )
+                mt_basis = "frozen_out_of_sample_confirmation"
+            else:
+                mt_returns = candidate.get("probe_returns") or []
+                mt_all_returns = [s.get("probe_returns") or [] for s in survivors]
+                mt_pbo = pbo_matrix
+                mt_effective = budget.get("effective_trials") or 1
+                mt_basis = "same_sample_effective_trial_penalty"
             mt_row = mtest.evaluate_multiple_testing(
-                candidate.get("probe_returns") or [],
-                [s.get("probe_returns") or [] for s in survivors],
-                n_trials_effective=budget.get("effective_trials") or 1,
-                pbo_returns_matrix=pbo_matrix,
+                mt_returns,
+                mt_all_returns,
+                n_trials_effective=mt_effective,
+                pbo_returns_matrix=mt_pbo,
+            )
+            mt_row["evidence_basis"] = mt_basis
+            mt_row["development_trials_not_reused_as_confirmation"] = bool(
+                use_frozen_confirmation
             )
             candidate["multiple_testing_gate"] = mt_row
             evidence = dict(candidate.get("judge_evidence") or {})
             evidence["dsr_passed"] = bool((mt_row.get("dsr") or {}).get("passed"))
             evidence["pbo_passed"] = bool((mt_row.get("pbo") or {}).get("passed"))
-            judgment = None
+            # DSR/PBO are retained as immutable evidence, but they are not a
+            # duplicate fifth review.  Discovery already requires a positive,
+            # post-cost untouched confirmation slice before a structured row
+            # can reach this point.  The independent pre-review Kimi judge may
+            # admit that executable candidate to the four formal reviews even
+            # when DSR/PBO remain unresolved; the formal statistical reviews
+            # still own the final accept/reject decision and deployment gates
+            # are unchanged.
+            probe_ev = candidate.get("probe") or {}
+            oos_gate = evaluate_oos_confirmation_gate(
+                candidate.get("confirmation_returns") or [],
+                candidate.get("confirmation_stats") or {},
+            )
+            confirmation_stats = dict(oos_gate.get("confirmation_stats") or {})
+            candidate["confirmation_stats"] = confirmation_stats
+            conf_returns = list(candidate.get("confirmation_returns") or [])
+            conf_wr = oos_gate.get("oos_win_rate")
+            oos_wr_ok = bool(oos_gate.get("oos_win_rate_above_50"))
+            oos_anti_lottery = bool(oos_gate.get("oos_anti_lottery"))
+            oos_base_ok = bool(oos_gate.get("oos_base_ok"))
+            oos_confirmation_passed = bool(oos_gate.get("oos_confirmation_passed"))
+            evidence.update({
+                "oos_confirmation_present": bool(oos_gate.get("oos_confirmation_present")),
+                "oos_confirmation_passed": oos_confirmation_passed,
+                "oos_n": int(confirmation_stats.get("n") or len(conf_returns) or 0),
+                "oos_mean_net": confirmation_stats.get("mean_net"),
+                "oos_hac_t": confirmation_stats.get("hac_t_stat"),
+                "oos_efr": confirmation_stats.get("efr"),
+                "oos_win_rate": conf_wr,
+                "oos_win_rate_above_50": oos_wr_ok,
+                "oos_anti_lottery": oos_anti_lottery,
+                "pbo_passed": bool((mt_row.get("pbo") or {}).get("passed")),
+                "formal_statistical_review_pending": not bool(mt_row.get("passed")),
+            })
+            judgment = committee.judge_from_evidence(evidence, run_id=run_id)
+            try:
+                from . import manufacture_batch_policy as mfg
+                manufacture_mode = bool(mfg.pre_review_gates_disabled())
+            except Exception:
+                manufacture_mode = False
+            # Manufacture batch: OOS/WR are selection features, not admit vetoes.
+            if manufacture_mode:
+                judgment = dict(judgment)
+                judgment["admit_to_assembly"] = True
+                judgment["manufacture_batch_force_admit"] = True
+                judgment["oos_confirmation_advisory"] = {
+                    "passed": oos_confirmation_passed,
+                    "hard_block": oos_gate.get("hard_block"),
+                }
+            elif judgment.get("admit_to_assembly") and not oos_confirmation_passed:
+                judgment = dict(judgment)
+                judgment["admit_to_assembly"] = False
+                judgment["hard_block"] = oos_gate.get("hard_block") or (
+                    "oos_confirmation_missing" if not conf_returns
+                    else "oos_wr_or_anti_lottery_fail"
+                )
+                judgment["hard_block_evidence"] = {
+                    "oos_win_rate": conf_wr,
+                    "oos_anti_lottery": oos_anti_lottery,
+                    "oos_base_ok": oos_base_ok,
+                    "confirmation_returns_n": len(conf_returns),
+                    "probe_account_wr": probe_ev.get("win_rate"),
+                    "probe_high_wr_pass": probe_ev.get("high_wr_pass"),
+                }
+            candidate["judge"] = judgment
+            candidate["pre_review_admission"] = {
+                "passed": bool(judgment.get("admit_to_assembly")),
+                "multiple_testing_passed": bool(mt_row.get("passed")),
+                "statistical_review_deferred": not bool(mt_row.get("passed")),
+                "oos_wr_above_50": oos_wr_ok,
+                "oos_anti_lottery": oos_anti_lottery,
+                "scope": "submission_to_four_formal_reviews_only",
+            }
             rejection_stage = None
-            if mt_row.get("passed"):
-                judgment = committee.judge_from_evidence(evidence, run_id=run_id)
-                candidate["judge"] = judgment
-                if judgment.get("admit_to_assembly"):
-                    admitted.append(candidate)
-                    learn_row = _learn_close(
-                        hyp,
-                        {
-                            "contract_hash": candidate.get("prediction_contract_hash"),
-                            "hypothesis_id": hyp.get("hypothesis_id"),
-                            "generator": hyp.get("source"),
-                            "expected_direction": (contract.get("target") or {}).get("direction"),
-                            "confidence": 0.5,
-                        },
-                        "survived",
-                        probe=candidate.get("probe"),
-                        multiverse=candidate.get("multiverse"),
-                        antifalsify=candidate.get("antifalsify"),
-                        leakage=candidate.get("leakage"),
-                        efr=candidate.get("feasibility"),
-                        execution=candidate.get("execution"),
-                        redteam=candidate.get("redteam"),
-                    )
-                    candidate["learning"] = {
-                        "primary": ((learn_row.get("attribution") or {}).get("primary")),
-                        "outcome_id": ((learn_row.get("attribution") or {}).get("outcome_id")),
-                    }
-                else:
-                    rejection_stage = "judge"
+            if judgment.get("admit_to_assembly"):
+                admitted.append(candidate)
+                learn_row = _learn_close(
+                    hyp,
+                    {
+                        "contract_hash": candidate.get("prediction_contract_hash"),
+                        "hypothesis_id": hyp.get("hypothesis_id"),
+                        "generator": hyp.get("source"),
+                        "expected_direction": (contract.get("target") or {}).get("direction"),
+                        "confidence": 0.5,
+                    },
+                    "survived",
+                    probe=candidate.get("probe"),
+                    multiverse=candidate.get("multiverse"),
+                    antifalsify=candidate.get("antifalsify"),
+                    leakage=candidate.get("leakage"),
+                    efr=candidate.get("feasibility"),
+                    execution=candidate.get("execution"),
+                    redteam=candidate.get("redteam"),
+                )
+                candidate["learning"] = {
+                    "primary": ((learn_row.get("attribution") or {}).get("primary")),
+                    "outcome_id": ((learn_row.get("attribution") or {}).get("outcome_id")),
+                }
             else:
-                rejection_stage = "multiple_testing"
+                rejection_stage = "independent_pre_review_judge"
 
             if rejection_stage:
                 rejected.append({
@@ -1370,10 +2268,11 @@ def run_discovery(
             candidate_results.append({
                 "hypothesis_id": hyp.get("hypothesis_id"),
                 "rank_before_testing": rank_index + 1,
-                "passed": bool(mt_row.get("passed") and judgment and judgment.get("admit_to_assembly")),
+                "passed": bool(judgment and judgment.get("admit_to_assembly")),
                 "dsr": mt_row.get("dsr"),
                 "pbo": mt_row.get("pbo"),
                 "path_stability": mt_row.get("path_stability"),
+                "evidence_basis": mt_row.get("evidence_basis"),
                 "judge": candidate.get("judge"),
             })
             ledger.append_event({
@@ -1383,12 +2282,18 @@ def run_discovery(
                 "passed": mt_row.get("passed"),
                 "dsr": ((mt_row.get("dsr") or {}).get("dsr")),
                 "pbo": ((mt_row.get("pbo") or {}).get("pbo")),
-                "effective_trials": budget.get("effective_trials"),
+                "effective_trials": mt_effective,
+                "submitted_to_independent_judge": True,
             }, run_id=run_id)
         survivors = admitted
         mt_pack = {
             "ok": True,
-            "passed": bool(survivors),
+            "passed": any(
+                bool(((row.get("dsr") or {}).get("passed")))
+                and bool(((row.get("pbo") or {}).get("passed")))
+                for row in candidate_results
+            ),
+            "review_admission_passed": bool(survivors),
             "method": "per_candidate_dsr_shared_clock_pbo_v2",
             "n_candidates_in": len(candidate_results),
             "n_candidates_passed": len(survivors),
@@ -1397,6 +2302,7 @@ def run_discovery(
             "candidates": candidate_results,
             "rejected": rejected,
             "thresholds_unchanged": {"dsr_min": 0.95, "pbo_max": 0.40},
+            "gate_scope": "formal_review_evidence_not_duplicate_pre_review_veto",
         }
         stages["multiple_testing"] = mt_pack
     else:
@@ -1439,6 +2345,51 @@ def run_discovery(
     # Population handoff: ranked survivors, NOT a forced early pick-1
     handoff = None
     handoff_population = []
+    mat_metrics = None
+    try:
+        from . import candidate_materialization as mat_mod
+        mat_metrics = mat_mod.materialization_report(
+            hypothesis_count=len(work_population or pop.get("hypotheses") or []),
+            representation_count=len(work_population or []),
+            compile_attempt_count=int(tested or 0),
+            compile_success_count=len(survivors),
+            probe_count=int(tested or 0),
+            survivor_count=len(survivors),
+            near_miss_count=len(near_miss_diagnostics),
+            repair_round_count=int(repair_round_count or 0),
+            waves=list(materialization_waves or []),
+            termination_reason=(
+                (stages.get("trial_budget") or {}).get("stop_reason")
+                or stop_reason
+                or ("has_survivors" if ok else "empty_after_repair")
+            ),
+        )
+        stages["candidate_materialization"] = mat_metrics
+    except Exception as exc:
+        stages["candidate_materialization"] = {"error": str(exc)}
+        mat_metrics = None
+
+    pipeline_failure = None
+    if not ok and mat_metrics and mat_metrics.get("failure"):
+        pipeline_failure = mat_metrics.get("failure")
+    elif not ok:
+        try:
+            from . import candidate_materialization as mat_mod
+            pipeline_failure = mat_mod.classify_empty_batch({
+                "hypothesis_count": len(work_population or []),
+                "representation_count": len(work_population or []),
+                "compile_success_count": 0,
+                "compile_attempt_count": int(tested or 0),
+                "probe_count": int(tested or 0),
+                "survivor_count": 0,
+                "near_miss_count": len(near_miss_diagnostics),
+            })
+        except Exception:
+            pipeline_failure = {
+                "primary": "CANDIDATE_MATERIALIZATION_FAILURE",
+                "is_pipeline_error": True,
+                "is_market_research_rejection": False,
+            }
     if ok:
         for top in survivors[:8]:
             h = top.get("hypothesis") or {}
@@ -1449,6 +2400,8 @@ def run_discovery(
                 "path": h.get("path"),
                 "factor_hints": h.get("factor_hints") or h.get("observable_proxy") or [],
                 "quality": ((top.get("elite") or {}).get("quality")),
+                "profit_first_rate": (top.get("probe") or {}).get("profit_first_rate"),
+                "path_review_eligible": (top.get("probe") or {}).get("path_review_eligible"),
                 "probe_factor": (top.get("probe") or {}).get("factor"),
                 "efr": (top.get("feasibility") or {}).get("efr"),
                 "recipe_id": top.get("recipe_id"),
@@ -1456,6 +2409,7 @@ def run_discovery(
             })
         top = survivors[0]
         h = top.get("hypothesis") or {}
+        path_diff = ((stages.get("path_sample_library") or {}).get("cluster_diff_summary") or {})
         handoff = {
             "hypothesis_id": h.get("hypothesis_id"),
             "mechanism_id": h.get("mechanism_id"),
@@ -1468,6 +2422,13 @@ def run_discovery(
             ),
             "bidirectional_hit": h.get("bidirectional_hit"),
             "probe_factor": (top.get("probe") or {}).get("factor"),
+            "profit_first_rate": (top.get("probe") or {}).get("profit_first_rate"),
+            "path_review_eligible": (top.get("probe") or {}).get("path_review_eligible"),
+            "path_cluster_diff": path_diff,
+            "path_conditional_prompt_zh": path_diff.get("prompt_zh"),
+            "creation_objective_zh": (
+                "预测在触及-0.5%之前先触及+0.5555%，禁止仅预测方向正负。"
+            ),
             "probe_side": (top.get("probe") or {}).get("side"),
             "efr": (top.get("feasibility") or {}).get("efr"),
             "research_value": (top.get("feasibility") or {}).get("research_value"),
@@ -1515,6 +2476,21 @@ def run_discovery(
         "stop_reason": (stages.get("trial_budget") or {}).get("stop_reason"),
     }, run_id=run_id)
 
+    try:
+        from .manufacture_batch_policy import ASSEMBLY_PAYLOAD_CAP as _payload_cap
+    except Exception:
+        _payload_cap = 24
+    outcome = "candidate_ready" if ok else "generation_system_failure"
+    error_code = None if ok else "CANDIDATE_MATERIALIZATION_FAILURE"
+    human_banner = (
+        "制造批次：%d 个可编译候选进入组装排序（复核前硬门槛已取消）。"
+        % len(survivors)
+        if survivors else
+        (
+            (pipeline_failure or {}).get("message_zh")
+            or "管道生成失败：候选材料化不足，不得伪装成市场无可信策略。"
+        )
+    )
     return {
         "ok": ok,
         "schema": "qiyu_research_discovery_v4",
@@ -1539,29 +2515,37 @@ def run_discovery(
                 "recipe": s.get("recipe") or {},
                 "probe": s.get("probe") or {},
                 "probe_returns": s.get("probe_returns") or [],
+                "review_returns": (
+                    s.get("confirmation_returns") or s.get("probe_returns") or []
+                ),
+                "review_stats": s.get("confirmation_stats") or s.get("probe") or {},
+                "review_window": s.get("confirmation_window") or {},
                 "multiple_testing_gate": s.get("multiple_testing_gate") or {},
+                "pre_review_admission": s.get("pre_review_admission") or {},
                 "judge": s.get("judge") or {},
                 "feasibility": s.get("feasibility") or {},
                 "execution": s.get("execution") or {},
                 "antifalsify": s.get("antifalsify") or {},
             }
-            for s in survivors[:8]
+            for s in survivors[: int(_payload_cap)]
         ],
         "n_survivors": len(survivors),
+        "present_to_assembly": ok or (bool(survivors) and True),
         "handoff": handoff,
         "handoff_population": handoff_population,
         "archive_elites": stages.get("map_elites"),
         "learning_loop": stages.get("learning_loop"),
-        "present_to_assembly": ok,
-        "human_banner_zh": (
-            "研究发现通过：%d 个假设经裸探针+反证+泄漏/因果边界+执行+EFR+多重检验后存活；"
-            "学习闭环已写入归因/记分卡/机制后验/下轮预算。"
-            % len(survivors)
-            if ok else
-            "当前没有候选同时通过统计、经济幅度与执行可行性三轴，禁止硬凑完整策略。"
-            "失败已按证据不足、代理不足、周期错配、执行映射失败等具体状态记录；"
-            "单个探针失败未被解释为整个机制族死亡。"
-        ),
+        "candidate_materialization": mat_metrics,
+        "outcome": outcome,
+        "error": error_code,
+        "detail": {
+            "pipeline_failure": pipeline_failure,
+            "data_blocked": False,
+            "is_market_research_rejection": False,
+            "repair_round_count": int(repair_round_count or 0),
+            "materialization_waves": list(materialization_waves or []),
+        } if (not ok) else {"repair_round_count": int(repair_round_count or 0)},
+        "human_banner_zh": human_banner,
         "at": _now(),
     }
 

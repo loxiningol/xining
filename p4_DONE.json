@@ -1,0 +1,67 @@
+{
+  "ok": true,
+  "phase": "P4",
+  "complete": true,
+  "probe": {
+    "ok": true,
+    "sample_primary": "LOW_WIN_RATE",
+    "sample_codes": [
+      "LOW_WIN_RATE",
+      "LOW_PROFIT_FIRST_RATE",
+      "HIGH_MAE",
+      "REGIME_INSTABILITY",
+      "PARAMETER_SPIKE",
+      "COST_FAILURE",
+      "DELAY_FAILURE",
+      "PNL_CONCENTRATION"
+    ],
+    "all_failure_codes_n": 12,
+    "repair_defs_n": 4,
+    "representation_types": [
+      "threshold",
+      "rank",
+      "delta",
+      "sequence",
+      "state",
+      "relative_exclusion"
+    ],
+    "parameter_plateau_score": 0.0,
+    "directed_plan_actions_n": 3
+  },
+  "junk_handoff_ok": false,
+  "junk_token_ok": false,
+  "select_top_n": 0,
+  "bypass_audit": {
+    "ok": true,
+    "reasons": [],
+    "top3_actual_count": 0,
+    "ranked_n": 2,
+    "handoff_fail_count": 2,
+    "padded_with_junk": false,
+    "policy": "filter_then_topn_never_pad"
+  },
+  "all_failure_codes": [
+    "LOW_WIN_RATE",
+    "LOW_AVG_WINNING_RETURN",
+    "LOW_PROFIT_FIRST_RATE",
+    "HIGH_MAE",
+    "LOW_FREQUENCY",
+    "RECENT_2Y_FAILURE",
+    "REGIME_INSTABILITY",
+    "PARAMETER_SPIKE",
+    "COST_FAILURE",
+    "DELAY_FAILURE",
+    "PNL_CONCENTRATION",
+    "NEAR_DUPLICATE"
+  ],
+  "wired": [
+    "12 failure codes + ALLOWED_MODS",
+    "parameter_plateau_score + expand_adjacent_param_plateau",
+    "cost/delay/regime/concentration handoff vetoes",
+    "recent_2y weighted metrics display",
+    "directed_repair_plan + optimization_round_log in quality failure",
+    "select_top_for_review filter-then-topn + token assert"
+  ],
+  "backup": "/root/backups/p4_quality_optimization_20260804_052541",
+  "note_zh": "P4质量优化层完成；未降杠杆/止损/11.11%/handoff地板。P5才要求真实PASS候选。"
+}

@@ -1,0 +1,139 @@
+{
+  "schema": "qiyu_step_a_v1",
+  "code_version": "step_a_strategy_creation_20260726",
+  "tasks": [
+    {
+      "task_id": "wsa_20260726_235157_c118",
+      "mode": "new_mechanism",
+      "stage": "collect_isolate",
+      "family": null,
+      "independent": null,
+      "gates": [],
+      "passed_count": null,
+      "first_fail": null,
+      "production_mounted": false,
+      "verdict": null,
+      "spec_path": null,
+      "fidelity_path": null,
+      "spec_ok": null,
+      "repair_rounds": 0
+    },
+    {
+      "task_id": "wsa_20260726_235259_bae0",
+      "mode": "new_mechanism",
+      "stage": "archived",
+      "family": "liquidity_sweep_reversal",
+      "independent": true,
+      "gates": [
+        [
+          "gate0_mechanism_integrity",
+          true
+        ],
+        [
+          "gate1_code_fidelity",
+          false
+        ]
+      ],
+      "passed_count": 1,
+      "first_fail": "gate1_code_fidelity",
+      "production_mounted": false,
+      "verdict": "code_fidelity_fail",
+      "spec_path": "/root/auto_trade/dual_engine/workflow_v2/mechanism_specs/mech_liquidity_sweep_reversal_sol5m_mechanism_spec.json",
+      "fidelity_path": "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260726_235259_bae0_r0_mechanism_fidelity_diff.json",
+      "spec_ok": true,
+      "repair_rounds": 0
+    },
+    {
+      "task_id": "wsa_20260727_013520_52ed",
+      "mode": "new_mechanism",
+      "stage": "archived",
+      "family": "orderbook_imbalance_snapback",
+      "independent": true,
+      "gates": [
+        [
+          "gate0_mechanism_integrity",
+          true
+        ],
+        [
+          "gate1_code_fidelity",
+          true
+        ]
+      ],
+      "passed_count": null,
+      "first_fail": null,
+      "production_mounted": false,
+      "verdict": "dsl_validate_fail",
+      "spec_path": "/root/auto_trade/dual_engine/workflow_v2/mechanism_specs/mech_orderbook_imbalance_snapback_sol5m_mechanism_spec.json",
+      "fidelity_path": "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_013520_52ed_r0_mechanism_fidelity_diff.json",
+      "spec_ok": true,
+      "repair_rounds": 0
+    },
+    {
+      "task_id": "wsa_20260727_013842_ca6c",
+      "mode": "new_mechanism",
+      "stage": "archived",
+      "family": "breakout_trap_reversal",
+      "independent": true,
+      "gates": [
+        [
+          "gate0_mechanism_integrity",
+          true
+        ],
+        [
+          "gate1_code_fidelity",
+          true
+        ],
+        [
+          "gate2_base_backtest",
+          true
+        ],
+        [
+          "gate3_walk_forward",
+          false
+        ]
+      ],
+      "passed_count": 3,
+      "first_fail": "gate3_walk_forward",
+      "production_mounted": false,
+      "verdict": "mechanism_viability_fail_archived",
+      "spec_path": "/root/auto_trade/dual_engine/workflow_v2/mechanism_specs/mech_micro_range_breakout_trap_sol5m_mechanism_spec.json",
+      "fidelity_path": "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_013842_ca6c_r0_mechanism_fidelity_diff.json",
+      "spec_ok": true,
+      "repair_rounds": 3
+    },
+    {
+      "task_id": "wsa_20260727_014053_d405",
+      "mode": "known_mechanism_deep_dig",
+      "stage": "archived",
+      "family": null,
+      "independent": null,
+      "gates": [
+        [
+          "gate0_mechanism_integrity",
+          false
+        ]
+      ],
+      "passed_count": 0,
+      "first_fail": "gate0_mechanism_integrity",
+      "production_mounted": false,
+      "verdict": "representation_failure_after_retry",
+      "spec_path": null,
+      "fidelity_path": null,
+      "spec_ok": false,
+      "repair_rounds": 0
+    }
+  ],
+  "fully_passed_all_gates": 0,
+  "production_mounted_count": 0,
+  "independent_mechanisms_proposed": [
+    "breakout_trap_reversal",
+    "liquidity_sweep_reversal",
+    "orderbook_imbalance_snapback"
+  ],
+  "gate0_pass_tasks": [
+    "wsa_20260726_235259_bae0",
+    "wsa_20260727_013520_52ed",
+    "wsa_20260727_013842_ca6c"
+  ],
+  "note": "No strategy passed all Gates 0-7 with human confirm; none production-mounted."
+}

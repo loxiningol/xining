@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu environment admission binding / BTC15 reassessment
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+Environment=PYTHONPATH=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_environment_admission.py
+Nice=10

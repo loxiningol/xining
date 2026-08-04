@@ -59,12 +59,18 @@ def mode():
     return "auto"
 
 
+def _vector_root():
+    return Path(_env("VECTOR_ROOT", default="/root"))
+
+
 def local_root():
-    return Path(_env("QIYU_RESEARCH_LOCAL_ROOT", default="/root/auto_trade/research_candle_store"))
+    default = str(_vector_root() / "auto_trade" / "research_candle_store")
+    return Path(_env("QIYU_RESEARCH_LOCAL_ROOT", default=default))
 
 
 def cache_root():
-    return Path(_env("QIYU_RESEARCH_CACHE_ROOT", default="/root/auto_trade/research_candle_cache"))
+    default = str(_vector_root() / "auto_trade" / "research_candle_cache")
+    return Path(_env("QIYU_RESEARCH_CACHE_ROOT", default=default))
 
 
 def _r2_endpoint():
@@ -488,10 +494,101 @@ def load_candles_range(inst_id, bar, start_ms=None, end_ms=None, max_bars=None):
     }
 
 
+def _flat_local_research_path(symbol, timeframe):
+    """兼容仓库内已落盘的 local/{base}_{tf}_research.json 扁平研究文件。"""
+    base = str(symbol or "").split("-")[0].strip().lower()
+    tf = _norm_bar(timeframe)
+    if not base or not tf:
+        return None
+    return local_root() / "local" / ("%s_%s_research.json" % (base, tf))
+
+
+def _load_flat_local_research(symbol, timeframe, max_bars=None):
+    path = _flat_local_research_path(symbol, timeframe)
+    if path is None or not path.exists():
+        return {
+            "ok": False,
+            "error": "not_found",
+            "candles": [],
+            "backend": "local_flat",
+            "path": str(path) if path else None,
+        }
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": "flat_decode:%s" % exc,
+            "candles": [],
+            "backend": "local_flat",
+            "path": str(path),
+        }
+    candles = raw.get("candles") if isinstance(raw, dict) else raw
+    if not isinstance(candles, list) or not candles:
+        return {
+            "ok": False,
+            "error": "empty_flat_research",
+            "candles": [],
+            "backend": "local_flat",
+            "path": str(path),
+        }
+    rows = []
+    for c in candles:
+        if not isinstance(c, dict):
+            continue
+        try:
+            rows.append({
+                "ts": int(c["ts"]),
+                "open": float(c["open"]),
+                "high": float(c["high"]),
+                "low": float(c["low"]),
+                "close": float(c["close"]),
+            })
+        except Exception:
+            continue
+    rows.sort(key=lambda r: r["ts"])
+    if max_bars is not None and len(rows) > int(max_bars):
+        rows = rows[-int(max_bars):]
+    return {
+        "ok": bool(rows),
+        "schema": "qiyu_research_candles_range_v1",
+        "instId": str(symbol or "").upper(),
+        "bar": _norm_bar(timeframe),
+        "backend": "local_flat",
+        "n": len(rows),
+        "candles": rows,
+        "chunks_loaded": [{"source": "local_flat", "path": str(path)}],
+        "start_ts": rows[0]["ts"] if rows else None,
+        "end_ts": rows[-1]["ts"] if rows else None,
+        "path": str(path),
+        "at": _now(),
+    }
+
+
 def load_for_creation(symbol, timeframe, lookback_days=400, max_bars=50000):
-    """Convenience for creation blueprint: last N days from research store."""
+    """Convenience for creation blueprint: last N days from research store.
+
+    优先 R2/分片 manifest；若缺失则回退仓库内 local/*_research.json 扁平文件。
+    """
     end_ms = int(time.time() * 1000)
     start_ms = end_ms - int(lookback_days) * 86400 * 1000
-    return load_candles_range(
+    got = load_candles_range(
         symbol, timeframe, start_ms=start_ms, end_ms=end_ms, max_bars=max_bars,
     )
+    if got.get("ok") and got.get("candles"):
+        return got
+    flat = _load_flat_local_research(symbol, timeframe, max_bars=max_bars)
+    if flat.get("ok"):
+        flat["fallback_from"] = {
+            "error": got.get("error"),
+            "backend": got.get("backend"),
+        }
+        return flat
+    # 保留原错误，附带扁平回退失败信息
+    out = dict(got or {})
+    out["flat_fallback"] = {
+        "ok": flat.get("ok"),
+        "error": flat.get("error"),
+        "path": flat.get("path"),
+    }
+    return out

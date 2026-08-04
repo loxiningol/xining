@@ -1,0 +1,70 @@
+{
+  "creation_brief": {
+    "avoid_duplicate_families": [
+      "exhaustion_fade_short"
+    ],
+    "do_not_force_open": true,
+    "do_not_loosen_entries": true,
+    "prefer_new_families": [
+      "mean_reversion_non_fade",
+      "session_breakout",
+      "microstructure_reclaim"
+    ],
+    "summary_zh": "组合预期成交日均0.32、周2.26；目标日0.5–1.0、周3.5–7。缺口应通过策略创造补齐，禁止放宽入场或强制开仓。",
+    "target_incremental_weekly_fills": 1.242
+  },
+  "frequency_gap": {
+    "expected_daily_fills": 0.321,
+    "expected_weekly_fills": 2.258,
+    "gap_daily_to_band": 0.179,
+    "gap_weekly_to_band": 1.242,
+    "status": "shortfall",
+    "target_daily": [
+      0.5,
+      1.0
+    ],
+    "target_weekly": [
+      3.5,
+      7.0
+    ]
+  },
+  "mandatory_niches_hint": [
+    {
+      "family": "mean_reversion_non_fade",
+      "thesis": "补齐组合成交频率；避开已饱和 exhaustion_fade 同质仓位",
+      "timeframe_pref": [
+        "5m",
+        "15m"
+      ]
+    },
+    {
+      "family": "session_breakout",
+      "thesis": "补齐组合成交频率；避开已饱和 exhaustion_fade 同质仓位",
+      "timeframe_pref": [
+        "5m",
+        "15m"
+      ]
+    },
+    {
+      "family": "microstructure_reclaim",
+      "thesis": "补齐组合成交频率；避开已饱和 exhaustion_fade 同质仓位",
+      "timeframe_pref": [
+        "5m",
+        "15m"
+      ]
+    }
+  ],
+  "mechanism_families": {
+    "independent_niche_count": 2,
+    "note": "NG/LTC/XRP exhaustion fades count as one family when present",
+    "saturated": [
+      "exhaustion_fade_short"
+    ],
+    "weights_weekly": {
+      "exhaustion_fade_short": 2.108,
+      "session_trend_pullback": 0.15
+    }
+  },
+  "schema": "qiyu_strategy_creation_frequency_input_v1",
+  "updated_at": "2026-07-26 19:35:25"
+}

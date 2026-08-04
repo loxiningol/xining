@@ -1,0 +1,397 @@
+{
+  "title": "策略创造系统重构与策略通过验收报告",
+  "final_decision": "FAIL",
+  "missing_items": [
+    "17.2_materialization_10job",
+    "17.5_real_strategy_formal_pass"
+  ],
+  "1_executive_summary": {
+    "system_version": "dual_engine_workflow_v2 + sole parallel_creation",
+    "code_commit": "src-hash-see-jobs",
+    "production_deploy_at": "2026-08-04 07:47:45",
+    "jobs_verified": 4,
+    "formal_pass_strategy_count": 0,
+    "conclusion": "FAIL"
+  },
+  "2_review_accuracy": {
+    "ok": true,
+    "reference_metric_tests": "passed",
+    "production_reference_parity": "passed",
+    "weekly_frequency_formula": "verified",
+    "weekly_frequency_reference": 1.0,
+    "weekly_frequency_production": 1.0,
+    "weekly_frequency_diff": 0.0,
+    "average_profitable_trade_formula": "verified",
+    "avg_profitable_return_reference": 0.12000000000000058,
+    "fee_inclusion": "verified",
+    "leverage_application": "verified",
+    "stop_distance": "verified",
+    "intrabar_ordering": "verified",
+    "unit_tests": {
+      "ok": true,
+      "returncode": 0,
+      "tail": "......................................./usr/lib/python3.6/site-packages/pytz/__init__.py:499: ResourceWarning: unclosed file <_io.TextIOWrapper name='/usr/share/zoneinfo/zone.tab' mode='r' encoding='UTF-8'>\n  for l in open(os.path.join(_tzinfo_dir, 'zone.tab'))\n/usr/lib64/python3.6/importlib/_bootstrap.py:219: RuntimeWarning: numpy.ufunc size changed, may indicate binary incompatibility. Expected 192 from C header, got 216 from PyObject\n  return f(*args, **kwds)\n....\n----------------------------------------------------------------------\nRan 43 tests in 1.232s\n\nOK",
+      "reference_metric_tests": "passed",
+      "at": "2026-08-04 07:47:49"
+    },
+    "policy_version": "manufacture_batch_policy_v1+review_gate_v1",
+    "handoff_floors": {
+      "win_rate": 0.45,
+      "mean_win_only_pct": 9.0,
+      "weekly": 0.5,
+      "profit_first": 0.55
+    },
+    "at": "2026-08-04 07:47:49"
+  },
+  "3_materialization": {
+    "ok": false,
+    "jobs_evaluated": 4,
+    "jobs_sample": [
+      {
+        "job_id": "creation_20260803_200442_242576_0959798b",
+        "outcome": "research_rejected",
+        "artifact_outcome": "research_rejected",
+        "n_hypotheses": 66,
+        "compile_success": 69,
+        "probe_tested": 70,
+        "mislabel_materialization_as_research": false,
+        "finished_at": "2026-08-03 20:24:14",
+        "entered_materialization": true
+      },
+      {
+        "job_id": "creation_20260803_221145_591866_5c7b3499",
+        "outcome": "candidate_quality_failure",
+        "artifact_outcome": "candidate_quality_failure",
+        "n_hypotheses": 69,
+        "compile_success": 72,
+        "probe_tested": 76,
+        "mislabel_materialization_as_research": false,
+        "finished_at": "2026-08-03 22:26:33",
+        "entered_materialization": true
+      },
+      {
+        "job_id": "creation_20260803_225545_200477_15f7c38f",
+        "outcome": "candidate_quality_failure",
+        "artifact_outcome": "candidate_quality_failure",
+        "n_hypotheses": 70,
+        "compile_success": 69,
+        "probe_tested": 74,
+        "mislabel_materialization_as_research": false,
+        "finished_at": "2026-08-03 23:59:41",
+        "entered_materialization": true
+      },
+      {
+        "job_id": "creation_20260804_000926_996218_fb507726",
+        "outcome": "candidate_quality_failure",
+        "artifact_outcome": "candidate_quality_failure",
+        "n_hypotheses": 67,
+        "compile_success": 74,
+        "probe_tested": 75,
+        "mislabel_materialization_as_research": false,
+        "finished_at": "2026-08-04 00:51:31",
+        "entered_materialization": true
+      }
+    ],
+    "cohort": "materialized_with_compile_probe",
+    "n_hypotheses_zero_count": 0,
+    "compile_success_zero_count": 0,
+    "probe_tested_zero_count": 0,
+    "median_hypotheses": 69,
+    "median_compiled_candidates": 72,
+    "median_probe_tested": 75,
+    "materialization_failure_mislabeled_as_research_failure": 0,
+    "note_zh": "统计口径=已进入材料化且具备 compile/probe 证据的正常任务；早期契约秒拒空池不计入「正常brief材料化」。若不足10个，等 P5 canary 完成后再复评。",
+    "at": "2026-08-04 07:47:50"
+  },
+  "4_garbage_intercept": {
+    "ok": true,
+    "expected": "handoff_failed + formal_review_not_submitted under current policy",
+    "note_zh": "历史任务曾在旧策略下进入复核；§17.3 验收以现行 handoff 回放为准。",
+    "rows": [
+      {
+        "job_id": "creation_20260803_184134_691917_f5449f02",
+        "historical_outcome": "review_submitted",
+        "historical_formal_review_started": true,
+        "historical_formal_submission_created": true,
+        "current_policy_replay_top_n": 0,
+        "current_policy_would_submit_formal_review": false,
+        "handoff_fail_reason_clear": true,
+        "candidates": [
+          {
+            "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+            "win_rate": 0.19710144927536233,
+            "mean_win_only_pct": 6.779314425821939,
+            "weekly_opens": 28.983622952869105,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          },
+          {
+            "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+            "win_rate": 0.19710144927536233,
+            "mean_win_only_pct": 6.779314425821939,
+            "weekly_opens": 28.983622952869105,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          },
+          {
+            "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+            "win_rate": 0.19710144927536233,
+            "mean_win_only_pct": 6.779314425821939,
+            "weekly_opens": 28.983622952869105,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          },
+          {
+            "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+            "win_rate": 0.19710144927536233,
+            "mean_win_only_pct": 6.779314425821939,
+            "weekly_opens": 28.983622952869105,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          },
+          {
+            "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+            "win_rate": 0.19710144927536233,
+            "mean_win_only_pct": 6.779314425821939,
+            "weekly_opens": 28.983622952869105,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          }
+        ],
+        "bypass_audit": {
+          "ok": true,
+          "reasons": [],
+          "top3_actual_count": 0,
+          "ranked_n": 44,
+          "handoff_fail_count": 44,
+          "padded_with_junk": false,
+          "policy": "filter_then_topn_never_pad"
+        }
+      },
+      {
+        "job_id": "creation_20260803_180616_313385_58c2851a",
+        "historical_outcome": "candidate_ready",
+        "historical_formal_review_started": false,
+        "historical_formal_submission_created": false,
+        "current_policy_replay_top_n": 0,
+        "current_policy_would_submit_formal_review": false,
+        "handoff_fail_reason_clear": true,
+        "candidates": [
+          {
+            "recipe_id": "recipe_d73762f93db19611fb948bc8",
+            "win_rate": 0.3128834355828221,
+            "mean_win_only_pct": null,
+            "weekly_opens": 13.693711713964245,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          },
+          {
+            "recipe_id": "recipe_a4174762d5acd0d34ba2c0a9",
+            "win_rate": 0.3128834355828221,
+            "mean_win_only_pct": null,
+            "weekly_opens": 13.693711713964245,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          },
+          {
+            "recipe_id": "recipe_e4ad6ddd1c11deb1e23e837b",
+            "win_rate": 0.3128834355828221,
+            "mean_win_only_pct": null,
+            "weekly_opens": 13.693711713964245,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          },
+          {
+            "recipe_id": "recipe_9ad145fcea4e0ec669a9e5b5",
+            "win_rate": 0.3128834355828221,
+            "mean_win_only_pct": null,
+            "weekly_opens": 13.693711713964245,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          },
+          {
+            "recipe_id": "recipe_400c6a4be832f79282e7e7c8",
+            "win_rate": 0.3128834355828221,
+            "mean_win_only_pct": null,
+            "weekly_opens": 13.693711713964245,
+            "handoff_ok": false,
+            "handoff_fail_reason": [
+              "handoff_win_rate_below_45_pct",
+              "handoff_mean_win_only_below_9.00_pct",
+              "handoff_profit_first_rate_below_0.55"
+            ],
+            "token_ok": false
+          }
+        ],
+        "bypass_audit": {
+          "ok": true,
+          "reasons": [],
+          "top3_actual_count": 0,
+          "ranked_n": 26,
+          "handoff_fail_count": 26,
+          "padded_with_junk": false,
+          "policy": "filter_then_topn_never_pad"
+        }
+      }
+    ],
+    "at": "2026-08-04 07:47:50"
+  },
+  "5_final_strategy": null,
+  "6_four_ai": null,
+  "7_validity": {
+    "ok": true,
+    "approved_at": "2026-08-01 12:00:00",
+    "valid_until": "2028-08-03 07:47:50",
+    "validity_period_days": 730,
+    "validity_period": "2 years",
+    "expiry_enforcement_test": "passed",
+    "renewal_required": true,
+    "renewal_updates_valid_until": true,
+    "recent_2y_metrics_independent": {
+      "n_trades": 5,
+      "n_winning": 5,
+      "average_profitable_trade_return": 0.11199999999999885,
+      "average_profitable_trade_return_pct": 11.199999999999886,
+      "passes_1111": true,
+      "formula": "mean(NetReturn_i * leverage for i in winning); losing trades excluded from denominator"
+    },
+    "weighted_average_profitable_trade_return": 0.13969230769230692,
+    "recent_2y_requirement_passed": true,
+    "old_data_cannot_override_recent_fail": false,
+    "detail": {
+      "stamped": {
+        "valid_from": "2026-08-04 07:47:50",
+        "valid_until": "2028-08-03 07:47:50",
+        "validity_days_total": 730,
+        "approved_at": null,
+        "symbol": "P5-PROBE-USDT-SWAP",
+        "strategy_key": "p5_validity_probe"
+      },
+      "annotate_expired": {
+        "symbol": "P5-PROBE-USDT-SWAP",
+        "timeframe": "15m",
+        "strategy_key": "p5_expiry_probe",
+        "valid_from": "2023-01-01 00:00:00",
+        "valid_until": "2024-01-01 00:00:00",
+        "validity_days_total": 730,
+        "days_remaining": -945,
+        "expired": true,
+        "countdown_label_zh": "已到期",
+        "refreshed_at": "2026-08-04 07:47:50"
+      },
+      "expire_dry_run": {
+        "ok": true,
+        "dry_run": true,
+        "assignment_id": null,
+        "would_delete": true,
+        "reason": "p5_probe"
+      },
+      "renew_before": {
+        "assignment_id": "P5-PROBE-USDT-SWAP|15m|p5_renew_probe",
+        "symbol": "P5-PROBE-USDT-SWAP",
+        "timeframe": "15m",
+        "strategy_key": "p5_renew_probe",
+        "strategy_title": "renew-a",
+        "config_file": null,
+        "validity_days_total": 730,
+        "valid_from": "2026-08-04 07:47:50",
+        "valid_until": "2028-08-03 07:47:50",
+        "stamped_at": "2026-08-04 07:47:50",
+        "policy_zh": "默认有效期=未来2年；到期删除并 WxPusher 通知",
+        "days_remaining": 730,
+        "expired": false,
+        "countdown_label_zh": "剩余 730 天",
+        "refreshed_at": "2026-08-04 07:47:50"
+      },
+      "renew_after": {
+        "assignment_id": "P5-PROBE-USDT-SWAP|15m|p5_renew_probe",
+        "symbol": "P5-PROBE-USDT-SWAP",
+        "timeframe": "15m",
+        "strategy_key": "p5_renew_probe",
+        "strategy_title": "renew-b",
+        "config_file": null,
+        "validity_days_total": 730,
+        "valid_from": "2026-08-04 07:47:50",
+        "valid_until": "2028-08-03 07:47:50",
+        "stamped_at": "2026-08-04 07:47:50",
+        "policy_zh": "默认有效期=未来2年；到期删除并 WxPusher 通知",
+        "days_remaining": 730,
+        "expired": false,
+        "countdown_label_zh": "剩余 730 天",
+        "refreshed_at": "2026-08-04 07:47:50"
+      }
+    },
+    "stamped_sample": {
+      "assignment_id": "P5-PROBE-USDT-SWAP|15m|p5_validity_probe",
+      "symbol": "P5-PROBE-USDT-SWAP",
+      "timeframe": "15m",
+      "strategy_key": "p5_validity_probe",
+      "strategy_title": "P5 validity probe",
+      "config_file": null,
+      "validity_days_total": 730,
+      "valid_from": "2026-08-04 07:47:50",
+      "valid_until": "2028-08-03 07:47:50",
+      "stamped_at": "2026-08-04 07:47:50",
+      "policy_zh": "默认有效期=未来2年；到期删除并 WxPusher 通知",
+      "days_remaining": 730,
+      "expired": false,
+      "countdown_label_zh": "剩余 730 天",
+      "refreshed_at": "2026-08-04 07:47:50"
+    },
+    "at": "2026-08-04 07:47:50"
+  },
+  "8_evidence_paths": {
+    "s17_1": "/root/auto_trade/dual_engine/p5_verification/s17_1_review_correctness.json",
+    "s17_3": "/root/auto_trade/dual_engine/p5_verification/s17_3_garbage_intercept.json",
+    "s17_4": "/root/auto_trade/dual_engine/p5_verification/s17_4_strategy_validity.json",
+    "s17_2": "/root/auto_trade/dual_engine/p5_verification/s17_2_materialization.json",
+    "s17_5": "/root/auto_trade/dual_engine/p5_verification/s17_5_formal_pass_scan.json"
+  },
+  "9_final_declaration": "最终验收结论：FAIL\n未满足项目：17.2_materialization_10job, 17.5_real_strategy_formal_pass",
+  "at": "2026-08-04 07:47:50"
+}

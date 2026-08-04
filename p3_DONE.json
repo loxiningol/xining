@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "phase": "P3",
+  "complete": true,
+  "sole_job_id": "creation_20260804_000926_996218_fb507726",
+  "ledger_ai_committee": {
+    "ok": true,
+    "n_hypotheses": 6,
+    "unique_ast_hash_n": 6,
+    "representation_types": [
+      "delta",
+      "rank",
+      "relative_exclusion",
+      "sequence",
+      "state",
+      "threshold"
+    ],
+    "round1": {
+      "mechanisms_n": 2,
+      "asts_n": 12,
+      "asts_rejected_n": 0
+    },
+    "round2": {
+      "diversity_supplement_n": 0,
+      "missing_representation_types": [],
+      "diagnosis_codes": [
+        "LOW_WIN_RATE",
+        "LOW_PROFIT_FIRST_RATE",
+        "HIGH_MAE"
+      ],
+      "repair_n": 4
+    },
+    "skip_llm": true,
+    "at": "2026-08-04 00:10:19"
+  },
+  "smoke_evidence": "/root/auto_trade/dual_engine/p3_ai_committee_evidence.json",
+  "backup": "/root/backups/p3_ai_ast_committee_20260804_000603",
+  "tests": "tests.test_ai_ast_committee + test_ast_compiler OK on prod",
+  "wired": [
+    "ai_ast_committee.run_creation_committee -> build_hypothesis_population",
+    "stages[ai_committee] + ledger event",
+    "quality_repair -> diagnose_failures + generate_repair_wave"
+  ],
+  "note_zh": "P3验收不要求本轮sole产出PASS策略；quality失败可接受。创造早期四AI AST committee已接线且有ledger证据。"
+}

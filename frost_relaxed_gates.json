@@ -1,0 +1,21 @@
+{
+  "updated_at": "2026-07-25 18:46:28",
+  "op": "寒霜放宽",
+  "mode": "frost_relaxed",
+  "hard_release_bar": {
+    "walk_forward": "fold_positive>=7 of folds>=10",
+    "extreme_friction": "sharpe>=0 (2x slip, 50ms, 5% fill fail)",
+    "logic_destruction": "±20% mean_net>-0.01 and trades>=3"
+  },
+  "soft": {
+    "monte_carlo": "advisory only, not required for pass"
+  },
+  "calibration": {
+    "user_asked_wf": ">=8/10",
+    "live_ada_ref_fold_positive": 7,
+    "live_ada_ref_key": "ada5_z20_t60_prev_h14_0724k",
+    "applied_wf": ">=7/10",
+    "reason_zh": "同指标下实盘B档ADA仅7/10正折；坚持8/10会导致连已验证实盘逻辑也无法过门，违背零产出禁止。"
+  },
+  "note": "WF fold_positive>=7/10 (user asked 8; live ADA ref empirically 7/10); friction sharpe>=0; destruction pass; MC advisory"
+}

@@ -1,0 +1,123 @@
+{
+  "schema": "qiyu_step_b_calibration_status_v1",
+  "updated_at": "2026-07-27 09:51:18",
+  "calibration_stage": {
+    "complete_periods": 0,
+    "stage": "观测期",
+    "banner_zh": "预测模型处于观测期（完整校准周期=0，需≥4进入初步校准）。当前数值为统计估计，不代表已验证精度；complete_periods=0时禁止宣称科学验证。",
+    "scientifically_validated": false,
+    "ui_must_show_calibration_banner": true,
+    "stage_bands": {
+      "观测期": "0-3",
+      "初步校准": "4-7",
+      "中期校准": "8-11",
+      "已完成基础预测校准": ">=12"
+    }
+  },
+  "period_metrics": {
+    "MAE": null,
+    "MedAE": null,
+    "Bias": null,
+    "coverage_80pct": null,
+    "coverage_95pct": null,
+    "brier_p_3day_no_entry": null,
+    "complete_periods": 0,
+    "total_persisted_rows": 21,
+    "strategy_errors_mae": {},
+    "family_errors_mae": {},
+    "positive_E_error_mae": null,
+    "legacy_vs_event_error": {
+      "legacy_MAE": null,
+      "event_MAE": null,
+      "note": "null until both layers have completed periods"
+    }
+  },
+  "validation_claim_forbidden": true,
+  "scientifically_validated": false,
+  "complete_periods": 0,
+  "stage_bands": {
+    "观测期": "0-3 complete periods",
+    "初步校准": "4-7",
+    "中期校准": "8-11",
+    "已完成基础预测校准": ">=12"
+  },
+  "snapshot_policy": "forever (forecast_snapshots/)",
+  "auto_backfill": "realized_weekly_fills filled when period age >=7d",
+  "rows_tail": [
+    {
+      "error": null,
+      "expected_daily_fills": 0.3464,
+      "expected_weekly_fills": 2.4249,
+      "generated_at": "2026-07-27 07:45:31",
+      "method": "statistical_baseline_regime_correlation_mutex",
+      "period_kind": "hourly_snapshot_noise",
+      "realized_weekly_fills": null,
+      "weekly_interval": [
+        0,
+        6
+      ]
+    },
+    {
+      "error": null,
+      "expected_daily_fills": 0.3464,
+      "expected_weekly_fills": 2.4249,
+      "generated_at": "2026-07-27 08:01:14",
+      "method": "statistical_baseline_regime_correlation_mutex",
+      "period_kind": "hourly_snapshot_noise",
+      "realized_weekly_fills": null,
+      "weekly_interval": [
+        0,
+        6
+      ]
+    },
+    {
+      "error": null,
+      "expected_daily_fills": 0.3464,
+      "expected_weekly_fills": 2.4249,
+      "generated_at": "2026-07-27 08:45:32",
+      "method": "statistical_baseline_regime_correlation_mutex",
+      "period_kind": "hourly_snapshot_noise",
+      "realized_weekly_fills": null,
+      "weekly_interval": [
+        0,
+        6
+      ]
+    },
+    {
+      "error": null,
+      "expected_daily_fills": 0.3464,
+      "expected_weekly_fills": 2.4249,
+      "generated_at": "2026-07-27 09:45:32",
+      "method": "statistical_baseline_regime_correlation_mutex",
+      "period_kind": "hourly_snapshot_noise",
+      "realized_weekly_fills": null,
+      "weekly_interval": [
+        0,
+        6
+      ]
+    },
+    {
+      "active_strategy_count": 5,
+      "calibrated_positive_E_weekly": 0.0,
+      "error": null,
+      "expected_daily_fills": 0.3353,
+      "expected_weekly_fills": 2.3472,
+      "frequency_source_layer": "mixed",
+      "generated_at": "2026-07-27 09:51:07",
+      "method": "statistical_baseline_regime_correlation_mutex",
+      "period_id": "W2026-W31",
+      "period_kind": "iso_week",
+      "realized_weekly_fills": null,
+      "strategy_pool_version": "a51a90ee3c993ebe",
+      "weekly_interval": [
+        1.0618,
+        3.1855
+      ],
+      "weekly_interval_95": [
+        0.0,
+        5.3091
+      ]
+    }
+  ],
+  "note_zh": "complete_periods=0 → 观测期；禁止宣称科学验证"
+}

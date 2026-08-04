@@ -1,0 +1,133 @@
+{
+  "schema": "qiyu_open_density_recalc_v1",
+  "at": "2026-08-03 12:26:22",
+  "note_zh": "周开仓=成交×7/真实观测天；L0开仓密度=triggers/evaluated_bars（不用730）。故意喂span_days=730验证是否被cap。",
+  "results": [
+    {
+      "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+      "symbol": "ADA-USDT-SWAP",
+      "timeframe": "5m",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "btc15_dual_cycle_downtrend_reentry_short_ai",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "15m",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "cci_75_100",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "conventional_down_arrangement_bottom_up_long",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "conventional_up_arrangement_valid_death_cross_short",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "conventional_up_break_long",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "early_downtrend_ema6_ema75_short",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "ema53_liquidity_sweep_reclaim_long",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "btc5_exhaustion_reclaim_long_ai",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "5m",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "cci_neg60_neg110_short",
+      "symbol": "CL-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "conventional_down_arrangement_bottom_up_long",
+      "symbol": "CL-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "cl5_exhaustion_fade_short_ai",
+      "symbol": "CL-USDT-SWAP",
+      "timeframe": "5m",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "ltc5_exhaustion_fade_short_ai",
+      "symbol": "LTC-USDT-SWAP",
+      "timeframe": "5m",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "conventional_up_break_long",
+      "symbol": "NG-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "ng5_exhaustion_fade_short_ai",
+      "symbol": "NG-USDT-SWAP",
+      "timeframe": "5m",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "xag5_session_breakdown_short_ai",
+      "symbol": "XAG-USDT-SWAP",
+      "timeframe": "5m",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "xau15_h1_breakout_long_ai",
+      "symbol": "XAU-USDT-SWAP",
+      "timeframe": "15m",
+      "name": null,
+      "error": "definition_missing"
+    },
+    {
+      "strategy_key": "conventional_up_break_long",
+      "symbol": "XAU-USDT-SWAP",
+      "timeframe": "1h",
+      "name": null,
+      "error": "definition_missing"
+    }
+  ]
+}

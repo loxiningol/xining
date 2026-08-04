@@ -1,0 +1,178 @@
+{
+  "ok": true,
+  "expected": "handoff_failed + formal_review_not_submitted under current policy",
+  "note_zh": "历史任务曾在旧策略下进入复核；§17.3 验收以现行 handoff 回放为准。",
+  "rows": [
+    {
+      "job_id": "creation_20260803_184134_691917_f5449f02",
+      "historical_outcome": "review_submitted",
+      "historical_formal_review_started": true,
+      "historical_formal_submission_created": true,
+      "current_policy_replay_top_n": 0,
+      "current_policy_would_submit_formal_review": false,
+      "handoff_fail_reason_clear": true,
+      "candidates": [
+        {
+          "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+          "win_rate": 0.19710144927536233,
+          "mean_win_only_pct": 6.779314425821939,
+          "weekly_opens": 28.983622952869105,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        },
+        {
+          "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+          "win_rate": 0.19710144927536233,
+          "mean_win_only_pct": 6.779314425821939,
+          "weekly_opens": 28.983622952869105,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        },
+        {
+          "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+          "win_rate": 0.19710144927536233,
+          "mean_win_only_pct": 6.779314425821939,
+          "weekly_opens": 28.983622952869105,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        },
+        {
+          "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+          "win_rate": 0.19710144927536233,
+          "mean_win_only_pct": 6.779314425821939,
+          "weekly_opens": 28.983622952869105,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        },
+        {
+          "recipe_id": "recipe_2be5b4665807ff3efd1823a5",
+          "win_rate": 0.19710144927536233,
+          "mean_win_only_pct": 6.779314425821939,
+          "weekly_opens": 28.983622952869105,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        }
+      ],
+      "bypass_audit": {
+        "ok": true,
+        "reasons": [],
+        "top3_actual_count": 0,
+        "ranked_n": 44,
+        "handoff_fail_count": 44,
+        "padded_with_junk": false,
+        "policy": "filter_then_topn_never_pad"
+      }
+    },
+    {
+      "job_id": "creation_20260803_180616_313385_58c2851a",
+      "historical_outcome": "candidate_ready",
+      "historical_formal_review_started": false,
+      "historical_formal_submission_created": false,
+      "current_policy_replay_top_n": 0,
+      "current_policy_would_submit_formal_review": false,
+      "handoff_fail_reason_clear": true,
+      "candidates": [
+        {
+          "recipe_id": "recipe_d73762f93db19611fb948bc8",
+          "win_rate": 0.3128834355828221,
+          "mean_win_only_pct": null,
+          "weekly_opens": 13.693711713964245,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        },
+        {
+          "recipe_id": "recipe_a4174762d5acd0d34ba2c0a9",
+          "win_rate": 0.3128834355828221,
+          "mean_win_only_pct": null,
+          "weekly_opens": 13.693711713964245,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        },
+        {
+          "recipe_id": "recipe_e4ad6ddd1c11deb1e23e837b",
+          "win_rate": 0.3128834355828221,
+          "mean_win_only_pct": null,
+          "weekly_opens": 13.693711713964245,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        },
+        {
+          "recipe_id": "recipe_9ad145fcea4e0ec669a9e5b5",
+          "win_rate": 0.3128834355828221,
+          "mean_win_only_pct": null,
+          "weekly_opens": 13.693711713964245,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        },
+        {
+          "recipe_id": "recipe_400c6a4be832f79282e7e7c8",
+          "win_rate": 0.3128834355828221,
+          "mean_win_only_pct": null,
+          "weekly_opens": 13.693711713964245,
+          "handoff_ok": false,
+          "handoff_fail_reason": [
+            "handoff_win_rate_below_45_pct",
+            "handoff_mean_win_only_below_9.00_pct",
+            "handoff_profit_first_rate_below_0.55"
+          ],
+          "token_ok": false
+        }
+      ],
+      "bypass_audit": {
+        "ok": true,
+        "reasons": [],
+        "top3_actual_count": 0,
+        "ranked_n": 26,
+        "handoff_fail_count": 26,
+        "padded_with_junk": false,
+        "policy": "filter_then_topn_never_pad"
+      }
+    }
+  ],
+  "at": "2026-08-04 07:47:50"
+}

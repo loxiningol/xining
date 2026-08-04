@@ -1,0 +1,1125 @@
+{
+  "generated_at": "2026-07-28 15:32:05",
+  "ideas_n": 14,
+  "formal_n": 8,
+  "direction_classes_in_formal": [
+    "A",
+    "D",
+    "E",
+    "F"
+  ],
+  "rejected": [
+    {
+      "idea_id": "p2_i08",
+      "reason": "shadow_alt",
+      "data_note": null,
+      "pregate": {
+        "pass": false,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.0055000000000000005,
+            "round_trip_cost_price_est": 0.0016799999999999999,
+            "coverage_ratio": 3.274,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "cascade_trap_proxy"
+          },
+          {
+            "PreGateD_data": false,
+            "idea_status": "shadow_alt"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "idea_id": "p2_i11",
+      "reason": "research_layer_only",
+      "data_note": "funding not in DSL entry features",
+      "pregate": {
+        "pass": false,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.004,
+            "round_trip_cost_price_est": 0.0014,
+            "coverage_ratio": 2.857,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "funding_pressure_unwind"
+          },
+          {
+            "PreGateD_data": false,
+            "idea_status": "research_layer_only"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "idea_id": "p2_i12",
+      "reason": "data_eliminate",
+      "data_note": "no true cross-asset feed in DSL",
+      "pregate": {
+        "pass": false,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.0034999999999999996,
+            "round_trip_cost_price_est": 0.00147,
+            "coverage_ratio": 2.381,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "cross_asset_btc_lead"
+          },
+          {
+            "PreGateD_data": false,
+            "idea_status": "data_eliminate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "idea_id": "p2_i14",
+      "reason": "shadow_alt",
+      "data_note": null,
+      "pregate": {
+        "pass": false,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.004,
+            "round_trip_cost_price_est": 0.0014,
+            "coverage_ratio": 2.857,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "selective_session_thrust"
+          },
+          {
+            "PreGateD_data": false,
+            "idea_status": "shadow_alt"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    }
+  ],
+  "formal_ids": [
+    "mech_p2_e_absorption_climax_reclaim_btc_5m",
+    "mech_p2_e_absorption_climax_reclaim_btc_15m",
+    "mech_p2_d_selective_session_thrust_btc_5m",
+    "mech_p2_d_selective_session_thrust_xau_5m",
+    "mech_p2_f_confirmed_vol_release_eth_15m",
+    "mech_p2_f_confirmed_vol_release_btc_15m",
+    "mech_p2_a_cascade_trap_proxy_xrp_15m",
+    "mech_p2_e_vacuum_fill_impulse_ng_5m"
+  ],
+  "packs": [
+    {
+      "mechanism_spec": {
+        "mechanism_id": "mech_p2_e_absorption_climax_reclaim_btc_5m",
+        "mechanism_name": "vol_climax_absorption_reclaim_long",
+        "mechanism_family": "absorption_climax_reclaim",
+        "market_inefficiency": "panic sellers trapped after climax wick below range",
+        "counterparty_source": "panic sellers trapped after climax wick below range",
+        "why_edge_exists": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "edge_decay_conditions": "vol_z mean-reverts below 0.5; climax not renewed within 3 bars",
+        "required_market_regime": "elevated realized vol with identifiable climax or expansion",
+        "entry_logic": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+        "exit_logic": "exit on vol fade or max hold; fixed SL intact",
+        "stop_logic": "fixed 0.9% SL (ADA production 0.6 untouched; not used here)",
+        "take_profit_logic": "vol fade / structure stall; target covers >2x cost",
+        "invalidation_logic": "vol climax fails to print or close does not confirm direction",
+        "non_negotiable_rules": [
+          "fixed SL 0.9%",
+          "leverage capped at 20x",
+          "initial position 30%",
+          "oscillator_crutches_forbidden",
+          "do_not_loosen_entries",
+          "do_not_force_open",
+          "expected_gross must cover >=2x round-trip cost"
+        ],
+        "tunable_parameters": [
+          "vol_z_threshold",
+          "atr_threshold",
+          "max_hold_bars"
+        ],
+        "forbidden_transformations": [
+          "inject_oscillator_crutches",
+          "widen SL beyond 0.9%",
+          "swap into Phase1 archived family template",
+          "loosen vol/atr gates to inflate trade count"
+        ],
+        "expected_trade_frequency_class": "selective_lt_1_per_day",
+        "expected_holding_period": "4_to_16_bars",
+        "suitable_symbols": [
+          "BTC-USDT-SWAP"
+        ],
+        "suitable_timeframes": [
+          "5m"
+        ],
+        "phase1_failure_patterns_avoided": [
+          "cost_floor_attractor_high_freq_low_edge",
+          "zero_trade_indicator_mr",
+          "family_label_without_impl_differentiation",
+          "phase1_archived_family_fingerprint"
+        ],
+        "expected_gross_move_pct": 0.45,
+        "expected_gross_move_vs_cost": {
+          "expected_gross_price": 0.0045000000000000005,
+          "round_trip_cost_price_est": 0.0014,
+          "coverage_ratio": 3.214,
+          "gate0_min_coverage": 2.0,
+          "passes_cost_cover": true
+        },
+        "family_levels": {
+          "L1": "E_volume_aggression_absorption",
+          "L2": "absorption_climax_reclaim",
+          "L3": "mech_p2_e_absorption_climax_reclaim_btc_5m"
+        },
+        "direction_class": "E",
+        "idea_id": "p2_i01"
+      },
+      "meta": {
+        "title": "vol_climax_absorption_reclaim_long",
+        "thesis": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "direction": "long",
+        "symbol": "BTC-USDT-SWAP",
+        "timeframe": "5m",
+        "suggested_core_features": [
+          "atr14",
+          "vol_z20",
+          "prev_high20",
+          "prev_low20",
+          "h1_slope4"
+        ],
+        "holding_horizon": "4_to_16_bars",
+        "exploration_direction": "volume_aggression_absorption",
+        "idea_id": "p2_i01",
+        "phase2": true
+      },
+      "idea": {
+        "idea_id": "p2_i01",
+        "direction_class": "E",
+        "title": "vol climax absorption reclaim long",
+        "family": "absorption_climax_reclaim",
+        "symbol": "BTC-USDT-SWAP",
+        "tf": "5m",
+        "side": "long",
+        "counterparty": "panic sellers trapped after climax wick below range",
+        "expected_gross_move_pct": 0.45,
+        "status": "formal_candidate"
+      },
+      "pregate": {
+        "pass": true,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.0045000000000000005,
+            "round_trip_cost_price_est": 0.0014,
+            "coverage_ratio": 3.214,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "absorption_climax_reclaim"
+          },
+          {
+            "PreGateD_data": true,
+            "idea_status": "formal_candidate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "mechanism_spec": {
+        "mechanism_id": "mech_p2_e_absorption_climax_reclaim_btc_15m",
+        "mechanism_name": "vol_climax_absorption_reclaim_short",
+        "mechanism_family": "absorption_climax_reclaim",
+        "market_inefficiency": "FOMO buyers trapped after climax wick above range",
+        "counterparty_source": "FOMO buyers trapped after climax wick above range",
+        "why_edge_exists": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "edge_decay_conditions": "vol_z mean-reverts below 0.5; climax not renewed within 3 bars",
+        "required_market_regime": "elevated realized vol with identifiable climax or expansion",
+        "entry_logic": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+        "exit_logic": "exit on vol fade or max hold; fixed SL intact",
+        "stop_logic": "fixed 0.9% SL (ADA production 0.6 untouched; not used here)",
+        "take_profit_logic": "vol fade / structure stall; target covers >2x cost",
+        "invalidation_logic": "vol climax fails to print or close does not confirm direction",
+        "non_negotiable_rules": [
+          "fixed SL 0.9%",
+          "leverage capped at 20x",
+          "initial position 30%",
+          "oscillator_crutches_forbidden",
+          "do_not_loosen_entries",
+          "do_not_force_open",
+          "expected_gross must cover >=2x round-trip cost"
+        ],
+        "tunable_parameters": [
+          "vol_z_threshold",
+          "atr_threshold",
+          "max_hold_bars"
+        ],
+        "forbidden_transformations": [
+          "inject_oscillator_crutches",
+          "widen SL beyond 0.9%",
+          "swap into Phase1 archived family template",
+          "loosen vol/atr gates to inflate trade count"
+        ],
+        "expected_trade_frequency_class": "selective_lt_1_per_day",
+        "expected_holding_period": "4_to_16_bars",
+        "suitable_symbols": [
+          "BTC-USDT-SWAP"
+        ],
+        "suitable_timeframes": [
+          "15m"
+        ],
+        "phase1_failure_patterns_avoided": [
+          "cost_floor_attractor_high_freq_low_edge",
+          "zero_trade_indicator_mr",
+          "family_label_without_impl_differentiation",
+          "phase1_archived_family_fingerprint"
+        ],
+        "expected_gross_move_pct": 0.5,
+        "expected_gross_move_vs_cost": {
+          "expected_gross_price": 0.005,
+          "round_trip_cost_price_est": 0.0014,
+          "coverage_ratio": 3.571,
+          "gate0_min_coverage": 2.0,
+          "passes_cost_cover": true
+        },
+        "family_levels": {
+          "L1": "E_volume_aggression_absorption",
+          "L2": "absorption_climax_reclaim",
+          "L3": "mech_p2_e_absorption_climax_reclaim_btc_15m"
+        },
+        "direction_class": "E",
+        "idea_id": "p2_i02"
+      },
+      "meta": {
+        "title": "vol_climax_absorption_reclaim_short",
+        "thesis": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "direction": "short",
+        "symbol": "BTC-USDT-SWAP",
+        "timeframe": "15m",
+        "suggested_core_features": [
+          "atr14",
+          "vol_z20",
+          "prev_high20",
+          "prev_low20",
+          "h1_slope4"
+        ],
+        "holding_horizon": "4_to_16_bars",
+        "exploration_direction": "volume_aggression_absorption",
+        "idea_id": "p2_i02",
+        "phase2": true
+      },
+      "idea": {
+        "idea_id": "p2_i02",
+        "direction_class": "E",
+        "title": "vol climax absorption reclaim short",
+        "family": "absorption_climax_reclaim",
+        "symbol": "BTC-USDT-SWAP",
+        "tf": "15m",
+        "side": "short",
+        "counterparty": "FOMO buyers trapped after climax wick above range",
+        "expected_gross_move_pct": 0.5,
+        "status": "formal_candidate"
+      },
+      "pregate": {
+        "pass": true,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.005,
+            "round_trip_cost_price_est": 0.0014,
+            "coverage_ratio": 3.571,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "absorption_climax_reclaim"
+          },
+          {
+            "PreGateD_data": true,
+            "idea_status": "formal_candidate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "mechanism_spec": {
+        "mechanism_id": "mech_p2_d_selective_session_thrust_btc_5m",
+        "mechanism_name": "selective_session_thrust_long",
+        "mechanism_family": "selective_session_thrust",
+        "market_inefficiency": "overnight inventory forced to chase session auction",
+        "counterparty_source": "overnight inventory forced to chase session auction",
+        "why_edge_exists": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "edge_decay_conditions": "vol_z mean-reverts below 0.5; climax not renewed within 3 bars",
+        "required_market_regime": "elevated realized vol with identifiable climax or expansion",
+        "entry_logic": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+        "exit_logic": "exit on vol fade or max hold; fixed SL intact",
+        "stop_logic": "fixed 0.9% SL (ADA production 0.6 untouched; not used here)",
+        "take_profit_logic": "vol fade / structure stall; target covers >2x cost",
+        "invalidation_logic": "vol climax fails to print or close does not confirm direction",
+        "non_negotiable_rules": [
+          "fixed SL 0.9%",
+          "leverage capped at 20x",
+          "initial position 30%",
+          "oscillator_crutches_forbidden",
+          "do_not_loosen_entries",
+          "do_not_force_open",
+          "expected_gross must cover >=2x round-trip cost"
+        ],
+        "tunable_parameters": [
+          "vol_z_threshold",
+          "atr_threshold",
+          "max_hold_bars"
+        ],
+        "forbidden_transformations": [
+          "inject_oscillator_crutches",
+          "widen SL beyond 0.9%",
+          "swap into Phase1 archived family template",
+          "loosen vol/atr gates to inflate trade count"
+        ],
+        "expected_trade_frequency_class": "selective_lt_1_per_day",
+        "expected_holding_period": "4_to_16_bars",
+        "suitable_symbols": [
+          "BTC-USDT-SWAP"
+        ],
+        "suitable_timeframes": [
+          "5m"
+        ],
+        "phase1_failure_patterns_avoided": [
+          "cost_floor_attractor_high_freq_low_edge",
+          "zero_trade_indicator_mr",
+          "family_label_without_impl_differentiation",
+          "phase1_archived_family_fingerprint"
+        ],
+        "expected_gross_move_pct": 0.4,
+        "expected_gross_move_vs_cost": {
+          "expected_gross_price": 0.004,
+          "round_trip_cost_price_est": 0.0014,
+          "coverage_ratio": 2.857,
+          "gate0_min_coverage": 2.0,
+          "passes_cost_cover": true
+        },
+        "family_levels": {
+          "L1": "D_selective_session_auction",
+          "L2": "selective_session_thrust",
+          "L3": "mech_p2_d_selective_session_thrust_btc_5m"
+        },
+        "direction_class": "D",
+        "idea_id": "p2_i03"
+      },
+      "meta": {
+        "title": "selective_session_thrust_long",
+        "thesis": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "direction": "long",
+        "symbol": "BTC-USDT-SWAP",
+        "timeframe": "5m",
+        "suggested_core_features": [
+          "atr14",
+          "vol_z20",
+          "prev_high20",
+          "prev_low20",
+          "h1_slope4"
+        ],
+        "holding_horizon": "4_to_16_bars",
+        "exploration_direction": "selective_session_auction",
+        "idea_id": "p2_i03",
+        "phase2": true
+      },
+      "idea": {
+        "idea_id": "p2_i03",
+        "direction_class": "D",
+        "title": "selective session thrust long",
+        "family": "selective_session_thrust",
+        "symbol": "BTC-USDT-SWAP",
+        "tf": "5m",
+        "side": "long",
+        "counterparty": "overnight inventory forced to chase session auction",
+        "expected_gross_move_pct": 0.4,
+        "status": "formal_candidate"
+      },
+      "pregate": {
+        "pass": true,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.004,
+            "round_trip_cost_price_est": 0.0014,
+            "coverage_ratio": 2.857,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "selective_session_thrust"
+          },
+          {
+            "PreGateD_data": true,
+            "idea_status": "formal_candidate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "mechanism_spec": {
+        "mechanism_id": "mech_p2_d_selective_session_thrust_xau_5m",
+        "mechanism_name": "selective_session_thrust_short_XAU",
+        "mechanism_family": "selective_session_thrust",
+        "market_inefficiency": "session auction sellers dominating thin book",
+        "counterparty_source": "session auction sellers dominating thin book",
+        "why_edge_exists": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "edge_decay_conditions": "vol_z mean-reverts below 0.5; climax not renewed within 3 bars",
+        "required_market_regime": "elevated realized vol with identifiable climax or expansion",
+        "entry_logic": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+        "exit_logic": "exit on vol fade or max hold; fixed SL intact",
+        "stop_logic": "fixed 0.9% SL (ADA production 0.6 untouched; not used here)",
+        "take_profit_logic": "vol fade / structure stall; target covers >2x cost",
+        "invalidation_logic": "vol climax fails to print or close does not confirm direction",
+        "non_negotiable_rules": [
+          "fixed SL 0.9%",
+          "leverage capped at 20x",
+          "initial position 30%",
+          "oscillator_crutches_forbidden",
+          "do_not_loosen_entries",
+          "do_not_force_open",
+          "expected_gross must cover >=2x round-trip cost"
+        ],
+        "tunable_parameters": [
+          "vol_z_threshold",
+          "atr_threshold",
+          "max_hold_bars"
+        ],
+        "forbidden_transformations": [
+          "inject_oscillator_crutches",
+          "widen SL beyond 0.9%",
+          "swap into Phase1 archived family template",
+          "loosen vol/atr gates to inflate trade count"
+        ],
+        "expected_trade_frequency_class": "selective_lt_1_per_day",
+        "expected_holding_period": "4_to_16_bars",
+        "suitable_symbols": [
+          "XAU-USDT-SWAP"
+        ],
+        "suitable_timeframes": [
+          "5m"
+        ],
+        "phase1_failure_patterns_avoided": [
+          "cost_floor_attractor_high_freq_low_edge",
+          "zero_trade_indicator_mr",
+          "family_label_without_impl_differentiation",
+          "phase1_archived_family_fingerprint"
+        ],
+        "expected_gross_move_pct": 0.35,
+        "expected_gross_move_vs_cost": {
+          "expected_gross_price": 0.0034999999999999996,
+          "round_trip_cost_price_est": 0.0014,
+          "coverage_ratio": 2.5,
+          "gate0_min_coverage": 2.0,
+          "passes_cost_cover": true
+        },
+        "family_levels": {
+          "L1": "D_selective_session_auction",
+          "L2": "selective_session_thrust",
+          "L3": "mech_p2_d_selective_session_thrust_xau_5m"
+        },
+        "direction_class": "D",
+        "idea_id": "p2_i04"
+      },
+      "meta": {
+        "title": "selective_session_thrust_short_XAU",
+        "thesis": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "direction": "short",
+        "symbol": "XAU-USDT-SWAP",
+        "timeframe": "5m",
+        "suggested_core_features": [
+          "atr14",
+          "vol_z20",
+          "prev_high20",
+          "prev_low20",
+          "h1_slope4"
+        ],
+        "holding_horizon": "4_to_16_bars",
+        "exploration_direction": "selective_session_auction",
+        "idea_id": "p2_i04",
+        "phase2": true
+      },
+      "idea": {
+        "idea_id": "p2_i04",
+        "direction_class": "D",
+        "title": "selective session thrust short XAU",
+        "family": "selective_session_thrust",
+        "symbol": "XAU-USDT-SWAP",
+        "tf": "5m",
+        "side": "short",
+        "counterparty": "session auction sellers dominating thin book",
+        "expected_gross_move_pct": 0.35,
+        "status": "formal_candidate"
+      },
+      "pregate": {
+        "pass": true,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.0034999999999999996,
+            "round_trip_cost_price_est": 0.0014,
+            "coverage_ratio": 2.5,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "selective_session_thrust"
+          },
+          {
+            "PreGateD_data": true,
+            "idea_status": "formal_candidate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "mechanism_spec": {
+        "mechanism_id": "mech_p2_f_confirmed_vol_release_eth_15m",
+        "mechanism_name": "confirmed_vol_release_long_ETH",
+        "mechanism_family": "confirmed_vol_release",
+        "market_inefficiency": "range shorts covering into expansion",
+        "counterparty_source": "range shorts covering into expansion",
+        "why_edge_exists": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "edge_decay_conditions": "vol_z mean-reverts below 0.5; climax not renewed within 3 bars",
+        "required_market_regime": "elevated realized vol with identifiable climax or expansion",
+        "entry_logic": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+        "exit_logic": "exit on vol fade or max hold; fixed SL intact",
+        "stop_logic": "fixed 0.9% SL (ADA production 0.6 untouched; not used here)",
+        "take_profit_logic": "vol fade / structure stall; target covers >2x cost",
+        "invalidation_logic": "vol climax fails to print or close does not confirm direction",
+        "non_negotiable_rules": [
+          "fixed SL 0.9%",
+          "leverage capped at 20x",
+          "initial position 30%",
+          "oscillator_crutches_forbidden",
+          "do_not_loosen_entries",
+          "do_not_force_open",
+          "expected_gross must cover >=2x round-trip cost"
+        ],
+        "tunable_parameters": [
+          "vol_z_threshold",
+          "atr_threshold",
+          "max_hold_bars"
+        ],
+        "forbidden_transformations": [
+          "inject_oscillator_crutches",
+          "widen SL beyond 0.9%",
+          "swap into Phase1 archived family template",
+          "loosen vol/atr gates to inflate trade count"
+        ],
+        "expected_trade_frequency_class": "selective_lt_1_per_day",
+        "expected_holding_period": "4_to_16_bars",
+        "suitable_symbols": [
+          "ETH-USDT-SWAP"
+        ],
+        "suitable_timeframes": [
+          "15m"
+        ],
+        "phase1_failure_patterns_avoided": [
+          "cost_floor_attractor_high_freq_low_edge",
+          "zero_trade_indicator_mr",
+          "family_label_without_impl_differentiation",
+          "phase1_archived_family_fingerprint"
+        ],
+        "expected_gross_move_pct": 0.55,
+        "expected_gross_move_vs_cost": {
+          "expected_gross_price": 0.0055000000000000005,
+          "round_trip_cost_price_est": 0.00147,
+          "coverage_ratio": 3.741,
+          "gate0_min_coverage": 2.0,
+          "passes_cost_cover": true
+        },
+        "family_levels": {
+          "L1": "F_confirmed_vol_regime_release",
+          "L2": "confirmed_vol_release",
+          "L3": "mech_p2_f_confirmed_vol_release_eth_15m"
+        },
+        "direction_class": "F",
+        "idea_id": "p2_i05"
+      },
+      "meta": {
+        "title": "confirmed_vol_release_long_ETH",
+        "thesis": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "direction": "long",
+        "symbol": "ETH-USDT-SWAP",
+        "timeframe": "15m",
+        "suggested_core_features": [
+          "atr14",
+          "vol_z20",
+          "prev_high20",
+          "prev_low20",
+          "h1_slope4"
+        ],
+        "holding_horizon": "4_to_16_bars",
+        "exploration_direction": "confirmed_vol_regime_release",
+        "idea_id": "p2_i05",
+        "phase2": true
+      },
+      "idea": {
+        "idea_id": "p2_i05",
+        "direction_class": "F",
+        "title": "confirmed vol release long ETH",
+        "family": "confirmed_vol_release",
+        "symbol": "ETH-USDT-SWAP",
+        "tf": "15m",
+        "side": "long",
+        "counterparty": "range shorts covering into expansion",
+        "expected_gross_move_pct": 0.55,
+        "status": "formal_candidate"
+      },
+      "pregate": {
+        "pass": true,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.0055000000000000005,
+            "round_trip_cost_price_est": 0.00147,
+            "coverage_ratio": 3.741,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "confirmed_vol_release"
+          },
+          {
+            "PreGateD_data": true,
+            "idea_status": "formal_candidate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "mechanism_spec": {
+        "mechanism_id": "mech_p2_f_confirmed_vol_release_btc_15m",
+        "mechanism_name": "confirmed_vol_release_short_BTC",
+        "mechanism_family": "confirmed_vol_release",
+        "market_inefficiency": "range longs trapped on downside expansion",
+        "counterparty_source": "range longs trapped on downside expansion",
+        "why_edge_exists": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "edge_decay_conditions": "vol_z mean-reverts below 0.5; climax not renewed within 3 bars",
+        "required_market_regime": "elevated realized vol with identifiable climax or expansion",
+        "entry_logic": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+        "exit_logic": "exit on vol fade or max hold; fixed SL intact",
+        "stop_logic": "fixed 0.9% SL (ADA production 0.6 untouched; not used here)",
+        "take_profit_logic": "vol fade / structure stall; target covers >2x cost",
+        "invalidation_logic": "vol climax fails to print or close does not confirm direction",
+        "non_negotiable_rules": [
+          "fixed SL 0.9%",
+          "leverage capped at 20x",
+          "initial position 30%",
+          "oscillator_crutches_forbidden",
+          "do_not_loosen_entries",
+          "do_not_force_open",
+          "expected_gross must cover >=2x round-trip cost"
+        ],
+        "tunable_parameters": [
+          "vol_z_threshold",
+          "atr_threshold",
+          "max_hold_bars"
+        ],
+        "forbidden_transformations": [
+          "inject_oscillator_crutches",
+          "widen SL beyond 0.9%",
+          "swap into Phase1 archived family template",
+          "loosen vol/atr gates to inflate trade count"
+        ],
+        "expected_trade_frequency_class": "selective_lt_1_per_day",
+        "expected_holding_period": "4_to_16_bars",
+        "suitable_symbols": [
+          "BTC-USDT-SWAP"
+        ],
+        "suitable_timeframes": [
+          "15m"
+        ],
+        "phase1_failure_patterns_avoided": [
+          "cost_floor_attractor_high_freq_low_edge",
+          "zero_trade_indicator_mr",
+          "family_label_without_impl_differentiation",
+          "phase1_archived_family_fingerprint"
+        ],
+        "expected_gross_move_pct": 0.5,
+        "expected_gross_move_vs_cost": {
+          "expected_gross_price": 0.005,
+          "round_trip_cost_price_est": 0.0014,
+          "coverage_ratio": 3.571,
+          "gate0_min_coverage": 2.0,
+          "passes_cost_cover": true
+        },
+        "family_levels": {
+          "L1": "F_confirmed_vol_regime_release",
+          "L2": "confirmed_vol_release",
+          "L3": "mech_p2_f_confirmed_vol_release_btc_15m"
+        },
+        "direction_class": "F",
+        "idea_id": "p2_i06"
+      },
+      "meta": {
+        "title": "confirmed_vol_release_short_BTC",
+        "thesis": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "direction": "short",
+        "symbol": "BTC-USDT-SWAP",
+        "timeframe": "15m",
+        "suggested_core_features": [
+          "atr14",
+          "vol_z20",
+          "prev_high20",
+          "prev_low20",
+          "h1_slope4"
+        ],
+        "holding_horizon": "4_to_16_bars",
+        "exploration_direction": "confirmed_vol_regime_release",
+        "idea_id": "p2_i06",
+        "phase2": true
+      },
+      "idea": {
+        "idea_id": "p2_i06",
+        "direction_class": "F",
+        "title": "confirmed vol release short BTC",
+        "family": "confirmed_vol_release",
+        "symbol": "BTC-USDT-SWAP",
+        "tf": "15m",
+        "side": "short",
+        "counterparty": "range longs trapped on downside expansion",
+        "expected_gross_move_pct": 0.5,
+        "status": "formal_candidate"
+      },
+      "pregate": {
+        "pass": true,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.005,
+            "round_trip_cost_price_est": 0.0014,
+            "coverage_ratio": 3.571,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "confirmed_vol_release"
+          },
+          {
+            "PreGateD_data": true,
+            "idea_status": "formal_candidate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "mechanism_spec": {
+        "mechanism_id": "mech_p2_a_cascade_trap_proxy_xrp_15m",
+        "mechanism_name": "cascade_trap_short_XRP",
+        "mechanism_family": "cascade_trap_proxy",
+        "market_inefficiency": "forced long liquidations then failed upside reclaim",
+        "counterparty_source": "forced long liquidations then failed upside reclaim",
+        "why_edge_exists": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "edge_decay_conditions": "vol_z mean-reverts below 0.5; climax not renewed within 3 bars",
+        "required_market_regime": "elevated realized vol with identifiable climax or expansion",
+        "entry_logic": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+        "exit_logic": "exit on vol fade or max hold; fixed SL intact",
+        "stop_logic": "fixed 0.9% SL (ADA production 0.6 untouched; not used here)",
+        "take_profit_logic": "vol fade / structure stall; target covers >2x cost",
+        "invalidation_logic": "vol climax fails to print or close does not confirm direction",
+        "non_negotiable_rules": [
+          "fixed SL 0.9%",
+          "leverage capped at 20x",
+          "initial position 30%",
+          "oscillator_crutches_forbidden",
+          "do_not_loosen_entries",
+          "do_not_force_open",
+          "expected_gross must cover >=2x round-trip cost"
+        ],
+        "tunable_parameters": [
+          "vol_z_threshold",
+          "atr_threshold",
+          "max_hold_bars"
+        ],
+        "forbidden_transformations": [
+          "inject_oscillator_crutches",
+          "widen SL beyond 0.9%",
+          "swap into Phase1 archived family template",
+          "loosen vol/atr gates to inflate trade count"
+        ],
+        "expected_trade_frequency_class": "selective_lt_1_per_day",
+        "expected_holding_period": "4_to_16_bars",
+        "suitable_symbols": [
+          "XRP-USDT-SWAP"
+        ],
+        "suitable_timeframes": [
+          "15m"
+        ],
+        "phase1_failure_patterns_avoided": [
+          "cost_floor_attractor_high_freq_low_edge",
+          "zero_trade_indicator_mr",
+          "family_label_without_impl_differentiation",
+          "phase1_archived_family_fingerprint"
+        ],
+        "expected_gross_move_pct": 0.6,
+        "expected_gross_move_vs_cost": {
+          "expected_gross_price": 0.006,
+          "round_trip_cost_price_est": 0.0016799999999999999,
+          "coverage_ratio": 3.571,
+          "gate0_min_coverage": 2.0,
+          "passes_cost_cover": true
+        },
+        "family_levels": {
+          "L1": "A_forced_flow_liquidation_cascade_proxy",
+          "L2": "cascade_trap_proxy",
+          "L3": "mech_p2_a_cascade_trap_proxy_xrp_15m"
+        },
+        "direction_class": "A",
+        "idea_id": "p2_i07"
+      },
+      "meta": {
+        "title": "cascade_trap_short_XRP",
+        "thesis": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "direction": "short",
+        "symbol": "XRP-USDT-SWAP",
+        "timeframe": "15m",
+        "suggested_core_features": [
+          "atr14",
+          "vol_z20",
+          "prev_high20",
+          "prev_low20",
+          "h1_slope4"
+        ],
+        "holding_horizon": "4_to_16_bars",
+        "exploration_direction": "forced_flow_liquidation_cascade_proxy",
+        "idea_id": "p2_i07",
+        "phase2": true
+      },
+      "idea": {
+        "idea_id": "p2_i07",
+        "direction_class": "A",
+        "title": "cascade trap short XRP",
+        "family": "cascade_trap_proxy",
+        "symbol": "XRP-USDT-SWAP",
+        "tf": "15m",
+        "side": "short",
+        "counterparty": "forced long liquidations then failed upside reclaim",
+        "expected_gross_move_pct": 0.6,
+        "status": "formal_candidate"
+      },
+      "pregate": {
+        "pass": true,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.006,
+            "round_trip_cost_price_est": 0.0016799999999999999,
+            "coverage_ratio": 3.571,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "cascade_trap_proxy"
+          },
+          {
+            "PreGateD_data": true,
+            "idea_status": "formal_candidate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    },
+    {
+      "mechanism_spec": {
+        "mechanism_id": "mech_p2_e_vacuum_fill_impulse_ng_5m",
+        "mechanism_name": "vacuum_fill_impulse_long_NG",
+        "mechanism_family": "vacuum_fill_impulse",
+        "market_inefficiency": "thin-book shorts run by impulse vacuum",
+        "counterparty_source": "thin-book shorts run by impulse vacuum",
+        "why_edge_exists": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "edge_decay_conditions": "vol_z mean-reverts below 0.5; climax not renewed within 3 bars",
+        "required_market_regime": "elevated realized vol with identifiable climax or expansion",
+        "entry_logic": "Enter on Phase2 family proxy: high vol_z + atr gate + directional OHLC structure (see family branch in codex_implement); oscillator crutches forbidden",
+        "exit_logic": "exit on vol fade or max hold; fixed SL intact",
+        "stop_logic": "fixed 0.9% SL (ADA production 0.6 untouched; not used here)",
+        "take_profit_logic": "vol fade / structure stall; target covers >2x cost",
+        "invalidation_logic": "vol climax fails to print or close does not confirm direction",
+        "non_negotiable_rules": [
+          "fixed SL 0.9%",
+          "leverage capped at 20x",
+          "initial position 30%",
+          "oscillator_crutches_forbidden",
+          "do_not_loosen_entries",
+          "do_not_force_open",
+          "expected_gross must cover >=2x round-trip cost"
+        ],
+        "tunable_parameters": [
+          "vol_z_threshold",
+          "atr_threshold",
+          "max_hold_bars"
+        ],
+        "forbidden_transformations": [
+          "inject_oscillator_crutches",
+          "widen SL beyond 0.9%",
+          "swap into Phase1 archived family template",
+          "loosen vol/atr gates to inflate trade count"
+        ],
+        "expected_trade_frequency_class": "selective_lt_1_per_day",
+        "expected_holding_period": "4_to_16_bars",
+        "suitable_symbols": [
+          "NG-USDT-SWAP"
+        ],
+        "suitable_timeframes": [
+          "5m"
+        ],
+        "phase1_failure_patterns_avoided": [
+          "cost_floor_attractor_high_freq_low_edge",
+          "zero_trade_indicator_mr",
+          "family_label_without_impl_differentiation",
+          "phase1_archived_family_fingerprint"
+        ],
+        "expected_gross_move_pct": 0.7,
+        "expected_gross_move_vs_cost": {
+          "expected_gross_price": 0.006999999999999999,
+          "round_trip_cost_price_est": 0.0021,
+          "coverage_ratio": 3.333,
+          "gate0_min_coverage": 2.0,
+          "passes_cost_cover": true
+        },
+        "family_levels": {
+          "L1": "E_volume_aggression_absorption",
+          "L2": "vacuum_fill_impulse",
+          "L3": "mech_p2_e_vacuum_fill_impulse_ng_5m"
+        },
+        "direction_class": "E",
+        "idea_id": "p2_i09"
+      },
+      "meta": {
+        "title": "vacuum_fill_impulse_long_NG",
+        "thesis": "Forced or climax flow creates a temporary dislocation whose mean expected continuation/reclaim exceeds round-trip execution cost",
+        "direction": "long",
+        "symbol": "NG-USDT-SWAP",
+        "timeframe": "5m",
+        "suggested_core_features": [
+          "atr14",
+          "vol_z20",
+          "prev_high20",
+          "prev_low20",
+          "h1_slope4"
+        ],
+        "holding_horizon": "4_to_16_bars",
+        "exploration_direction": "volume_aggression_absorption",
+        "idea_id": "p2_i09",
+        "phase2": true
+      },
+      "idea": {
+        "idea_id": "p2_i09",
+        "direction_class": "E",
+        "title": "vacuum fill impulse long NG",
+        "family": "vacuum_fill_impulse",
+        "symbol": "NG-USDT-SWAP",
+        "tf": "5m",
+        "side": "long",
+        "counterparty": "thin-book shorts run by impulse vacuum",
+        "expected_gross_move_pct": 0.7,
+        "status": "formal_candidate"
+      },
+      "pregate": {
+        "pass": true,
+        "notes": [
+          {
+            "PreGateA_clarity": true
+          },
+          {
+            "PreGateB_cost_cover": true,
+            "expected_gross_price": 0.006999999999999999,
+            "round_trip_cost_price_est": 0.0021,
+            "coverage_ratio": 3.333,
+            "gate0_min_coverage": 2.0,
+            "passes_cost_cover": true
+          },
+          {
+            "PreGateC_novelty": true,
+            "crutches": [],
+            "family": "vacuum_fill_impulse"
+          },
+          {
+            "PreGateD_data": true,
+            "idea_status": "formal_candidate"
+          }
+        ],
+        "gate0_cost_fail": false
+      }
+    }
+  ]
+}

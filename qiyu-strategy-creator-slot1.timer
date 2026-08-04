@@ -1,0 +1,12 @@
+[Unit]
+Description=Run secondary strategy creation slot every hour (offset)
+
+[Timer]
+OnBootSec=20min
+OnUnitInactiveSec=1h
+AccuracySec=1min
+RandomizedDelaySec=120
+Unit=qiyu-strategy-creator-slot1.service
+
+[Install]
+WantedBy=timers.target

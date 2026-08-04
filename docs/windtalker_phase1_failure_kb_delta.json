@@ -1,0 +1,95 @@
+{
+  "generated_at": "2026-07-27 22:58:07",
+  "before_n_phase_start": 4,
+  "before_n_this_run": 20,
+  "after_n": 29,
+  "added_n": 25,
+  "added_n_this_run": 9,
+  "new_records_this_run": [
+    {
+      "task_id": "wsa_20260727_225332_dbd7",
+      "stage": "repair_round3",
+      "family": "liquidity_failed_breakout_high",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:54:10",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225332_dbd7_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225419_cce6",
+      "stage": "gate0",
+      "family": "",
+      "verdict": "blocked_by_failure_kb",
+      "at": "2026-07-27 22:54:24",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225419_cce6_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225410_58ca",
+      "stage": "repair_round3",
+      "family": "mean_reversion_vwap_deviation",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:54:34",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225410_58ca_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225434_6fc8",
+      "stage": "repair_round3",
+      "family": "time_structure_session_breakout",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:55:24",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225434_6fc8_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225524_c811",
+      "stage": "repair_round3",
+      "family": "trend_continuation_thrust_retest",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:56:13",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225524_c811_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225613_f668",
+      "stage": "repair_round3",
+      "family": "vol_regime_compression_release",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:56:31",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225613_f668_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225631_4f2d",
+      "stage": "repair_round3",
+      "family": "liquidity_failed_breakout_low",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:57:01",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225631_4f2d_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225701_fc41",
+      "stage": "repair_round3",
+      "family": "mean_reversion_rsi_extreme",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:57:13",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225701_fc41_strategy_failure_record.json"
+    },
+    {
+      "task_id": "wsa_20260727_225713_5871",
+      "stage": "repair_round3",
+      "family": "mean_reversion_zscore_dislocation",
+      "verdict": "mechanism_viability_fail_archived",
+      "at": "2026-07-27 22:58:07",
+      "path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225713_5871_strategy_failure_record.json"
+    }
+  ],
+  "blocked_families_after": [
+    "breakout_trap_reversal",
+    "liquidity_failed_breakout_high",
+    "mean_reversion_vwap_deviation",
+    "time_structure_session_breakout",
+    "trend_continuation_thrust_retest",
+    "vol_regime_compression_release",
+    "liquidity_failed_breakout_low",
+    "mean_reversion_rsi_extreme",
+    "mean_reversion_zscore_dislocation"
+  ],
+  "lessons_after_n": 14,
+  "vol_z20_fix": true
+}

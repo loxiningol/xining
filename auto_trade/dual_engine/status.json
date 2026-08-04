@@ -1,0 +1,170 @@
+{
+  "schema": "qiyu_dual_engine_status_v1",
+  "updated_at": "2026-08-02 22:33:20",
+  "current_task_id": "wsa_20260802_223318_74e1",
+  "stage": "archived",
+  "stage_label": "归档",
+  "insight_summary": "",
+  "insight_at": null,
+  "evolution": {
+    "size": 0,
+    "best_fitness": null,
+    "generation": 0,
+    "fitness_trend": [],
+    "last_evolve_at": null,
+    "promoted": []
+  },
+  "formal_recent": [],
+  "job": {
+    "running": false,
+    "kind": null,
+    "started_at": null,
+    "error": null
+  },
+  "last_error": null,
+  "workflow": {
+    "workflow_version": "v1",
+    "creation_entry": "legacy",
+    "migration_version": "001",
+    "upgrade_status": "implementing",
+    "acceptance": {
+      "A": null,
+      "B": null,
+      "C": null,
+      "D": null,
+      "E": null,
+      "F": null,
+      "G": null,
+      "H": null
+    },
+    "switched_at": null,
+    "pause": {
+      "non_live_creation": true,
+      "evolve_timer": true
+    },
+    "code_version": "strategy_workflow_v2_step_a_20260726",
+    "recent_failures": [
+      {
+        "task_id": "wsa_20260802_223318_74e1",
+        "strategy_id": "wsa_btc_15m_312fa0",
+        "failure_level": "insufficient_evidence",
+        "created_at": "2026-08-02 22:33:20"
+      }
+    ],
+    "flow": "old"
+  },
+  "auto_driver": {
+    "ok": false,
+    "running": false,
+    "error": "expected an indented block after 'elif' statement on line 80 (live_status.py, line 81)"
+  },
+  "auto_driver_slots": {
+    "ok": false,
+    "slots": [],
+    "capacity": 1,
+    "error": "expected an indented block after 'elif' statement on line 80 (live_status.py, line 81)"
+  },
+  "current_task": {
+    "id": "wsa_20260802_223318_74e1",
+    "stage": "archived",
+    "stage_label": "归档",
+    "focus": {
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "15m",
+      "reason": "windtalker_prebuilt_spec"
+    },
+    "hypothesis_count": 0,
+    "candidate_title": "8.2创造修复后：趋势突破型+衰竭回收型",
+    "sim_wr": null,
+    "formal_wr": null,
+    "updated_at": "2026-08-02 22:33:20",
+    "history": [],
+    "workflow_version": "v2",
+    "exploration_mode": "A",
+    "mechanism_statement": {
+      "forced_actor": "late_panic_sellers_and_breakout_chasers_into_flush",
+      "observable_behavior": "admitted recipe recipe_2602a7eba035fff03c1222c4",
+      "predictable_distortion": "margin_stress; inventory_shock; stop_cascade",
+      "persistence_reason": "margin_stress; inventory_shock; stop_cascade",
+      "counterparty": "late_panic_sellers_and_breakout_chasers_into_flush",
+      "activation_regime": "only the regimes represented in the admitted research sample",
+      "invalidation_regime": "falling_knife_in_persistent_trend; multi_wave_liquidation; catching_mid_impulse_without_confirmation",
+      "causal_entry": "ADMITTED_RECIPE_LOCK {\"event_id\":\"close_z_20_low_AND_volume_z_low_q60\",\"event_kind\":\"mechanism_intersection\",\"event_logic\":\"all\",\"execution_leverage\":20,\"execution_mapping\":\"next_bar_open\",\"exit_policy\":{\"allow_early_take_profit\":false,\"exit_bar\":\"entry_plus_horizon_minus_1\",\"mode\":\"fixed_horizon_close_v1\",\"price\":\"bar_close\"},\"factor\":\"close_z_20\",\"family\":\"mean_reversion\",\"horizon_bars\":12,\"hypothesis_id\":\"H_panic_exhaustion_recovery_001\",\"mechanism_id\":\"panic_exhaustion_recovery_001\",\"primary_cost_per_trade\":0.00236,\"primary_cost_scenario\":\"taker_taker\",\"protective_stop_evaluated\":true,\"protective_stop_policy\":{\"applies_from\":\"entry_bar\",\"mode\":\"intrabar_fixed_pct_v1\",\"precedence\":\"protective_stop_before_time_exit\",\"price_pct\":0.009},\"quantile\":0.6,\"recipe_id\":\"recipe_2602a7eba035fff03c1222c4\",\"required_entry_timing\":{\"mode\":\"next_bar_open\",\"signal_evaluation\":\"closed_bar\",\"timeframe\":\"15m\"},\"research_contract_body_hash\":\"rc_a89eb612fc91cde6a6ce1a40\",\"research_contract_id\":\"rc_a89eb612fc91cde6a6ce1a40\",\"schema\":\"qiyu_admitted_probe_recipe_v1\",\"side\":\"low\",\"statistical_return_basis\":\"full_size_leveraged_after_cost_v1\",\"statistical_returns_are_post_cost\":true,\"terms\":[{\"factor\":\"close_z_20\",\"min_history\":80,\"q\":0.6,\"side\":\"low\",\"threshold_source\":\"prior_only_rolling_quantile\",\"window\":240},{\"factor\":\"volume_z\",\"min_history\":80,\"q\":0.6,\"side\":\"low\",\"threshold_source\":\"prior_only_rolling_quantile\",\"window\":240}],\"trade_direction\":\"long\"}",
+      "causal_exit": "fixed horizon close only",
+      "forbidden_substitutions": [
+        "change admitted recipe family/event/terms/direction/horizon/execution mapping",
+        "replace admitted event with a family template"
+      ]
+    },
+    "fingerprint": {
+      "directionality": "long",
+      "regime_dependency": "only the regimes represented in the admitted research sample",
+      "signal_origin": "admitted recipe recipe_2602a7eba035fff03c1222c4",
+      "entry_trigger_type": "admitted_recipe_lock {\"event_id\":\"close_z_20_low_and_volume_z_low_q60\",\"event_kind\":\"mechanism_intersection\",\"event_logi",
+      "exit_trigger_type": "fixed horizon close only",
+      "mean_reversion_vs_trend": "mean_reversion",
+      "volatility_dependency": "unspecified",
+      "liquidity_dependency": "unspecified",
+      "holding_period": "12_bars",
+      "symbol_dependency": "btc-usdt-swap",
+      "timeframe_dependency": "15m",
+      "counterparty_type": "late_panic_sellers_and_breakout_chasers_into_flush",
+      "mechanism_family": "mean_reversion",
+      "mechanism_id": "panic_exhaustion_recovery_001",
+      "fingerprint_hash": "5305a1d660efe35905d2e48562ea9ace",
+      "family_hash": "6570a337f2513e58462e551fb7838712"
+    },
+    "condition_audit": null,
+    "packs_abc": null,
+    "drift": null,
+    "multidimensional_review": null,
+    "failure_archive": {
+      "schema": "qiyu_failure_archive_v1",
+      "strategy_id": "wsa_btc_15m_312fa0",
+      "mechanism_id": "panic_exhaustion_recovery_001",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "15m",
+      "exploration_mode": "A",
+      "failure_level": "insufficient_evidence",
+      "evidence_scope": {
+        "failed_test": "density_precheck",
+        "packs_keys": []
+      },
+      "failed_test": "density_precheck",
+      "observed_result": "第一次复核·密度拒绝: l0_no_frame,REJECT_TOO_RARE,l0_triggers_lt_30",
+      "expected_result": "step_a_gate_pass",
+      "root_cause_confidence": "medium",
+      "alternative_explanations": [
+        "insufficient_sample",
+        "representation_mismatch"
+      ],
+      "ruled_out_explanations": [
+        "vague_market_unsuitable_claim"
+      ],
+      "unresolved_questions": [
+        "whether_mechanism_exists_under_other_data_grain"
+      ],
+      "reusable_exclusion_rule": {
+        "exclude_if": {
+          "mechanism_family": "panic_exhaustion_recovery_001",
+          "failed_test": "density_precheck",
+          "symbol": "BTC-USDT-SWAP",
+          "timeframe": "15m"
+        },
+        "note": "machine-readable exclusion from structured archive"
+      },
+      "retry_conditions": [
+        "new_data_family",
+        "different_symbol_tf"
+      ],
+      "final_statement": "funnel_l0_cull",
+      "task_id": "wsa_20260802_223318_74e1",
+      "model_call_id": null,
+      "code_version": "strategy_workflow_v2_step_a_20260726",
+      "data_version": "live_frames_v1",
+      "backtest_version": "backtest_engine_v2",
+      "created_at": "2026-08-02 22:33:20"
+    },
+    "failure_level": "insufficient_evidence"
+  }
+}

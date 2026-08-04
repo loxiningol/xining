@@ -143,6 +143,7 @@ def filter_factor_by_ls_weekly(candidate, span_days, constraints=None):
         candidate.get("returns") or [],
         span_days,
         lev_scale=lev,
+        round_trip_cost=ROUND_TRIP_COST,
     )
     row = dict(candidate)
     row["ls_weekly"] = pack

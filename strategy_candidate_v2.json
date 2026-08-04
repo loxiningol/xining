@@ -1,0 +1,308 @@
+{
+  "ok": true,
+  "errors": [],
+  "schema": "qiyu_step_a_v1",
+  "artifact": "strategy_candidate_pack",
+  "call_id": "prebuilt_htf_thrust_vol_climax_range_break_v2",
+  "attempts": 0,
+  "meta": {
+    "symbol": "BTC-USDT-SWAP",
+    "timeframe": "15m",
+    "direction": "long",
+    "title": "htf_thrust_vol_climax_range_break",
+    "thesis": "Prior vol_accepted_donchian_h1_continuation failed L1 sample_payoff_le_1.2 (family KB-blocked). This independent mechanism requires volume climax + meaningful HTF thrust magnitude + intraday ATR expansion vs H1 ATR before accepting a Donchian break, then harvests with max atr_trailing (4.0) and longer hold so winners clear the 1.2 payoff floor after friction.",
+    "source": "handcraft_workflow_v2_candidate_v2_l1_repair",
+    "suggested_core_features": [
+      "prev_high20",
+      "prev_low20",
+      "vol_z20",
+      "atr14",
+      "h1_atr14",
+      "h1_slope4"
+    ],
+    "holding_horizon": "6_to_48_bars_15m",
+    "kb_avoidance": [
+      "vol_accepted_donchian_h1_continuation (blocked; L1 sample_payoff_le_1.2)",
+      "compression_release_structural_breakout",
+      "vol_regime_compression_release / confirmed_vol_release",
+      "trend_continuation_thrust_retest / selective_session_thrust",
+      "fixed micro-TP / fixed % take-profit",
+      "EMA/RSI/MACD template collapse",
+      "tiny-range high WR attractor"
+    ],
+    "prior_fail_task_id": "wsa_20260729_200111_c691",
+    "repair_intent": "raise_selectivity_and_winner_extent_for_payoff_gt_1.2"
+  },
+  "mechanism_spec": {
+    "mechanism_id": "mech_htf_thrust_vol_climax_range_break_btc15m_v2",
+    "mechanism_name": "htf_thrust_vol_climax_range_break",
+    "mechanism_family": "htf_thrust_vol_climax_range_break",
+    "market_inefficiency": "A 20-bar Donchian break only becomes a tradeable dislocation when three conditions co-occur: (1) volume climax (vol_z20 elevated) proves resting liquidity is being consumed, (2) HTF slope has non-trivial magnitude so the cascade has directional drift, and (3) intraday ATR is expanded versus H1 ATR so continuation distance can exceed round-trip friction. Mild-volume flat-ATR breaks are the prior payoff attractor and are explicitly excluded.",
+    "counterparty_source": "Range-bound and breakout-fade accounts with stops beyond the 20-bar extreme; under volume climax their forced covering supplies one-sided flow that HTF thrust prolongs.",
+    "why_edge_exists": "Stop placement beyond recent extremes is inventory management, not instant fair-value arb. Requiring climax volume + HTF thrust magnitude + ATR expansion filters the low-payoff fake breaks that killed the prior Donchian family. Edge is harvested with atr_trailing at the Phase-2 max (n_atr=4.0) rather than clipped by fixed micro-TP.",
+    "edge_decay_conditions": "Breakouts overcrowded with fade liquidity; vol_z collapses; HTF slope magnitude flips/flattens; or ATR expansion vs H1 disappears so continuation cannot cover 20x+fees (payoff attractor ≤1.2).",
+    "required_market_regime": "Directional or transitioning markets with ATR expansion (atr14 vs h1_atr14) and volume climax on range breaks — not deep squeeze chop and not mild-volume Donchian noise.",
+    "entry_logic": "LONG ALL: (1) close cross_above prev_high20; (2) vol_z20 > 1.8 (climax acceptance); (3) h1_slope4 > 0.001 (meaningful HTF thrust, not flat); (4) atr14 > close*0.0025 (room); (5) atr14 > h1_atr14*0.35 (intraday expansion vs HTF); (6) close > open. SHORT mirror with cross_below prev_low20, h1_slope4 < -0.001, close < open.",
+    "exit_logic": "Primary dynamic exit: atr_trailing n_atr=4.0 on ATR_14 (role=take_profit). Protective production stop_loss_pct=0.009 remains engine/daemon-enforced and is not fixed % TP.",
+    "stop_logic": "Hard protective SL 0.9% (stop_loss_pct=0.009) via backtest engine / formal daemon. Do not widen, do not migrate ADA 0.6%, do not invent fixed 1% TP.",
+    "take_profit_logic": "No fixed percentage take-profit. Use Phase-2 atr_trailing with n_atr=4.0 (top of [2.5,4.0]) so winners expand past L1 payoff floor 1.2 after friction.",
+    "invalidation_logic": "swing_extreme lookback=24 as role=invalidation; also max_hold_bars=48.",
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "no_ema_rsi_macd_cci_core_filters",
+      "must_keep_vol_climax_vol_z20",
+      "must_keep_htf_thrust_magnitude",
+      "must_keep_atr_expansion_vs_h1",
+      "must_use_atr_trailing_and_or_swing_extreme",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm"
+    ],
+    "tunable_parameters": [
+      "vol_z20_min",
+      "h1_slope_min_abs",
+      "atr_floor_scale",
+      "atr_vs_h1_scale",
+      "atr_trail_n",
+      "swing_lookback",
+      "max_hold_bars"
+    ],
+    "forbidden_transformations": [
+      "rename_back_to_vol_accepted_donchian_h1_continuation",
+      "convert_to_atr_squeeze_compression_release_clone",
+      "swap_into_phase1_archived_family_template",
+      "add_fixed_micro_tp_below_2pct",
+      "remove_vol_climax_or_htf_thrust_filters",
+      "loosen_gates_only_to_inflate_trade_count",
+      "weaken_or_widen_0.9_protective_sl"
+    ],
+    "expected_trade_frequency_class": "selective_0.15_to_0.8_per_day_15m",
+    "expected_holding_period": "6_to_48_bars_15m",
+    "suitable_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "XAU-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "PEPE-USDT-SWAP"
+    ],
+    "suitable_timeframes": [
+      "5m",
+      "15m",
+      "1h"
+    ]
+  },
+  "dsl": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "htf_thrust_vol_climax_range_break_btc15m_long_v2",
+    "name": "htf_thrust_vol_climax_range_break_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": ["BTC-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {
+          "id": "e_break_high",
+          "left": {"feature": "close"},
+          "op": "cross_above",
+          "right": {"feature": "prev_high20"}
+        },
+        {
+          "id": "e_vol_climax",
+          "left": {"feature": "vol_z20"},
+          "op": "gt",
+          "right": {"value": 1.8}
+        },
+        {
+          "id": "e_htf_thrust",
+          "left": {"feature": "h1_slope4"},
+          "op": "gt",
+          "right": {"value": 0.001}
+        },
+        {
+          "id": "e_atr_room",
+          "left": {"feature": "atr14"},
+          "op": "gt",
+          "right": {"feature": "close", "scale": 0.0025}
+        },
+        {
+          "id": "e_atr_expand_vs_h1",
+          "left": {"feature": "atr14"},
+          "op": "gt",
+          "right": {"feature": "h1_atr14", "scale": 0.35}
+        },
+        {
+          "id": "e_dir_candle",
+          "left": {"feature": "close"},
+          "op": "gt",
+          "right": {"feature": "open"}
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_swing_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 24,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|htf_thrust_vol_climax_range_break|sl0.9|no_fixed_tp|atr_trail_4.0|swing_inv_24|btc15m_long|v2_l1_repair",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 2,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "htf_thrust_vol_climax_range_break_btc15m_long_v2",
+    "name": "htf_thrust_vol_climax_range_break_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": ["BTC-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {
+          "id": "e_break_high",
+          "left": {"feature": "close"},
+          "op": "cross_above",
+          "right": {"feature": "prev_high20"}
+        },
+        {
+          "id": "e_vol_climax",
+          "left": {"feature": "vol_z20"},
+          "op": "gt",
+          "right": {"value": 1.8}
+        },
+        {
+          "id": "e_htf_thrust",
+          "left": {"feature": "h1_slope4"},
+          "op": "gt",
+          "right": {"value": 0.001}
+        },
+        {
+          "id": "e_atr_room",
+          "left": {"feature": "atr14"},
+          "op": "gt",
+          "right": {"feature": "close", "scale": 0.0025}
+        },
+        {
+          "id": "e_atr_expand_vs_h1",
+          "left": {"feature": "atr14"},
+          "op": "gt",
+          "right": {"feature": "h1_atr14", "scale": 0.35}
+        },
+        {
+          "id": "e_dir_candle",
+          "left": {"feature": "close"},
+          "op": "gt",
+          "right": {"feature": "open"}
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_swing_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 24,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|htf_thrust_vol_climax_range_break|sl0.9|no_fixed_tp|atr_trail_4.0|swing_inv_24|btc15m_long|v2_l1_repair",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 2,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "htf_thrust_vol_climax_range_break_btc15m_short_v2",
+    "name": "htf_thrust_vol_climax_range_break_short",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": ["BTC-USDT-SWAP"],
+    "entry": {
+      "all": [
+        {
+          "id": "e_break_low",
+          "left": {"feature": "close"},
+          "op": "cross_below",
+          "right": {"feature": "prev_low20"}
+        },
+        {
+          "id": "e_vol_climax",
+          "left": {"feature": "vol_z20"},
+          "op": "gt",
+          "right": {"value": 1.8}
+        },
+        {
+          "id": "e_htf_thrust",
+          "left": {"feature": "h1_slope4"},
+          "op": "lt",
+          "right": {"value": -0.001}
+        },
+        {
+          "id": "e_atr_room",
+          "left": {"feature": "atr14"},
+          "op": "gt",
+          "right": {"feature": "close", "scale": 0.0025}
+        },
+        {
+          "id": "e_atr_expand_vs_h1",
+          "left": {"feature": "atr14"},
+          "op": "gt",
+          "right": {"feature": "h1_atr14", "scale": 0.35}
+        },
+        {
+          "id": "e_dir_candle",
+          "left": {"feature": "close"},
+          "op": "lt",
+          "right": {"feature": "open"}
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_swing_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 24,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|htf_thrust_vol_climax_range_break|sl0.9|no_fixed_tp|atr_trail_4.0|swing_inv_24|btc15m_short|v2_l1_repair",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 2,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  }
+}

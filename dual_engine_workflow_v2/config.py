@@ -91,10 +91,14 @@ CONDITION_CLASSIFICATIONS = (
 
 CONDITION_ACTIONS = ("retain", "revise", "remove", "reject_strategy")
 
-# Traditional indicators forbidden as core edge / unapproved Codex injects
+# Traditional indicators forbidden as *unauthorized* Codex invents.
+# Formally mapped recipe factors (rsi14 / bb_*) are authorized via admitted recipe.
 FORBIDDEN_CORE_FEATURES = (
-    "rsi", "macd", "ema", "sma", "boll", "bb_", "supertrend", "adx",
+    "macd", "ema", "sma", "supertrend", "adx",
     "cci",  # also used by legacy repair — blocked unless GLM-approved
+    # Keep "boll"/"rsi" tokens for narrative injection bans; recipe-authorized
+    # dsl features still pass via allowed_features from GENERIC_FACTOR_TO_DSL.
+    "bollinger_fade",
 )
 
 

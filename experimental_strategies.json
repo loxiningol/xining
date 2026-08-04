@@ -1,0 +1,1701 @@
+{
+  "mode": "description_and_params_layer_only",
+  "note": "7.7.5.5阶段保护 param_meta.label，不让前端保存时覆盖中文标签；新增参数默认范围收窄。仍不影响真实回测逻辑。",
+  "schema_version": "7.7.5.5",
+  "strategies": [
+    {
+      "description": "EMA7上升趋势回踩续涨实验做多策略；由旧CCI窄区间正式策略降级并完成逻辑重构。",
+      "direction": "做多",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "已启用BTC自动交易｜按当前行情动态复核",
+      "qualification_forward_start_beijing": "2026-07-19 23:13",
+      "research_trial_count": 12960,
+      "exit": "价格相对开仓价上涨0.6%，或CCI大于等于160，或K值大于等于80时止盈；止损按当前参数。",
+      "group": "实验策略",
+      "key": "cci_75_100",
+      "name": "EMA7上升趋势回踩续涨",
+      "modified_at_beijing": "2026.7.19 23:47",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_exit_greater_equal": {
+          "label": "CCI止盈大于等于",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "ema38_growth_24h_min_pct": {
+          "label": "EMA38过去24小时最小涨幅（百分比）",
+          "max": 20,
+          "min": -20,
+          "step": 0.1
+        },
+        "k_exit_greater_equal": {
+          "label": "K值止盈大于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "kd_diff_max_exclusive": {
+          "label": "K-D差值上限（严格小于）",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "price_take_profit_pct": {
+          "label": "价格止盈比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": 100,
+        "cci_entry_min": 20,
+        "cci_exit_greater_equal": 160,
+        "ema38_growth_24h_min_pct": 0.2,
+        "k_exit_greater_equal": 80,
+        "kd_diff_max_exclusive": 5,
+        "price_take_profit_pct": 0.006,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "EMA7 > EMA23 > EMA38；EMA38过去24小时涨幅大于等于0.2%；阳线；最低价小于等于EMA7且收盘价大于等于EMA7，形成回踩收复；当前与前一根K线的最低价均高于各自EMA38；K值大于D值且K-D严格小于5；CCI位于20至100；MACD柱大于0且较前一根净增加。",
+      "version": "v2.3-btc-auto-trade-reenabled"
+    },
+    {
+      "description": "EMA19反抽失败后，EMA6与EMA75同步破位确认的实验做空策略。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "止盈：记录触发K线CCI为x，后续K线CCI小于等于x-100，或J值小于等于-10；止损：按当前止损参数。",
+      "group": "实验策略",
+      "key": "early_downtrend_ema6_ema75_short",
+      "name": "EMA19反抽失败·EMA6/EMA75同步破位",
+      "modified_at_beijing": "2026.7.19 21:16",
+      "param_meta": {
+        "ema19_slope_lookback": {"label": "EMA19转弱回看K线数", "min": 1, "max": 48, "step": 1},
+        "ema19_growth_max_pct": {"label": "EMA19允许最大涨幅百分比", "min": -10, "max": 10, "step": 0.01},
+        "ema19_retest_lookback": {"label": "EMA19反抽回看K线数", "min": 1, "max": 48, "step": 1},
+        "entry_atr_period": {"label": "实体强度ATR周期", "min": 2, "max": 100, "step": 1},
+        "entry_body_atr_min": {"label": "触发阴线最小实体ATR倍数", "min": 0, "max": 10, "step": 0.01},
+        "exit_cci_drop": {"label": "止盈CCI相对触发值下降", "min": 1, "max": 300, "step": 1},
+        "exit_j_less_equal": {"label": "止盈J值上限", "min": -200, "max": 200, "step": 0.1},
+        "stop_loss_pct": {"label": "止损比例", "min": 0.0001, "max": 0.2, "step": 0.0001}
+      },
+      "params": {
+        "ema19_slope_lookback": 6,
+        "ema19_growth_max_pct": 0,
+        "ema19_retest_lookback": 8,
+        "entry_atr_period": 14,
+        "entry_body_atr_min": 0.7,
+        "exit_cci_drop": 100,
+        "exit_j_less_equal": -10,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "阴线；开盘价同时高于当根EMA6与EMA75，收盘价同时低于当根EMA6与EMA75；收盘价低于前一根K线开盘价；EMA6与EMA75均低于EMA19和EMA53，且EMA6大于等于EMA75；触发K线前8根中至少一根最高价大于等于其对应EMA19；当前EMA19小于等于向前第6根EMA19；阴线实体大于等于ATR(14)的0.7倍；K值小于D值。",
+      "version": "v2.0-ema19-retest-failure-ema6-ema75-break-short"
+    },
+    {
+      "description": "由AI独立研究创建：EMA53保持平稳向上时，对前36小时最低点进行流动性扫荡并重新收回的高质量低频实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "已启用BTC自动交易｜按当前行情动态复核",
+      "qualification_forward_start_beijing": "2026-07-19 23:13",
+      "research_trial_count": 1489,
+      "exit": "止盈：记录触发K线CCI为x，后续K线CCI大于等于x+80；定时退出：开仓后18小时仍未止盈/止损则强制平仓；止损：按当前止损参数。",
+      "group": "实验策略",
+      "key": "ema53_liquidity_sweep_reclaim_long",
+      "name": "EMA53缓升｜36小时低点扫荡收回（AI创造）",
+      "modified_at_beijing": "2026.7.19 23:47",
+      "param_meta": {
+        "sweep_lookback": {"label": "前序低点扫荡回看K线数", "min": 2, "max": 200, "step": 1},
+        "ema53_growth_lookback": {"label": "EMA53趋势回看K线数", "min": 1, "max": 200, "step": 1},
+        "ema53_growth_min_pct": {"label": "EMA53允许最小涨幅百分比", "min": -10, "max": 10, "step": 0.01},
+        "entry_atr_period": {"label": "下影线强度ATR周期", "min": 2, "max": 100, "step": 1},
+        "lower_wick_atr_min": {"label": "最小下影线ATR倍数", "min": 0, "max": 10, "step": 0.01},
+        "entry_d_less_equal": {"label": "触发D值上限", "min": -100, "max": 200, "step": 0.1},
+        "entry_k_net_increase_min": {"label": "触发K值最小净增加", "min": -100, "max": 100, "step": 0.1},
+        "exit_cci_increase": {"label": "止盈CCI相对触发值增加", "min": 1, "max": 300, "step": 1},
+        "max_hold_hours": {"label": "最大持仓小时数", "min": 1, "max": 240, "step": 1},
+        "stop_loss_pct": {"label": "止损比例", "min": 0.0001, "max": 0.2, "step": 0.0001}
+      },
+      "params": {
+        "entry_requires_directional_candle": 0,
+        "sweep_lookback": 36,
+        "ema53_growth_lookback": 24,
+        "ema53_growth_min_pct": -0.05,
+        "entry_atr_period": 14,
+        "lower_wick_atr_min": 0.7,
+        "entry_d_less_equal": 35,
+        "entry_k_net_increase_min": 0,
+        "exit_cci_increase": 80,
+        "max_hold_hours": 18,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "触发K线最低价严格低于其前36根K线最低价、但收盘价重新高于该前36根最低价；EMA53最近24小时涨幅大于等于-0.05%；下影线长度大于等于ATR(14)的0.7倍；D值小于等于35；K值相较前一根不下降。",
+      "version": "v1.3-btc-auto-trade-reenabled"
+    },
+    {
+      "description": "常规下跌均线排列后的筑底上行实验做多策略。",
+      "direction": "做多",
+      "enabled": false,
+      "auto_trade_eligible": false,
+      "live_enabled": false,
+      "offline": true,
+      "offline_reason": "human_policy_cannot_open_delete",
+      "exit": "止盈：若触发K线K值小于50，则K值大于等于60时止盈；若触发K线K值大于等于50，则J值大于90时止盈；止损：按当前止损参数。",
+      "group": "实验策略",
+      "key": "conventional_down_arrangement_bottom_up_long",
+      "name": "常规下跌排列筑底上行",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "entry_j_cross_level_exclusive": {"label": "J值上穿阈值（严格）", "min": -100, "max": 200, "step": 0.1},
+        "entry_kd_abs_difference_max_exclusive": {"label": "当前与前8根K-D绝对差上限（不含）", "min": 0, "max": 100, "step": 0.1},
+        "entry_k_branch_threshold": {"label": "触发K值分支线", "min": -100, "max": 200, "step": 0.1},
+        "exit_k_for_low_entry_k_greater_equal": {"label": "低K触发后的止盈K值", "min": -100, "max": 200, "step": 0.1},
+        "exit_j_for_high_entry_k_greater_than": {"label": "高K触发后的止盈J值", "min": -100, "max": 200, "step": 0.1},
+        "stop_loss_pct": {"label": "止损比例", "min": 0.0001, "max": 0.2, "step": 0.0001}
+      },
+      "params": {
+        "entry_j_cross_level_exclusive": 30,
+        "entry_kd_abs_difference_max_exclusive": 4,
+        "entry_k_branch_threshold": 50,
+        "exit_k_for_low_entry_k_greater_equal": 60,
+        "exit_j_for_high_entry_k_greater_than": 90,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "EMA75 > EMA53 > EMA17 > EMA6；阳线；触发K线K值大于D值；触发K线K值与D值差值的绝对值小于4；向前第8根K线K值与D值差值的绝对值小于4；并且须满足以下两项中的任意一项：①触发K线J值大于30且前一根K线J值小于30；②触发K线K值大于D值且前一根K线K值小于D值；触发K线收盘价大于向前第8根K线开盘价；触发K线CCI值大于向前第8根K线CCI值。",
+      "version": "v2.0-conventional-down-arrangement-bottom-up-long"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "K ≥ 86.5 或 CCI > 135。",
+      "group": "实验策略",
+      "key": "ema7_break_long",
+      "name": "ema7突破",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_exit_greater_than": {
+          "label": "CCI止盈大于",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "k_exit_greater_equal": {
+          "label": "K值止盈大于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": 110,
+        "cci_entry_min": 40,
+        "cci_exit_greater_than": 135,
+        "k_exit_greater_equal": 86.5,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "EMA32 < EMA23 < EMA8 < EMA7；实体上穿 EMA7；CCI 40 ~ 110。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做空策略。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "K ≤ 13.5 或 CCI < -135。",
+      "group": "实验策略",
+      "key": "ema7_break_short",
+      "name": "ema7破位",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_exit_less_than": {
+          "label": "CCI止盈小于",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "k_exit_less_equal": {
+          "label": "K值止盈小于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": -40,
+        "cci_entry_min": -110,
+        "cci_exit_less_than": -135,
+        "k_exit_less_equal": 13.5,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "EMA7 < EMA8 < EMA23 < EMA32；实体下穿 EMA7；CCI -110 ~ -40。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "K > 78 且 J > 78，或 J > 105。",
+      "group": "实验策略",
+      "key": "ema8_mainwave_long",
+      "name": "ema8主升浪",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_cross_level": {
+          "label": "CCI穿越阈值",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "d_entry_less_than": {
+          "label": "D值入场小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_entry_less_than": {
+          "label": "J值入场小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_exit_greater_than": {
+          "label": "J值止盈大于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_max": {
+          "label": "K值入场上限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_min": {
+          "label": "K值入场下限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_cross_level": -60,
+        "d_entry_less_than": 70,
+        "j_entry_less_than": 85,
+        "j_exit_greater_than": 105,
+        "k_entry_max": 70,
+        "k_entry_min": 45,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "EMA32 > EMA7 > EMA8；45 ≤ K ≤ 70；D < 70；J < 85；MACD 柱 > 0；CCI 上穿 -60（前值 ≤ -60，当前 > -60）。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做空策略。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "K < 22 且 J < 22。",
+      "group": "实验策略",
+      "key": "ema8_mainwave_short",
+      "name": "ema8主降浪",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_cross_level": {
+          "label": "CCI穿越阈值",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "d_entry_greater_than": {
+          "label": "D值入场大于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_entry_greater_than": {
+          "label": "J值入场大于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_exit_less_than": {
+          "label": "J值止盈小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_max": {
+          "label": "K值入场上限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_min": {
+          "label": "K值入场下限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_exit_less_than": {
+          "label": "K值止盈小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_cross_level": 60,
+        "d_entry_greater_than": 30,
+        "j_entry_greater_than": 15,
+        "j_exit_less_than": 22,
+        "k_entry_max": 55,
+        "k_entry_min": 30,
+        "k_exit_less_than": 22,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "EMA32 < EMA7 < EMA8；30 ≤ K ≤ 55；D > 30；J > 15；MACD 柱 < 0；CCI 下穿 60（前值 ≥ 60，当前 < 60）。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "J > 50。",
+      "group": "实验策略",
+      "key": "ema7_cross_long",
+      "name": "EMA7上穿",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "j_entry_max": {
+          "label": "J值入场上限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_entry_min": {
+          "label": "J值入场下限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_exit_greater_than": {
+          "label": "J值止盈大于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": -50,
+        "cci_entry_min": -110,
+        "j_entry_max": 50,
+        "j_entry_min": 21,
+        "j_exit_greater_than": 50,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "EMA7 > EMA23 > EMA32；收盘价位于 EMA8 与 EMA32 区间内；阳线；开盘价低于 EMA7；收盘价高于 EMA7；21 ≤ J ≤ 50；CCI -110 ~ -50。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "CCI > 145。",
+      "group": "实验策略",
+      "key": "cci_110_135_long",
+      "name": "CCI 110-135",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_exit_greater_than": {
+          "label": "CCI止盈大于",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "no_ema_cross_bars": {
+          "label": "无均线交叉观察根数",
+          "max": 300,
+          "min": 1,
+          "step": 1
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": 135,
+        "cci_entry_min": 110,
+        "cci_exit_greater_than": 145,
+        "no_ema_cross_bars": 10,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "触碰 EMA7；EMA7 > EMA23 > EMA38；K > D；MACD 柱 > 0；CCI 110 ~ 135；前 10 根无 EMA7 / EMA23 交叉。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做空策略。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "J ≤ 56。",
+      "group": "实验策略",
+      "key": "j_cross_79_short",
+      "name": "J值下穿79",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "j_cross_level": {
+          "label": "J值穿越阈值",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_exit_less_equal": {
+          "label": "J值止盈小于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_less_than": {
+          "label": "K值入场小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "no_ema_cross_bars": {
+          "label": "无均线交叉观察根数",
+          "max": 300,
+          "min": 1,
+          "step": 1
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "j_cross_level": 79,
+        "j_exit_less_equal": 56,
+        "k_entry_less_than": 85,
+        "no_ema_cross_bars": 10,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "阴线触碰 EMA7；EMA7 > EMA23 > EMA38；K > D；K < 85；J 从 79 上方下穿到 79 下方；前 10 根无 EMA7 / EMA23 交叉。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "K > 47 或 J > 53。",
+      "group": "实验策略",
+      "key": "cci75_110_long",
+      "name": "cci75-110逆向做多",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "j_exit_greater_than": {
+          "label": "J值止盈大于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_max": {
+          "label": "K值入场上限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_min": {
+          "label": "K值入场下限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_exit_greater_than": {
+          "label": "K值止盈大于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": -75,
+        "cci_entry_min": -110,
+        "j_exit_greater_than": 53,
+        "k_entry_max": 45,
+        "k_entry_min": 30,
+        "k_exit_greater_than": 47,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "阳线触碰 EMA7；CCI -110 ~ -75；30 < K < 45；K > D；MACD 柱 > 0 且较前一根净增长；EMA7 < EMA23 < EMA38；前 10 根无 EMA7 / EMA23 交叉。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "J ≥ 25。",
+      "group": "实验策略",
+      "key": "j_cross_7_8_long",
+      "name": "J上穿7.8小调整",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "d_entry_less_than": {
+          "label": "D值入场小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_cross_level": {
+          "label": "J值穿越阈值",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_exit_greater_equal": {
+          "label": "J值止盈大于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": -100,
+        "cci_entry_min": -250,
+        "d_entry_less_than": 20,
+        "j_cross_level": 7.8,
+        "j_exit_greater_equal": 25,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "CCI -250 ~ -100；J 从 7.8 下方向上穿越 7.8；D < 20；K < D；EMA7 < EMA23 < EMA38；前 10 根无 EMA7 / EMA23 交叉。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "J ≥ 50。",
+      "group": "实验策略",
+      "key": "cci_less_neg170_long",
+      "name": "cci小于负170蓄能回调主升浪",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_less_than": {
+          "label": "CCI入场小于",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "j_exit_greater_equal": {
+          "label": "J值止盈大于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_cross_level": {
+          "label": "K值穿越阈值",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_less_than": -170,
+        "j_exit_greater_equal": 50,
+        "k_cross_level": 15,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "阳线；CCI < -170；K 从 15 下方向上穿越 15；K < D；收盘价低于前一根开盘价；前 10 根无 EMA7 / EMA23 交叉。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做空策略。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "J ≤ 18。",
+      "group": "实验策略",
+      "key": "cci_neg60_neg110_short",
+      "name": "CCI负60-负110下行中再下行",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "d_entry_less_than": {
+          "label": "D值入场小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "d_minus_k_max": {
+          "label": "D-K最大差值",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_exit_less_equal": {
+          "label": "J值止盈小于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": -60,
+        "cci_entry_min": -110,
+        "d_entry_less_than": 40,
+        "d_minus_k_max": 2,
+        "j_exit_less_equal": 18,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "阴线触碰 EMA7；EMA7 < EMA23 < EMA38；D < 40；K ≤ D；D-K ≤ 2；CCI -110 ~ -60；前 10 根无 EMA7 / EMA23 交叉。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "J ≥ 48。",
+      "group": "实验策略",
+      "key": "cci_neg110_neg180_long",
+      "name": "cci负110到负180（逆向做多）",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "cci_entry_max": {
+          "label": "CCI入场上限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "cci_entry_min": {
+          "label": "CCI入场下限",
+          "max": 500,
+          "min": -500,
+          "step": 1
+        },
+        "d_entry_less_than": {
+          "label": "D值入场小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_entry_less_than": {
+          "label": "J值入场小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_exit_greater_equal": {
+          "label": "J值止盈大于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_less_than": {
+          "label": "K值入场小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "cci_entry_max": -110,
+        "cci_entry_min": -180,
+        "d_entry_less_than": 30,
+        "j_entry_less_than": 30,
+        "j_exit_greater_equal": 48,
+        "k_entry_less_than": 30,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "收盘价 ≤ EMA7；K ≤ D；K < 30；D < 30；J < 30；CCI -180 ~ -110；CCI、K、D、J 均较前一根上升；EMA7 < EMA23 < EMA38；前 10 根无 EMA7 / EMA23 交叉。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做空策略。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "K ≤ 35 且 J ≤ 35。",
+      "group": "实验策略",
+      "key": "ema7_ema23_down_short",
+      "name": "ema7 ema23均线下跌",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "j_entry_greater_than": {
+          "label": "J值入场大于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "j_exit_less_equal": {
+          "label": "J值止盈小于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_greater_than": {
+          "label": "K值入场大于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_max": {
+          "label": "K值入场上限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_entry_min": {
+          "label": "K值入场下限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "k_exit_less_equal": {
+          "label": "K值止盈小于等于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "kd_diff_max": {
+          "label": "K-D差值上限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "kd_diff_min": {
+          "label": "K-D差值下限",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        }
+      },
+      "params": {
+        "j_entry_greater_than": 37,
+        "j_exit_less_equal": 35,
+        "k_entry_greater_than": 37,
+        "k_entry_max": 60,
+        "k_entry_min": 50,
+        "k_exit_less_equal": 35,
+        "kd_diff_max": 8,
+        "kd_diff_min": 3,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "阴线；EMA7 < EMA53 且 EMA23 < EMA53；价格同时触及 EMA7 与 EMA23；收盘价 < EMA7；50 ≤ K < 60；J > 37 且 K > 37；3 < K-D < 8；当前及前一根最高价均低于 EMA53。",
+      "version": "v7.1-desc"
+    },
+    {
+      "description": "实验做空策略。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "止盈（j小于36.5且d小于62且cci小于负89）；止损：按当前止损参数。",
+      "group": "实验策略",
+      "key": "ema7_center_down_short",
+      "name": "ema6居中后再下行",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "j_exit_less_than": {
+          "label": "J值止盈小于",
+          "max": 150,
+          "min": -50,
+          "step": 0.5
+        },
+        "kd_diff_max": {
+          "label": "K-D 最大值",
+          "min": -50,
+          "max": 50,
+          "step": 0.5
+        },
+        "kd_diff_min": {
+          "label": "K-D 最小值",
+          "min": -50,
+          "max": 50,
+          "step": 0.5
+        },
+        "lookback_ema_order_bars": {
+          "label": "均线排列回看根数",
+          "max": 300,
+          "min": 1,
+          "step": 1
+        },
+        "lookback_green_bars": {
+          "label": "阳线回看根数",
+          "max": 300,
+          "min": 1,
+          "step": 1
+        },
+        "require_high_less_than_ema95": {
+          "label": "要求最高价低于EMA95",
+          "max": 1,
+          "min": 0,
+          "step": 1
+        },
+        "required_green_close_count": {
+          "label": "要求阳线数量",
+          "max": 300,
+          "min": 1,
+          "step": 1
+        },
+        "stop_loss_pct": {
+          "label": "止损比例",
+          "max": 0.2,
+          "min": 0.0001,
+          "step": 0.0001
+        },
+        "class2_j_exit_less_than": {
+          "label": "止盈J小于",
+          "min": 0,
+          "max": 100,
+          "step": 0.1
+        },
+        "lookback_prev_k_ge_d_bars": {
+          "label": "信号前K>=D回看根数",
+          "min": 1,
+          "max": 20,
+          "step": 1
+        },
+        "signal_cci_less_than": {
+          "label": "信号CCI(62)小于",
+          "min": -300,
+          "max": 300,
+          "step": 1
+        },
+        "signal_k_drop_min": {
+          "label": "信号K值较前一根至少下降",
+          "min": 0,
+          "max": 50,
+          "step": 0.1
+        },
+        "require_green_close_above_ema19": {
+          "label": "计入阳线必须收盘价大于EMA19",
+          "min": 0,
+          "max": 1,
+          "step": 1
+        },
+        "signal_d_less_than": {
+          "label": "触发D值小于",
+          "min": 0,
+          "max": 100,
+          "step": 0.1
+        },
+        "prev_cci_greater_than": {
+          "label": "前5根至少一根CCI大于",
+          "min": -300,
+          "max": 300,
+          "step": 1
+        },
+        "lookback_prev_cci_gt_bars": {
+          "label": "前罬CI检查K线数",
+          "min": 1,
+          "max": 20,
+          "step": 1
+        },
+        "exit_d_less_than": {
+          "label": "止盈D小于",
+          "min": 0,
+          "max": 100,
+          "step": 0.1
+        },
+        "exit_cci_less_than": {
+          "label": "止盈CCI小于",
+          "min": -300,
+          "max": 300,
+          "step": 1
+        },
+        "trigger_j_less_than": {
+          "label": "触发K线及前5根共6根J值小于",
+          "min": 0,
+          "max": 200,
+          "step": 0.1
+        },
+        "lookback_trigger_j_lt_bars": {
+          "label": "向前检查J值K线数，不含触发K线",
+          "min": 1,
+          "max": 20,
+          "step": 1
+        },
+        "prev_cci_max_less_than": {
+          "label": "前5根CCI最大值小于",
+          "min": -300,
+          "max": 300,
+          "step": 0.1
+        },
+        "lookback_prev_cci_max_lt_bars": {
+          "label": "前置CCI最大值检查K线数",
+          "min": 1,
+          "max": 20,
+          "step": 1
+        }
+      },
+      "params": {
+        "j_exit_less_than": 35,
+        "kd_diff_max": 6,
+        "kd_diff_min": -3,
+        "lookback_ema_order_bars": 5,
+        "lookback_green_bars": 5,
+        "require_high_less_than_ema95": 1,
+        "required_green_close_count": 3,
+        "stop_loss_pct": 0.009,
+        "class2_j_exit_less_than": 36.5,
+        "lookback_prev_k_ge_d_bars": 5,
+        "signal_cci_less_than": -15,
+        "signal_k_drop_min": 1.5,
+        "require_green_close_above_ema19": 1,
+        "signal_d_less_than": 76,
+        "prev_cci_greater_than": -50,
+        "lookback_prev_cci_gt_bars": 5,
+        "exit_d_less_than": 62,
+        "exit_cci_less_than": -89,
+        "trigger_j_less_than": 106.5,
+        "lookback_trigger_j_lt_bars": 5,
+        "prev_cci_max_less_than": 3.5,
+        "lookback_prev_cci_max_lt_bars": 5
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "阴线；-3 <= K-D <= 6；触发K线的D值须小于76；触发K线的前5根K线须存在至少一根K线的CCI值大于-50；信号K线的KDJ K值必须小于前一根K线的KDJ K值且二者差值大于等于1.5；信号K线的 CCI(62) 值必须小于 -15；信号K线的前 5 根K线的 KDJ K值均大于等于D值；EMA6 < EMA53；最高价 < EMA95；当前或前 5 根内出现过 EMA53 > EMA6 > EMA19；收盘价低于前 5 根中至少 3 根阳线的收盘价，且这 3 根被计入的阳线必须各自满足收盘价大于当根 EMA19；触发K线及其前5根K线共6根K线的J值均小于106.5；触发K线的前5根K线的CCI最大值须小于3.5。",
+      "version": "v8.2-strict-v3-ema6-active"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "止盈（J大于53.5且D大于38且CCI大于89）；止损：按当前止损参数。",
+      "group": "实验策略",
+      "key": "ema7_center_up_long",
+      "name": "ema6居中后再上行",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "dk_diff_min": {"label": "D-K 最小值", "min": -50, "max": 50, "step": 0.5},
+        "dk_diff_max": {"label": "D-K 最大值", "min": -50, "max": 50, "step": 0.5},
+        "lookback_bars": {"label": "前置条件回看K线数", "min": 1, "max": 20, "step": 1},
+        "signal_d_greater_than": {"label": "触发D值大于", "min": 0, "max": 100, "step": 0.1},
+        "prev_cci_less_than": {"label": "前5根至少一根CCI小于", "min": -300, "max": 300, "step": 1},
+        "prev_cci_min_greater_than": {"label": "前5根CCI最小值大于", "min": -300, "max": 300, "step": 0.1},
+        "signal_k_rise_min": {"label": "信号K值较前一根至少上升", "min": 0, "max": 50, "step": 0.1},
+        "signal_cci_greater_than": {"label": "信号CCI(62)大于", "min": -300, "max": 300, "step": 1},
+        "required_bearish_close_count": {"label": "要求阴线数量", "min": 1, "max": 20, "step": 1},
+        "trigger_j_greater_than": {"label": "触发K线及前5根共6根J值大于", "min": -200, "max": 200, "step": 0.1},
+        "exit_j_greater_than": {"label": "止盈J大于", "min": -100, "max": 200, "step": 0.1},
+        "exit_d_greater_than": {"label": "止盈D大于", "min": 0, "max": 100, "step": 0.1},
+        "exit_cci_greater_than": {"label": "止盈CCI大于", "min": -300, "max": 300, "step": 1},
+        "stop_loss_pct": {"label": "止损比例", "min": 0.0001, "max": 0.2, "step": 0.0001}
+      },
+      "params": {
+        "dk_diff_min": -3,
+        "dk_diff_max": 6,
+        "lookback_bars": 5,
+        "signal_d_greater_than": 24,
+        "prev_cci_less_than": 50,
+        "prev_cci_min_greater_than": -3.5,
+        "signal_k_rise_min": 1.5,
+        "signal_cci_greater_than": 15,
+        "required_bearish_close_count": 3,
+        "trigger_j_greater_than": -6.5,
+        "exit_j_greater_than": 53.5,
+        "exit_d_greater_than": 38,
+        "exit_cci_greater_than": 89,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "阳线；-3 <= D-K <= 6；触发K线的D值须大于24；触发K线的前5根K线须存在至少一根K线的CCI值小于50；信号K线的KDJ K值必须大于前一根K线的KDJ K值且二者差值大于等于1.5；信号K线的CCI(62)值必须大于15；信号K线的前5根K线的KDJ D值均大于等于K值；EMA6 > EMA53；最低价 > EMA95；当前或前5根内出现过EMA53 < EMA6 < EMA19；收盘价高于前5根中至少3根阴线的收盘价，且这3根被计入的阴线必须各自满足收盘价小于当根EMA19；触发K线及其前5根K线共6根K线的J值均大于-6.5；触发K线的前5根K线的CCI最小值须大于-3.5。",
+      "version": "v1.0-ema6-center-up-long"
+    },
+    {
+      "description": "实验做多策略。",
+      "direction": "做多",
+      "enabled": true,
+      "exit": "止盈（记录触发K线CCI为x，后续K线CCI大于等于x+50，或KDJ D值大于等于89.7）；止损：按当前止损参数；开仓后8小时仍未止盈/止损，则在下一根K线定时强制平仓。",
+      "group": "实验策略",
+      "key": "conventional_up_break_long",
+      "name": "常规上升排列突破",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "signal_stick_min": {"label": "触发K线Stick最小值", "min": -10000, "max": 10000, "step": 0.1},
+        "prior_cci_non_decreasing_lookback": {"label": "前置CCI非单调递减检查K线数", "min": 2, "max": 20, "step": 1},
+        "prior_cci_above_lookback": {"label": "前置CCI全部高于阈值的K线数", "min": 1, "max": 30, "step": 1},
+        "prior_cci_strictly_greater_than": {"label": "前置CCI严格大于", "min": -300, "max": 300, "step": 0.5},
+        "kd_compare_start_lookback": {"label": "K值与D值向前比较起始K线数", "min": 1, "max": 30, "step": 1},
+        "kd_compare_end_lookback": {"label": "K值与D值向前比较结束K线数", "min": 1, "max": 30, "step": 1},
+        "lookback_prev_d_bars": {"label": "前置D值检查K线数", "min": 1, "max": 20, "step": 1},
+        "prev_d_min": {"label": "前置K线D值下限", "min": 0, "max": 100, "step": 0.5},
+        "prior_kd_min_lookback": {"label": "前置K-D最小值检查K线数", "min": 1, "max": 20, "step": 1},
+        "prior_kd_min_less_than": {"label": "前置K-D最小值小于", "min": -100, "max": 100, "step": 0.1},
+        "ema53_low_lookback": {"label": "最低价高于EMA53的前置K线数", "min": 1, "max": 20, "step": 1},
+        "prior_kdj_lookback": {"label": "前置J值净减少检查K线数", "min": 1, "max": 20, "step": 1},
+        "prior_j_net_decrease_min": {"label": "前置J值最小净减少", "min": 0, "max": 100, "step": 0.5},
+        "j_net_increase_max": {"label": "J值相对前一根净增加上限", "min": -100, "max": 100, "step": 0.5},
+        "exit_cci_increase": {"label": "止盈CCI相对触发值增量", "min": 0, "max": 300, "step": 1},
+        "exit_d_greater_equal": {"label": "止盈D值大于等于", "min": 0, "max": 100, "step": 0.5},
+        "max_hold_hours_without_exit": {"label": "未止盈止损最长持仓小时", "min": 1, "max": 168, "step": 1},
+        "stop_loss_pct": {"label": "止损比例", "min": 0.0001, "max": 0.2, "step": 0.0001}
+      },
+      "params": {
+        "signal_stick_min": 0,
+        "prior_cci_non_decreasing_lookback": 5,
+        "prior_cci_above_lookback": 8,
+        "prior_cci_strictly_greater_than": 50,
+        "kd_compare_start_lookback": 8,
+        "kd_compare_end_lookback": 10,
+        "lookback_prev_d_bars": 3,
+        "prev_d_min": 50,
+        "prior_kd_min_lookback": 2,
+        "prior_kd_min_less_than": 1.1,
+        "ema53_low_lookback": 3,
+        "prior_kdj_lookback": 2,
+        "prior_j_net_decrease_min": 2,
+        "j_net_increase_max": 15,
+        "exit_cci_increase": 50,
+        "exit_d_greater_equal": 89.7,
+        "max_hold_hours_without_exit": 8,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "触发K线MACD Stick值大于等于0；触发K线K值相较前一根K线K值净增加（差值大于0）；不含触发K线的前5根CCI不得为连续严格单调递减；不含触发K线的前8根K线CCI均严格大于50；触发K线K值与D值均分别严格大于向前第8、第9及第10根K线各自的K值与D值；EMA6 > EMA19 > EMA53 > EMA75；触发K线须在同一根K线内穿越EMA6（最低价小于等于当根EMA6，收盘价大于等于当根EMA6）；触发K线及其前3根K线的最低价均大于各自对应的EMA53；触发K线前3根K线的D值均大于等于50；触发K线前2根各自K-D的最小值小于1.1（允许为负）；触发K线前2根中至少存在一根K线同时满足J值相较其前一根净减少2及以上、且该根最低价大于当根EMA17；触发K线J值相较前一根J值的净增加不超过15（允许为负）。",
+      "version": "v1.19-conventional-up-break"
+    },
+    {
+      "description": "实验做空策略。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "止盈（记录触发K线CCI为x，后续K线CCI小于等于x-50，或KDJ D值小于等于11.3）；止损：按当前止损参数；开仓后8小时仍未止盈/止损，则在下一根K线定时强制平仓。",
+      "group": "实验策略",
+      "key": "conventional_down_break_short",
+      "name": "常规下降排列下行",
+      "modified_at_beijing": "2026.7.18 0:00",
+      "param_meta": {
+        "signal_stick_max": {"label": "触发K线Stick最大值", "min": -10000, "max": 10000, "step": 0.1},
+        "prior_cci_non_increasing_lookback": {"label": "前置CCI非单调递增检查K线数", "min": 2, "max": 20, "step": 1},
+        "prior_cci_below_lookback": {"label": "前置CCI全部低于阈值的K线数", "min": 1, "max": 30, "step": 1},
+        "prior_cci_strictly_less_than": {"label": "前置CCI严格小于", "min": -300, "max": 300, "step": 0.5},
+        "kd_compare_start_lookback": {"label": "K值与D值向前比较起始K线数", "min": 1, "max": 30, "step": 1},
+        "kd_compare_end_lookback": {"label": "K值与D值向前比较结束K线数", "min": 1, "max": 30, "step": 1},
+        "lookback_prev_d_bars": {"label": "前置D值检查K线数", "min": 1, "max": 20, "step": 1},
+        "prev_d_max": {"label": "前置K线D值上限", "min": -100, "max": 100, "step": 0.5},
+        "prior_dk_min_lookback": {"label": "前置D-K最小值检查K线数", "min": 1, "max": 20, "step": 1},
+        "prior_dk_min_less_than": {"label": "前置D-K最小值小于", "min": -100, "max": 100, "step": 0.1},
+        "ema53_high_lookback": {"label": "最高价低于EMA53的前置K线数", "min": 1, "max": 20, "step": 1},
+        "prior_kdj_lookback": {"label": "前置J值净增加检查K线数", "min": 1, "max": 20, "step": 1},
+        "prior_j_net_increase_min": {"label": "前置J值最小净增加", "min": 0, "max": 100, "step": 0.5},
+        "j_net_decrease_max": {"label": "J值相对前一根净减少上限", "min": -100, "max": 100, "step": 0.5},
+        "exit_cci_decrease": {"label": "止盈CCI相对触发值减量", "min": 0, "max": 300, "step": 1},
+        "exit_d_less_equal": {"label": "止盈D值小于等于", "min": -100, "max": 100, "step": 0.1},
+        "max_hold_hours_without_exit": {"label": "未止盈止损最长持仓小时", "min": 1, "max": 168, "step": 1},
+        "stop_loss_pct": {"label": "止损比例", "min": 0.0001, "max": 0.2, "step": 0.0001}
+      },
+      "params": {
+        "signal_stick_max": 0,
+        "prior_cci_non_increasing_lookback": 5,
+        "prior_cci_below_lookback": 8,
+        "prior_cci_strictly_less_than": -50,
+        "kd_compare_start_lookback": 8,
+        "kd_compare_end_lookback": 10,
+        "lookback_prev_d_bars": 3,
+        "prev_d_max": -50,
+        "prior_dk_min_lookback": 2,
+        "prior_dk_min_less_than": 1.1,
+        "ema53_high_lookback": 3,
+        "prior_kdj_lookback": 2,
+        "prior_j_net_increase_min": 2,
+        "j_net_decrease_max": 15,
+        "exit_cci_decrease": 50,
+        "exit_d_less_equal": 11.3,
+        "max_hold_hours_without_exit": 8,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "触发K线MACD Stick值小于等于0；触发K线K值相较前一根K线K值净减少（差值小于0）；不含触发K线的前5根CCI不得为连续严格单调递增；不含触发K线的前8根K线CCI均严格小于-50；触发K线K值与D值均分别严格小于向前第8、第9及第10根K线各自的K值与D值；EMA6 < EMA19 < EMA53 < EMA75；触发K线须在同一根K线内下穿EMA6（最高价大于当根EMA6，收盘价小于等于当根EMA6）；触发K线及其前3根K线的最高价均小于各自对应的EMA53；触发K线前3根K线的D值均小于等于-50；触发K线前2根各自D-K的最小值小于1.1（允许为负）；触发K线前2根中至少存在一根K线同时满足J值相较其前一根净增加2及以上、且该根最高价小于当根EMA17；触发K线J值相较前一根J值的净减少不超过15（允许为负）。",
+      "version": "v1.1-conventional-down-break-short"
+    },
+    {
+      "description": "常规上升均线排列后的筑顶下行实验做空策略；v2.1在约75%扣费后胜率目标下提高触发频率，以CCI相对前8根转弱作为动能确认。",
+      "direction": "做空",
+      "enabled": true,
+      "exit": "止盈：若触发K线K值大于50，则后续K值小于等于45时止盈；若触发K线K值小于等于50，则后续J值小于10时止盈；止损：按当前止损参数。",
+      "group": "实验策略",
+      "key": "conventional_up_arrangement_top_down_short",
+      "name": "常规上升排列筑顶下行",
+      "modified_at_beijing": "2026.7.19 17:11",
+      "param_meta": {
+        "entry_j_cross_level_exclusive": {"label": "J值下穿阈值（严格）", "min": -100, "max": 200, "step": 0.1},
+        "entry_current_kd_abs_difference_max_exclusive": {"label": "触发K线K-D绝对差上限（不含）", "min": 0, "max": 100, "step": 0.1},
+        "entry_reference_kd_abs_difference_max_exclusive": {"label": "前8根K线K-D绝对差上限（不含）", "min": 0, "max": 100, "step": 0.1},
+        "entry_kd_cross_prior_d_less_than": {"label": "K/D下穿路径前3根D值上限（严格小于）", "min": -100, "max": 200, "step": 0.1},
+        "entry_ema53_growth_24h_max_pct": {"label": "EMA53过去24小时最大涨幅（百分比）", "min": -20, "max": 20, "step": 0.1},
+        "entry_k_branch_threshold": {"label": "触发K值止盈分支阈值", "min": -100, "max": 200, "step": 0.1},
+        "exit_k_for_high_entry_k_less_equal": {"label": "高K触发后的止盈K值（小于等于）", "min": -100, "max": 200, "step": 0.1},
+        "exit_j_for_low_entry_k_less_than": {"label": "低K触发后的止盈J值（严格小于）", "min": -200, "max": 300, "step": 0.1},
+        "stop_loss_pct": {"label": "止损比例", "min": 0.0001, "max": 0.2, "step": 0.0001}
+      },
+      "params": {
+        "entry_j_cross_level_exclusive": 65,
+        "entry_current_kd_abs_difference_max_exclusive": 4,
+        "entry_reference_kd_abs_difference_max_exclusive": 5,
+        "entry_kd_cross_prior_d_less_than": 80,
+        "entry_ema53_growth_24h_max_pct": 1.0,
+        "entry_k_branch_threshold": 50,
+        "exit_k_for_high_entry_k_less_equal": 45,
+        "exit_j_for_low_entry_k_less_than": 10,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "EMA75 < EMA53 < EMA17 < EMA6；触发K线EMA53相较向前第24根K线EMA53的涨幅小于等于1.0%；阴线；触发K线K值小于D值；触发K线K值与D值差值的绝对值严格小于4；向前第8根K线K值与D值差值的绝对值严格小于5；并且须满足以下两项中的任意一项：①触发K线J值小于65且前一根K线J值大于65；②触发K线K值小于D值、前一根K线K值大于D值，且触发K线前3根K线的K值均大于D值、这3根K线的D值均严格小于80；触发K线CCI值小于向前第8根K线CCI值。",
+      "version": "v2.1-balanced-frequency"
+    },
+    {
+      "description": "上升排列末端的动能衰减做空模型：价格回落至EMA6下方但仍位于EMA17上方时，以K/D死叉、J/K下降、CCI高位回落和EMA6减速共同确认短线顶部。",
+      "direction": "做空",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "已启用BTC 1小时自动交易",
+      "supported_timeframes": [
+        "1h"
+      ],
+      "exit": "价格相对开仓价下跌1.3%时止盈；开仓后12小时仍未止盈或止损则按收盘价定时强制平仓；止损按回测控制台当前选择的止损参数，研究主基准为0.9%。",
+      "group": "实验策略",
+      "key": "conventional_up_arrangement_valid_death_cross_short",
+      "name": "常规上升排列有效死叉",
+      "modified_at_beijing": "2026.7.20 12:11",
+      "param_meta": {
+        "entry_k_less_than": {"label": "信号及前1根K值均严格小于", "min": -100, "max": 200, "step": 0.1},
+        "entry_d_less_than": {"label": "信号及前1根D值均严格小于", "min": -100, "max": 200, "step": 0.1},
+        "entry_j_less_than": {"label": "信号及前1根J值均严格小于", "min": -200, "max": 300, "step": 0.1},
+        "entry_cci_greater_than": {"label": "信号K线CCI严格大于", "min": -500, "max": 500, "step": 0.1},
+        "prior_k_above_d_bars": {"label": "前置K值大于D值的连续K线数", "min": 1, "max": 20, "step": 1},
+        "second_prior_k_minus_d_less_than": {"label": "信号前第2根K-D严格小于", "min": -100, "max": 100, "step": 0.1},
+        "entry_j_net_drop_min": {"label": "信号J值相较前一根最小净下降", "min": -100, "max": 200, "step": 0.1},
+        "entry_k_net_drop_min": {"label": "信号K值相较前一根最小净下降", "min": -100, "max": 200, "step": 0.1},
+        "entry_cci_net_drop_min": {"label": "信号CCI相较前一根最小净下降", "min": -500, "max": 500, "step": 0.1},
+        "entry_close_minus_ema6_atr_max": {"label": "收盘价减EMA6的最大ATR倍数", "min": -10, "max": 10, "step": 0.05},
+        "entry_ema6_slope_3h_atr_max": {"label": "EMA6三小时增量最大ATR倍数", "min": -10, "max": 10, "step": 0.05},
+        "entry_ema6_ema17_spread_atr_max": {"label": "EMA6减EMA17最大ATR倍数", "min": -10, "max": 10, "step": 0.05},
+        "take_profit_price_ratio": {"label": "价格止盈比例", "min": 0.001, "max": 0.05, "step": 0.0005},
+        "max_hold_hours_without_exit": {"label": "未止盈止损最长持仓小时", "min": 1, "max": 168, "step": 1},
+        "stop_loss_pct": {"label": "默认止损比例", "min": 0.003, "max": 0.009, "step": 0.003}
+      },
+      "params": {
+        "entry_k_less_than": 94,
+        "entry_d_less_than": 94,
+        "entry_j_less_than": 94,
+        "entry_cci_greater_than": 110,
+        "prior_k_above_d_bars": 1,
+        "second_prior_k_minus_d_less_than": 7,
+        "entry_j_net_drop_min": 5,
+        "entry_k_net_drop_min": 1,
+        "entry_cci_net_drop_min": 0,
+        "entry_close_minus_ema6_atr_max": 0,
+        "entry_ema6_slope_3h_atr_max": 0.5,
+        "entry_ema6_ema17_spread_atr_max": 2,
+        "take_profit_price_ratio": 0.013,
+        "max_hold_hours_without_exit": 12,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "仅适用于1小时周期。信号K线及前1根K线的K、D、J均严格小于94；信号K线CCI严格大于110且相较前一根不再增加；信号K线K值小于D值，前1根K值大于D值，形成有效死叉；信号前第2根K-D严格小于7；信号J值相较前一根净下降至少5，K值净下降至少1；信号K线须为阴线且收盘价严格小于前一根开盘价；EMA6 > EMA17 > EMA53 > EMA75；信号收盘价严格大于EMA17且小于等于EMA6；EMA6近3小时增量不超过0.5倍ATR(14)，EMA6与EMA17间距不超过2倍ATR(14)。",
+      "version": "v2.1-btc1h-auto-enabled"
+    },
+    {
+      "description": "泛上涨排列中的同根K线双均线有效下穿做空模型：EMA17保持在EMA53与EMA75上方，价格由EMA17、EMA19共同上方收至二者共同下方；前置K/D动能与核心均线无交叉窗口共同确认结构稳定性。",
+      "direction": "做空",
+      "enabled": true,
+      "auto_trade_eligible": false,
+      "auto_trade_qualification_status": "仅开放1小时回测｜未加入自动交易",
+      "supported_timeframes": [
+        "1h"
+      ],
+      "exit": "CCI严格小于15或KDJ J值严格小于21时止盈，任一条件满足即平仓；止损按回测控制台当前选择的止损参数。",
+      "group": "实验策略",
+      "key": "general_up_arrangement_effective_cross_down_short",
+      "name": "泛上涨排列有效下穿",
+      "modified_at_beijing": "2026.7.20 16:22",
+      "param_meta": {
+        "entry_kd_abs_difference_max_exclusive": {
+          "label": "信号K线K与D差值绝对值严格小于",
+          "min": 0.1,
+          "max": 50,
+          "step": 0.1
+        },
+        "entry_kd_abs_difference_min_inclusive": {
+          "label": "信号K线K与D差值绝对值大于等于",
+          "min": 0,
+          "max": 50,
+          "step": 0.1
+        },
+        "entry_cci_greater_than": {
+          "label": "信号K线CCI严格大于",
+          "min": -500,
+          "max": 500,
+          "step": 0.1
+        },
+        "entry_kdj_upper_lookback_bars": {
+          "label": "信号及前置KDJ上限回看根数",
+          "min": 0,
+          "max": 20,
+          "step": 1
+        },
+        "entry_kdj_upper_limit_exclusive": {
+          "label": "信号及前置K、D、J均严格小于",
+          "min": -200,
+          "max": 300,
+          "step": 0.1
+        },
+        "prior_bearish_close_above_ema6_lookback": {
+          "label": "前置阴线收盘高于EMA6回看根数",
+          "min": 1,
+          "max": 20,
+          "step": 1
+        },
+        "prior_k_above_d_lookback": {
+          "label": "信号前K>D确认回看根数",
+          "min": 1,
+          "max": 20,
+          "step": 1
+        },
+        "prior_k_above_d_abs_difference_min_inclusive": {
+          "label": "前置K>D的差值绝对值大于等于",
+          "min": 0,
+          "max": 100,
+          "step": 0.1
+        },
+        "prior_ema_cross_free_lookback": {
+          "label": "EMA53/EMA75无交叉回看根数",
+          "min": 1,
+          "max": 50,
+          "step": 1
+        },
+        "exit_cci_less_than": {
+          "label": "止盈CCI严格小于",
+          "min": -500,
+          "max": 500,
+          "step": 0.1
+        },
+        "exit_j_less_than": {
+          "label": "止盈J值严格小于",
+          "min": -200,
+          "max": 300,
+          "step": 0.1
+        },
+        "stop_loss_pct": {
+          "label": "默认止损比例",
+          "min": 0.003,
+          "max": 0.009,
+          "step": 0.003
+        }
+      },
+      "params": {
+        "entry_kd_abs_difference_max_exclusive": 6,
+        "entry_kd_abs_difference_min_inclusive": 0.3,
+        "entry_cci_greater_than": 60,
+        "entry_kdj_upper_lookback_bars": 2,
+        "entry_kdj_upper_limit_exclusive": 86,
+        "prior_bearish_close_above_ema6_lookback": 2,
+        "prior_k_above_d_lookback": 3,
+        "prior_k_above_d_abs_difference_min_inclusive": 0.5,
+        "prior_ema_cross_free_lookback": 8,
+        "exit_cci_less_than": 15,
+        "exit_j_less_than": 21,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "仅适用于1小时周期。EMA17 > EMA53 > EMA75；信号K线开盘价严格大于当根EMA17与EMA19，收盘价严格小于当根EMA17与EMA19且严格大于EMA53，即同一根K线同时有效下穿EMA17和EMA19但仍收于EMA53上方；信号K线最低价严格大于当根EMA53；信号K线CCI严格大于60；信号K线及其前两根K线的K、D、J值均严格小于86；信号前两根K线中如有阴线，则该阴线收盘价必须严格大于其对应EMA6，阳线或十字线不受此条限制；信号K线K值与D值差值的绝对值大于等于0.3且严格小于6；信号前3根K线中至少存在一根K值大于D值且差值绝对值大于等于0.5；信号前8根K线内，EMA53与EMA75之间不得发生上穿、下穿或接触，EMA53和EMA75也不得与EMA6、EMA17、EMA19、EMA95发生上穿、下穿或接触。",
+      "version": "v1.6-prior-bearish-close-above-ema6"
+    },
+    {
+      "description": "由AI基于BTC完整15分钟历史数据创建的双周期做空策略：上一根已闭合1小时K线确认空头结构，15分钟K线负责下跌加速后的K/D再死叉入场。",
+      "direction": "做空",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "BTC 15分钟自动交易已启用",
+      "supported_instruments": [
+        "BTC-USDT-SWAP"
+      ],
+      "supported_timeframes": [
+        "15m"
+      ],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.009,
+      "exit": "价格相对开仓价下跌1.2%时止盈；开仓后48根15分钟K线（12小时）仍未止盈或止损则按收盘价强制平仓；止损建议使用0.9%。",
+      "group": "实验策略",
+      "key": "btc15_dual_cycle_downtrend_reentry_short_ai",
+      "name": "双周期下跌加速再死叉（AI创造）",
+      "modified_at_beijing": "2026.7.20 10:57",
+      "param_meta": {
+        "return_lookback_bars": {"label": "15分钟跌幅回看K线数", "min": 16, "max": 192, "step": 1},
+        "return_max_pct": {"label": "回看区间最大涨跌幅百分比", "min": -20, "max": 5, "step": 0.1},
+        "prior_high_lookback_bars": {"label": "前序最高价回看K线数", "min": 16, "max": 288, "step": 1},
+        "prior_high_distance_atr_max": {"label": "收盘价距前序高点最大ATR倍数", "min": -50, "max": 0, "step": 0.5},
+        "ema53_slope_lookback_bars": {"label": "EMA53斜率回看K线数", "min": 16, "max": 288, "step": 1},
+        "ema53_slope_max_pct": {"label": "EMA53最大涨跌幅百分比", "min": -20, "max": 5, "step": 0.1},
+        "h1_ema19_ema53_gap_atr_max": {"label": "已闭合1小时EMA19减EMA53最大ATR倍数", "min": -20, "max": 5, "step": 0.05},
+        "take_profit_price_ratio": {"label": "价格止盈比例", "min": 0.001, "max": 0.05, "step": 0.0005},
+        "max_hold_bars": {"label": "最长持仓15分钟K线数", "min": 4, "max": 192, "step": 1},
+        "entry_requires_directional_candle": {"label": "是否强制阴线触发（0为否）", "min": 0, "max": 1, "step": 1},
+        "stop_loss_pct": {"label": "止损比例", "min": 0.003, "max": 0.009, "step": 0.003}
+      },
+      "params": {
+        "return_lookback_bars": 64,
+        "return_max_pct": -3.5,
+        "prior_high_lookback_bars": 96,
+        "prior_high_distance_atr_max": -14,
+        "ema53_slope_lookback_bars": 96,
+        "ema53_slope_max_pct": -3,
+        "h1_ema19_ema53_gap_atr_max": -1.25,
+        "take_profit_price_ratio": 0.012,
+        "max_hold_bars": 48,
+        "entry_requires_directional_candle": 0,
+        "stop_loss_pct": 0.009
+      },
+      "stop_loss_pct": 0.009,
+      "trigger": "仅适用于BTC 15分钟周期。上一根已闭合1小时K线的EMA19低于EMA53，且EMA19-EMA53小于等于-1.25倍该1小时K线ATR(14)；当前15分钟收盘价相较向前第64根K线跌幅小于等于-3.5%；当前收盘价相对前96根15分钟K线最高价的距离小于等于-14倍当前ATR(14)；当前EMA53相较向前第96根EMA53跌幅小于等于-3.0%；当前K值小于D值且前一根K线K值大于等于D值，形成K/D再死叉。不要求触发K线必须为阴线。",
+      "version": "v1.1-btc15-auto-trade-enabled"
+    },
+    {
+      "group": "实验策略",
+      "key": "btc5_exhaustion_reclaim_long_ai",
+      "name": "BTC 5分钟超跌收回（AI创造）",
+      "direction": "做多",
+      "enabled": false,
+      "auto_trade_eligible": false,
+      "live_enabled": false,
+      "offline": true,
+      "offline_reason": "human_policy_cannot_open_delete",
+      "auto_trade_qualification_status": "BTC 5分钟自动交易已启用",
+      "supported_instruments": ["BTC-USDT-SWAP"],
+      "supported_timeframes": ["5m"],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.009,
+      "description": "5分钟极端偏离后的收回模型，以已闭合1小时斜率排除强单边下跌，捕捉超跌反弹。",
+      "trigger": "Z-score(20)小于等于-2；RSI(14)小于等于35；阳线；K值较前一根上升；上一根已闭合1小时EMA19四小时斜率不低于-0.1%；ATR(14)/收盘价位于0.05%至0.8%。",
+      "exit": "价格上涨0.6%止盈；72根5分钟K线（6小时）未止盈止损则强制平仓；固定止损0.9%。",
+      "params": {"z20_abs_min":2.0,"rsi_extreme":35,"h1_slope_abs_limit":0.001,"atr_pct_min":0.0005,"atr_pct_max":0.008,"take_profit_price_ratio":0.006,"max_hold_bars":72,"signal_score":210,"stop_loss_pct":0.009},
+      "stop_loss_pct": 0.009,
+      "modified_at_beijing": "2026.7.20 20:30",
+      "version": "v1.0-live"
+    },
+    {
+      "group": "实验策略",
+      "key": "cl5_exhaustion_fade_short_ai",
+      "name": "CL 5分钟冲高衰竭回落（AI创造）",
+      "direction": "做空",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "CL 5分钟自动交易已启用",
+      "supported_instruments": ["CL-USDT-SWAP"],
+      "supported_timeframes": ["5m"],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.006,
+      "description": "CL短时冲高后的均值回归模型，使用波动率与1小时斜率过滤失控趋势。",
+      "trigger": "Z-score(20)大于等于1.25；RSI(14)大于等于70；阴线；K值较前一根下降；上一根已闭合1小时EMA19四小时斜率不高于0.1%；ATR(14)/收盘价位于0.08%至0.8%。",
+      "exit": "价格下跌0.6%止盈；12根5分钟K线（1小时）未止盈止损则强制平仓；固定止损0.6%。",
+      "params": {"z20_abs_min":1.25,"rsi_extreme":30,"h1_slope_abs_limit":0.001,"atr_pct_min":0.0008,"atr_pct_max":0.008,"take_profit_price_ratio":0.006,"max_hold_bars":12,"signal_score":220,"stop_loss_pct":0.006},
+      "stop_loss_pct": 0.006,
+      "modified_at_beijing": "2026.7.20 20:30",
+      "version": "v1.0-live"
+    },
+    {
+      "group": "实验策略",
+      "key": "ng5_exhaustion_fade_short_ai",
+      "name": "NG 5分钟冲高衰竭回落（AI创造）",
+      "direction": "做空",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "NG 5分钟自动交易已启用",
+      "supported_instruments": ["NG-USDT-SWAP"],
+      "supported_timeframes": ["5m"],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.009,
+      "description": "NG极端冲高后的回落模型，允许较大1小时波动但要求5分钟动能先转弱。",
+      "trigger": "Z-score(20)大于等于1.6；RSI(14)大于等于75；阴线；K值较前一根下降；上一根已闭合1小时EMA19四小时斜率不高于0.6%；ATR(14)/收盘价位于0.03%至0.8%。",
+      "exit": "价格下跌0.9%止盈；72根5分钟K线（6小时）未止盈止损则强制平仓；固定止损0.9%。",
+      "params": {"z20_abs_min":1.6,"rsi_extreme":25,"h1_slope_abs_limit":0.006,"atr_pct_min":0.0003,"atr_pct_max":0.008,"take_profit_price_ratio":0.009,"max_hold_bars":72,"signal_score":215,"stop_loss_pct":0.009},
+      "stop_loss_pct": 0.009,
+      "modified_at_beijing": "2026.7.20 20:30",
+      "version": "v1.0-live"
+    },
+    {
+      "group": "实验策略",
+      "key": "ng5_session_exhaustion_reclaim_long_ai",
+      "name": "NG 5分钟时段超跌收回（AI创造）",
+      "direction": "做多",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "NG 5分钟自动交易已启用｜三段走查通过",
+      "supported_instruments": ["NG-USDT-SWAP"],
+      "supported_timeframes": ["5m"],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.009,
+      "description": "NG在北京时间16:00至24:00流动性时段的超跌均值回归模型；使用Z-score、RSI、K值反转、ATR与已闭合1小时斜率共同过滤。",
+      "trigger": "仅在UTC 08:00至16:00（北京时间16:00至24:00）；Z-score(20)小于等于-1.25；RSI(14)小于等于35；阳线；K值较前一根上升；上一根已闭合1小时EMA19四小时斜率不低于-0.6%；ATR(14)/收盘价位于0.05%至0.4%。",
+      "exit": "价格上涨0.6%止盈；48根5分钟K线（4小时）未止盈止损则强制平仓；固定止损0.9%。",
+      "params": {"z20_abs_min":1.25,"rsi_extreme":35,"h1_slope_abs_limit":0.006,"atr_pct_min":0.0005,"atr_pct_max":0.004,"utc_hour_start":8,"utc_hour_end":16,"take_profit_price_ratio":0.006,"max_hold_bars":48,"signal_score":230,"stop_loss_pct":0.009},
+      "stop_loss_pct": 0.009,
+      "modified_at_beijing": "2026.7.20 23:05",
+      "version": "v1.0-live-frequency-expansion"
+    },
+    {
+      "group": "实验策略",
+      "key": "xag5_session_breakdown_short_ai",
+      "name": "XAG 5分钟时段顺势破位（AI创造）",
+      "direction": "做空",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "XAG 5分钟自动交易候选｜三段走查与组合验证通过",
+      "supported_instruments": ["XAG-USDT-SWAP"],
+      "supported_timeframes": ["5m"],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.009,
+      "description": "XAG在北京时间08:00至16:00的5分钟顺势破位模型；使用已闭合1小时空头结构、二十根新低、实体、CCI与ATR共同确认。",
+      "trigger": "仅在UTC 00:00至08:00（北京时间08:00至16:00）；上一根已闭合1小时EMA19低于EMA53且EMA19四小时斜率小于-0.03%；阴线收盘严格跌破前20根最低价；实体不小于0.5倍ATR；CCI小于等于-40；ATR(14)/收盘价位于0.08%至0.4%。",
+      "exit": "价格下跌0.6%止盈；72根5分钟K线（6小时）未止盈止损则强制平仓；固定止损0.9%。",
+      "params": {"h1_slope_min":0.0003,"body_atr_min":0.5,"cci_abs_min":40,"atr_pct_min":0.0008,"atr_pct_max":0.004,"utc_hour_start":0,"utc_hour_end":8,"take_profit_price_ratio":0.006,"max_hold_bars":72,"signal_score":235,"stop_loss_pct":0.009},
+      "stop_loss_pct": 0.009,
+      "modified_at_beijing": "2026.7.21 03:00",
+      "version": "v1.1-deficit-fill-frequency"
+    },
+    {
+      "group": "实验策略",
+      "key": "ltc5_exhaustion_fade_short_ai",
+      "name": "LTC 5分钟冲高衰竭回落（AI创造）",
+      "direction": "做空",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "LTC 5分钟自动交易已启用｜三段正期望、动态样本放行",
+      "supported_instruments": ["LTC-USDT-SWAP"],
+      "supported_timeframes": ["5m"],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.009,
+      "description": "LTC极端冲高后的5分钟均值回归做空模型，作为高频组合的独立加密标的信号。",
+      "trigger": "Z-score(20)大于等于1.25；RSI(14)大于等于75；阴线；K值较前一根下降；上一根已闭合1小时EMA19四小时斜率不高于0.6%；ATR(14)/收盘价位于0.03%至0.8%。",
+      "exit": "价格下跌0.9%止盈；72根5分钟K线（6小时）未止盈止损则强制平仓；固定止损0.9%。",
+      "params": {"z20_abs_min":1.25,"rsi_extreme":25,"h1_slope_abs_limit":0.006,"atr_pct_min":0.0003,"atr_pct_max":0.008,"take_profit_price_ratio":0.009,"max_hold_bars":72,"signal_score":215,"stop_loss_pct":0.009},
+      "stop_loss_pct": 0.009,
+      "modified_at_beijing": "2026.7.21 01:20",
+      "version": "v1.0-dynamic-sample-live"
+    },
+    {
+      "group": "实验策略",
+      "key": "ada5_session_trend_pullback_short_ai",
+      "name": "ADA 5分钟时段趋势反抽（AI创造）",
+      "direction": "做空",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "ADA 5分钟自动交易已启用｜近期市场环境版本",
+      "supported_instruments": ["ADA-USDT-SWAP"],
+      "supported_timeframes": ["5m"],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.006,
+      "description": "ADA在北京时间20:00至次日04:00的空头趋势反抽再下行模型；采用0.6%止损与0.9%止盈改善赔率。",
+      "trigger": "仅在UTC 12:00至20:00（北京时间20:00至次日04:00）；上一根已闭合1小时EMA19低于EMA53且四小时斜率小于-0.05%；当前5分钟EMA19低于EMA53；最高价触及或高于EMA19后收盘回到EMA6下方；阴线；K值由上向下穿越D值且K值不低于55；ATR/收盘价位于0.03%至1.5%。",
+      "exit": "价格下跌0.9%止盈；48根5分钟K线（4小时）未止盈止损则强制平仓；固定止损0.6%。",
+      "params": {"h1_slope_min":0.0005,"ema19_touch_tolerance":0,"k_min":55,"atr_pct_min":0.0003,"atr_pct_max":0.015,"utc_hour_start":12,"utc_hour_end":20,"take_profit_price_ratio":0.009,"max_hold_bars":48,"signal_score":205,"stop_loss_pct":0.006},
+      "stop_loss_pct": 0.006,
+      "modified_at_beijing": "2026.7.21 01:20",
+      "version": "v1.0-current-regime-live"
+    },
+    {
+      "group": "实验策略",
+      "key": "xau15_h1_breakout_long_ai",
+      "name": "XAU 15分钟顺势放量突破（AI创造）",
+      "direction": "做多",
+      "enabled": true,
+      "auto_trade_eligible": true,
+      "auto_trade_qualification_status": "XAU 15分钟自动交易已启用",
+      "supported_instruments": ["XAU-USDT-SWAP"],
+      "supported_timeframes": ["15m"],
+      "recommended_leverage": 20,
+      "recommended_stop_loss_pct": 0.009,
+      "description": "在已闭合1小时多头结构中捕捉15分钟二十根新高突破，并以实体、CCI和ATR确认有效性。",
+      "trigger": "上一根已闭合1小时EMA19高于EMA53且EMA19四小时斜率大于0.1%；阳线收盘突破前20根最高价；实体不小于0.9倍ATR；CCI不小于130；ATR/收盘价位于0.18%至0.8%。",
+      "exit": "价格上涨0.4%止盈；32根15分钟K线（8小时）未止盈止损则强制平仓；固定止损0.9%。",
+      "params": {"h1_slope_min":0.001,"body_atr_min":0.9,"cci_min":130,"atr_pct_min":0.0018,"atr_pct_max":0.008,"take_profit_price_ratio":0.004,"max_hold_bars":32,"signal_score":250,"stop_loss_pct":0.009},
+      "stop_loss_pct": 0.009,
+      "modified_at_beijing": "2026.7.20 20:30",
+      "version": "v1.0-live"
+    }
+  ],
+  "updated_at": "2026-07-21 01:20:00"
+}

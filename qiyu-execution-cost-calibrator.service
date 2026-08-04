@@ -1,0 +1,16 @@
+[Unit]
+Description=Qiyu read-only execution cost telemetry calibrator
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+ExecStart=/usr/bin/flock -n -E 75 /root/auto_trade/execution_cost_calibrator.lock /usr/bin/python3 /root/auto_trade_execution_cost_calibrator.py
+User=root
+Nice=12
+TimeoutStartSec=3min
+SuccessExitStatus=75
+
+[Install]
+WantedBy=multi-user.target

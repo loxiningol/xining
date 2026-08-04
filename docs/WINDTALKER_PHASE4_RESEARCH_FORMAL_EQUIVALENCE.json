@@ -1,0 +1,380 @@
+{
+  "schema": "WINDTALKER_PHASE4_RESEARCH_FORMAL_EQUIVALENCE",
+  "generated_at": "2026-07-28 13:50:53",
+  "thresholds_fixed_before_results": {
+    "core_data_deps_match": 1.0,
+    "event_order_match": 1.0,
+    "state_machine_critical_path_match": 1.0,
+    "entry_direction_match": 1.0,
+    "setup_entry_jaccard_min": 0.7,
+    "entry_jaccard_min": 0.7,
+    "state_path_match_min": 0.8,
+    "exit_reason_agreement_min": 0.6,
+    "trade_sequence_similarity_min": 0.65,
+    "no_forbidden_proxy": true,
+    "legacy_fallback_used_must_be_false": true,
+    "fixed_before_results": true
+  },
+  "candidates": [
+    {
+      "candidate_id": "bridge_oi_price_crowding_fade_btc_5m",
+      "source_probe_id": "probe_oi_price_crowding_fade_btc_5m",
+      "static": {
+        "data_deps": {
+          "status": "exact",
+          "research_core_in_formal": [
+            "oi_z20"
+          ],
+          "missing_in_formal": []
+        },
+        "event_order": {
+          "status": "exact",
+          "flattened_to_AND": false
+        },
+        "direction": {
+          "status": "exact",
+          "research": "short",
+          "formal": "short"
+        },
+        "exit": {
+          "status": "semantically_equivalent",
+          "production_sl_adapter": 0.009,
+          "note": "0.9% production SL adapter is allowed explicit risk difference"
+        },
+        "proxy": {
+          "status": "exact",
+          "forbidden_present": false
+        },
+        "state_machine": {
+          "status": "exact"
+        }
+      },
+      "ast": {
+        "research_topology": "c11807493ada246f256ad2e35e8419ddca4b2342abfb230b0bfc6962450b1f32",
+        "formal_topology": "c11807493ada246f256ad2e35e8419ddca4b2342abfb230b0bfc6962450b1f32",
+        "ir_ast_hash": "ae5eab8e70ece528eea3179b8dc7c496a491c9b8f6495def37d86dc8f7105b76",
+        "topology_match": true,
+        "compared_as": "topology_fingerprint_plus_event_sequence_presence"
+      },
+      "behavior": {
+        "research_entries": 14,
+        "formal_entries": 14,
+        "entry_jaccard": 1.0,
+        "setup_jaccard": 1.0,
+        "direction_match": 1.0,
+        "exit_reason_agreement": 1.0,
+        "trade_sequence_similarity": 1.0,
+        "research_entry_timestamps_sample": [
+          651,
+          664,
+          669,
+          696,
+          706,
+          727,
+          746,
+          1304,
+          1317,
+          1337,
+          1345,
+          1358,
+          1371,
+          1376
+        ],
+        "formal_entry_timestamps_sample": [
+          651,
+          664,
+          669,
+          696,
+          706,
+          727,
+          746,
+          1304,
+          1317,
+          1337,
+          1345,
+          1358,
+          1371,
+          1376
+        ]
+      },
+      "checks": {
+        "core_data_deps": true,
+        "event_order": true,
+        "state_machine": true,
+        "direction": true,
+        "entry_jaccard": true,
+        "setup_jaccard": true,
+        "exit_reason": true,
+        "trade_seq": true,
+        "no_forbidden_proxy": true,
+        "legacy_fallback_false": true
+      },
+      "thresholds": {
+        "core_data_deps_match": 1.0,
+        "event_order_match": 1.0,
+        "state_machine_critical_path_match": 1.0,
+        "entry_direction_match": 1.0,
+        "setup_entry_jaccard_min": 0.7,
+        "entry_jaccard_min": 0.7,
+        "state_path_match_min": 0.8,
+        "exit_reason_agreement_min": 0.6,
+        "trade_sequence_similarity_min": 0.65,
+        "no_forbidden_proxy": true,
+        "legacy_fallback_used_must_be_false": true,
+        "fixed_before_results": true
+      },
+      "promotion_fidelity": "PASS",
+      "legacy_fallback_used": false
+    },
+    {
+      "candidate_id": "bridge_btc_lead_lag_eth_5m",
+      "source_probe_id": "probe_btc_lead_lag_eth_5m",
+      "static": {
+        "data_deps": {
+          "status": "exact",
+          "research_core_in_formal": [
+            "lag_ret1",
+            "lead_lag_corr20",
+            "lead_ret1",
+            "lead_ret3"
+          ],
+          "missing_in_formal": []
+        },
+        "event_order": {
+          "status": "exact",
+          "flattened_to_AND": false
+        },
+        "direction": {
+          "status": "exact",
+          "research": "long",
+          "formal": "long"
+        },
+        "exit": {
+          "status": "semantically_equivalent",
+          "production_sl_adapter": 0.009,
+          "note": "0.9% production SL adapter is allowed explicit risk difference"
+        },
+        "proxy": {
+          "status": "exact",
+          "forbidden_present": false
+        },
+        "state_machine": {
+          "status": "exact"
+        }
+      },
+      "ast": {
+        "research_topology": "bad870c5e3afb0211db29f6d5736a601b2e538451f7dd73339438a259cc325aa",
+        "formal_topology": "bad870c5e3afb0211db29f6d5736a601b2e538451f7dd73339438a259cc325aa",
+        "ir_ast_hash": "af43d45fae9a24bbc23262ac28077a75ab4d127959910f55222df3c1ee2b2fa9",
+        "topology_match": true,
+        "compared_as": "topology_fingerprint_plus_event_sequence_presence"
+      },
+      "behavior": {
+        "research_entries": 206,
+        "formal_entries": 206,
+        "entry_jaccard": 1.0,
+        "setup_jaccard": 1.0,
+        "direction_match": 1.0,
+        "exit_reason_agreement": 1.0,
+        "trade_sequence_similarity": 1.0,
+        "research_entry_timestamps_sample": [
+          50,
+          54,
+          63,
+          65,
+          68,
+          80,
+          82,
+          97,
+          100,
+          103,
+          112,
+          118,
+          124,
+          128,
+          130,
+          136,
+          140,
+          142,
+          144,
+          148
+        ],
+        "formal_entry_timestamps_sample": [
+          50,
+          54,
+          63,
+          65,
+          68,
+          80,
+          82,
+          97,
+          100,
+          103,
+          112,
+          118,
+          124,
+          128,
+          130,
+          136,
+          140,
+          142,
+          144,
+          148
+        ]
+      },
+      "checks": {
+        "core_data_deps": true,
+        "event_order": true,
+        "state_machine": true,
+        "direction": true,
+        "entry_jaccard": true,
+        "setup_jaccard": true,
+        "exit_reason": true,
+        "trade_seq": true,
+        "no_forbidden_proxy": true,
+        "legacy_fallback_false": true
+      },
+      "thresholds": {
+        "core_data_deps_match": 1.0,
+        "event_order_match": 1.0,
+        "state_machine_critical_path_match": 1.0,
+        "entry_direction_match": 1.0,
+        "setup_entry_jaccard_min": 0.7,
+        "entry_jaccard_min": 0.7,
+        "state_path_match_min": 0.8,
+        "exit_reason_agreement_min": 0.6,
+        "trade_sequence_similarity_min": 0.65,
+        "no_forbidden_proxy": true,
+        "legacy_fallback_used_must_be_false": true,
+        "fixed_before_results": true
+      },
+      "promotion_fidelity": "PASS",
+      "legacy_fallback_used": false
+    },
+    {
+      "candidate_id": "bridge_taker_absorption_btc_5m",
+      "source_probe_id": "probe_taker_absorption_btc_5m",
+      "static": {
+        "data_deps": {
+          "status": "exact",
+          "research_core_in_formal": [
+            "taker_imbalance",
+            "taker_imbalance_z20"
+          ],
+          "missing_in_formal": []
+        },
+        "event_order": {
+          "status": "exact",
+          "flattened_to_AND": false
+        },
+        "direction": {
+          "status": "exact",
+          "research": "long",
+          "formal": "long"
+        },
+        "exit": {
+          "status": "semantically_equivalent",
+          "production_sl_adapter": 0.009,
+          "note": "0.9% production SL adapter is allowed explicit risk difference"
+        },
+        "proxy": {
+          "status": "exact",
+          "forbidden_present": false
+        },
+        "state_machine": {
+          "status": "exact"
+        }
+      },
+      "ast": {
+        "research_topology": "c69ecac7d361413ce02ff83282e8b85662e4568d8930e692f84bb1ac8f51ea66",
+        "formal_topology": "c69ecac7d361413ce02ff83282e8b85662e4568d8930e692f84bb1ac8f51ea66",
+        "ir_ast_hash": "48c0b06917030ff8e85e32a51ddc4c010155739eaccf731fe1feb278a0bedb0f",
+        "topology_match": true,
+        "compared_as": "topology_fingerprint_plus_event_sequence_presence"
+      },
+      "behavior": {
+        "research_entries": 113,
+        "formal_entries": 113,
+        "entry_jaccard": 1.0,
+        "setup_jaccard": 1.0,
+        "direction_match": 1.0,
+        "exit_reason_agreement": 1.0,
+        "trade_sequence_similarity": 1.0,
+        "research_entry_timestamps_sample": [
+          828,
+          830,
+          832,
+          839,
+          841,
+          847,
+          853,
+          855,
+          860,
+          872,
+          874,
+          877,
+          883,
+          887,
+          892,
+          900,
+          902,
+          904,
+          912,
+          919
+        ],
+        "formal_entry_timestamps_sample": [
+          828,
+          830,
+          832,
+          839,
+          841,
+          847,
+          853,
+          855,
+          860,
+          872,
+          874,
+          877,
+          883,
+          887,
+          892,
+          900,
+          902,
+          904,
+          912,
+          919
+        ]
+      },
+      "checks": {
+        "core_data_deps": true,
+        "event_order": true,
+        "state_machine": true,
+        "direction": true,
+        "entry_jaccard": true,
+        "setup_jaccard": true,
+        "exit_reason": true,
+        "trade_seq": true,
+        "no_forbidden_proxy": true,
+        "legacy_fallback_false": true
+      },
+      "thresholds": {
+        "core_data_deps_match": 1.0,
+        "event_order_match": 1.0,
+        "state_machine_critical_path_match": 1.0,
+        "entry_direction_match": 1.0,
+        "setup_entry_jaccard_min": 0.7,
+        "entry_jaccard_min": 0.7,
+        "state_path_match_min": 0.8,
+        "exit_reason_agreement_min": 0.6,
+        "trade_sequence_similarity_min": 0.65,
+        "no_forbidden_proxy": true,
+        "legacy_fallback_used_must_be_false": true,
+        "fixed_before_results": true
+      },
+      "promotion_fidelity": "PASS",
+      "legacy_fallback_used": false
+    }
+  ],
+  "pass_count": 3,
+  "n": 3
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run slow microstructure primitive discovery every hour (temporary backlog catch-up)
+
+[Timer]
+OnCalendar=*-*-* *:15:00
+Persistent=true
+RandomizedDelaySec=90
+Unit=qiyu-microstructure-primitives.service
+
+[Install]
+WantedBy=timers.target

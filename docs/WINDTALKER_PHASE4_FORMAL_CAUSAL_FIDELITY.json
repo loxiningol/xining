@@ -1,0 +1,248 @@
+{
+  "schema": "WINDTALKER_PHASE4_FORMAL_CAUSAL_FIDELITY",
+  "generated_at": "2026-07-28 13:50:54",
+  "rule": "Must re-run on formal implementation — Phase3 probe PASS not cited as substitute",
+  "candidates": [
+    {
+      "candidate_id": "bridge_oi_price_crowding_fade_btc_5m",
+      "source_probe_id": "probe_oi_price_crowding_fade_btc_5m",
+      "research_structural_fidelity": true,
+      "formal_structural_fidelity": true,
+      "research_causal_fidelity": true,
+      "formal_causal_fidelity": true,
+      "research_formal_equivalence": true,
+      "legacy_template_independence": true,
+      "final_promotion_fidelity": "PASS",
+      "structural_detail": {
+        "uses_core_research_features": true,
+        "not_ohlc_template": true,
+        "has_event_sequence_or_state": true,
+        "no_legacy_fallback": true
+      },
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 14,
+          "ablated_entries": 0,
+          "overlap": 0.0
+        },
+        "random_proxy": {
+          "pass": true,
+          "overlap": 0.027,
+          "random_entries": 24
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "overlap": 0.3636,
+          "destroyed_entries": 16
+        },
+        "regime_veto": {
+          "pass": true,
+          "veto_entries": 0
+        },
+        "counterfactual": {
+          "pass": true,
+          "overlap": 0.0,
+          "cf_entries": 0
+        }
+      },
+      "causal_pass_count": 5,
+      "independence_pairs": [
+        {
+          "other": "bridge_btc_lead_lag_eth_5m",
+          "feat_sim": 0.1111,
+          "sig_overlap": 0.0,
+          "topo_same": false,
+          "independent": true
+        },
+        {
+          "other": "bridge_taker_absorption_btc_5m",
+          "feat_sim": 0.2857,
+          "sig_overlap": 0.016,
+          "topo_same": false,
+          "independent": true
+        }
+      ],
+      "base_entries": 14,
+      "features": [
+        "atr14",
+        "close",
+        "oi_z20",
+        "open"
+      ],
+      "core_variables": [
+        "oi_z20"
+      ]
+    },
+    {
+      "candidate_id": "bridge_btc_lead_lag_eth_5m",
+      "source_probe_id": "probe_btc_lead_lag_eth_5m",
+      "research_structural_fidelity": true,
+      "formal_structural_fidelity": true,
+      "research_causal_fidelity": true,
+      "formal_causal_fidelity": true,
+      "research_formal_equivalence": true,
+      "legacy_template_independence": true,
+      "final_promotion_fidelity": "PASS",
+      "structural_detail": {
+        "uses_core_research_features": true,
+        "not_ohlc_template": true,
+        "has_event_sequence_or_state": true,
+        "no_legacy_fallback": true
+      },
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 206,
+          "ablated_entries": 0,
+          "overlap": 0.0
+        },
+        "random_proxy": {
+          "pass": true,
+          "overlap": 0.1158,
+          "random_entries": 247
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "overlap": 0.5478,
+          "destroyed_entries": 215
+        },
+        "regime_veto": {
+          "pass": true,
+          "veto_entries": 0
+        },
+        "counterfactual": {
+          "pass": true,
+          "overlap": 0.0,
+          "cf_entries": 0
+        }
+      },
+      "causal_pass_count": 5,
+      "independence_pairs": [
+        {
+          "other": "bridge_oi_price_crowding_fade_btc_5m",
+          "feat_sim": 0.1111,
+          "sig_overlap": 0.0,
+          "topo_same": false,
+          "independent": true
+        },
+        {
+          "other": "bridge_taker_absorption_btc_5m",
+          "feat_sim": 0.0,
+          "sig_overlap": 0.0,
+          "topo_same": false,
+          "independent": true
+        }
+      ],
+      "base_entries": 206,
+      "features": [
+        "atr14",
+        "cross_sync_score",
+        "lag_ret1",
+        "lead_lag_corr20",
+        "lead_ret1",
+        "lead_ret3"
+      ],
+      "core_variables": [
+        "lead_ret1",
+        "lag_ret1",
+        "lead_ret3",
+        "lead_lag_corr20"
+      ]
+    },
+    {
+      "candidate_id": "bridge_taker_absorption_btc_5m",
+      "source_probe_id": "probe_taker_absorption_btc_5m",
+      "research_structural_fidelity": true,
+      "formal_structural_fidelity": true,
+      "research_causal_fidelity": true,
+      "formal_causal_fidelity": true,
+      "research_formal_equivalence": true,
+      "legacy_template_independence": true,
+      "final_promotion_fidelity": "PASS",
+      "structural_detail": {
+        "uses_core_research_features": true,
+        "not_ohlc_template": true,
+        "has_event_sequence_or_state": true,
+        "no_legacy_fallback": true
+      },
+      "causal_tests": {
+        "ablation": {
+          "pass": true,
+          "base_entries": 113,
+          "ablated_entries": 0,
+          "overlap": 0.0
+        },
+        "random_proxy": {
+          "pass": true,
+          "overlap": 0.1242,
+          "random_entries": 59
+        },
+        "event_order_destroy": {
+          "pass": true,
+          "overlap": 0.1976,
+          "destroyed_entries": 87
+        },
+        "regime_veto": {
+          "pass": true,
+          "veto_entries": 0
+        },
+        "counterfactual": {
+          "pass": true,
+          "overlap": 0.0,
+          "cf_entries": 0
+        }
+      },
+      "causal_pass_count": 5,
+      "independence_pairs": [
+        {
+          "other": "bridge_oi_price_crowding_fade_btc_5m",
+          "feat_sim": 0.2857,
+          "sig_overlap": 0.016,
+          "topo_same": false,
+          "independent": true
+        },
+        {
+          "other": "bridge_btc_lead_lag_eth_5m",
+          "feat_sim": 0.0,
+          "sig_overlap": 0.0,
+          "topo_same": false,
+          "independent": true
+        }
+      ],
+      "base_entries": 113,
+      "features": [
+        "close",
+        "open",
+        "taker_imbalance",
+        "taker_imbalance_z20",
+        "vol_z20"
+      ],
+      "core_variables": [
+        "taker_imbalance",
+        "taker_imbalance_z20"
+      ]
+    }
+  ],
+  "pass_count": 3,
+  "formal_causal_pass_ids": [
+    "bridge_oi_price_crowding_fade_btc_5m",
+    "bridge_btc_lead_lag_eth_5m",
+    "bridge_taker_absorption_btc_5m"
+  ],
+  "structural_pass_ids": [
+    "bridge_oi_price_crowding_fade_btc_5m",
+    "bridge_btc_lead_lag_eth_5m",
+    "bridge_taker_absorption_btc_5m"
+  ],
+  "equivalence_pass_ids": [
+    "bridge_oi_price_crowding_fade_btc_5m",
+    "bridge_btc_lead_lag_eth_5m",
+    "bridge_taker_absorption_btc_5m"
+  ],
+  "legacy_indep_pass_ids": [
+    "bridge_oi_price_crowding_fade_btc_5m",
+    "bridge_btc_lead_lag_eth_5m",
+    "bridge_taker_absorption_btc_5m"
+  ]
+}

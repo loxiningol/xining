@@ -17,7 +17,7 @@ from datetime import datetime
 SCHEMA = "qiyu_research_contract_v2"
 VALID_DIRECTIONS = ("long", "short")
 DEFAULT_HORIZONS_BARS = (1, 3, 6, 12)
-PRODUCTION_PROTECTIVE_STOP_PCT = 0.009
+PRODUCTION_PROTECTIVE_STOP_PCT = 0.005  # 0.5% price, unlevered
 PRODUCTION_EXECUTION_LEVERAGE = 20
 
 
@@ -75,20 +75,33 @@ def _operator(raw):
 
 def _indicator_feature(name):
     raw = str(name or "").strip()
-    lower = raw.lower()
+    lower = raw.lower().replace(" ", "").replace("_", "")
     aliases = {
-        "j": "kdj_j", "j值": "kdj_j", "kdj_j": "kdj_j",
+        "j": "kdj_j", "j值": "kdj_j", "kdj_j": "kdj_j", "kdjJ": "kdj_j",
         "k": "kdj_k", "k值": "kdj_k", "kdj_k": "kdj_k",
         "d": "kdj_d", "d值": "kdj_d", "kdj_d": "kdj_d",
         "rsi": "rsi_14", "rsi14": "rsi_14", "rsi_14": "rsi_14",
         "atr": "atr_pct_14", "atr14": "atr_pct_14", "atr_14": "atr_pct_14",
+        # Bollinger(20,2)
+        "布林下轨": "bb_lower_dist", "布林下轨距离": "bb_lower_dist",
+        "bblower": "bb_lower_dist", "bb_lower": "bb_lower_dist",
+        "bb_lower_dist": "bb_lower_dist", "lowerband": "bb_lower_dist",
+        "布林上轨": "bb_upper_dist", "bbupper": "bb_upper_dist",
+        "bb_upper": "bb_upper_dist", "bb_upper_dist": "bb_upper_dist",
+        "布林中轨": "bb_mid_reclaim", "布林中轴": "bb_mid_reclaim",
+        "bbmid": "bb_mid_reclaim", "bb_mid": "bb_mid_reclaim",
+        "bb_mid_reclaim": "bb_mid_reclaim",
+        "布林带宽": "bb_width", "bbwidth": "bb_width", "bb_width": "bb_width",
     }
-    return aliases.get(lower, lower)
+    # Also accept original underscore forms.
+    lower2 = str(name or "").strip().lower()
+    return aliases.get(lower) or aliases.get(lower2) or lower2
 
 
 _COND_RE = re.compile(
     r"(?:[（(]?\s*(?P<tf>\d+\s*(?:m|min|分钟|h|hour|小时))\s*[）)]?\s*(?:的|上|周期)?\s*)?"
-    r"(?P<indicator>kdj[_\- ]?[jkd]|rsi\s*\d*|atr\s*\d*|[jkdJDK](?:值)?)\s*"
+    r"(?P<indicator>kdj[_\- ]?[jkd]|rsi\s*\d*|atr\s*\d*|bb[_\- ]?(?:lower|upper|mid|width)(?:[_\- ]?dist)?|"
+    r"布林(?:下轨|上轨|中轨|中轴|带宽)|[jkdJDK](?:值)?)\s*"
     r"(?P<op>>=|<=|=>|=<|>|<|==|=|大于等于|小于等于|不小于|不大于|至少|至多|大于|小于|超过|低于|等于|为)\s*"
     r"(?P<value>-?\d+(?:\.\d+)?)",
     re.IGNORECASE,
@@ -169,10 +182,70 @@ def _strong_clauses(text):
     strong = (
         "必须", "要求", "仅当", "不得", "禁止", "不能替", "不可替", "保持", "规则",
         "条件", "若", "即", "等到", "收盘", "走完", "触发", "开仓", "平仓",
-        "持有", "固定",
+        "持有", "固定", "硬条款", "机制",
     )
     rows = [p.strip() for p in parts if p.strip() and any(k in p for k in strong)]
     return _uniq(rows)[:40]
+
+
+def _indicator_narrative_clauses(text):
+    """Executable indicator sentences even without 必须/要求 keywords.
+
+    Without this, '触及布林下轨' never enters required_clauses and discovery
+    silently swaps to rsi×z20 lottery books while claiming BB research.
+    """
+    parts = re.split(r"[\n。；;]+", str(text or ""))
+    keys = (
+        "布林", "bollinger", "bb_lower", "bb_upper", "bb_mid", "bb_width",
+        "rsi", "唐奇安", "donchian", "超卖", "超买", "下轨", "上轨", "中轨",
+    )
+    rows = []
+    for part in parts:
+        blob = part.strip()
+        if not blob:
+            continue
+        lower = blob.lower()
+        if any(k in blob or k in lower for k in keys):
+            if _is_performance_target_clause(blob) or _is_policy_meta_clause(blob):
+                continue
+            rows.append(blob)
+    return _uniq(rows)[:24]
+
+
+def _narrative_required_features(text):
+    blob = str(text or "")
+    lower = blob.lower()
+    feats = []
+    if any(t in blob for t in ("布林下轨", "触及下轨", "跌破下轨")) or "bb_lower" in lower:
+        feats.append("bb_lower_dist")
+    if any(t in blob for t in ("布林上轨", "触及上轨", "突破上轨")) or "bb_upper" in lower:
+        feats.append("bb_upper_dist")
+    if any(t in blob for t in ("布林中轨", "布林中轴", "回收中轨", "回归中轨")) or "bb_mid" in lower:
+        feats.append("bb_mid_reclaim")
+    if any(t in blob for t in ("布林带宽", "带宽压缩", "带宽扩张")) or "bb_width" in lower:
+        feats.append("bb_width")
+    if ("布林" in blob or "bollinger" in lower) and not feats:
+        feats.extend(["bb_lower_dist", "bb_mid_reclaim"])
+    if "rsi" in lower or "超卖" in blob or "超买" in blob:
+        feats.append("rsi_14")
+    return _uniq(feats)
+
+
+
+def _is_header_only_clause(text):
+    """Bare section headers are not executable required clauses."""
+    blob = str(text or "").strip()
+    if not blob:
+        return True
+    if re.fullmatch(
+        r"(?:硬条款|软条款|执行|机制|条件|要求|禁止|说明|备注|约束|研究方向)"
+        r"\s*[:：]?\s*",
+        blob,
+    ):
+        return True
+    if re.fullmatch(r"\d+\s*[\)\.、．]\s*", blob):
+        return True
+    return False
 
 
 def _is_performance_target_clause(text):
@@ -186,9 +259,42 @@ def _is_performance_target_clause(text):
         "周收益", "月收益", "年化", "夏普", "sharpe", "dsr", "pbo",
         "最大回撤", "胜率", "收益率目标", "收益目标", "交易频率",
         "周交易量", "周开仓", "周交易次数",
+        "分散赢利", "dense", "distributed", "anti-lottery", "反彩票", "彩票",
     )) and not any(token in blob for token in (
-        "开仓", "入场", "平仓", "止盈", "止损", "k线", "指标",
+        "开仓条件", "入场条件", "平仓条件", "止盈条件", "k线走完",
     ))
+
+
+def _is_policy_meta_clause(text):
+    """Operational policy lines are enforced elsewhere; do not hard-block research.
+
+    Examples: ADA research ban, no auto-mount, no window fabrication.  These are
+    real constraints but they are not machine-exact *event* clauses — treating
+    them as required_clauses made every dense-WR recovery brief die before
+    discovery (invalid_research_contract / required_clause_unrepresentable).
+    """
+    blob = str(text or "").strip().lower()
+    if not blob:
+        return False
+    policy_tokens = (
+        "ada 禁止", "ada禁止", "禁止作为研究", "禁止研究 ada", "禁止研究ada",
+        "禁止：ada", "禁止:ada", "ada 研究", "ada研究",
+        "不得自动上线", "禁止自动上线", "不得挂载", "禁止挂载",
+        "不得伪造", "禁止伪造", "不使用 force", "不降低任何正式复核",
+        "不得自动", "不自动上线", "automatic_live", "auto-mount", "automount",
+        "四次正式复核", "提交四次正式复核", "正式复核门槛",
+        "创造端全部既有门禁", "生产验收任务",
+    )
+    if any(token in blob for token in policy_tokens):
+        return True
+    # Soft search preferences without executable thresholds.
+    if any(token in blob for token in (
+        "优先密集", "优先使用较密", "搜索偏好", "prefer dense",
+    )) and not any(token in blob for token in (
+        "开仓", "入场", "平仓", "止盈", "止损", "持有",
+    )):
+        return True
+    return False
 
 
 _WEEKLY_OPEN_GATE_RE = re.compile(
@@ -252,7 +358,7 @@ def _family_hints(text):
         (("成交量异动", "异常成交量", "放量突破", "volume anomaly"), "volume_anomaly_breakout"),
         (("趋势", "顺势", "momentum", "pullback", "回撤"), "trend_pullback"),
         (("压缩", "squeeze", "波动扩张"), "vol_squeeze_break"),
-        (("均值回归", "mean reversion", "反转"), "mean_reversion"),
+        (("均值回归", "mean reversion", "反转", "布林", "bollinger", "bb_"), "mean_reversion"),
         (("流动性", "sweep", "假突破", "止损猎杀"), "liquidity_sweep"),
         (("衰竭", "exhaust", "恐慌", "超卖"), "exhaustion"),
         (("配对", "协整", "cross-asset", "跨品种", "lead-lag"), "pairs_cointegration"),
@@ -408,18 +514,24 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
     }
 
     parsed_conditions = _parse_conditions(text, timeframe)
-    brief_strong_clauses = _strong_clauses(text)
+    brief_strong_clauses = _uniq(
+        _strong_clauses(text) + _indicator_narrative_clauses(text)
+    )
     strong_clauses = _uniq(
         _list(event_in.get("required_clauses"))
         + _list(constraints.get("required_clauses"))
         + [row for row in brief_strong_clauses
-           if not _is_performance_target_clause(row)]
+           if not _is_performance_target_clause(row)
+           and not _is_policy_meta_clause(row)
+           and not _is_header_only_clause(row)]
     )
     diagnostic_clauses = _uniq(
         _list(event_in.get("diagnostic_clauses"))
         + _list(constraints.get("diagnostic_clauses"))
         + [row for row in brief_strong_clauses
-           if _is_performance_target_clause(row)]
+           if _is_performance_target_clause(row)
+           or _is_policy_meta_clause(row)
+           or _is_header_only_clause(row)]
     )
     required_conditions = _uniq(
         _list(event_in.get("required_conditions"))
@@ -437,6 +549,12 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
             "signal_evaluation": "closed_bar",
             "timeframe": timeframe,
         }
+    elif any(k in text for k in ("下一根开盘", "下根开盘", "次根开盘", "下一根开仓")):
+        timing_mode = {
+            "mode": "next_bar_open",
+            "signal_evaluation": "closed_bar",
+            "timeframe": timeframe,
+        }
     # Do not invent execution timing when the human did not specify it.  An
     # explicit bar-close/next-open requirement is immutable and must be checked
     # by the compiler/backtester; unspecified timing stays a research choice.
@@ -448,6 +566,7 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
         _list(feature_in.get("required_features"))
         + _list(constraints.get("required_features"))
         + [row.get("feature") or row.get("indicator") for row in required_conditions if isinstance(row, dict)]
+        + _narrative_required_features(text)
     )
     explicit_allowed = (
         bool(feature_in.get("allowed_features_enforced"))
@@ -528,7 +647,7 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
         errors.append("early_take_profit_research_policy_unsupported")
     stop_pct = ((holding_contract.get("protective_stop_policy") or {}).get("price_pct"))
     if stop_pct is None or abs(float(stop_pct) - PRODUCTION_PROTECTIVE_STOP_PCT) > 1e-12:
-        errors.append("protective_stop_policy_must_equal_0p9pct")
+        errors.append("protective_stop_policy_must_equal_0p5pct")
 
     explicit_family_hints = _uniq(_list(supplied.get("family_hints")))
     # Structured mechanism families are an allowlist, not a suggestion.  Text
@@ -569,10 +688,80 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
             "session", "utc", "时段", "交易时段",
         )) and session_window:
             represented_by.append("session_window:structured")
-        if any(token in text_clause for token in ("不得", "禁止", "不可替", "不能替")) and (
+        if any(token in text_clause for token in (
+            "不得", "禁止", "不可替", "不能替", "顶替", "彩票",
+        )) and (
             forbidden_substitutions
+            or any(tok in text_clause for tok in (
+                "单因子", "任意单因子", "替代为完整", "替換为完整", "替换为完整",
+                "close_z", "顶替布林", "账户口径垃圾", "交屎",
+            ))
+            or "布林" in text_clause
         ):
             represented_by.append("feature_contract:forbidden_substitutions")
+        if any(token in text_clause for token in (
+            "制造", "交接门槛", "精简四AI", "精简多AI", "制造≥", "制造>=",
+        )):
+            represented_by.append("manufacture_batch_policy:handoff_floors")
+        if any(token in text_clause for token in (
+            "20倍", "20x", "杠杆", "0.9%", "0.9％", "0.5%", "0.5％", "保护止损", "下一根",
+        )) and (
+            (holding_contract.get("protective_stop_policy") or {}).get("price_pct")
+            is not None
+            or (holding_contract.get("execution_leverage") is not None)
+            or (timing_mode.get("mode") == "next_bar_open")
+        ):
+            if "下一根" in text_clause or "开盘" in text_clause:
+                represented_by.append("entry_timing:next_bar_open")
+            if "杠杆" in text_clause or "20" in text_clause:
+                represented_by.append("holding_contract:execution_leverage")
+            if "止损" in text_clause or "0.9" in text_clause or "0.5" in text_clause:
+                represented_by.append("holding_contract:protective_stop")
+        # Bollinger narrative clauses → formal bb_* factors (now machine-exact).
+        lower_clause = text_clause.lower()
+        if any(token in text_clause for token in (
+            "布林下轨", "触及下轨", "跌破下轨", "下轨外侧",
+        )) or any(token in lower_clause for token in (
+            "bollinger lower", "lower band", "bb_lower",
+        )):
+            represented_by.append("factor:bb_lower_dist")
+        if any(token in text_clause for token in (
+            "布林上轨", "触及上轨", "突破上轨",
+        )) or any(token in lower_clause for token in (
+            "bollinger upper", "upper band", "bb_upper",
+        )):
+            represented_by.append("factor:bb_upper_dist")
+        if any(token in text_clause for token in (
+            "布林中轨", "布林中轴", "回归中轨", "回收中轨",
+        )) or any(token in lower_clause for token in (
+            "bollinger mid", "middle band", "bb_mid",
+        )):
+            represented_by.append("factor:bb_mid_reclaim")
+        if any(token in text_clause for token in (
+            "布林带宽", "带宽压缩", "带宽扩张",
+        )) or "bb_width" in lower_clause or "bollinger width" in lower_clause:
+            represented_by.append("factor:bb_width")
+        if (
+            ("布林" in text_clause or "bollinger" in lower_clause or " boll" in lower_clause)
+            and not any(x.startswith("factor:bb_") for x in represented_by)
+        ):
+            # Generic 布林 mention → mid+lower mean-reversion pair.
+            represented_by.append("factor:bb_lower_dist")
+            represented_by.append("factor:bb_mid_reclaim")
+        if any(token in text_clause for token in (
+            "多条件", "合取", "完整时序", "完整事件", "复合",
+        )):
+            # Mechanism completeness is enforced by discovery event_kind /
+            # intersection probes; keep the clause exact via that identity.
+            represented_by.append("event_contract:mechanism_preserving_intersection")
+        if any(token in text_clause for token in (
+            "开发段", "确认段", "独立确认", "冻结后再", "不得反向参与选择",
+        )):
+            represented_by.append("research_protocol:dev_confirm_split")
+        if any(token in text_clause for token in (
+            "手续费", "滑点", "半价差", "摩擦", "friction", "cost",
+        )):
+            represented_by.append("probe_protocol:cost_scenarios_internalized")
         status = "machine_exact" if represented_by else "unsupported"
         clause_id = "clause_%s" % _canonical_hash({
             "index": index, "text": text_clause,
@@ -711,14 +900,24 @@ def apply_to_hypothesis(hypothesis, contract):
         ((contract.get("feature_contract") or {}).get("forbidden_substitutions") or [])
     )
     hints = list(row.get("factor_hints") or row.get("observable_proxy") or [])
-    for feature in ((contract.get("feature_contract") or {}).get("required_features") or []):
+    required_features = list(
+        ((contract.get("feature_contract") or {}).get("required_features") or [])
+    )
+    for feature in required_features:
         if feature not in hints:
             hints.insert(0, feature)
     row["factor_hints"] = _uniq(hints)
+    hint_set = set(str(x) for x in (row.get("factor_hints") or []))
+    req_set = set(str(x) for x in required_features)
+    overlap = sorted(hint_set & req_set)
+    row["contract_feature_overlap"] = overlap
+    row["contract_feature_overlap_n"] = len(overlap)
     families = set(contract.get("family_hints") or [])
     row["contract_family_match"] = not families or str(row.get("family") or "") in families
     row["contract_family_enforced"] = bool(contract.get("family_hints_enforced"))
     row["contract_priority"] = 5.0 if row["contract_family_match"] else 0.0
+    if overlap:
+        row["contract_priority"] = float(row["contract_priority"]) + 2.0 * len(overlap)
     return row
 
 

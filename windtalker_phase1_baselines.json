@@ -1,0 +1,58 @@
+{
+  "prompt_baseline": {
+    "source": "user_prompt_static_numbers",
+    "fillable_weekly": 2.3472,
+    "fillable_daily": 0.3353,
+    "calibrated_positive_E_weekly": 0.0,
+    "positive_E_gap_weekly": 3.5,
+    "live_strategy_count": 5,
+    "mechanism_family_count": 2,
+    "note": "Prompt cited these as baseline; live values re-read below."
+  },
+  "live_baseline": {
+    "schema": "qiyu_strategy_creation_frequency_input_v2",
+    "priority": "positive_expectancy_frequency_gap",
+    "generated_at": "2026-07-27 21:46:22",
+    "forecast_id": "fc_2026-07-27_214622_a51a90ee3c99",
+    "strategy_pool_version": "a51a90ee3c993ebe",
+    "fillable_weekly": 2.3472,
+    "fillable_daily": 0.3353,
+    "calibrated_positive_E_weekly": 0.0,
+    "positive_E_gap_weekly": 3.5,
+    "uncalibrated_contribution": 0.3,
+    "near_zero_contribution": 0.5,
+    "negative_contribution": 1.808,
+    "do_not_loosen_entries": true,
+    "do_not_force_open": true,
+    "prioritize_positive_expectancy_gap": true,
+    "mounted_count": 5,
+    "can_open_count": 5,
+    "mechanism_families": {
+      "independent_niche_count": 2,
+      "note": "NG/LTC/XRP exhaustion fades count as one family when present",
+      "saturated": [
+        "exhaustion_fade_short"
+      ],
+      "weights_weekly": {
+        "exhaustion_fade_short": 2.4579999999999997,
+        "session_trend_pullback": 0.15
+      }
+    },
+    "factory_creation_priority": "positive_expectancy_frequency_gap",
+    "factory_flags": {
+      "do_not_loosen_entries": true,
+      "do_not_force_open": true
+    }
+  },
+  "deltas": {
+    "fillable_weekly_delta": 0.0,
+    "gap_weekly_delta": 0.0,
+    "positive_E_delta": 0.0,
+    "reasons": [
+      "Live creation input re-read at orchestrator start (schema v2, priority=positive_expectancy_frequency_gap).",
+      "Fillable weekly may drift slightly with forecast refresh; positive-E gap remains +3.5 while calibrated positive-E=0.",
+      "Pool version a51a90ee3c993ebe unchanged (no new mounts)."
+    ]
+  },
+  "generated_at": "2026-07-27 22:40:43"
+}

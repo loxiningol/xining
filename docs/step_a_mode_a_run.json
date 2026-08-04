@@ -1,0 +1,433 @@
+{
+  "ok": false,
+  "task_id": "wsa_20260727_013842_ca6c",
+  "reason": "repair_exhausted_or_drift",
+  "gate_results": {
+    "schema": "qiyu_step_a_v1",
+    "artifact": "gate_results",
+    "code_version": "step_a_strategy_creation_20260726",
+    "task_id": "wsa_20260727_013842_ca6c",
+    "created_at": "2026-07-27 01:40:42",
+    "gates": [
+      {
+        "gate_id": "gate0_mechanism_integrity",
+        "name": "机制完整性",
+        "pass": true,
+        "blocking": true,
+        "evidence": {
+          "spec_complete": true,
+          "counterparty_clear": true,
+          "edge_decay_clear": true,
+          "not_indicator_soup": true,
+          "family_present": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:39:46"
+      },
+      {
+        "gate_id": "gate1_code_fidelity",
+        "name": "代码忠实度",
+        "pass": true,
+        "blocking": true,
+        "evidence": {
+          "fidelity_pass": true,
+          "has_entry": true,
+          "has_exit_or_exit_logic": true,
+          "stop_in_spec": true,
+          "no_non_negotiable_violations": true,
+          "no_future_feature_tokens": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:39:46"
+      },
+      {
+        "gate_id": "gate2_base_backtest",
+        "name": "基础回测",
+        "pass": true,
+        "blocking": true,
+        "evidence": {
+          "sample_size": 165,
+          "win_rate_pct": 13.333333333333334,
+          "profit_factor": null,
+          "gross_expectancy": -0.048645965627030455,
+          "cost_after_expectancy": -0.048645965627030455,
+          "max_dd": null,
+          "holding": null,
+          "trade_frequency_proxy_trades": 165
+        },
+        "notes": [
+          "gate2_records_metrics; quality judged with later gates"
+        ],
+        "at": "2026-07-27 01:40:42"
+      },
+      {
+        "gate_id": "gate3_walk_forward",
+        "name": "Walk-forward",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "pass_count": 0,
+          "total": 10,
+          "requirement": "7/10",
+          "windows": [
+            {
+              "id": "window_0",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 12.5,
+                "mean_net": -0.04624432035876317,
+                "oos_profit": -0.08241760732580686,
+                "sharpe": -3.0949,
+                "fold_positive": 1,
+                "folds": 10,
+                "fold_means": [
+                  -0.080606,
+                  -0.115342,
+                  0.014506,
+                  -0.064637,
+                  -0.036132,
+                  -0.11358,
+                  -0.022795,
+                  -0.0067,
+                  -0.037597,
+                  -0.000262
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_1",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 12.5,
+                "mean_net": -0.049429315406470796,
+                "oos_profit": -0.06054243491080739,
+                "sharpe": -2.721,
+                "fold_positive": 0,
+                "folds": 10,
+                "fold_means": [
+                  -0.033162,
+                  -0.157002,
+                  -0.050168,
+                  -0.066783,
+                  -0.059038,
+                  -0.046853,
+                  -0.01725,
+                  -0.019609,
+                  -0.010029,
+                  -0.010438
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_2",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 6.25,
+                "mean_net": -0.05946427418222175,
+                "oos_profit": -0.09064690963499561,
+                "sharpe": -2.9185,
+                "fold_positive": 1,
+                "folds": 10,
+                "fold_means": [
+                  -0.025003,
+                  -0.033371,
+                  -0.050023,
+                  -0.162982,
+                  -0.01993,
+                  -0.082012,
+                  -0.135588,
+                  -0.028029,
+                  0.003919,
+                  -0.035228
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_3",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 12.5,
+                "mean_net": -0.0610939697572387,
+                "oos_profit": -0.19701492685526567,
+                "sharpe": -3.0708,
+                "fold_positive": 2,
+                "folds": 10,
+                "fold_means": [
+                  -0.079563,
+                  -0.049157,
+                  0.027059,
+                  -0.12758,
+                  0.001485,
+                  -0.216162,
+                  -0.080659,
+                  -0.030609,
+                  -0.016622,
+                  -0.066581
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_4",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 12.5,
+                "mean_net": -0.042872805361759046,
+                "oos_profit": -0.17038496444037715,
+                "sharpe": -2.3567,
+                "fold_positive": 1,
+                "folds": 10,
+                "fold_means": [
+                  -0.000333,
+                  -0.111028,
+                  -0.036121,
+                  0.004619,
+                  -0.016277,
+                  -0.014926,
+                  -0.109415,
+                  -0.033551,
+                  -0.039954,
+                  -0.028463
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_5",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 25.0,
+                "mean_net": -0.051885008234970775,
+                "oos_profit": -0.3408952134598112,
+                "sharpe": -2.1943,
+                "fold_positive": 3,
+                "folds": 10,
+                "fold_means": [
+                  -0.216142,
+                  -0.140025,
+                  0.038934,
+                  -0.003981,
+                  0.033937,
+                  -0.117455,
+                  0.012768,
+                  -0.053259,
+                  -0.117579,
+                  -0.026239
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_6",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 37.5,
+                "mean_net": -0.044912806858067394,
+                "oos_profit": -0.3933635549294087,
+                "sharpe": -2.1895,
+                "fold_positive": 2,
+                "folds": 10,
+                "fold_means": [
+                  -0.058526,
+                  -0.02499,
+                  0.0301,
+                  -0.121146,
+                  -0.014906,
+                  0.034538,
+                  -0.004635,
+                  -0.004592,
+                  -0.072148,
+                  -0.122238
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_7",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 0.0,
+                "mean_net": -0.03290556576166069,
+                "oos_profit": -0.18257111391485328,
+                "sharpe": -6.8686,
+                "fold_positive": 0,
+                "folds": 10,
+                "fold_means": [
+                  -0.023372,
+                  -0.018281,
+                  -0.025851,
+                  -0.027154,
+                  -0.056659,
+                  -0.025867,
+                  -0.03232,
+                  -0.038678,
+                  -0.052926,
+                  -0.019021
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_8",
+              "pass": false,
+              "metrics": {
+                "trades": 16,
+                "win_rate_pct": 0.0,
+                "mean_net": -0.07707035173667182,
+                "oos_profit": -0.4477865515402306,
+                "sharpe": -4.2149,
+                "fold_positive": 0,
+                "folds": 10,
+                "fold_means": [
+                  -0.020144,
+                  -0.046897,
+                  -0.022809,
+                  -0.126121,
+                  -0.122274,
+                  -0.023178,
+                  -0.064312,
+                  -0.216183,
+                  -0.068026,
+                  -0.047776
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_9",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 14.285714285714285,
+                "mean_net": -0.02726331647308753,
+                "oos_profit": -0.15920299950368794,
+                "sharpe": -5.2084,
+                "fold_positive": 0,
+                "folds": 10,
+                "fold_means": [
+                  -0.01784,
+                  -0.047992,
+                  -0.030794,
+                  -0.034887,
+                  -0.016161,
+                  -0.004309,
+                  -0.05468,
+                  -0.016467,
+                  -0.038742,
+                  -0.016262
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            }
+          ],
+          "average_only_forbidden": true,
+          "has_per_window_detail": true,
+          "failed_window_explanations": [
+            {
+              "id": "window_0",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_1",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_2",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_3",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_4",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_5",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_6",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_7",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_8",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_9",
+              "reason": "chunk_non_positive_or_empty"
+            }
+          ]
+        },
+        "notes": [],
+        "at": "2026-07-27 01:40:42"
+      },
+      {
+        "gate_id": "gate4_split_destruction",
+        "name": "gate4_split_destruction",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:40:42"
+      },
+      {
+        "gate_id": "gate5_mc_friction",
+        "name": "gate5_mc_friction",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:40:42"
+      },
+      {
+        "gate_id": "gate6_multi_ai_review",
+        "name": "gate6_multi_ai_review",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:40:42"
+      },
+      {
+        "gate_id": "gate7_human_confirm",
+        "name": "gate7_human_confirm",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 01:40:42"
+      }
+    ],
+    "all_gates_pass": false,
+    "first_fail_gate": "gate3_walk_forward",
+    "passed_count": 3,
+    "total_gates": 8,
+    "production_mounted": false
+  }
+}

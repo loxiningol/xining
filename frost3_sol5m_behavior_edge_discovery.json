@@ -1,0 +1,239 @@
+{
+  "report_title": "SOL/USDT PERPETUAL 5m — Edge Discovery Report",
+  "symbol": "SOL-USDT-SWAP",
+  "timeframe": "5m",
+  "key_prefix": "frost3_sol5m_behavior_",
+  "fixed": {
+    "leverage": 20,
+    "stop_loss_pct": 0.009,
+    "position_pct": 0.30,
+    "no_martingale_grid_add_dynstop": true
+  },
+  "targets": {
+    "opens_per_day": [0.8, 1.5],
+    "theoretical_wr_avg_ds_qwen_glm": 75.0,
+    "fees": "model maker AND taker paths honestly",
+    "slippage": "must simulate; still profitable"
+  },
+  "forbidden": "Indicator-combo edge (EMA/MACD/RSI/ADX/BB stacks as the strategy)",
+  "allowed_families": [
+    "Order Flow Proxy",
+    "Liquidity Sweep",
+    "Volatility Compression",
+    "VWAP Behaviour",
+    "Funding Behaviour",
+    "OI Behaviour",
+    "Session Rotation",
+    "Auction Failure"
+  ],
+  "proxy_documentation": {
+    "order_book_depth": "unavailable in DSL/backtest — NOT claimed as tradable L2",
+    "true_volume": "OKX candle volume used when present; else ATR pulse proxy",
+    "order_flow_proxy": "close location in bar range + body ratio (aggressive buy/sell proxy)",
+    "liquidity_sweep_proxy": "pierce prev_low20/prev_high20 then close back through level + wick dominance",
+    "vol_compression_proxy": "vol_compress_proxy = atr14 / atr14.rolling(48).median",
+    "vol_pulse_proxy": "vol_pulse_proxy = atr14 / atr14.rolling(48).mean",
+    "vwap_proxy": "cum_vwap from typical_price=(h+l+c)/3 weighted by volume (or range if vol missing); vwap_dist_proxy=(close-vwap)/vwap",
+    "session_rotation": "hour_utc + session_liq (UTC 07–20 primary liquidity window)",
+    "auction_failure": "break prev_high20/prev_low20 then close back inside + opposing wick ≥ threshold",
+    "funding_behaviour": "OKX public funding-rate-history fetched when network allows; funding_z_proxy / funding_sign features injected if series alignable; else documented as unavailable for bar-level backtest",
+    "oi_behaviour": "OKX open-interest snapshot + history if fetchable; oi_chg_proxy; else document gap"
+  },
+  "probe_note_zh": "本地OKX公开300根5m探针(~1天)：裸扫流动性过频(7–12/日)；会话+下影线回收≈0.96/日落入目标带；需在远程全样本上复核。",
+  "probe_stats_1d": {
+    "bars": 300,
+    "session_utc_7_20_pct": 52.0,
+    "raw_sweep_long_per_day": 7.68,
+    "raw_sweep_short_per_day": 12.48,
+    "session_sweep_long_lw025_per_day": 0.96,
+    "of_reclaim_long_eu_per_day": 0.96,
+    "vwap_reclaim_long_sess_per_day": 0.96,
+    "auction_fail_short_sess_vp_per_day": 2.88,
+    "funding_latest_sample": "mild positive ~3e-5; history oscillates around 0 — extreme funding fade rare"
+  },
+  "known_deaths_to_avoid": [
+    "SOL5m impulse_continuation — trades过多、WF崩、friction吞噬（frost2 postmortem）",
+    "btc5_exhaustion_reclaim friction_negative",
+    "CL15m exhaustion 边际rsi≈54 + 硬止损簇",
+    "盲克隆 live ADA trend_pullback / LTC&NG exhaustion_fade / XRP15m exhaustion",
+    "无会话约束的5m高频刷单",
+    "把RSI/MACD/EMA丝带当edge伪装成behaviour"
+  ],
+  "candidates": [
+    {
+      "id": 1,
+      "family": "Liquidity Sweep",
+      "logic_class": "session_liquidity_sweep_reclaim_long",
+      "direction": "long",
+      "thesis_zh": "主流动性会话内刺穿近端低点后收回，下影主导=止损猎杀后回流",
+      "entry_sketch": "session_liq>0.5; close>prev_low20; low触及/低于prev_low20由低点代理; lower_wick_proxy>0.25; vol_pulse_proxy>1.0; vwap_dist_proxy>-0.004",
+      "exit_sketch": "close<prev_low20 invalidation; vwap_dist_proxy>0.006 take; max_hold=36",
+      "freq_hint_per_day": "0.8-1.4",
+      "novelty_vs_live": "非ADA pullback/LTC exhaustion；是会话扫损回收",
+      "proxy_honesty": "无L2；用prev_low20+wick+ATR脉冲"
+    },
+    {
+      "id": 2,
+      "family": "Auction Failure",
+      "logic_class": "session_auction_fail_short",
+      "direction": "short",
+      "thesis_zh": "突破近端高点失败并收回区间，上影主导=拍卖失败供给",
+      "entry_sketch": "session_liq>0.5; high刺破prev_high20; close<prev_high20; upper_wick_proxy>0.4; vol_pulse_proxy>1.0",
+      "exit_sketch": "close>prev_high20 invalidation; max_hold=32",
+      "freq_hint_per_day": "1.5-3（需再收紧）",
+      "novelty_vs_live": "非趋势突破追空；是失败拍卖",
+      "proxy_honesty": "拍卖失败用OHLC结构代理"
+    },
+    {
+      "id": 3,
+      "family": "Order Flow Proxy",
+      "logic_class": "aggressive_close_reclaim_long",
+      "direction": "long",
+      "thesis_zh": "欧美学段近端低点附近收盘逼近bar高位=主动买盘代理",
+      "entry_sketch": "hour_utc>=13; hour_utc<20; close位置比>0.7; body_ratio_proxy>0.35; close>prev_low20",
+      "exit_sketch": "close位置比<0.35 invalidation; max_hold=28",
+      "freq_hint_per_day": "~1.0 (1d探针)",
+      "novelty_vs_live": "非指标交叉；是收盘位置流代理",
+      "proxy_honesty": "非真实delta；OHLC位置代理"
+    },
+    {
+      "id": 4,
+      "family": "VWAP Behaviour",
+      "logic_class": "session_vwap_reclaim_long",
+      "direction": "long",
+      "thesis_zh": "会话内价格由VWAP下方收回至上方且波动脉冲确认",
+      "entry_sketch": "session_liq>0.5; vwap_dist_proxy由负转正; vol_pulse_proxy>1.02; close>open",
+      "exit_sketch": "vwap_dist_proxy<0 invalidation; max_hold=40",
+      "freq_hint_per_day": "~1.0 (1d探针)",
+      "novelty_vs_live": "VWAP行为非EMA丝带",
+      "proxy_honesty": "cum VWAP用volume加权typical price"
+    },
+    {
+      "id": 5,
+      "family": "VWAP Behaviour",
+      "logic_class": "session_vwap_reject_short",
+      "direction": "short",
+      "thesis_zh": "会话内从上方向下拒绝VWAP",
+      "entry_sketch": "session_liq>0.5; vwap_dist_proxy由正转负; upper_wick_proxy>0.3; close<open",
+      "exit_sketch": "vwap_dist_proxy>0 invalidation; max_hold=36",
+      "freq_hint_per_day": "~2.9 (需降频)",
+      "novelty_vs_live": "VWAP拒绝非exhaustion RSI",
+      "proxy_honesty": "同上"
+    },
+    {
+      "id": 6,
+      "family": "Volatility Compression",
+      "logic_class": "compress_then_sweep_long",
+      "direction": "long",
+      "thesis_zh": "波动压缩后出现扫低收回=能量释放方向偏好多头回收",
+      "entry_sketch": "vol_compress_proxy<0.85; session_liq>0.5; sweep reclaim prev_low20; lower_wick_proxy>0.2",
+      "exit_sketch": "vol_compress_proxy>1.15 或 close<prev_low20; max_hold=36",
+      "freq_hint_per_day": "低（1d探针0）— 全样本再估",
+      "novelty_vs_live": "压缩+扫损组合，非BB squeeze指标栈",
+      "proxy_honesty": "ATR中位压缩代理"
+    },
+    {
+      "id": 7,
+      "family": "Volatility Compression",
+      "logic_class": "compress_failed_break_short",
+      "direction": "short",
+      "thesis_zh": "压缩后假突破高点失败",
+      "entry_sketch": "vol_compress_proxy<0.8; auction fail short结构; session_liq>0.5",
+      "exit_sketch": "close>prev_high20; max_hold=32",
+      "freq_hint_per_day": "待全样本",
+      "novelty_vs_live": "压缩失败拍卖",
+      "proxy_honesty": "ATR压缩+OHLC失败突破"
+    },
+    {
+      "id": 8,
+      "family": "Session Rotation",
+      "logic_class": "asia_thin_fade_into_london",
+      "direction": "short",
+      "thesis_zh": "亚盘薄流动性冲高后在伦敦开盘窗失败回落",
+      "entry_sketch": "hour_utc>=7; hour_utc<10; upper_wick_proxy>0.4; close<prev_high20; vol_pulse_proxy>1.05",
+      "exit_sketch": "hour_utc>=14 或结构失效; max_hold=24",
+      "freq_hint_per_day": "待估",
+      "novelty_vs_live": "会话轮转非趋势指标",
+      "proxy_honesty": "用hour_utc会话，无真实深度"
+    },
+    {
+      "id": 9,
+      "family": "Session Rotation",
+      "logic_class": "us_overlap_flow_continuation_long",
+      "direction": "long",
+      "thesis_zh": "美欧重叠主动买盘收盘位置持续，非EMA追涨",
+      "entry_sketch": "hour_utc>=13; hour_utc<18; close_loc_proxy>0.65; vol_pulse_proxy>1.05; vwap_dist_proxy>0",
+      "exit_sketch": "close_loc_proxy<0.4; max_hold=30",
+      "freq_hint_per_day": "可能偏高需再滤",
+      "novelty_vs_live": "会话流，非ADA pullback",
+      "proxy_honesty": "收盘位置+会话"
+    },
+    {
+      "id": 10,
+      "family": "Funding Behaviour",
+      "logic_class": "funding_extreme_fade_short",
+      "direction": "short",
+      "thesis_zh": "资金费率显著为正后的拥挤多头回撤（需funding序列）",
+      "entry_sketch": "funding_z_proxy>1.5; session_liq>0.5; close<prev_high20; upper_wick_proxy>0.3",
+      "exit_sketch": "funding_z_proxy<0.5 或结构失效; max_hold=48",
+      "freq_hint_per_day": "低（funding 8h步进）",
+      "novelty_vs_live": "资金费率行为",
+      "proxy_honesty": "优先OKX funding history；若无法对齐bar则降权/跳过"
+    },
+    {
+      "id": 11,
+      "family": "Funding Behaviour",
+      "logic_class": "funding_extreme_fade_long",
+      "direction": "long",
+      "thesis_zh": "显著负费率拥挤空头回补",
+      "entry_sketch": "funding_z_proxy<-1.5; session_liq>0.5; lower_wick_proxy>0.3; close>prev_low20",
+      "exit_sketch": "funding_z_proxy>-0.5; max_hold=48",
+      "freq_hint_per_day": "低",
+      "novelty_vs_live": "资金费率行为",
+      "proxy_honesty": "同上"
+    },
+    {
+      "id": 12,
+      "family": "OI Behaviour",
+      "logic_class": "oi_drop_with_sweep_long",
+      "direction": "long",
+      "thesis_zh": "OI下降伴随扫低收回=杠杆清洗后反弹",
+      "entry_sketch": "oi_chg_proxy<0; sweep reclaim; session_liq>0.5",
+      "exit_sketch": "结构失效; max_hold=36",
+      "freq_hint_per_day": "依赖OI序列可得性",
+      "novelty_vs_live": "OI清洗行为",
+      "proxy_honesty": "OI history若不可用则标记unavailable并淘汰该边"
+    },
+    {
+      "id": 13,
+      "family": "Liquidity Sweep",
+      "logic_class": "session_liquidity_sweep_reclaim_short",
+      "direction": "short",
+      "thesis_zh": "会话内刺穿近端高点收回",
+      "entry_sketch": "session_liq>0.5; close<prev_high20; upper_wick_proxy>0.25; vol_pulse_proxy>1.0",
+      "exit_sketch": "close>prev_high20; max_hold=36",
+      "freq_hint_per_day": "原始偏高，需wick+会话双重过滤",
+      "novelty_vs_live": "扫高回收空，非LTC衰竭空",
+      "proxy_honesty": "prev_high20+wick"
+    },
+    {
+      "id": 14,
+      "family": "Order Flow Proxy",
+      "logic_class": "absorption_wick_long",
+      "direction": "long",
+      "thesis_zh": "大下影+小实体近低点=吸收抛压代理",
+      "entry_sketch": "lower_wick_proxy>0.55; body_ratio_proxy<0.25; session_liq>0.5; close>prev_low20",
+      "exit_sketch": "lower_wick失效/跌破; max_hold=28",
+      "freq_hint_per_day": "待估",
+      "novelty_vs_live": "吸收结构",
+      "proxy_honesty": "无足迹图；wick/body代理"
+    }
+  ],
+  "primary_seed_for_hypothesis": "session_liquidity_sweep_reclaim_long",
+  "secondary_seeds": [
+    "session_vwap_reclaim_long",
+    "aggressive_close_reclaim_long",
+    "session_auction_fail_short"
+  ],
+  "created_at_note": "Edge Discovery FIRST — before DSL finalization / gates"
+}

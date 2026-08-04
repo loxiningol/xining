@@ -230,7 +230,7 @@ TARGET_TRADES_PER_DAY = (0.5, 1.0)
 return {"state": "SAT_WITNESS" if all(checks.values()) else "CONTRADICTION", ...}
 ```
 
-检查项含: 机器初筛五折≥4/5、DD<40%、人工确认门禁、S/A/B/C 比例 (70/50/30/15%)、杠杆 20x、WxPusher 通道存在等。
+检查项含: 机器初筛五折≥4/5、DD<40%、人工确认门禁、S/A/B/C 比例 (70/50/30/10%)、杠杆 20x、WxPusher 通道存在等。
 
 进化循环 (`auto_trade_strategy_evolution.py`) 与生态工厂均依赖 SAT_WITNESS 心跳; 异常时禁止放松门禁。
 
@@ -259,7 +259,7 @@ return {"state": "SAT_WITNESS" if all(checks.values()) else "CONTRADICTION", ...
 ```python
 """Create → machine screen → WxPusher push → human confirm → B(30%) live
 Grades (equity ratio, leverage fixed 20x):
-  S=70%  A=50%  B=30%  C=15%
+  S=70%  A=50%  B=30%  C=10%
 Never auto-live without human confirm."""
 ```
 
@@ -475,7 +475,7 @@ Web 指标 API:
 | 主止损 | **0.9%** (`STOP_LOSS_PCT=0.009`) | 全局默认 |
 | 辅止损 | **0.6%** | ecosystem 文档 (auxiliary) |
 | 止盈 | **0.9%** | web_server auto_mode base_cfg |
-| S/A/B/C 仓位比 | 70/50/30/15% | human_confirm + lifecycle |
+| S/A/B/C 仓位比 | 70/50/30/10% | human_confirm + lifecycle |
 
 ---
 

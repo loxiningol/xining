@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "reference_metric_tests": "passed",
+  "production_reference_parity": "passed",
+  "weekly_frequency_formula": "verified",
+  "weekly_frequency_reference": 1.0,
+  "weekly_frequency_production": 1.0,
+  "weekly_frequency_diff": 0.0,
+  "average_profitable_trade_formula": "verified",
+  "avg_profitable_return_reference": 0.12000000000000058,
+  "fee_inclusion": "verified",
+  "leverage_application": "verified",
+  "stop_distance": "verified",
+  "intrabar_ordering": "verified",
+  "unit_tests": {
+    "ok": true,
+    "returncode": 0,
+    "tail": "......................................./usr/lib/python3.6/site-packages/pytz/__init__.py:499: ResourceWarning: unclosed file <_io.TextIOWrapper name='/usr/share/zoneinfo/zone.tab' mode='r' encoding='UTF-8'>\n  for l in open(os.path.join(_tzinfo_dir, 'zone.tab'))\n/usr/lib64/python3.6/importlib/_bootstrap.py:219: RuntimeWarning: numpy.ufunc size changed, may indicate binary incompatibility. Expected 192 from C header, got 216 from PyObject\n  return f(*args, **kwds)\n....\n----------------------------------------------------------------------\nRan 43 tests in 1.232s\n\nOK",
+    "reference_metric_tests": "passed",
+    "at": "2026-08-04 07:47:49"
+  },
+  "policy_version": "manufacture_batch_policy_v1+review_gate_v1",
+  "handoff_floors": {
+    "win_rate": 0.45,
+    "mean_win_only_pct": 9.0,
+    "weekly": 0.5,
+    "profit_first": 0.55
+  },
+  "at": "2026-08-04 07:47:49"
+}

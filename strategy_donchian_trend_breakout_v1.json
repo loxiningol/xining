@@ -1,0 +1,700 @@
+{
+  "ok": true,
+  "errors": [],
+  "schema": "qiyu_step_a_v1",
+  "artifact": "strategy_candidate_pack",
+  "call_id": "prebuilt_structure_confirmed_donchian_trend_breakout_v1",
+  "attempts": 0,
+  "meta": {
+    "symbol": "BTC-USDT-SWAP",
+    "timeframe": "15m",
+    "direction": "long",
+    "title": "structure_confirmed_donchian_trend_breakout",
+    "title_zh": "唐奇安结构确认趋势突破",
+    "thesis": "Failed pack vol_accepted_donchian_h1_continuation died on L1 sample_payoff (weak h1_slope>0 + mild vol_z>1.0). This NEW family requires: (1) Donchian20 close-cross acceptance, (2) 2-bar rising structure into the break (trend initiation), (3) meaningful HTF slope magnitude h1_slope4>0.0015, (4) dual volume confirm vol_z20>1.6 AND vol_ma20_ratio>1.2, (5) ATR regime band to reject chop/chaos. Harvest with partial_tp_atr 0.5@2.5 + atr_trailing 3.5; protective 0.9% SL. Not a rename of blocked Donchian.",
+    "source": "handcraft_workflow_v2_donchian_trend_breakout_v1",
+    "primary_submit": "BTC-USDT-SWAP 15m long",
+    "suggested_core_features": [
+      "prev_high20",
+      "prev_low20",
+      "vol_z20",
+      "vol_ma20_ratio",
+      "atr14",
+      "h1_slope4"
+    ],
+    "holding_horizon": "6_to_40_bars_15m",
+    "matrix_intent": {
+      "primary": {
+        "symbol": "BTC-USDT-SWAP",
+        "timeframe": "15m",
+        "direction": "long"
+      },
+      "enable_multi_symbol_matrix": true,
+      "note": "38-symbol suitable_symbols for L1 aggregate fills; primary BTC 15m."
+    },
+    "kb_avoidance": [
+      "vol_accepted_donchian_h1_continuation (blocked; L1 sample_payoff)",
+      "macro_sfp_displacement*",
+      "htf_ema_align_ltf_cci_vol_pullback",
+      "stop_hunt_range_reclaim / breakout_trap_reversal / liquidity_failed_breakout_*",
+      "compression_release_structural_breakout / atr_decline_htf_range_break",
+      "fixed micro-TP / fixed % take-profit",
+      "EMA/CCI/RSI as core edge"
+    ],
+    "contract_id": "structure_confirmed_donchian_trend_breakout",
+    "redesign_note": "submit1 wsa_20260730_220817_958d failed pretest no_invariants_contract; embed contract (redesign1)"
+  },
+  "mechanism_spec": {
+    "mechanism_id": "mech_structure_confirmed_donchian_trend_breakout_btc15m_v1",
+    "mechanism_name": "structure_confirmed_donchian_trend_breakout",
+    "mechanism_family": "structure_confirmed_donchian_trend_breakout",
+    "market_inefficiency": "A classic Donchian20 break only becomes tradeable mid-frequency continuation when three structural filters co-occur: (1) the break bar closes beyond prev_high20/prev_low20 with dual volume acceptance (vol_z20 climax + vol_ma20_ratio expansion), (2) a 2-bar rising/falling structure proves trend initiation rather than a one-tick spike, and (3) H1 slope has non-trivial magnitude so the cascade has directional drift. Mild-volume flat-slope breaks are the prior L1 payoff attractor and are explicitly excluded. An ATR regime band rejects both dead chop and chaotic spike regimes.",
+    "counterparty_source": "Range-bound and breakout-fade accounts with stops parked beyond the 20-bar Donchian extreme; under volume-accepted structural breaks their forced covering supplies one-sided flow that HTF slope prolongs.",
+    "why_edge_exists": "Stop placement beyond recent extremes is inventory management, not instant fair-value arb. Requiring structure (2-bar momentum into break) + slope magnitude + dual volume + ATR band filters the low-payoff fake breaks that killed vol_accepted_donchian_h1_continuation. Edge is harvested with partial_tp_atr scale-out then atr_trailing (no fixed % TP) so winners clear L1/Gate2 payoff floors after friction.",
+    "edge_decay_conditions": "Breakouts overcrowded with fade liquidity; vol_z or vol_ma20_ratio collapse; H1 slope magnitude flattens/flips; ATR exits the mid-regime band into chop or panic; continuation cannot cover 20x+fees (payoff attractor ≤1.2).",
+    "required_market_regime": "Directional or transitioning mid-frequency markets with ATR in a tradable band and volume expansion on Donchian breaks — not deep chop, not one-bar noise spikes, not mild-volume flat-slope Donchian noise.",
+    "entry_logic": "LONG ALL: (1) close cross_above prev_high20; (2) close > close[offset=1] AND close[offset=1] > close[offset=2] (2-bar rising structure); (3) h1_slope4 > 0.0015 (meaningful HTF thrust); (4) vol_z20 > 1.6; (5) vol_ma20_ratio > 1.2; (6) atr14 > close*0.0025 AND atr14 < close*0.01 (ATR regime / chop filter); (7) close > open. SHORT mirror: cross_below prev_low20, 2-bar falling structure, h1_slope4 < -0.0015, same volume/ATR band, close < open.",
+    "exit_logic": "Scale-out partial_tp_atr n_atr=2.5 partial_tp_ratio=0.5 then atr_trailing n_atr=3.5 ATR_14 (role=take_profit). swing_extreme lookback=20 invalidation. Protective SL 0.9% immutable. max_hold_bars=40. No fixed % TP.",
+    "stop_logic": "Logical invalidation via swing_extreme(20). Outer protective SL 0.9% (stop_loss_pct=0.009) via backtest engine / formal daemon. Do not widen, do not invent fixed 1% TP.",
+    "take_profit_logic": "No fixed percentage take-profit. partial_tp_atr 0.5@2.5×ATR_14 scale-out + atr_trailing 3.5×ATR_14 (within [2.5,4.0]) so winners expand past L1 payoff floor after friction while capping worst5 concentration.",
+    "invalidation_logic": "swing_extreme lookback=20 as role=invalidation; max_hold_bars=40; HTF slope flip / volume collapse after entry ends continuation thesis.",
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "no_ema_rsi_macd_cci_core_filters",
+      "must_keep_donchian20_cross_acceptance",
+      "must_keep_two_bar_structure_filter",
+      "must_keep_htf_slope_magnitude",
+      "must_keep_dual_volume_confirm",
+      "must_keep_atr_regime_band",
+      "must_use_atr_trailing_and_or_swing_extreme",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm",
+      "not_rename_into_blocked_vol_accepted_donchian_or_macro_sfp_or_stop_hunt"
+    ],
+    "tunable_parameters": [
+      "vol_z20_min",
+      "vol_ma20_ratio_min",
+      "h1_slope_min_abs",
+      "atr_floor_scale",
+      "atr_ceil_scale",
+      "atr_trail_n",
+      "partial_tp_atr_n",
+      "partial_tp_ratio",
+      "swing_lookback",
+      "max_hold_bars"
+    ],
+    "forbidden_transformations": [
+      "rename_into_vol_accepted_donchian_h1_continuation",
+      "rename_into_macro_sfp_displacement_or_stop_hunt_or_breakout_trap",
+      "convert_to_atr_squeeze_or_atr_decline_clone",
+      "inject_ema_cci_rsi_as_core_edge",
+      "add_fixed_micro_tp_below_2pct",
+      "remove_structure_or_slope_magnitude_or_dual_volume_filters",
+      "weaken_or_widen_0.9_protective_sl",
+      "auto_mount_or_confirm_without_human",
+      "lower_gate2_floors"
+    ],
+    "expected_trade_frequency_class": "selective_0.15_to_0.8_per_day_15m",
+    "expected_holding_period": "6_to_40_bars_15m",
+    "suitable_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "XRP-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "BNB-USDT-SWAP",
+      "ADA-USDT-SWAP",
+      "LTC-USDT-SWAP",
+      "LINK-USDT-SWAP",
+      "AVAX-USDT-SWAP",
+      "SUI-USDT-SWAP",
+      "PEPE-USDT-SWAP",
+      "BONK-USDT-SWAP",
+      "WIF-USDT-SWAP",
+      "NEAR-USDT-SWAP",
+      "APT-USDT-SWAP",
+      "ARB-USDT-SWAP",
+      "OP-USDT-SWAP",
+      "INJ-USDT-SWAP",
+      "SEI-USDT-SWAP",
+      "TIA-USDT-SWAP",
+      "DOT-USDT-SWAP",
+      "ATOM-USDT-SWAP",
+      "UNI-USDT-SWAP",
+      "AAVE-USDT-SWAP",
+      "FIL-USDT-SWAP",
+      "ICP-USDT-SWAP",
+      "RENDER-USDT-SWAP",
+      "ONDO-USDT-SWAP",
+      "JUP-USDT-SWAP",
+      "ORDI-USDT-SWAP",
+      "WLD-USDT-SWAP",
+      "TRX-USDT-SWAP",
+      "BCH-USDT-SWAP",
+      "ETC-USDT-SWAP",
+      "XAU-USDT-SWAP",
+      "XAG-USDT-SWAP",
+      "CL-USDT-SWAP"
+    ],
+    "suitable_timeframes": [
+      "15m",
+      "5m",
+      "1h"
+    ]
+  },
+  "dsl": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "structure_confirmed_donchian_trend_breakout_btc15m_long_v1",
+    "name": "structure_confirmed_donchian_trend_breakout_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_donch_break",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_above",
+          "right": {
+            "feature": "prev_high20"
+          }
+        },
+        {
+          "id": "e_struct_up1",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "close",
+            "offset": 1
+          }
+        },
+        {
+          "id": "e_struct_up2",
+          "left": {
+            "feature": "close",
+            "offset": 1
+          },
+          "op": "gt",
+          "right": {
+            "feature": "close",
+            "offset": 2
+          }
+        },
+        {
+          "id": "e_htf_slope",
+          "left": {
+            "feature": "h1_slope4"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.0015
+          }
+        },
+        {
+          "id": "e_vol_z",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.6
+          }
+        },
+        {
+          "id": "e_vol_ma",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.2
+          }
+        },
+        {
+          "id": "e_atr_floor",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "close",
+            "scale": 0.0025
+          }
+        },
+        {
+          "id": "e_atr_ceil",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "close",
+            "scale": 0.01
+          }
+        },
+        {
+          "id": "e_bull_body",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_partial_2p5",
+          "exit_op": "partial_tp_atr",
+          "n_atr": 2.5,
+          "atr_period": 14,
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.5,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_sw_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 20,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 40,
+    "description": "step_a|structure_confirmed_donchian_trend_breakout|donch20_x|struct2|slope1.5e-3|volz1.6|volma1.2|atr_band|partial2.5+trail3.5|sw20|sl0.9|btc15m_long",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "structure_confirmed_donchian_trend_breakout_btc15m_long_v1",
+    "name": "structure_confirmed_donchian_trend_breakout_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_donch_break",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_above",
+          "right": {
+            "feature": "prev_high20"
+          }
+        },
+        {
+          "id": "e_struct_up1",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "close",
+            "offset": 1
+          }
+        },
+        {
+          "id": "e_struct_up2",
+          "left": {
+            "feature": "close",
+            "offset": 1
+          },
+          "op": "gt",
+          "right": {
+            "feature": "close",
+            "offset": 2
+          }
+        },
+        {
+          "id": "e_htf_slope",
+          "left": {
+            "feature": "h1_slope4"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.0015
+          }
+        },
+        {
+          "id": "e_vol_z",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.6
+          }
+        },
+        {
+          "id": "e_vol_ma",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.2
+          }
+        },
+        {
+          "id": "e_atr_floor",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "close",
+            "scale": 0.0025
+          }
+        },
+        {
+          "id": "e_atr_ceil",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "close",
+            "scale": 0.01
+          }
+        },
+        {
+          "id": "e_bull_body",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_partial_2p5",
+          "exit_op": "partial_tp_atr",
+          "n_atr": 2.5,
+          "atr_period": 14,
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.5,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_sw_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 20,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 40,
+    "description": "step_a|structure_confirmed_donchian_trend_breakout|donch20_x|struct2|slope1.5e-3|volz1.6|volma1.2|atr_band|partial2.5+trail3.5|sw20|sl0.9|btc15m_long",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "structure_confirmed_donchian_trend_breakout_btc15m_short_v1",
+    "name": "structure_confirmed_donchian_trend_breakout_short",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_donch_break",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_below",
+          "right": {
+            "feature": "prev_low20"
+          }
+        },
+        {
+          "id": "e_struct_dn1",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "close",
+            "offset": 1
+          }
+        },
+        {
+          "id": "e_struct_dn2",
+          "left": {
+            "feature": "close",
+            "offset": 1
+          },
+          "op": "lt",
+          "right": {
+            "feature": "close",
+            "offset": 2
+          }
+        },
+        {
+          "id": "e_htf_slope",
+          "left": {
+            "feature": "h1_slope4"
+          },
+          "op": "lt",
+          "right": {
+            "value": -0.0015
+          }
+        },
+        {
+          "id": "e_vol_z",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.6
+          }
+        },
+        {
+          "id": "e_vol_ma",
+          "left": {
+            "feature": "vol_ma20_ratio"
+          },
+          "op": "gt",
+          "right": {
+            "value": 1.2
+          }
+        },
+        {
+          "id": "e_atr_floor",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "close",
+            "scale": 0.0025
+          }
+        },
+        {
+          "id": "e_atr_ceil",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "close",
+            "scale": 0.01
+          }
+        },
+        {
+          "id": "e_bear_body",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_partial_2p5",
+          "exit_op": "partial_tp_atr",
+          "n_atr": 2.5,
+          "atr_period": 14,
+          "partial_tp_ratio": 0.5,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 3.5,
+          "atr_period": 14,
+          "role": "take_profit"
+        },
+        {
+          "id": "x_sw_inv",
+          "exit_op": "swing_extreme",
+          "lookback": 20,
+          "role": "invalidation"
+        }
+      ]
+    },
+    "max_hold_bars": 40,
+    "description": "step_a|structure_confirmed_donchian_trend_breakout|short|donch20_x|struct2|slope-1.5e-3|volz1.6|volma1.2|atr_band|partial2.5+trail3.5|sw20|sl0.9|btc15m",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "pipeline_readiness": {
+    "prebuilt": true,
+    "human_confirm_required_for_mount": true,
+    "auto_mount": false,
+    "enable_multi_symbol_matrix": true
+  },
+  "invariants_contract": {
+    "schema": "qiyu_invariants_contract_v1",
+    "contract_id": "structure_confirmed_donchian_trend_breakout",
+    "title_zh": "[BTC 15m] 唐奇安结构确认趋势突破",
+    "require_sanity_asserts": false,
+    "must_timeframe": "15m",
+    "max_entry_leaves": 12,
+    "mechanism_pseudocode": {
+      "donchian": "close cross_above prev_high20 (long) / cross_below prev_low20 (short)",
+      "structure": "2-bar rising/falling closes into the break (trend initiation)",
+      "htf_filter": "h1_slope4 > 0.0015 long / < -0.0015 short (magnitude, not vacuous >0)",
+      "volume_accept": "vol_z20 > 1.6 AND vol_ma20_ratio > 1.2",
+      "chop_filter": "atr14 in (close*0.0025, close*0.01)",
+      "body": "close > open long / close < open short",
+      "tp_scaleout": "partial_tp_atr 0.5@2.5 ATR_14",
+      "tp_trail": "atr_trailing n_atr=3.5 atr_period=14",
+      "invalidation": "swing_extreme lookback=20",
+      "outer_sl": "protective 0.9% immutable (engine-level, not DSL exit_op)"
+    },
+    "required_entry_feature_cmps": [
+      {
+        "left": "close",
+        "op": "cross_above",
+        "right": "prev_high20"
+      },
+      {
+        "left": "close",
+        "op": "gt",
+        "right": "close"
+      },
+      {
+        "left": "close",
+        "op": "gt",
+        "right": "open"
+      }
+    ],
+    "required_entry_feature_cmps_short": [
+      {
+        "left": "close",
+        "op": "cross_below",
+        "right": "prev_low20"
+      },
+      {
+        "left": "close",
+        "op": "lt",
+        "right": "close"
+      },
+      {
+        "left": "close",
+        "op": "lt",
+        "right": "open"
+      }
+    ],
+    "required_entry_value_cmps": [
+      {
+        "left": "h1_slope4",
+        "op": "gt",
+        "value": 0.0015
+      },
+      {
+        "left": "vol_z20",
+        "op": "gt",
+        "value": 1.6
+      },
+      {
+        "left": "vol_ma20_ratio",
+        "op": "gt",
+        "value": 1.2
+      }
+    ],
+    "required_exit_ops": [
+      {
+        "exit_op": "partial_tp_atr",
+        "n_atr": 2.5,
+        "partial_tp_ratio": 0.5,
+        "role": "take_profit"
+      },
+      {
+        "exit_op": "atr_trailing",
+        "n_atr": 3.5,
+        "atr_period": 14,
+        "role": "take_profit"
+      },
+      {
+        "exit_op": "swing_extreme",
+        "lookback": 20,
+        "role": "invalidation"
+      }
+    ],
+    "forbidden_features": [
+      "pdh",
+      "pdl",
+      "pdc",
+      "asia_high",
+      "asia_low",
+      "asia_mid",
+      "asia_range",
+      "asia_range_atr_ratio",
+      "cci",
+      "rsi14",
+      "ema21",
+      "ema53",
+      "macd_stick"
+    ],
+    "forbidden_exit_ops": [
+      "fixed_pct_tp"
+    ],
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "no_ema_rsi_macd_cci_core_filters",
+      "must_keep_donchian20_cross_acceptance",
+      "must_keep_two_bar_structure_filter",
+      "must_keep_htf_slope_magnitude",
+      "must_keep_dual_volume_confirm",
+      "must_keep_atr_regime_band",
+      "must_use_atr_trailing_and_or_swing_extreme",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm",
+      "not_rename_into_blocked_vol_accepted_donchian_or_macro_sfp_or_stop_hunt"
+    ],
+    "prune_audit_instructions_zh": [
+      "对比本契约与 DSL：只列多余假设、未授权硬编码、逻辑偏离。",
+      "必须保留：Donchian20穿越、2-bar结构、HTF slope幅度、双成交量确认、ATR带、partial+trail退出。",
+      "禁止改名回 vol_accepted_donchian / macro_sfp / stop_hunt；禁止固定百分比止盈；禁止降低 Gate2。",
+      "若无法在不新增契约外逻辑的情况下修好 → decision=RESET。"
+    ]
+  }
+}

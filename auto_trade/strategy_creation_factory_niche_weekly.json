@@ -1,0 +1,10 @@
+{
+  "report": {
+    "error": "no such table: prescreen_death_maps",
+    "mandatory_niches": [],
+    "ok": false,
+    "summary": {}
+  },
+  "updated_at": "2026-08-02 22:33:18",
+  "week": "2026-W30"
+}

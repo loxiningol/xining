@@ -6427,7 +6427,7 @@ def status():
              "early_pruning_policy": "整批90日净成本快筛→按获取函数仅保留前20%→全历史→0.6%辅助止损→压力/严重成本→三段前向→跨品种盲测→多重检验；任一级失败即停止",
              "probabilistic_policy": "Bootstrap均值90%区间 + Beta胜率后验 + 利润因子 + 年化日收益Sharpe；样本不足不晋级",
              "causal_policy": "每个DSL必须给出可观测的市场状态→机制→转折→成本覆盖→失效条件，并至少提供两项可证伪测试",
-             "position_grade_ratios": {"S": 0.70, "A": 0.50, "B": 0.30, "C": 0.15},
+             "position_grade_ratios": {"S": 0.70, "A": 0.50, "B": 0.30, "C": 0.10},
              "immutable_ai_capital_params": sorted(PROTECTED_CAPITAL_PARAMS),
              "routine_signal_execution_uses_ai": False,
              "strategy_creation_training": strategy_creation_status(),

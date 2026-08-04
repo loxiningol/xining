@@ -1,0 +1,60 @@
+{
+  "ok": false,
+  "jobs_evaluated": 4,
+  "jobs_sample": [
+    {
+      "job_id": "creation_20260803_200442_242576_0959798b",
+      "outcome": "research_rejected",
+      "artifact_outcome": "research_rejected",
+      "n_hypotheses": 66,
+      "compile_success": 69,
+      "probe_tested": 70,
+      "mislabel_materialization_as_research": false,
+      "finished_at": "2026-08-03 20:24:14",
+      "entered_materialization": true
+    },
+    {
+      "job_id": "creation_20260803_221145_591866_5c7b3499",
+      "outcome": "candidate_quality_failure",
+      "artifact_outcome": "candidate_quality_failure",
+      "n_hypotheses": 69,
+      "compile_success": 72,
+      "probe_tested": 76,
+      "mislabel_materialization_as_research": false,
+      "finished_at": "2026-08-03 22:26:33",
+      "entered_materialization": true
+    },
+    {
+      "job_id": "creation_20260803_225545_200477_15f7c38f",
+      "outcome": "candidate_quality_failure",
+      "artifact_outcome": "candidate_quality_failure",
+      "n_hypotheses": 70,
+      "compile_success": 69,
+      "probe_tested": 74,
+      "mislabel_materialization_as_research": false,
+      "finished_at": "2026-08-03 23:59:41",
+      "entered_materialization": true
+    },
+    {
+      "job_id": "creation_20260804_000926_996218_fb507726",
+      "outcome": "candidate_quality_failure",
+      "artifact_outcome": "candidate_quality_failure",
+      "n_hypotheses": 67,
+      "compile_success": 74,
+      "probe_tested": 75,
+      "mislabel_materialization_as_research": false,
+      "finished_at": "2026-08-04 00:51:31",
+      "entered_materialization": true
+    }
+  ],
+  "cohort": "materialized_with_compile_probe",
+  "n_hypotheses_zero_count": 0,
+  "compile_success_zero_count": 0,
+  "probe_tested_zero_count": 0,
+  "median_hypotheses": 69,
+  "median_compiled_candidates": 72,
+  "median_probe_tested": 75,
+  "materialization_failure_mislabeled_as_research_failure": 0,
+  "note_zh": "统计口径=已进入材料化且具备 compile/probe 证据的正常任务；早期契约秒拒空池不计入「正常brief材料化」。若不足10个，等 P5 canary 完成后再复评。",
+  "at": "2026-08-04 07:47:50"
+}

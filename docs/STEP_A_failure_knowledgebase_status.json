@@ -1,0 +1,21 @@
+{
+  "schema": "qiyu_step_a_v1",
+  "kb_path": "/root/auto_trade/dual_engine/workflow_v2/failure_knowledgebase.json",
+  "updated_at": "2026-07-27 01:42:00",
+  "record_file_count": 4,
+  "blocked_paths_count": 4,
+  "blocked_families_count": 1,
+  "lessons_count": 4,
+  "counterexamples_count": 0,
+  "indexed_records": 4,
+  "mandatory_preread_wired": true,
+  "sample_blocked_families": [
+    "breakout_trap_reversal"
+  ],
+  "sample_lessons": [
+    "fidelity/gate1 fail",
+    "strategy contains unknown top-level fields",
+    "no infinite retune; no disguised mechanism swap",
+    "GLM must emit full mechanism_spec fields; aliases+retry exhausted"
+  ]
+}

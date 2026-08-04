@@ -181,12 +181,13 @@ REPAIR_ROUND_TYPES = (
     "mechanism_viability_verdict",
 )
 
-WF_WINDOW_PASS_REQUIREMENT = (7, 10)  # ≥7/10
-MC_ORDER_ACCEPT_PCT = 0.90
+# 大样本前向默认：10 窗至少 7 窗。小样本由 creation_quality_doctrine 比例门覆盖。
+WF_WINDOW_PASS_REQUIREMENT = (7, 10)
+MC_ORDER_ACCEPT_PCT = 0.90  # 大样本默认；门槛5 按成交笔数分层覆盖
 
 PRODUCTION_CONSTRAINTS = {
     "leverage": 20,
-    "stop_loss_pct": 0.009,
+    "stop_loss_pct": 0.005,
     "initial_position_pct": 0.30,
     "ada_sl_migration_allowed": False,
     "no_force_open": True,

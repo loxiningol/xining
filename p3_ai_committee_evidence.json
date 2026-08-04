@@ -1,0 +1,80 @@
+{
+  "ok": true,
+  "phase": "P3",
+  "elapsed_sec": 0.174,
+  "committee": {
+    "n_hypotheses": 6,
+    "unique_ast_hash_n": 6,
+    "representation_types": [
+      "delta",
+      "rank",
+      "relative_exclusion",
+      "sequence",
+      "state",
+      "threshold"
+    ],
+    "round1": {
+      "mechanisms_n": 2,
+      "asts_n": 12,
+      "asts_rejected_n": 0
+    },
+    "round2": {
+      "diversity_supplement_n": 0,
+      "missing_representation_types": [],
+      "diagnosis_codes": [
+        "LOW_WIN_RATE",
+        "LOW_PROFIT_FIRST_RATE",
+        "HIGH_MAE"
+      ],
+      "repair_n": 4
+    },
+    "skip_llm": true
+  },
+  "population_ai_committee": {
+    "ok": true,
+    "n_hypotheses": 6,
+    "unique_ast_hash_n": 6,
+    "unique_ast_hashes": [
+      "ast_53353e39d3481c6528460874",
+      "ast_7372b07ff50659fe50a189b3",
+      "ast_7fef9864e46542c9820d776d",
+      "ast_d3efed29c1b9a2a5cf03d15e",
+      "ast_fad40f6945aec93e5cd9a06f",
+      "ast_ff705ab8ee103302b48a3612"
+    ],
+    "representation_types": [
+      "delta",
+      "rank",
+      "relative_exclusion",
+      "sequence",
+      "state",
+      "threshold"
+    ],
+    "round1": {
+      "mechanisms_n": 2,
+      "asts_n": 12,
+      "asts_rejected_n": 0
+    },
+    "round2": {
+      "diversity_supplement_n": 0,
+      "missing_representation_types": [],
+      "diagnosis_codes": [
+        "LOW_WIN_RATE",
+        "LOW_PROFIT_FIRST_RATE",
+        "HIGH_MAE"
+      ],
+      "repair_n": 4
+    },
+    "skip_llm": true,
+    "error": null
+  },
+  "population_n": 32,
+  "population_p3_source_n": 1,
+  "invariants": {
+    "leverage": 20,
+    "stop_pct": 0.005,
+    "profit_first_target": 0.005555,
+    "may_declare_direction_dead": false
+  },
+  "at": "2026-08-04 00:07:21"
+}

@@ -1,0 +1,59 @@
+{
+  "formal_running_count": "13",
+  "formal_lines": "qiyu-formal-auto-trade-ada-5m.service  loaded active running Qiyu Formal Auto Trade Daemon (ADA 5m Live)            \nqiyu-formal-auto-trade-btc-15m.service loaded active running Qiyu Formal Auto Trade Daemon (BTC 15m)                \nqiyu-formal-auto-trade-btc-5m.service  loaded active running Qiyu Formal Auto Trade Daemon (BTC 5m Live)            \nqiyu-formal-auto-trade-cl-5m.service   loaded active running Qiyu Formal Auto Trade Daemon (CL 5m Live)             \nqiyu-formal-auto-trade-cl.service      loaded active running Qiyu Formal Auto Trade Daemon (CL)                     \nqiyu-formal-auto-trade-ltc-5m.service  loaded active running Qiyu Formal Auto Trade Daemon (LTC 5m Live)            \nqiyu-formal-auto-trade-ng-5m.service   loaded active running Qiyu Formal Auto Trade Daemon (NG 5m Live)             \nqiyu-formal-auto-trade-ng.service      loaded active running Qiyu Formal Auto Trade Daemon (NG)                     \nqiyu-formal-auto-trade-xag-5m.service  loaded active running Qiyu Formal Auto Trade Daemon (XAG 5m Live)            \nqiyu-formal-auto-trade-xau-15m.service loaded active running Qiyu Formal Auto Trade Daemon (XAU 15m Live)           \nqiyu-formal-auto-trade-xau.service     loaded active running Qiyu Formal Auto Trade Daemon (XAU)                    \nqiyu-formal-auto-trade-xrp-15m.service loaded active running Qiyu Formal Auto Trade Daemon (XRP 15m Live)           \nqiyu-formal-auto-trade.service         loaded active running Qiyu Formal Auto Trade Daemon                          ",
+  "backup_dirs": "/root/backups/step_a_strategy_creation_20260726_234045",
+  "rollback_scripts": "/root/backups/step_a_strategy_creation_20260726_234045/ROLLBACK.sh",
+  "flags": {
+    "schema": "qiyu_workflow_flags_v1",
+    "workflow_version": "v2",
+    "creation_entry": "v2",
+    "migration_version": "001",
+    "upgrade_status": "switched_to_v2",
+    "acceptance": {
+      "A": true,
+      "B": true,
+      "C": true,
+      "D": true,
+      "E": true,
+      "F": true,
+      "G": true,
+      "H": true
+    },
+    "acceptance_passed_at": null,
+    "switched_at": "2026-07-26 19:02:33",
+    "pause": {
+      "non_live_creation": false,
+      "evolve_timer": true,
+      "note": "creation resumed on v2; evolve timer still paused pending first validation"
+    },
+    "notes": [
+      {
+        "at": "2026-07-26 19:02:33",
+        "note": "A-H passed; migrate 001 applied"
+      },
+      {
+        "at": "2026-07-26 23:51:42",
+        "note": "STEP A modules deployed; v2 entry routes to step_a pipeline"
+      }
+    ],
+    "updated_at": "2026-07-27 01:40:53",
+    "step_a_deployed": true,
+    "step_a_code_version": "step_a_strategy_creation_20260726"
+  },
+  "deploy_list": [
+    "/root/dual_engine_workflow_v2/step_a_config.py",
+    "/root/dual_engine_workflow_v2/mechanism_spec.py",
+    "/root/dual_engine_workflow_v2/fidelity_diff.py",
+    "/root/dual_engine_workflow_v2/failure_kb.py",
+    "/root/dual_engine_workflow_v2/step_a_fingerprint.py",
+    "/root/dual_engine_workflow_v2/split_tests_20.py",
+    "/root/dual_engine_workflow_v2/gates.py",
+    "/root/dual_engine_workflow_v2/attackers.py",
+    "/root/dual_engine_workflow_v2/scores_split.py",
+    "/root/dual_engine_workflow_v2/pipeline_step_a.py",
+    "/root/dual_engine_workflow_v2/__init__.py",
+    "/root/dual_engine_workflow_v2/config.py",
+    "/root/auto_trade_dual_engine_factory.py",
+    "/root/tests_workflow_v2/test_step_a_acceptance.py"
+  ]
+}

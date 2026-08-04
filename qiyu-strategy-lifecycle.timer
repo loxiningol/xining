@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Qiyu strategy lifecycle metabolism hourly
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1h
+AccuracySec=1min
+Unit=qiyu-strategy-lifecycle.service
+
+[Install]
+WantedBy=timers.target

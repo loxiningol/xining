@@ -1,0 +1,100 @@
+{
+  "iterations": [
+    {
+      "iteration": 1,
+      "task_id": "wsa_20260730_050504_1f8e",
+      "pipeline_reason": "kb_blocked",
+      "elapsed_sec": 0.0,
+      "composite_score": 0.0,
+      "total_gap": 5.0,
+      "metric_gaps": {
+        "l1_filled_entries": 5.0,
+        "lottery": 0.0
+      },
+      "failed_checks": [],
+      "l1_reject": [],
+      "l1": {
+        "pass": false,
+        "reject_reasons": [],
+        "filled_entries": null,
+        "payoff_ratio": null,
+        "win_rate": null,
+        "expectancy_factor": null
+      },
+      "gate2": {
+        "payoff_ratio": null,
+        "calmar": null,
+        "worst5_loss_share": null,
+        "expectancy_factor": null,
+        "sample_size": null,
+        "pass": null
+      },
+      "ai_decision": "PATCH",
+      "ai_rationale": "当前DSL的partial_tp_atr n_atr=2.0过早止盈50%仓位，严重限制盈亏比；同时atr_trail n_atr=4.5低于机制设计值5.0。移除partial并提升trailing ATR至5.0，符合v2优化方向，预计提高payoff ratio并降低worst5损失占比。",
+      "limit_reason": null,
+      "applied_patches": [
+        {
+          "op": "replace_exit"
+        }
+      ],
+      "apply_errors": [],
+      "chosen_provider": "deepseek"
+    },
+    {
+      "iteration": 2,
+      "task_id": "wsa_20260730_050827_ab9d",
+      "pipeline_reason": "funnel_l1_fail",
+      "elapsed_sec": 0.0,
+      "composite_score": 2.7,
+      "total_gap": 2.0,
+      "metric_gaps": {
+        "l1_filled_entries": 2.0,
+        "l1_payoff": 0.0
+      },
+      "failed_checks": [],
+      "l1_reject": [
+        "sample_filled_entries_lt_5"
+      ],
+      "l1": {
+        "pass": false,
+        "reject_reasons": [
+          "sample_filled_entries_lt_5"
+        ],
+        "filled_entries": 3,
+        "payoff_ratio": 2.1444500114602207,
+        "win_rate": 0.3333333333333333,
+        "expectancy_factor": 0.7148166704867402
+      },
+      "gate2": {
+        "payoff_ratio": null,
+        "calmar": null,
+        "worst5_loss_share": null,
+        "expectancy_factor": null,
+        "sample_size": null,
+        "pass": null
+      },
+      "ai_decision": "LIMIT_REACHED",
+      "ai_rationale": "majority_limit",
+      "limit_reason": "deepseek: 核心信号频率极低，且所有可调参数已位于合理边界（vol_z=1.8最低，ATR trailing=5.0最高），无法增加filled_entries而不违反不可协商规则。 | qwen: 单标的(ETH-USDT-SWAP) 15m timeframe下，入场条件受硬约束锁死（不可放宽vol_z20、sweep、reclaim、displacement body），无法通过调参增加样本数，客观数据稀疏导致样本量无法达到5个的最低要求。",
+      "applied_patches": [],
+      "apply_errors": [],
+      "chosen_provider": null
+    }
+  ],
+  "success": false,
+  "workdir": "/root/auto_trade/dual_engine/workflow_v2/auto_driver_runs/20260730_050504",
+  "ai_limit_reached": true,
+  "ai_limit_reason": "deepseek: 核心信号频率极低，且所有可调参数已位于合理边界（vol_z=1.8最低，ATR trailing=5.0最高），无法增加filled_entries而不违反不可协商规则。 | qwen: 单标的(ETH-USDT-SWAP) 15m timeframe下，入场条件受硬约束锁死（不可放宽vol_z20、sweep、reclaim、displacement body），无法通过调参增加样本数，客观数据稀疏导致样本量无法达到5个的最低要求。",
+  "ai_abort": false,
+  "ai_abort_reason": null,
+  "kb_blocked_exhausted": false,
+  "final_status": "LIMIT_REACHED_FAILED",
+  "stop_code": "AI_LIMIT_REACHED",
+  "stop_detail": {
+    "message": "deepseek: 核心信号频率极低，且所有可调参数已位于合理边界（vol_z=1.8最低，ATR trailing=5.0最高），无法增加filled_entries而不违反不可协商规则。 | qwen: 单标的(ETH-USDT-SWAP) 15m timeframe下，入场条件受硬约束锁死（不可放宽vol_z20、sweep、reclaim、displacement body），无法通过调参增加样本数，客观数据稀疏导致样本量无法达到5个的最低要求。"
+  },
+  "limit_analysis": null,
+  "review_suggestions": null,
+  "n_iterations": 2,
+  "elapsed_sec": 363.28
+}

@@ -1,0 +1,13 @@
+{
+  "priority": [
+    "BTC-USDT-SWAP",
+    "CL-USDT-SWAP",
+    "XAU-USDT-SWAP",
+    "NG-USDT-SWAP",
+    "XAG-USDT-SWAP",
+    "LTC-USDT-SWAP",
+    "ADA-USDT-SWAP"
+  ],
+  "arbitration_window_sec": 15,
+  "unknown_symbol_policy": "append_to_end"
+}

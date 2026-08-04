@@ -45,19 +45,19 @@ ROLE_CONTRACTS = {
     "mechanism_scientist": {
         "model_pref": "glm",
         "may_see_returns": False,
-        "task_zh": "从参与者约束推导收益来源",
-        "forbids_zh": "禁止先看回测收益",
+        "task_zh": "从成功/失败路径差异解释谁会继续交易、为何先走+0.5555%而非先反向0.5%",
+        "forbids_zh": "禁止先看回测收益；禁止只报方向预测；回答不了「为何不应先反向0.5%」的候选直接丢弃",
     },
     "empirical_scientist": {
         "model_pref": "qwen",
         "may_write_rules": False,
-        "task_zh": "扫描条件分布异常",
+        "task_zh": "扫描成功路径 vs 先止损失败路径的条件分布差异",
         "forbids_zh": "禁止编写交易规则",
     },
     "symbolic_searcher": {
         "model_pref": "non_llm",
-        "task_zh": "符号/遗传搜索表达式",
-        "forbids_zh": "禁止写自然语言故事",
+        "task_zh": "只用路径样本库支持的特征生成≤4条件表达式",
+        "forbids_zh": "禁止写自然语言故事；禁止无证据指标；禁止先写复杂止盈",
     },
     "antifalsify_auditor": {
         "model_pref": "non_llm_stats",
@@ -66,7 +66,7 @@ ROLE_CONTRACTS = {
     },
     "constructive_redteam": {
         "model_pref": "qwen_or_non_llm",
-        "task_zh": "构造最强反方探针并比较",
+        "task_zh": "预测为何会先触发0.5%止损或依赖极端行情，并提出自动测试",
         "forbids_zh": "禁止给主假设找借口",
     },
     "leakage_auditor": {
@@ -83,19 +83,34 @@ ROLE_CONTRACTS = {
         "model_pref": "non_llm",
         "may_propose_strategy": False,
         "task_zh": "成本/滑点/容量可行性",
-        "forbids_zh": "禁止发明新交易逻辑",
+        "forbids_zh": "禁止发明新交易逻辑；禁止改动固定0.5%止损与20×杠杆",
     },
     "statistician": {
         "model_pref": "non_llm",
-        "task_zh": "多重检验与有效试验次数",
+        "task_zh": "多重检验与有效试验次数；路径命中时间切片稳定性",
         "forbids_zh": "不应由LLM裁决",
     },
     "judge": {
         "model_pref": "deterministic_rules_then_kimi_independent_veto",
         "may_propose_strategy": False,
-        "task_zh": "本地硬门槛通过后，由Kimi独立裁决是否允许进入策略组装",
+        "task_zh": "本地硬门槛（含profit_first路径门）通过后，由Kimi独立裁决是否允许进入策略组装",
     },
 }
+
+PATH_CONDITIONAL_CREATION_PROMPT = """你是栖语路径命中创造委员会成员。目标不是预测 future_return>0，而是：
+
+P(先触及 +0.5555% 价格目标 | 在触及 -0.5% 保护止损之前)
+
+固定契约：止损=0.5%价格（未杠杆）、杠杆=20×、盈利路径理论最低杠杆收益=11.11%。
+
+输入会给出成功路径 vs 先止损失败路径的特征差异（cluster_diff_summary）。你必须：
+1) 只用有证据的特征，最多4个入场条件；
+2) 明确回答：为何入场后不应先反向0.5%；
+3) 标明什么状态会立即失效；
+4) 禁止叠加无证据指标；禁止先写复杂止盈；禁止改止损/杠杆。
+
+若无法回答第2条，输出空候选。
+"""
 
 
 OPPOSING_FAMILY = {
@@ -507,9 +522,11 @@ def run_constructive_redteam(main_hyp, factor_matrix, fwd_returns, run_id,
 
 
 KIMI_EVIDENCE_JUDGE_PROMPT = """你是策略正式四次复核之前的独立研究裁判。
+创造目标是路径命中：在触及-0.5%之前先触及+0.5555%。
 你不是策略生成者，不得提出新策略、阈值或过滤条件。输入只有脱敏的证据布尔字段
 和本地规则得分，不含账户、密钥或下单信息。请独立判断证据是否足以进入策略组装。
 本地硬门槛拥有最高优先级，你只能同意或否决，绝不能覆盖本地否决。
+若缺少 profit_first_rate / path_bare_screen 证据，或盈利单杠杆均值明显低于11.11%，应REJECT。
 严格输出JSON：{"decision":"ADMIT或REJECT","reason":"...",
 "unresolved_risks":["..."]}。ADMIT只代表可进入策略组装，不代表通过正式复核或可实盘。
 """
@@ -586,14 +603,28 @@ def judge_from_evidence(evidence_fields, run_id=None):
         score += 1.5
     if evidence_fields.get("bidirectional_hit"):
         score += 1.0
+    if evidence_fields.get("path_review_eligible") or evidence_fields.get("path_bare_passed"):
+        score += 2.0
+    elif evidence_fields.get("path_packaging_ok"):
+        score += 0.5
+    pfr = evidence_fields.get("profit_first_rate")
+    try:
+        if pfr is not None and float(pfr) >= 0.55:
+            score += 1.0
+    except Exception:
+        pass
     deterministic_admit = bool(not missing and score >= 6.5)
     # Kimi is called only after all deterministic research gates (including
     # DSR/PBO supplied by the caller) pass.  Availability policy is explicit:
     # optional judges may veto with a valid REJECT, but disabled/provider-error
     # states no longer masquerade as evidence that the candidate failed.
-    kimi_enabled = str(os.environ.get("QIYU_KIMI_ENABLED") or "0").strip().lower() in (
-        "1", "true", "yes", "on",
-    )
+    # 与 auto_trade_ai_consensus 对齐：有 Kimi Key 时默认启用独立裁判
+    _kimi_flag = os.environ.get("QIYU_KIMI_ENABLED")
+    _kimi_key = bool(str(os.environ.get("QIYU_KIMI_API_KEY") or "").strip())
+    if _kimi_flag is None or str(_kimi_flag).strip() == "":
+        kimi_enabled = bool(_kimi_key)
+    else:
+        kimi_enabled = str(_kimi_flag).strip().lower() in ("1", "true", "yes", "on")
     kimi_required = str(os.environ.get("QIYU_KIMI_REQUIRED") or "0").strip().lower() in (
         "1", "true", "yes", "on",
     )

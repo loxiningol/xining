@@ -1,0 +1,17 @@
+{
+  "schema": "qiyu_portfolio_risk_v2_absolute_equity",
+  "enabled": true,
+  "max_open_positions": 3,
+  "max_positions_per_symbol": 1,
+  "max_pending_orders": 0,
+  "max_daily_entries": 5,
+  "max_daily_realized_loss_ratio": 0.08,
+  "max_consecutive_losses": 3,
+  "max_total_estimated_risk_ratio": 0.152,
+  "position_sizing_basis": "account_total_equity_at_entry",
+  "profiles": {
+    "1h": {"full_position_ratio": 0.28, "leverage": 20, "stop_loss_pct": 0.009},
+    "15m": {"full_position_ratio": 0.20, "leverage": 20, "stop_loss_pct": 0.009},
+    "5m": {"full_position_ratio": 0.15, "leverage": 20, "stop_loss_pct": 0.009}
+  }
+}

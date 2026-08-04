@@ -1,0 +1,595 @@
+{
+  "schema": "qiyu_step_b_event_coverage_matrix_v1",
+  "updated_at": "2026-07-27 09:53:51",
+  "window_days": 7,
+  "required_event_types": [
+    "market_evaluated",
+    "raw_signal_generated",
+    "signal_filtered",
+    "risk_rejected",
+    "position_conflict_rejected",
+    "order_attempted",
+    "order_rejected",
+    "order_partially_filled",
+    "order_filled",
+    "position_opened",
+    "exit_signal_generated",
+    "stop_loss_triggered",
+    "take_profit_triggered",
+    "manual_close",
+    "strategy_close",
+    "position_closed"
+  ],
+  "full_coverage_core": [
+    "market_evaluated",
+    "raw_signal_generated",
+    "order_attempted",
+    "order_filled",
+    "position_opened",
+    "position_closed"
+  ],
+  "strategies": {
+    "ng5_exhaustion_fade_short_ai": {
+      "strategy_id": "ng5_exhaustion_fade_short_ai",
+      "window_days": 7,
+      "event_n": 3452,
+      "span_days": 0.5958,
+      "core_stages_seen": 1,
+      "core_stages_required": 6,
+      "full_taxonomy_seen": false,
+      "sufficient_7d_event_coverage": false,
+      "source_layer": "legacy-derived",
+      "insufficient_source": true,
+      "per_type": {
+        "market_evaluated": {
+          "wired": true,
+          "emitted": true,
+          "count": 3452,
+          "status": "emitted"
+        },
+        "raw_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "signal_filtered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "risk_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_conflict_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_attempted": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_partially_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_opened": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "exit_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "stop_loss_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "take_profit_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "manual_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "strategy_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_closed": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        }
+      },
+      "note": "event_n>0 alone ≠ 7-day full coverage base; legacy remains primary until sufficient_7d_event_coverage"
+    },
+    "ltc5_exhaustion_fade_short_ai": {
+      "strategy_id": "ltc5_exhaustion_fade_short_ai",
+      "window_days": 7,
+      "event_n": 3425,
+      "span_days": 0.5958,
+      "core_stages_seen": 1,
+      "core_stages_required": 6,
+      "full_taxonomy_seen": false,
+      "sufficient_7d_event_coverage": false,
+      "source_layer": "legacy-derived",
+      "insufficient_source": true,
+      "per_type": {
+        "market_evaluated": {
+          "wired": true,
+          "emitted": true,
+          "count": 3425,
+          "status": "emitted"
+        },
+        "raw_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "signal_filtered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "risk_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_conflict_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_attempted": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_partially_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_opened": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "exit_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "stop_loss_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "take_profit_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "manual_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "strategy_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_closed": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        }
+      },
+      "note": "event_n>0 alone ≠ 7-day full coverage base; legacy remains primary until sufficient_7d_event_coverage"
+    },
+    "codex0725t3_ada5m_trendpb_r42_z2p3_h14": {
+      "strategy_id": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+      "window_days": 7,
+      "event_n": 3418,
+      "span_days": 0.5957,
+      "core_stages_seen": 1,
+      "core_stages_required": 6,
+      "full_taxonomy_seen": false,
+      "sufficient_7d_event_coverage": false,
+      "source_layer": "legacy-derived",
+      "insufficient_source": true,
+      "per_type": {
+        "market_evaluated": {
+          "wired": true,
+          "emitted": true,
+          "count": 3418,
+          "status": "emitted"
+        },
+        "raw_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "signal_filtered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "risk_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_conflict_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_attempted": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_partially_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_opened": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "exit_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "stop_loss_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "take_profit_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "manual_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "strategy_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_closed": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        }
+      },
+      "note": "event_n>0 alone ≠ 7-day full coverage base; legacy remains primary until sufficient_7d_event_coverage"
+    },
+    "frost3_btc1h_xrpport_exhaustion_fade_slope": {
+      "strategy_id": "frost3_btc1h_xrpport_exhaustion_fade_slope",
+      "window_days": 7,
+      "event_n": 859,
+      "span_days": 0.5959,
+      "core_stages_seen": 1,
+      "core_stages_required": 6,
+      "full_taxonomy_seen": false,
+      "sufficient_7d_event_coverage": false,
+      "source_layer": "legacy-derived",
+      "insufficient_source": true,
+      "per_type": {
+        "market_evaluated": {
+          "wired": true,
+          "emitted": true,
+          "count": 859,
+          "status": "emitted"
+        },
+        "raw_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "signal_filtered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "risk_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_conflict_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_attempted": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_partially_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_opened": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "exit_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "stop_loss_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "take_profit_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "manual_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "strategy_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_closed": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        }
+      },
+      "note": "event_n>0 alone ≠ 7-day full coverage base; legacy remains primary until sufficient_7d_event_coverage"
+    },
+    "frost_xrp_rescue_h20_t45": {
+      "strategy_id": "frost_xrp_rescue_h20_t45",
+      "window_days": 7,
+      "event_n": 1946,
+      "span_days": 0.5957,
+      "core_stages_seen": 5,
+      "core_stages_required": 6,
+      "full_taxonomy_seen": false,
+      "sufficient_7d_event_coverage": false,
+      "source_layer": "legacy-derived",
+      "insufficient_source": true,
+      "per_type": {
+        "market_evaluated": {
+          "wired": true,
+          "emitted": true,
+          "count": 1653,
+          "status": "emitted"
+        },
+        "raw_signal_generated": {
+          "wired": true,
+          "emitted": true,
+          "count": 94,
+          "status": "emitted"
+        },
+        "signal_filtered": {
+          "wired": true,
+          "emitted": true,
+          "count": 1,
+          "status": "emitted"
+        },
+        "risk_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "position_conflict_rejected": {
+          "wired": true,
+          "emitted": true,
+          "count": 194,
+          "status": "emitted"
+        },
+        "order_attempted": {
+          "wired": true,
+          "emitted": true,
+          "count": 1,
+          "status": "emitted"
+        },
+        "order_rejected": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_partially_filled": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "order_filled": {
+          "wired": true,
+          "emitted": true,
+          "count": 1,
+          "status": "emitted"
+        },
+        "position_opened": {
+          "wired": true,
+          "emitted": true,
+          "count": 1,
+          "status": "emitted"
+        },
+        "exit_signal_generated": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "stop_loss_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "take_profit_triggered": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "manual_close": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        },
+        "strategy_close": {
+          "wired": true,
+          "emitted": true,
+          "count": 1,
+          "status": "emitted"
+        },
+        "position_closed": {
+          "wired": true,
+          "emitted": false,
+          "count": 0,
+          "status": "never-seen"
+        }
+      },
+      "note": "event_n>0 alone ≠ 7-day full coverage base; legacy remains primary until sufficient_7d_event_coverage"
+    }
+  },
+  "summary": {
+    "strategy_count": 5,
+    "any_sufficient_7d_full_coverage": false,
+    "legacy_still_primary": true,
+    "stream_path": "/root/auto_trade/strategy_events.jsonl",
+    "stream_exists": true
+  }
+}

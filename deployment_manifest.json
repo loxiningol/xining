@@ -73,7 +73,7 @@
       "copy the manifest with the critical files",
       "verify every critical sha256 on the runtime host before restarting services",
       "never deploy when a required critical file is missing",
-      "a human-confirm item must contain a verified full three-AI result and AI-discounted theoretical weekly opens >= 0.5 (statistical anchor, no inflate)"
+      "a human-confirm item must contain a verified full three-AI result and near-2y AI-discounted theoretical weekly opens >= 0.5 (backtest_2y anchor, no inflate)"
     ],
     "runtime_root": "/root",
     "schema": "qiyu_production_source_policy_v1",

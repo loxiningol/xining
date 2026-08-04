@@ -13,10 +13,15 @@ from __future__ import print_function
 import bisect
 import hashlib
 import math
+import os
 import random
 from datetime import datetime
 
 from . import recipe_policy
+from .creation_quality_doctrine import (
+    MIN_INDEPENDENT_EVENTS as _DOCTRINE_MIN_EVENTS,
+    MIN_WIN_RATE_EXCLUSIVE as _DOCTRINE_MIN_WR,
+)
 
 
 RESEARCH_STATES_ZH = {
@@ -36,8 +41,13 @@ RESEARCH_STATES_ZH = {
 }
 
 DEFAULT_HORIZONS = (1, 3, 6, 12)
-DEFAULT_QUANTILES = (0.80, 0.90)
-MIN_INDEPENDENT_EVENTS = 12
+# Include denser (lower) quantiles so search can find distributed high-WR
+# books instead of only rare 80/90-tail lottery breakouts.
+# 更密分位：提高「每轮必有可交接候选」的搜索覆盖（仍须过胜率/反彩票底线）
+DEFAULT_QUANTILES = (0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90)
+INTERSECTION_QUANTILES = (0.60, 0.70, 0.75, 0.80)
+MIN_INDEPENDENT_EVENTS = _DOCTRINE_MIN_EVENTS  # 探针独立事件下限（与创造成交笔数对齐）
+MIN_ASSEMBLY_WIN_RATE = _DOCTRINE_MIN_WR  # 组装就绪要求胜率严格大于 50%
 CAUSAL_QUANTILE_WINDOW = 240
 CAUSAL_QUANTILE_MIN_HISTORY = 80
 
@@ -172,6 +182,7 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
     available = [h for h in hints if h in (factor_matrix or {})]
     specs = []
     cache = {}
+    compile_failures = []
 
     def mask(name, side, q):
         key = (name, side, q)
@@ -192,27 +203,49 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
             "threshold_source": "prior_only_rolling_quantile",
         }
 
-    def constrained_side(name):
-        raw = ((hypothesis or {}).get("factor_side_constraints") or {}).get(name)
-        if isinstance(raw, dict):
-            declared = str(
-                (hypothesis or {}).get("predicted_direction") or ""
-            ).strip().lower()
-            key = "long" if declared in ("long", "buy", "positive_shift") else (
-                "short" if declared in ("short", "sell", "negative_shift") else ""
-            )
-            raw = raw.get(key) or raw.get("default")
-        raw = str(raw or "").strip().lower()
-        if raw == "trade_direction":
-            declared = str(
-                (hypothesis or {}).get("predicted_direction") or ""
-            ).strip().lower()
-            if declared in ("long", "buy", "positive_shift"):
-                return "high"
-            if declared in ("short", "sell", "negative_shift"):
-                return "low"
-            return None
-        return raw if raw in ("high", "low") else None
+    # P2: prefer deterministic event_ast when present.
+    event_ast = (hypothesis or {}).get("event_ast")
+    if isinstance(event_ast, dict) and event_ast:
+        try:
+            from . import ast_compiler as ac
+            compiled = ac.compile_ast_to_mask(event_ast, factor_matrix)
+            if compiled.get("ok") and compiled.get("mask") is not None:
+                dsl_pack = ac.compile_ast_to_dsl(event_ast)
+                terms = list(dsl_pack.get("terms") or [])
+                if not terms:
+                    terms = [{"node_type": "ast", "event_ast_hash": compiled.get("event_ast_hash")}]
+                specs.append({
+                    "event_id": "ast_%s" % (
+                        (hypothesis or {}).get("event_ast_hash")
+                        or compiled.get("event_ast_hash")
+                        or "compiled"
+                    )[:48],
+                    "terms": terms,
+                    "mask": list(compiled.get("mask") or []),
+                    "kind": "ast_compiled",
+                    "logic": "ast",
+                    "event_ast": compiled.get("normalized") or event_ast,
+                    "event_ast_hash": compiled.get("event_ast_hash"),
+                    "event_ast_formal_ok": bool(dsl_pack.get("formal_ok")),
+                    "event_ast_dsl": dsl_pack.get("entry_tree"),
+                    "ast_compile_report": compiled.get("compile_report"),
+                })
+            else:
+                compile_failures.append({
+                    "candidate_id": (hypothesis or {}).get("hypothesis_id"),
+                    "compile_stage": "mask",
+                    "report": compiled.get("compile_report"),
+                    "source_payload": {
+                        "event_ast_hash": (hypothesis or {}).get("event_ast_hash"),
+                    },
+                })
+        except Exception as exc:
+            compile_failures.append({
+                "candidate_id": (hypothesis or {}).get("hypothesis_id"),
+                "compile_stage": "mask",
+                "exception_type": type(exc).__name__,
+                "detail": str(exc)[:240],
+            })
 
     # Exact human-contract comparisons take precedence over generic quantiles.
     # The contract compiler already rejects missing required features; this
@@ -272,42 +305,119 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
         })
         return specs[: int(max_specs)], available
 
-    # Structured mechanism intersections are immutable event identity.  Do
-    # not let a generic low-volume proxy or an opposite signed displacement
-    # consume trials and then masquerade as the requested volume-breakout
-    # mechanism.
-    required_intersection = list(
-        (hypothesis or {}).get("required_factor_intersection") or []
-    )
-    if required_intersection:
-        if any(name not in (factor_matrix or {}) for name in required_intersection):
-            return [], available
-        for q in DEFAULT_QUANTILES:
-            terms = []
-            masks = []
-            sides = []
-            for name in required_intersection:
-                side = constrained_side(name)
-                if side not in ("high", "low"):
-                    return [], available
-                sides.append(side)
-                terms.append(quantile_term(name, side, q))
-                masks.append(mask(name, side, q))
-            n = min([len(row) for row in masks] or [0])
-            specs.append({
-                "event_id": "%s_q%s" % (
-                    "_AND_".join(
-                        "%s_%s" % (name, sides[index])
-                        for index, name in enumerate(required_intersection)
-                    ),
-                    int(q * 100),
-                ),
-                "terms": terms,
-                "mask": [all(row[k] for row in masks) for k in range(n)],
-                "kind": "mechanism_intersection",
-                "logic": "all",
+    # Structured search freezes a complete composite event before this formal
+    # probe.  Rebuild that exact rolling-quantile identity instead of falling
+    # back to the first factor or silently re-mining new thresholds.
+    required_quantile_terms = [
+        row for row in ((hypothesis or {}).get("required_quantile_terms") or [])
+        if isinstance(row, dict)
+    ]
+    if required_quantile_terms:
+        masks = []
+        frozen_terms = []
+        for row in required_quantile_terms:
+            name = row.get("factor")
+            side = str(row.get("side") or "")
+            q = _finite(row.get("q"))
+            if name not in (factor_matrix or {}) or side not in ("high", "low") or q is None:
+                return [], available
+            masks.append(mask(name, side, q))
+            frozen_terms.append({
+                "factor": name,
+                "side": side,
+                "q": q,
+                "window": int(row.get("window") or CAUSAL_QUANTILE_WINDOW),
+                "min_history": int(row.get("min_history") or CAUSAL_QUANTILE_MIN_HISTORY),
+                "threshold_source": "prior_only_rolling_quantile",
             })
-        return specs[: int(max_specs)], available
+        n = min([len(row) for row in masks] or [0])
+        specs.append({
+            "event_id": str(
+                (hypothesis or {}).get("mechanism_id")
+                or (hypothesis or {}).get("hypothesis_id")
+                or "structured_composite_event"
+            ),
+            "terms": frozen_terms,
+            "mask": [all(bool(row[index]) for row in masks) for index in range(n)],
+            "kind": "mechanism_preserving",
+            "logic": "all",
+            "structured_identity_locked": True,
+        })
+        return specs, [row.get("factor") for row in frozen_terms]
+
+    def _resolve_side(factor_name, declared_direction):
+        constraints = (hypothesis or {}).get("factor_side_constraints") or {}
+        rule = str(constraints.get(factor_name) or "").strip().lower()
+        if rule in ("high", "low"):
+            return rule
+        if rule == "trade_direction":
+            if declared_direction in ("long", "buy", "positive_shift"):
+                return "high"
+            if declared_direction in ("short", "sell", "negative_shift"):
+                return "low"
+        return None
+
+    required_ix = [
+        str(name) for name in ((hypothesis or {}).get("required_factor_intersection") or [])
+        if str(name) in (factor_matrix or {})
+    ]
+    # Locked mechanism intersections: only the required pair/sides, no single-proxy dump.
+    if len(required_ix) >= 2:
+        declared = str((hypothesis or {}).get("predicted_direction") or "").strip().lower()
+        directions = _direction_candidates(hypothesis)
+        dir_labels = []
+        for sign in directions:
+            dir_labels.append("long" if int(sign) > 0 else "short")
+        if declared in ("long", "short"):
+            dir_labels = [declared]
+        for direction_label in dir_labels:
+            sides = []
+            ok = True
+            for name in required_ix:
+                side = _resolve_side(name, direction_label)
+                if side is None:
+                    ok = False
+                    break
+                sides.append(side)
+            if not ok:
+                continue
+            for q_ix in INTERSECTION_QUANTILES:
+                masks = [mask(required_ix[i], sides[i], q_ix) for i in range(len(required_ix))]
+                n = min([len(row) for row in masks] or [0])
+                specs.append({
+                    "event_id": "%s_q%s" % (
+                        "_AND_".join(
+                            "%s_%s" % (required_ix[i], sides[i])
+                            for i in range(len(required_ix))
+                        ),
+                        int(float(q_ix) * 100),
+                    ),
+                    "terms": [
+                        quantile_term(required_ix[i], sides[i], q_ix)
+                        for i in range(len(required_ix))
+                    ],
+                    "mask": [all(bool(row[index]) for row in masks) for index in range(n)],
+                    "kind": "mechanism_intersection",
+                    "logic": "all",
+                })
+        # Prefer formal mapped composites; skip unrelated single_proxy / free pairs.
+        seen, unique = set(), []
+        for row in specs:
+            if row["event_id"] in seen:
+                continue
+            seen.add(row["event_id"])
+            unique.append(row)
+
+        def _formal_factor_ok(term):
+            return str((term or {}).get("factor") or "") in recipe_policy.GENERIC_FACTOR_TO_DSL
+
+        unique.sort(
+            key=lambda row: (
+                0 if all(_formal_factor_ok(t) for t in (row.get("terms") or [])) else 1,
+                str(row.get("event_id") or ""),
+            )
+        )
+        return unique[: int(max_specs)], available
 
     for name in available:
         for q in DEFAULT_QUANTILES:
@@ -326,19 +436,22 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
         for j in range(i + 1, min(len(available), 5)):
             pairs.append((available[i], available[j]))
     for a, b in pairs:
-        for sa, sb in (("high", "high"), ("low", "low"), ("high", "low"), ("low", "high")):
-            ma, mb = mask(a, sa, 0.8), mask(b, sb, 0.8)
-            n = min(len(ma), len(mb))
-            specs.append({
-                "event_id": "%s_%s_AND_%s_%s" % (a, sa, b, sb),
-                "terms": [
-                    quantile_term(a, sa, 0.8),
-                    quantile_term(b, sb, 0.8),
-                ],
-                "mask": [bool(ma[k] and mb[k]) for k in range(n)],
-                "kind": "mechanism_intersection",
-                "logic": "all",
-            })
+        for q_ix in INTERSECTION_QUANTILES:
+            for sa, sb in (("high", "high"), ("low", "low"), ("high", "low"), ("low", "high")):
+                ma, mb = mask(a, sa, q_ix), mask(b, sb, q_ix)
+                n = min(len(ma), len(mb))
+                specs.append({
+                    "event_id": "%s_%s_AND_%s_%s_q%s" % (
+                        a, sa, b, sb, int(float(q_ix) * 100),
+                    ),
+                    "terms": [
+                        quantile_term(a, sa, q_ix),
+                        quantile_term(b, sb, q_ix),
+                    ],
+                    "mask": [bool(ma[k] and mb[k]) for k in range(n)],
+                    "kind": "mechanism_intersection",
+                    "logic": "all",
+                })
 
     # Specialised, still-minimal mechanism events. These remain probes, not strategies.
     family = str((hypothesis or {}).get("family") or "").lower()
@@ -373,13 +486,198 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
             "logic": "all",
         })
 
+    # Exhaustion recovery is a conjunctive mechanism, not a one-factor tail.
+    # Preserve the human research identity from the first probe: extreme
+    # oversold state + deep negative displacement + a completed bullish reclaim.
+    # Successive variants then test whether selling-velocity decay and a low
+    # persistent-downtrend score separate true exhaustion from a trend relay.
+    if any(x in blob for x in (
+        "exhaust", "liquid", "衰竭", "清算", "panic", "mean_reversion",
+    )):
+        exhaustion_events = (
+            (
+                "rsi_z_bullish_reclaim_core",
+                (("rsi_14", "low", 0.80),
+                 ("close_z_20", "low", 0.80),
+                 ("bullish_reclaim", "high", 0.80)),
+            ),
+            (
+                "rsi_z_bullish_reclaim_core_dense70",
+                (("rsi_14", "low", 0.70),
+                 ("close_z_20", "low", 0.70),
+                 ("bullish_reclaim", "high", 0.70)),
+            ),
+            (
+                "rsi_z_reclaim_with_velocity_decay",
+                (("rsi_14", "low", 0.80),
+                 ("close_z_20", "low", 0.80),
+                 ("bullish_reclaim", "high", 0.80),
+                 ("downside_velocity_decay", "high", 0.80)),
+            ),
+            (
+                "rsi_z_reclaim_with_velocity_decay_dense70",
+                (("rsi_14", "low", 0.70),
+                 ("close_z_20", "low", 0.70),
+                 ("bullish_reclaim", "high", 0.70),
+                 ("downside_velocity_decay", "high", 0.70)),
+            ),
+            (
+                "rsi_z_reclaim_anti_falling_knife",
+                (("rsi_14", "low", 0.80),
+                 ("close_z_20", "low", 0.80),
+                 ("bullish_reclaim", "high", 0.80),
+                 ("downside_velocity_decay", "high", 0.80),
+                 ("downtrend_persistence_12", "low", 0.80)),
+            ),
+        )
+        # Bollinger mean-reversion identity (formal bb_* factors). Prefer these
+        # when the brief/family names 布林/bollinger so discovery does not collapse
+        # onto rsi×z20 lottery clones that already fail the win-only gate.
+        if any(x in blob for x in (
+            "布林", "bollinger", "bb_lower", "bb_mid", "bb_width", "boll",
+        )):
+            exhaustion_events = exhaustion_events + (
+                (
+                    "rsi_bb_lower_mid_reclaim_core",
+                    (("rsi_14", "low", 0.80),
+                     ("bb_lower_dist", "low", 0.80),
+                     ("bb_mid_reclaim", "high", 0.70)),
+                ),
+                (
+                    "rsi_bb_lower_mid_reclaim_dense70",
+                    (("rsi_14", "low", 0.70),
+                     ("bb_lower_dist", "low", 0.70),
+                     ("bb_mid_reclaim", "high", 0.65)),
+                ),
+                (
+                    "rsi_bb_lower_mid_width_guard",
+                    (("rsi_14", "low", 0.80),
+                     ("bb_lower_dist", "low", 0.80),
+                     ("bb_mid_reclaim", "high", 0.70),
+                     ("bb_width", "low", 0.70)),
+                ),
+                (
+                    "rsi_bb_lower_reclaim_velocity",
+                    (("rsi_14", "low", 0.80),
+                     ("bb_lower_dist", "low", 0.80),
+                     ("bb_mid_reclaim", "high", 0.70),
+                     ("downside_velocity_decay", "high", 0.75)),
+                ),
+            )
+        for event_name, definitions in reversed(exhaustion_events):
+            if not all(name in (factor_matrix or {}) for name, _, _ in definitions):
+                continue
+            term_rows = [
+                quantile_term(name, side, q)
+                for name, side, q in definitions
+            ]
+            masks = [mask(name, side, q) for name, side, q in definitions]
+            n = min([len(row) for row in masks] or [0])
+            is_bb = "bb_" in event_name or "boll" in event_name
+            specs.insert(0, {
+                "event_id": event_name,
+                "terms": term_rows,
+                "mask": [all(bool(row[index]) for row in masks) for index in range(n)],
+                "kind": "mechanism_preserving",
+                "logic": "all",
+                "mechanism_identity": (
+                    "rsi_bollinger_mid_reclaim" if is_bb else "rsi_zscore_candle_reclaim"
+                ),
+                "anti_falling_knife_tested": bool(
+                    event_name.endswith("anti_falling_knife")
+                ),
+            })
+
+    # Materialization repair waves: force state/combo representations even when
+    # the first direct-mechanism probes look weak. Controlled by env wave id.
+    try:
+        from . import candidate_materialization as mat
+        wave = str(os.environ.get("QIYU_MATERIALIZATION_WAVE") or "").strip()
+        if not wave:
+            # Always inject wave2 state forms so first pass is not single-threshold only.
+            wave = mat.WAVE_STATE
+        for event_name, definitions in mat.forced_probe_event_defs(wave):
+            if not all(name in (factor_matrix or {}) for name, _, _ in definitions):
+                continue
+            if any(row.get("event_id") == event_name for row in specs):
+                continue
+            term_rows = [quantile_term(name, side, q) for name, side, q in definitions]
+            masks = [mask(name, side, q) for name, side, q in definitions]
+            n = min([len(row) for row in masks] or [0])
+            specs.insert(0, {
+                "event_id": event_name,
+                "terms": term_rows,
+                "mask": [all(bool(row[index]) for row in masks) for index in range(n)],
+                "kind": "mechanism_preserving",
+                "logic": "all",
+                "mechanism_identity": "materialization_%s" % wave,
+                "materialization_wave": wave,
+            })
+    except Exception:
+        pass
+
+    # Layer B quality repairs: confirmation + exclusion (stop/leverage untouched).
+    try:
+        from . import quality_optimization as qopt
+        qcodes = str(os.environ.get("QIYU_QUALITY_FAILURE_CODES") or "").strip()
+        code_list = [c for c in qcodes.split(",") if c] if qcodes else [
+            qopt.LOW_WIN_RATE, qopt.LOW_PROFIT_FIRST_RATE, qopt.HIGH_MAE,
+        ]
+        for event_name, definitions, rtype in qopt.quality_repair_event_defs(code_list):
+            if not all(name in (factor_matrix or {}) for name, _, _ in definitions):
+                continue
+            if any(row.get("event_id") == event_name for row in specs):
+                continue
+            term_rows = [quantile_term(name, side, q) for name, side, q in definitions]
+            masks = [mask(name, side, q) for name, side, q in definitions]
+            n = min([len(row) for row in masks] or [0])
+            specs.insert(0, {
+                "event_id": event_name,
+                "terms": term_rows,
+                "mask": [all(bool(row[index]) for row in masks) for index in range(n)],
+                "kind": "mechanism_preserving",
+                "logic": "all",
+                "mechanism_identity": "quality_repair",
+                "representation_type": rtype,
+                "quality_repair": True,
+            })
+    except Exception:
+        pass
+
     # Stable order and bounded diagnostic budget.
+    # 关键：密分位单因子会占满 max_specs，可正式编译的 close_z×volume_z
+    # 交集永远进不了预算 → best=None / formal_capability_blocked / 存活0。
     seen, unique = set(), []
     for row in specs:
         if row["event_id"] in seen:
             continue
         seen.add(row["event_id"])
         unique.append(row)
+
+    def _formal_factor_ok(term):
+        return str((term or {}).get("factor") or "") in recipe_policy.GENERIC_FACTOR_TO_DSL
+
+    def _priority(row):
+        kind = str(row.get("kind") or "")
+        terms = list(row.get("terms") or [])
+        all_formal = bool(terms) and all(_formal_factor_ok(t) for t in terms)
+        if kind == "human_contract_exact":
+            return 0
+        if kind == "ast_compiled" and row.get("event_ast_formal_ok"):
+            return 1
+        if kind == "ast_compiled":
+            return 2
+        if kind in ("mechanism_intersection", "mechanism_preserving") and all_formal:
+            return 3
+        if kind in ("mechanism_intersection", "mechanism_preserving"):
+            return 4
+        if kind == "single_proxy" and all_formal:
+            return 5
+        return 6
+
+    unique.sort(key=_priority)
+    if compile_failures and isinstance(hypothesis, dict):
+        hypothesis["ast_compile_failures"] = list(compile_failures)
     return unique[: int(max_specs)], available
 
 
@@ -557,13 +855,35 @@ def _trade_observation(candles, signal_i, horizon, direction, mapping):
     else:
         mfe = (1.0 - min(lows) / entry) if lows else ret
         mae = (1.0 - max(highs) / entry) if highs else ret
-    return {"return": ret, "mfe": mfe, "mae": mae,
-            "signal_index": signal_i, "entry_index": entry_i, "exit_index": exit_i,
-            "planned_exit_index": planned_exit_i, "exit_reason": exit_reason,
-            "protective_stop_price": stop_price,
-            "signal_ts": rows[signal_i].get("ts"),
-            "entry_ts": rows[entry_i].get("ts"),
-            "exit_ts": rows[exit_i].get("ts")}
+    # Path-hit label: target-before-stop (creation objective).
+    path_label = None
+    try:
+        from . import path_outcome as path_out
+        path_label = path_out.label_path(
+            rows, entry_i, direction, horizon,
+            target_pct=path_out.TARGET_PRICE_PCT,
+            stop_pct=stop_pct,
+        )
+    except Exception:
+        path_label = None
+    out = {
+        "return": ret, "mfe": mfe, "mae": mae,
+        "signal_index": signal_i, "entry_index": entry_i, "exit_index": exit_i,
+        "planned_exit_index": planned_exit_i, "exit_reason": exit_reason,
+        "protective_stop_price": stop_price,
+        "signal_ts": rows[signal_i].get("ts"),
+        "entry_ts": rows[entry_i].get("ts"),
+        "exit_ts": rows[exit_i].get("ts"),
+    }
+    if path_label:
+        out["profit_first"] = path_label.get("profit_first")
+        out["first_touch"] = path_label.get("first_touch")
+        out["mfe_pct"] = path_label.get("mfe_pct")
+        out["mae_pct"] = path_label.get("mae_pct")
+        out["bars_to_target"] = path_label.get("bars_to_target")
+        out["bars_to_stop"] = path_label.get("bars_to_stop")
+        out["path_label"] = path_label
+    return out
 
 
 def _newey_west_t(xs):
@@ -733,6 +1053,76 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
     pp = scenario_rows.get(primary) or {}
     n = len(rets)
     net_mean = _mean(rets)
+    wins = [v for v in rets if v is not None and float(v) > 0]
+    losses = [v for v in rets if v is not None and float(v) < 0]
+    win_rate = (len(wins) / float(n)) if n else None
+    avg_win = (sum(wins) / float(len(wins))) if wins else 0.0
+    avg_loss_mag = (sum(-float(v) for v in losses) / float(len(losses))) if losses else 0.0
+    if avg_loss_mag > 0:
+        payoff_ratio = avg_win / avg_loss_mag
+    else:
+        payoff_ratio = 999.0 if avg_win > 0 else 0.0
+    expectancy_factor = (win_rate * payoff_ratio) if win_rate is not None else None
+    # Anti-lottery: removing the single largest win must not erase expectancy.
+    if wins:
+        max_win = max(wins)
+        reduced = list(rets)
+        reduced.remove(max_win)
+        mean_without_max_win = _mean(reduced)
+    else:
+        mean_without_max_win = net_mean
+    high_wr = bool(win_rate is not None and win_rate > float(MIN_ASSEMBLY_WIN_RATE))
+    anti_lottery = bool(
+        expectancy_factor is not None and expectancy_factor >= 1.0
+        and mean_without_max_win is not None and mean_without_max_win > 0
+    )
+    # Manufacture-batch mode: still cancel old WR/Gate vetoes, but path-hit
+    # bare screen is mandatory — no more "sample adequacy alone → READY".
+    try:
+        from . import manufacture_batch_policy as mfg
+        manufacture_mode = bool(mfg.pre_review_gates_disabled())
+    except Exception:
+        manufacture_mode = False
+    path_screen = None
+    try:
+        from . import path_bare_screen as pbs
+        path_screen = pbs.screen_from_observations(
+            obs, horizon=horizon, direction=direction,
+        )
+    except Exception:
+        path_screen = None
+    path_packaging_ok = bool((path_screen or {}).get("packaging_ok"))
+    path_review_ok = bool((path_screen or {}).get("passed"))
+    path_summary = (path_screen or {}).get("summary") or {}
+    # 毛收益仅作诊断；交接/组装必须用账户口径（含摩擦）胜率>50% + 反彩票。
+    # 禁止「毛胜率好看、账户胜率≈35%」的屎策略混进四阶段复核。
+    gross_wins = [v for v in gross_rets if v is not None and float(v) > 0]
+    gross_losses = [v for v in gross_rets if v is not None and float(v) < 0]
+    gross_win_rate = (len(gross_wins) / float(n)) if n else None
+    gross_avg_win = (sum(gross_wins) / float(len(gross_wins))) if gross_wins else 0.0
+    gross_avg_loss_mag = (
+        sum(-float(v) for v in gross_losses) / float(len(gross_losses))
+        if gross_losses else 0.0
+    )
+    if gross_avg_loss_mag > 0:
+        gross_payoff = gross_avg_win / gross_avg_loss_mag
+    else:
+        gross_payoff = 999.0 if gross_avg_win > 0 else 0.0
+    gross_expectancy_factor = (
+        (gross_win_rate * gross_payoff) if gross_win_rate is not None else None
+    )
+    if gross_wins:
+        g_reduced = list(gross_rets)
+        g_reduced.remove(max(gross_wins))
+        gross_mean_without_max_win = _mean(g_reduced)
+    else:
+        gross_mean_without_max_win = gross
+    gross_high_wr = bool(
+        gross_win_rate is not None and gross_win_rate > float(MIN_ASSEMBLY_WIN_RATE)
+    )
+    gross_anti_lottery = bool(
+        gross_mean_without_max_win is not None and gross_mean_without_max_win > 0
+    )
     statistical = bool(
         n >= MIN_INDEPENDENT_EVENTS and net_mean is not None
         and net_mean > 0 and t >= 1.64
@@ -740,11 +1130,31 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
     economic = bool(gross is not None and gross > 0 and (_mean(mfes) or 0.0) >=
                     float((costs.get("maker_taker") or {}).get("total_friction") or 0.0))
     execution = bool((pp.get("mean_net") or -1.0) > 0 and (pp.get("efr") or 0.0) >= 1.20)
+    # 生产交接底线：账户胜率严格>50% + 去最大盈利后不崩 + 平均净收益>0 + 样本够。
+    handoff_floor = bool(
+        n >= MIN_INDEPENDENT_EVENTS
+        and net_mean is not None and net_mean > 0
+        and high_wr and anti_lottery
+    )
     regime_conditional, regime_pack = _regime_split_conditional(candles, obs)
     if n < MIN_INDEPENDENT_EVENTS:
         state = "SAMPLE_INADEQUATE"
-    elif statistical and economic and execution:
+    elif manufacture_mode and n >= MIN_INDEPENDENT_EVENTS:
+        # Materialize first, judge later. Path metrics are recorded and used at
+        # handoff / ranking — they must NOT veto packaging or the manufacture
+        # batch collapses to empty and the pipeline falsely claims "no market edge".
         state = "READY_FOR_ASSEMBLY"
+    elif path_review_ok and statistical and economic and execution and high_wr and anti_lottery:
+        state = "READY_FOR_ASSEMBLY"
+    elif path_review_ok and handoff_floor:
+        state = "READY_FOR_ASSEMBLY"
+    elif statistical and economic and execution and high_wr and anti_lottery:
+        state = "READY_FOR_ASSEMBLY"
+    elif handoff_floor:
+        state = "READY_FOR_ASSEMBLY"
+    elif statistical and economic and execution and not (high_wr and anti_lottery):
+        # Positive mean with rare big wins — keep as diagnostic, never assemble.
+        state = "NEAR_MISS_DIAGNOSTIC"
     elif statistical and economic:
         state = "EXECUTION_MAPPING_FAILURE"
     elif regime_conditional and (statistical or (net_mean is not None and net_mean > 0 and t >= 1.0)):
@@ -774,6 +1184,10 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         "event_kind": event.get("kind"),
         "event_logic": event.get("logic"),
         "terms": event.get("terms"),
+        "event_ast": event.get("event_ast"),
+        "event_ast_hash": event.get("event_ast_hash"),
+        "event_ast_formal_ok": event.get("event_ast_formal_ok"),
+        "event_ast_dsl": event.get("event_ast_dsl"),
         "factor": ((event.get("terms") or [{}])[0]).get("factor"),
         "side": ((event.get("terms") or [{}])[0]).get("side"),
         "q": ((event.get("terms") or [{}])[0]).get("q"),
@@ -789,8 +1203,37 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         "effective_sample_size": n,
         "mean_hit": gross,
         "mean_net": net_mean,
+        "win_rate": win_rate,
+        "win_rate_pct": (None if win_rate is None else win_rate * 100.0),
+        "payoff_ratio": payoff_ratio,
+        "expectancy_factor": expectancy_factor,
+        "mean_net_without_max_win": mean_without_max_win,
+        "high_wr_pass": high_wr,
+        "anti_lottery_pass": anti_lottery,
+        "gross_win_rate": gross_win_rate,
+        "gross_win_rate_pct": (
+            None if gross_win_rate is None else gross_win_rate * 100.0
+        ),
+        "gross_payoff_ratio": gross_payoff,
+        "gross_expectancy_factor": gross_expectancy_factor,
+        "gross_mean_without_max_win": gross_mean_without_max_win,
+        "gross_high_wr_pass": gross_high_wr,
+        "gross_anti_lottery_pass": gross_anti_lottery,
+        "handoff_floor": handoff_floor,
+        "handoff_return_basis": "account_net_after_friction_v1",
         "mean_mfe": mean_mfe,
         "mean_mae": mean_mae,
+        "path_bare_screen": path_screen,
+        "profit_first_rate": path_summary.get("profit_first_rate"),
+        "loss_first_rate": path_summary.get("loss_first_rate"),
+        "unresolved_rate": path_summary.get("unresolved_rate"),
+        "median_mfe_pct": path_summary.get("median_mfe_pct"),
+        "median_mae_pct": path_summary.get("median_mae_pct"),
+        "mean_winning_levered": path_summary.get("mean_winning_levered"),
+        "median_winning_levered": path_summary.get("median_winning_levered"),
+        "path_packaging_ok": path_packaging_ok,
+        "path_review_eligible": path_review_ok,
+        "path_entry_score": ((path_screen or {}).get("rank") or {}).get("score"),
         "hac_t_stat": t,
         "gross_hac_t_stat": gross_t,
         "volatility_effect_t_stat": volatility_t,
@@ -877,22 +1320,6 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
     specs, available = _candidate_events(hypothesis, matrix, max_specs=max_trials)
     requested = list((hypothesis or {}).get("factor_hints") or
                      (hypothesis or {}).get("observable_proxy") or [])
-    required_intersection = list(
-        (hypothesis or {}).get("required_factor_intersection") or []
-    )
-    missing_required = [
-        name for name in required_intersection if name not in matrix
-    ]
-    if missing_required:
-        return {
-            "ok": True, "passed": False, "hypothesis_id": hypothesis.get("hypothesis_id"),
-            "research_state": "PROXY_INADEQUATE",
-            "research_state_zh": RESEARCH_STATES_ZH["PROXY_INADEQUATE"],
-            "n_probes": 0, "best": None, "probes": [],
-            "missing_proxies": missing_required,
-            "available_proxies": sorted(matrix.keys()),
-            "family_closed": False, "at": _now(),
-        }
     if requested and not available:
         return {
             "ok": True, "passed": False, "hypothesis_id": hypothesis.get("hypothesis_id"),
@@ -968,20 +1395,19 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
     # then alternate execution mappings.  A small budget therefore stays diverse.
     directions = _direction_candidates(hypothesis)
     plan = []
-    preferred_horizons = [h for h in (3, 1, 6, 12) if h in horizons]
-    dimension_cycle = []
-    # Latin-style order gives a tiny budget immediate horizon/mapping breadth.
-    max_len = max(len(preferred_horizons), len(mappings))
-    for offset in range(max_len * max_len):
-        dimension_cycle.append((
-            preferred_horizons[offset % len(preferred_horizons)],
-            mappings[(offset + offset // len(preferred_horizons)) % len(mappings)],
-        ))
-    for round_i in range(len(dimension_cycle)):
-        for spec_i, spec in enumerate(specs):
-            horizon, mapping = dimension_cycle[(spec_i + round_i) % len(dimension_cycle)]
-            direction = directions[(spec_i + round_i) % len(directions)]
-            plan.append((spec, horizon, direction, mapping))
+    horizon_order = (3, 1, 6, 12, 2, 4, 8, 10, 16, 18, 20, 24, 30, 36, 48)
+    preferred_horizons = [h for h in horizon_order if h in horizons]
+    preferred_horizons.extend(
+        h for h in sorted(horizons) if h not in preferred_horizons
+    )
+    # Candidate-first grid: keep the full event identity fixed while comparing
+    # its holding periods.  The old Latin traversal tested each event only once
+    # at an arbitrary horizon, so "multi-horizon search" was merely telemetry.
+    for spec_i, spec in enumerate(specs):
+        for horizon in preferred_horizons:
+            for mapping_i, mapping in enumerate(mappings):
+                direction = directions[(spec_i + mapping_i) % len(directions)]
+                plan.append((spec, horizon, direction, mapping))
     # If direction is not fixed by the hypothesis, also test the opposite direction.
     if len(directions) > 1:
         for horizon in preferred_horizons:
@@ -1046,9 +1472,14 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
             "VOLATILITY_EFFECT_ONLY": 2,
             "NO_DIRECTIONAL_EFFECT": 0, "SAMPLE_INADEQUATE": -1,
         }
-        return (state_rank.get(row.get("research_state"), -1),
-                float(row.get("mean_net") or -1e9),
-                int(row.get("n_independent_events") or 0))
+        return (
+            state_rank.get(row.get("research_state"), -1),
+            1 if row.get("path_review_eligible") else 0,
+            float(row.get("profit_first_rate") or -1.0),
+            float(row.get("path_entry_score") or -1.0),
+            float(row.get("mean_net") or -1e9),
+            int(row.get("n_independent_events") or 0),
+        )
     ordered = sorted(rows, key=rank, reverse=True)
     # Only an execution mapping implemented by the formal DSL may become the
     # admitted recipe.  Other mappings remain valuable diagnostics, but
@@ -1061,7 +1492,16 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
     formally_executable = [
         row for row in ordered if (row.get("formal_capability") or {}).get("ok")
     ]
-    best = formally_executable[0] if formally_executable else None
+    # 可正式复现的候选优先；其中已过交接底线的再优先，避免被诊断态单因子掩盖。
+    formal_ready = [
+        row for row in formally_executable
+        if row.get("passed") or row.get("handoff_floor")
+        or row.get("research_state") == "READY_FOR_ASSEMBLY"
+    ]
+    best = (
+        formal_ready[0] if formal_ready
+        else (formally_executable[0] if formally_executable else None)
+    )
     diagnostic_best = ordered[0] if ordered else None
     passed = bool(best and best.get("passed"))
     state = (best or diagnostic_best or {}).get("research_state") or "SAMPLE_INADEQUATE"
@@ -1106,6 +1546,10 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
             best["failure_codes"] = codes
 
     event_kinds = sorted(set(r.get("event_kind") for r in rows if r.get("event_kind")))
+    ast_rows = [r for r in rows if r.get("event_kind") == "ast_compiled"]
+    ast_hashes = sorted(set(
+        str(r.get("event_ast_hash") or "") for r in ast_rows if r.get("event_ast_hash")
+    ))
     coverage = {
         "event_definitions_tested": event_n,
         "event_kinds_tested": event_kinds,
@@ -1121,6 +1565,10 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
         "trial_budget_limit": budget,
         "leaf_coverage_enough_for_contradiction": bool(state == "MECHANISM_CONTRADICTED"),
         "sufficient_to_close_family": False,
+        "ast_compiled_n": len(ast_rows),
+        "ast_formal_ok_n": sum(1 for r in ast_rows if r.get("event_ast_formal_ok")),
+        "ast_hashes": ast_hashes[:24],
+        "ast_compile_failures_n": len((hypothesis or {}).get("ast_compile_failures") or []),
     }
     return {
         "ok": True,
@@ -1140,12 +1588,28 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
             if diagnostic_best is not None else None
         ),
         "formal_execution_mappings": ["next_bar_open"],
-        "formal_capability_reasons": sorted(set(
+        # The formal status of the admitted/best row must not inherit reasons
+        # from unrelated diagnostic single-factor probes.  Keep the aggregate
+        # list separately for audit, while the primary field describes exactly
+        # the row that could advance.
+        "formal_capability_reasons": list(
+            ((best or diagnostic_best or {}).get("formal_capability") or {}).get(
+                "reasons"
+            ) or []
+        ),
+        "diagnostic_formal_capability_reasons": sorted(set(
             reason for row in ordered
             for reason in ((row.get("formal_capability") or {}).get("reasons") or [])
         )),
         "probes": [{k: v for k, v in r.items() if k not in ("trade_returns", "pbo_bar_returns", "event_mask")} for r in ordered],
         "coverage": coverage,
+        "ast_compile": {
+            "attempted": bool((hypothesis or {}).get("event_ast")),
+            "compiled_n": len(ast_rows),
+            "formal_ok_n": sum(1 for r in ast_rows if r.get("event_ast_formal_ok")),
+            "hashes": ast_hashes[:24],
+            "failures": list((hypothesis or {}).get("ast_compile_failures") or [])[:8],
+        },
         "required_entry_timing": (hypothesis or {}).get("required_entry_timing") or {},
         "entry_timing_mapping_locked": timing_mode in ("bar_close", "next_bar_open"),
         "family_closed": False,

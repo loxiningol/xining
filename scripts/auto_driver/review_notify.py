@@ -260,20 +260,53 @@ def ensure_human_confirm_on_success(*, result=None, pack=None, cfg=None):
                 metrics[k] = result.get(k)
         if gr.get("calmar") is not None:
             metrics["calmar"] = gr.get("calmar")
+        # Fallback is allowed only when STEP A returned the canonical full
+        # three-AI artifact.  Never synthesize approved=True here.
+        ai_review = (
+            result.get("theoretical_review_all")
+            or result.get("ai_review")
+            or (result.get("artifacts") or {}).get("theoretical_review_all")
+            or {}
+        )
+        if not ai_review.get("four_review_admission"):
+            adm = result.get("admission_v2") or {}
+            r1 = adm.get("review1") or (adm.get("final") or {}).get("reviews", {}).get("r1")
+            r2 = adm.get("review2") or (adm.get("final") or {}).get("reviews", {}).get("r2")
+            r3 = adm.get("review3") or (adm.get("final") or {}).get("reviews", {}).get("r3")
+            r4 = adm.get("review4") or (adm.get("final") or {}).get("reviews", {}).get("r4")
+            if r1 and r2 and r3 and r4:
+                ai_review = dict(ai_review)
+                ai_review["four_review_admission"] = {
+                    "schema": "qiyu_four_review_admission_v2",
+                    "profile": adm.get("profile") or "strict_four_review_v2",
+                    "pass": bool(
+                        r1.get("pass") and r2.get("pass")
+                        and r3.get("pass") and r4.get("pass")
+                    ),
+                    "reviews": {"r1": r1, "r2": r2, "r3": r3, "r4": r4},
+                    "task_id": result.get("task_id"),
+                    "pipeline_handoff": "auto_driver_step_a",
+                }
+        try:
+            import auto_trade_human_confirm_pipeline as _pipe
+            verification = _pipe.verify_four_review_admission_for_pending(
+                ai_review, source="auto_driver_review_pipeline")
+        except Exception as exc:
+            verification = {"ok": False, "reasons": [str(exc)[:160]]}
+        if not verification.get("ok"):
+            return {
+                "ok": False,
+                "error": "verified_four_review_required",
+                "review_verification": verification,
+                "channel": "strategy_pending_confirm",
+                "production_mounted": False,
+                "auto_mount": False,
+            }
         push = pipe.enqueue_for_human(
             {"dsl": dsl, "symbol": cfg.get("symbol"), "timeframe": cfg.get("timeframe")},
             metrics,
             source="auto_driver_review_pipeline",
-            ai_review={
-                "approved": True,
-                "policy": "three_review_pass_await_human",
-                "natural_language": (
-                    "三次复核均已通过；已接入原人工确认 WxPusher 通道。"
-                    "production_mounted=False，需 --confirm 才挂载。"
-                ),
-                "calmar": metrics.get("calmar"),
-                "payoff": metrics.get("payoff") or metrics.get("payoff_ratio"),
-            },
+            ai_review=ai_review,
         )
         return {
             "ok": bool(push.get("ok")),

@@ -1,0 +1,264 @@
+{
+  "op": "寒霜放宽救援",
+  "started_at": "2026-07-25 18:59:50",
+  "gate_mode": "frost_relaxed",
+  "strategies": {
+    "XRP-USDT-SWAP": {
+      "symbol": "XRP-USDT-SWAP",
+      "logic_class": "exhaustion_fade",
+      "dsl_key": "frost_xrp_rescue_h20_t45",
+      "suite_pass": true,
+      "suite": {
+        "walk_forward": true,
+        "extreme_friction": true,
+        "logic_destruction": true,
+        "monte_carlo_soft": true
+      },
+      "base_metrics": {
+        "trades": 14,
+        "win_rate_pct": 85.71428571428571,
+        "mean_net": 0.06840359826923197,
+        "oos_profit": 0.4287865620443913,
+        "sharpe": 2.3528,
+        "fold_positive": 8,
+        "folds": 10,
+        "fold_means": [
+          0.0478,
+          0.024586,
+          -0.012662,
+          -0.120752,
+          0.140333,
+          0.241332,
+          0.080556,
+          0.155575,
+          0.079465,
+          0.019085
+        ]
+      },
+      "friction_sharpe": 1.8621,
+      "dest": true,
+      "mc": {
+        "ok": true,
+        "pass": true,
+        "paths": 80,
+        "mean_final": 1.395939,
+        "positive_path_ratio": 0.9875,
+        "gates": {
+          "mean_final_gt_0": true,
+          "positive_path_ratio_ge_0.55": true
+        }
+      },
+      "sim": {
+        "ok": true,
+        "pass": true,
+        "wr_deepseek_sim": 77.71,
+        "wr_qwen_sim": 75.71,
+        "gate": 55.0,
+        "audit": {
+          "wr_deepseek_sim": 77.71428571428571,
+          "wr_qwen_sim": 75.71428571428571,
+          "reason_zh": "模拟复核兜底：经验胜率折价",
+          "fallback": true,
+          "error": "json_parse:invalid character in identifier (<unknown>, line 1)"
+        }
+      },
+      "cert": {
+        "title": "内部质量认证",
+        "at": "2026-07-25 19:01:25",
+        "symbol": "XRP-USDT-SWAP",
+        "key": "frost_xrp_rescue_h20_t45",
+        "sim_ds": 77.71,
+        "sim_qwen": 75.71,
+        "gate_mode": "frost_relaxed"
+      },
+      "formal": {
+        "approved": true,
+        "annotation": "DeepSeek 78.0% | Qwen 80.0% | mean 79.0%",
+        "ai_review": {
+          "approved": true,
+          "policy": "deepseek_and_qwen_formal_only_ge_50",
+          "ai_theoretical_wr_avg": 79.0,
+          "ai_theoretical_wr_by_provider": {
+            "deepseek": 78.0,
+            "qwen": 80.0
+          },
+          "ai_stop_cluster_risk_by_provider": {
+            "deepseek": "low",
+            "qwen": "low"
+          },
+          "natural_language": "DeepSeek 78.0% | Qwen 80.0% | mean 79.0%",
+          "reviews": [
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-pro",
+              "ok": true,
+              "candidate_hash": "42a4dbbb0df105c98a1076812cf1708b1cc2f72e5ba1bf5145b8bae33339e33b",
+              "decision": "APPROVE",
+              "theoretical_win_rate_pct": 78.0,
+              "stop_cluster_risk": "low",
+              "stop_cluster_prob": 0.1,
+              "confidence": 0.85,
+              "reason": "实证胜率85.7%且5折10折交叉验证全正，mean_net显著为正，最大亏损连次2，止损簇风险极低；信号逻辑无自相矛盾，做空衰竭模式合理；基于样本量有限小幅折价至78%仍远高于50%。",
+              "failure_modes": [
+                "样本仅14笔，可能存在过拟合风险",
+                "市场结构突变可能导致失效"
+              ],
+              "latency_sec": 13.173,
+              "hash_mismatch": false
+            },
+            {
+              "provider": "qwen",
+              "model": "qwen3.7-plus",
+              "ok": true,
+              "candidate_hash": "42a4dbbb0df105c98a1076812cf1708b1cc2f72e5ba1bf5145b8bae33339e33b",
+              "decision": "APPROVE",
+              "theoretical_win_rate_pct": 80.0,
+              "stop_cluster_risk": "low",
+              "stop_cluster_prob": 0.15,
+              "confidence": 0.85,
+              "reason": "策略基于下跌趋势中的反弹衰竭逻辑（RSI>55配合MACD<0及价格<EMA16），逻辑自洽且无未来信息。实证胜率85.71%，五折交叉验证全正，最大连亏仅为2，止损簇风险极低。考虑到总交易样本量较小（14笔），对实证胜率进行约5.7个百分点的合理折价至80%，仍远高于50%的通过阈值，在真实摩擦成本下具备稳健正期望。",
+              "failure_modes": [
+                "总样本量偏小（14笔），实证胜率可能存在统计偏差",
+                "极端单边上涨行情中RSI高位钝化，导致止盈条件（RSI<45）难以触发而频繁触发invalidation止损"
+              ],
+              "latency_sec": 32.221,
+              "hash_mismatch": false
+            }
+          ],
+          "gate": 50.0
+        }
+      },
+      "pending": {
+        "ok": true,
+        "key": "frost_xrp_rescue_h20_t45",
+        "reason": null,
+        "duplicate": null
+      }
+    },
+    "DOGE-USDT-SWAP": {
+      "symbol": "DOGE-USDT-SWAP",
+      "logic_class": "range_reclaim",
+      "dsl_key": "frost_doge_rescue_35_h18_t55_z0p8",
+      "suite_pass": false,
+      "suite": {
+        "walk_forward": false,
+        "extreme_friction": true,
+        "logic_destruction": false,
+        "monte_carlo_soft": true
+      },
+      "base_metrics": {
+        "trades": 18,
+        "win_rate_pct": 50.0,
+        "mean_net": 0.05902013802861182,
+        "oos_profit": -0.4587291329179022,
+        "sharpe": 0.8043,
+        "fold_positive": 6,
+        "folds": 10,
+        "fold_means": [
+          0.249189,
+          0.338337,
+          -0.002785,
+          -0.21875,
+          0.2845,
+          0.34455,
+          0.062375,
+          -0.218875,
+          0.208135,
+          -0.218625
+        ]
+      },
+      "friction_sharpe": 0.4659,
+      "dest": false,
+      "mc": {
+        "ok": true,
+        "pass": true,
+        "paths": 80,
+        "mean_final": 2.444845,
+        "positive_path_ratio": 0.6875,
+        "gates": {
+          "mean_final_gt_0": true,
+          "positive_path_ratio_ge_0.55": true
+        }
+      },
+      "sim": {
+        "ok": true,
+        "pass": false,
+        "wr_deepseek_sim": 0.0,
+        "wr_qwen_sim": 0.0,
+        "gate": 55.0,
+        "audit": {
+          "wr_deepseek_sim": 0.0,
+          "wr_qwen_sim": 0.0,
+          "reason_zh": "模拟复核兜底：经验胜率折价",
+          "fallback": true,
+          "error": "json_parse:EOL while scanning string literal (<unknown>, line 1)"
+        }
+      },
+      "cert": null,
+      "formal": null,
+      "pending": null
+    },
+    "SOL-USDT-SWAP": {
+      "symbol": "SOL-USDT-SWAP",
+      "logic_class": "impulse_continuation",
+      "dsl_key": "frost_sol_rescue_40_z3p0_h22",
+      "suite_pass": false,
+      "suite": {
+        "walk_forward": false,
+        "extreme_friction": false,
+        "logic_destruction": false,
+        "monte_carlo_soft": false
+      },
+      "base_metrics": {
+        "trades": 7,
+        "win_rate_pct": 42.857142857142854,
+        "mean_net": -0.05420128979179274,
+        "oos_profit": -0.3898645114297452,
+        "sharpe": -1.0381,
+        "fold_positive": 3,
+        "folds": 7,
+        "fold_means": [
+          0.173446,
+          -0.090402,
+          -0.109626,
+          0.037037,
+          0.017047,
+          -0.21635,
+          -0.190561
+        ]
+      },
+      "friction_sharpe": -1.2526,
+      "dest": false,
+      "mc": {
+        "ok": true,
+        "pass": false,
+        "paths": 80,
+        "mean_final": -0.271067,
+        "positive_path_ratio": 0.1625,
+        "gates": {
+          "mean_final_gt_0": true,
+          "positive_path_ratio_ge_0.55": true
+        }
+      },
+      "sim": null,
+      "formal": null
+    }
+  },
+  "pending": [
+    {
+      "ok": true,
+      "key": "frost_xrp_rescue_h20_t45",
+      "reason": null,
+      "duplicate": null
+    }
+  ],
+  "survivors": [
+    "XRP-USDT-SWAP"
+  ],
+  "sim_entered": [
+    "XRP-USDT-SWAP",
+    "DOGE-USDT-SWAP"
+  ],
+  "ok": true,
+  "finished_at": "2026-07-25 19:13:00"
+}

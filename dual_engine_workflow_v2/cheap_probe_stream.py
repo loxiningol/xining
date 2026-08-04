@@ -174,7 +174,17 @@ def build_mechanism_cells(brief="", max_cells=80):
     from . import research_branch_manager as branch_mgr
     from . import mechanism_graph as mechanism_graph
     cells = []
-    trees = branch_mgr.trees_for_brief(brief) or list(branch_mgr.TREES)
+    # Brief-locked trees only — never fall back to the full TREES union.
+    trees = branch_mgr.trees_for_brief(brief) or []
+    allowed_extra_families = set()
+    for tree in trees:
+        tid = str(tree.get("tree_id") or "")
+        if tid == "exhaustion_recovery":
+            allowed_extra_families.add("exhaustion")
+        elif tid == "donchian_trend_break":
+            allowed_extra_families.add("donchian_trend_break")
+        elif tid == "vol_squeeze_break":
+            allowed_extra_families.add("vol_squeeze")
     mechanism_features = {
         str(row.get("mechanism_id") or ""): list(
             row.get("factor_hints") or row.get("observable_proxy") or []
@@ -243,7 +253,9 @@ def build_mechanism_cells(brief="", max_cells=80):
                     "task": br.get("task"),
                 })
     for row in extra:
-        cells.append(dict(row))
+        # Only append extras inside brief-locked families (no unconditional dump).
+        if allowed_extra_families and str(row.get("family") or "") in allowed_extra_families:
+            cells.append(dict(row))
     # Expand each lattice cell into a few *mechanism* variants (not RSI±1 spam).
     feature_bundles = (
         ["close_z_20", "rsi_14", "exhaustion_score"],
@@ -400,16 +412,52 @@ def evaluate_cheap_probe(cell, factor_matrix, candles, timeframe="5m",
             "horizon_bars": int(h),
             "factor": factor,
             "side": side,
+            "indep_idx": list(indep_idx)[:400],
+            "direction": direction,
         })
         if best is None:
             best = summ
         else:
-            # prefer higher |t| among non-sample-fail, else more events
+            # prefer path-hit rate when present, else |t|
             def key(s):
                 st = 0 if s.get("failure_state") == "SAMPLE_INADEQUATE" else 1
-                return (st, abs(float(s.get("t_hac") or 0)), float(s.get("gross_mean_bp") or -1e9))
+                return (
+                    st,
+                    float(s.get("profit_first_rate") or -1.0),
+                    abs(float(s.get("t_hac") or 0)),
+                    float(s.get("gross_mean_bp") or -1e9),
+                )
             if key(summ) > key(best):
                 best = summ
+
+    # Path-hit proxy on the winning horizon (cheap tier).
+    path_stats = {
+        "profit_first_rate": None,
+        "mfe_p50_bp": None,
+        "mae_p50_bp": None,
+    }
+    try:
+        from . import path_outcome as path_out
+        h_best = int((best or {}).get("horizon_bars") or (horizons[0] if horizons else 6))
+        indep = list((best or {}).get("indep_idx") or [])
+        direction = float((best or {}).get("direction") or 1.0)
+        if candles and indep:
+            pack = path_out.summarize_signals(
+                candles, indep, direction, h_best, mapping="next_bar_open",
+            )
+            path_stats["profit_first_rate"] = pack.get("profit_first_rate")
+            med_mfe = pack.get("median_mfe_pct")
+            med_mae = pack.get("median_mae_pct")
+            path_stats["mfe_p50_bp"] = (
+                None if med_mfe is None else round(float(med_mfe) * 10000.0, 2)
+            )
+            path_stats["mae_p50_bp"] = (
+                None if med_mae is None else round(float(med_mae) * 10000.0, 2)
+            )
+            if best is not None:
+                best["profit_first_rate"] = path_stats["profit_first_rate"]
+    except Exception:
+        pass
 
     out = {
         "probe_id": "P_%s_h%s" % (cell.get("cell_id"), (best or {}).get("horizon_bars")),
@@ -432,8 +480,9 @@ def evaluate_cheap_probe(cell, factor_matrix, candles, timeframe="5m",
         "t_hac": (best or {}).get("t_hac") or 0.0,
         "hit_rate": (best or {}).get("hit_rate"),
         "abs_mean_bp": (best or {}).get("abs_mean_bp"),
-        "mfe_p50_bp": None,
-        "mae_p50_bp": None,
+        "profit_first_rate": path_stats.get("profit_first_rate"),
+        "mfe_p50_bp": path_stats.get("mfe_p50_bp"),
+        "mae_p50_bp": path_stats.get("mae_p50_bp"),
         "regime_consistency": None,
         "failure_state": (best or {}).get("failure_state") or "SAMPLE_INADEQUATE",
         "at": _now(),

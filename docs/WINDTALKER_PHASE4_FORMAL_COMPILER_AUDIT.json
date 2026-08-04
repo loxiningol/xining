@@ -1,0 +1,41 @@
+{
+  "schema": "WINDTALKER_PHASE4_FORMAL_COMPILER_AUDIT",
+  "generated_at": "2026-07-28 13:46:42",
+  "collapse_site": "/root/dual_engine_workflow_v2/pipeline_step_a.py::codex_implement_from_spec",
+  "compiler_version": "windtalker_phase4_candidate_ir_compiler_v1",
+  "modes": {
+    "legacy_spec_to_code": "preserved as _legacy_codex_implement_from_spec",
+    "candidate_ir_compiler": "new path via feature flag formal_implementation_mode"
+  },
+  "feature_flag": "formal_implementation_mode",
+  "candidate_only": true,
+  "patch_applied": true,
+  "already_patched": true,
+  "pipeline_sha_before": "95b185a0d2d7627f782dc8352f5c9ed98fb995a07087e1907875178879764062",
+  "pipeline_sha_after": "95b185a0d2d7627f782dc8352f5c9ed98fb995a07087e1907875178879764062",
+  "backup_path": "/root/backups/windtalker_phase4_step_a_20260728_214642",
+  "rollback": {
+    "method": "cp /root/backups/windtalker_phase4_step_a_20260728_214642/pipeline_step_a.py /root/dual_engine_workflow_v2/pipeline_step_a.py",
+    "needed": false
+  },
+  "smoke_tests": {
+    "valid_oi_ir_compile": {
+      "ok": true,
+      "legacy_fallback_used": false,
+      "verdict": "PASS"
+    },
+    "unsupported_rsi_fail_closed": {
+      "ok": true,
+      "verdict": "FAIL_CLOSED",
+      "legacy_fallback_used": false
+    },
+    "candidate_mode_missing_ir_fail_closed": {
+      "ok_false": true,
+      "legacy_fallback_used": false
+    },
+    "legacy_path_preserved": true
+  },
+  "fail_closed_policy": "unsupported → FAIL; no silent OHLC fallback; legacy_fallback_used must be false",
+  "production_default_mode": "legacy_spec_to_code",
+  "verdict": "PASS"
+}

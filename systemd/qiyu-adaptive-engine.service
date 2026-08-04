@@ -1,0 +1,11 @@
+[Unit]
+Description=Qiyu Adaptive Engine Tick (breath/niche/corridor/survival)
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/root
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_adaptive_engine_tick.py
+
+[Install]
+WantedBy=multi-user.target

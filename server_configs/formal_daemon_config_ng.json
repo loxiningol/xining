@@ -1,0 +1,31 @@
+{
+  "allow_auto_close": true,
+  "allow_auto_open": true,
+  "cooldown_sec_after_open": 3600,
+  "enabled": true,
+  "fee_buffer_usdt": 0,
+  "formal_auto_trading_authorized": true,
+  "full_position_ratio": 0.28,
+  "gate_authorized_auto_trading": true,
+  "last_open_ts": 0,
+  "last_signal_candle_id": null,
+  "last_signal_candle_ids": {},
+  "leverage": 20,
+  "ng_strategy_assignment_status": "active",
+  "notification_enabled": true,
+  "position_mode": "full_balance",
+  "protective_close_if_attached_sl_invalid": true,
+  "reserve_usdt": 0,
+  "stop_loss_pct": 0.009,
+  "strategy_key": "conventional_up_break_long",
+  "strategy_keys": [
+    "conventional_up_break_long"
+  ],
+  "symbol": "NG-USDT-SWAP",
+  "sz": "FULL_BALANCE",
+  "take_profit_mode": "authoritative_strategy",
+  "take_profit_on_signal_invalidated": false,
+  "take_profit_pct": 0.009,
+  "tick_interval_sec": 60,
+  "timeframe": "1h"
+}

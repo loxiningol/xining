@@ -1,0 +1,97 @@
+{
+  "mechanism_spec": {
+    "mechanism_id": "htf_slope_ltf_ema21_pullback_v1",
+    "mechanism_name": "大周期斜率趋势+15m均线回踩",
+    "mechanism_family": "htf_slope_aligned_micro_pullback",
+    "market_inefficiency": "当1h趋势确认（h1_ema19>h1_ema53且h1_slope4>0），15m因短期获利盘离场回踩至ema21后被主趋势方向机构买盘重新承接，形成均值回归至趋势的非对称做多机会。散户在回踩中恐慌出局提供对手方筹码。",
+    "counterparty_source": "15m回调中恐慌性离场的散户多头（在做多场景）或追空的逆势交易者。他们在ema21附近抛出/开空，被主趋势机构资金吸收。",
+    "why_edge_exists": "1h趋势通过ema19>ema53+正slope4双重确认已建立。15m回踩到ema21是趋势内正常呼吸，历史上约60%以上的此类回踩在随后数根K线内恢复趋势方向。入场需额外量能确认(vol_z20>1.2)+方向拒绝K线(close>open)过滤无量假信号。使用3.5*ATR动态止盈让利润跟随趋势段发展，利用趋势空间远大于回踩幅度的非对称性。",
+    "edge_decay_conditions": "1h趋势反转/震荡化；多次假回踩后市场习惯于不回踩直接拉升（信号稀少化）；该周期ema21已失去支撑作用。",
+    "required_market_regime": "明确的1h趋势环境（h1_ema19>h1_ema53 + slope4>0 做多，反之做空）。15m出现可观测的回调至ema21水平并恢复。横盘震荡市无信号。",
+    "entry_logic": "做多 ALL: (1) h1_ema19 > h1_ema53（1h金叉趋势）；(2) h1_slope4 > 0（1h上升斜率）；(3) close cross_above ema21（15m回踩后重新站上均线）；(4) vol_z20 > 1.2（量能恢复确认）；(5) close > open（阳线拒绝回调）。做空对称。",
+    "exit_logic": "ATR_trailing 3.5*ATR_14 移动止盈顺趋势波段；swing_extreme(12)作为趋势段结构失效；0.9% SL由引擎硬编码。",
+    "stop_logic": "硬止损0.9%（stop_loss_pct=0.009）。",
+    "take_profit_logic": "动态ATR移动止盈 3.5*ATR_14；禁止固定百分比止盈。",
+    "invalidation_logic": "swing_extreme lookback=12：若价格创出12根反方向极值则判定回踩失败/趋势段结束。",
+    "non_negotiable_rules": ["止损0.9%不可修改", "禁止固定百分比止盈", "禁止RSI/CCI作为核心过滤", "entry必须含1h趋势方向确认", "exit必须含ATR动态算子"],
+    "tunable_parameters": ["vol_z20_min", "atr_trail_n", "swing_lookback", "max_hold_bars", "h1_slope_threshold"],
+    "forbidden_transformations": ["不得移除1h趋势确认条件", "不得引入CCI/RSI指标", "不得使用固定止盈", "不得改成顺势突破追单"],
+    "expected_trade_frequency_class": "medium",
+    "expected_holding_period": "4-18根K线",
+    "suitable_symbols": ["SOL-USDT-SWAP", "XRP-USDT-SWAP", "ADA-USDT-SWAP", "ETH-USDT-SWAP", "BTC-USDT-SWAP", "DOGE-USDT-SWAP", "BNB-USDT-SWAP"],
+    "suitable_timeframes": ["15m"]
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "htf_slope_pullback_long_v1",
+    "name": "大周期斜率+15m回踩做多",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": ["SOL-USDT-SWAP"],
+    "max_hold_bars": 18,
+    "entry": {
+      "all": [
+        {"id": "e_htf_trend", "left": {"feature": "h1_ema19"}, "op": "gt", "right": {"feature": "h1_ema53"}},
+        {"id": "e_htf_slope", "left": {"feature": "h1_slope4"}, "op": "gt", "right": {"value": 0.0}},
+        {"id": "e_pullback_reclaim", "left": {"feature": "close"}, "op": "cross_above", "right": {"feature": "ema21"}},
+        {"id": "e_vol", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.2}},
+        {"id": "e_bull_bar", "left": {"feature": "close"}, "op": "gt", "right": {"feature": "open"}}
+      ]
+    },
+    "exit": {
+      "any": [
+        {"id": "x_atr", "exit_op": "atr_trailing", "n_atr": 3.5, "atr_period": 14, "role": "take_profit"},
+        {"id": "x_sw", "exit_op": "swing_extreme", "lookback": 12, "role": "invalidation"}
+      ]
+    },
+    "description": "1h金叉+正斜率趋势方向，15m价格回踩ema21后重新站上+量能确认+阳线 → 3.5*ATR移动止盈+12根swing失效。"
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "htf_slope_pullback_short_v1",
+    "name": "大周期斜率+15m回踩做空",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": ["SOL-USDT-SWAP"],
+    "max_hold_bars": 18,
+    "entry": {
+      "all": [
+        {"id": "e_htf_trend", "left": {"feature": "h1_ema19"}, "op": "lt", "right": {"feature": "h1_ema53"}},
+        {"id": "e_htf_slope", "left": {"feature": "h1_slope4"}, "op": "lt", "right": {"value": 0.0}},
+        {"id": "e_pullback_reclaim", "left": {"feature": "close"}, "op": "cross_below", "right": {"feature": "ema21"}},
+        {"id": "e_vol", "left": {"feature": "vol_z20"}, "op": "gt", "right": {"value": 1.2}},
+        {"id": "e_bear_bar", "left": {"feature": "close"}, "op": "lt", "right": {"feature": "open"}}
+      ]
+    },
+    "exit": {
+      "any": [
+        {"id": "x_atr", "exit_op": "atr_trailing", "n_atr": 3.5, "atr_period": 14, "role": "take_profit"},
+        {"id": "x_sw", "exit_op": "swing_extreme", "lookback": 12, "role": "invalidation"}
+      ]
+    },
+    "description": "对称于做多：1h死叉+负斜率，15m回踩ema21后跌穿+量能+阴线 → 做空。"
+  },
+  "kb_avoidance_checklist": {
+    "htf_ema_align_ltf_cci_vol_pullback": "DIFFERENT: that family used CCI as core filter; this uses ONLY h1_slope4 + ema21 reclaim + vol. No CCI/RSI at all.",
+    "trend_continuation_thrust_retest": "NOT pullback/retest of range break; this is ema21 mean-reversion within trend",
+    "breakout_trap_reversal": "NOT a breakout fade; follows trend direction",
+    "mean_reversion_rsi_extreme": "NO RSI/CCI used",
+    "stop_hunt_range_reclaim": "NOT sweep-based; uses ema21 structural pullback"
+  },
+  "calibration_note": {
+    "source": "prod 5-asset lean scan 2026-07-30",
+    "chosen": {"symbol": "SOL-USDT-SWAP", "dir": "long", "volz": 1.2, "trail": 3.5, "hold": 18, "swing_lb": 12, "n": 31, "mean": 0.02, "pay": 2.167, "wr": 0.355, "l1_12": 4},
+    "also_positive": ["ADA short vol=0.8 pay=1.53 n=38", "XRP long vol=1.2 pay=2.11 n=29"]
+  },
+  "pipeline_readiness": {
+    "gate0_ready": true,
+    "mechanism_spec_complete": true,
+    "dsl_schema_valid": "qiyu_strategy_dsl_v1",
+    "exit_ops_dynamic": ["atr_trailing", "swing_extreme"],
+    "no_fixed_pct_tp": true,
+    "no_cci_rsi_core": true,
+    "protective_sl": 0.009,
+    "ema_features_in_mechanism_statement": true,
+    "user_authorized_core_features": ["ema21", "h1_ema19", "h1_ema53"]
+  }
+}

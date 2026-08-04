@@ -1,0 +1,303 @@
+{
+  "generated_at": "2026-07-27 22:46:06",
+  "initial_ideas_n": 14,
+  "feasible_ideas_n": 12,
+  "data_eliminated_n": 2,
+  "expand_failures": [],
+  "dedup_rejected": [],
+  "formal_specs_n": 8,
+  "candidates": [
+    {
+      "mechanism_id": "mech_liquidity_failed_breakout_high_xrp15m",
+      "mechanism_name": "range_high_breakout_trap_short",
+      "mechanism_family": "liquidity_failed_breakout_high",
+      "exploration_direction": "liquidity_failed_breakout",
+      "counterparty_source": "breakout momentum buyers who entered on wick above range high20 and are now underwater",
+      "symbol": "XRP-USDT-SWAP",
+      "timeframe": "15m",
+      "direction": "short",
+      "idea_id": "fb_01",
+      "fingerprint_hash": "a21209572d1e934e2c698e4345d90e74",
+      "family_hash": "35665f3b027c0b9ce8f192a265eda384",
+      "dedup_report": {
+        "vs_live": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "vs_peers": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "counts_as_independent": true
+      },
+      "status": "formal_spec_ready"
+    },
+    {
+      "mechanism_id": "mech_mr_vwap_dev_btc15m",
+      "mechanism_name": "vwap_deviation_revert_long",
+      "mechanism_family": "mean_reversion_vwap_deviation",
+      "exploration_direction": "mean_reversion",
+      "counterparty_source": "trend_following_buyers_panic_closing_or_trapped",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "15m",
+      "direction": "long",
+      "idea_id": "mr_vwap_01",
+      "fingerprint_hash": "6649c12779acedc47ed27cdeeb5e0737",
+      "family_hash": "df256aa9d5a5247feb914ae4a4a8c19e",
+      "dedup_report": {
+        "vs_live": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "vs_peers": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "counts_as_independent": true
+      },
+      "status": "formal_spec_ready"
+    },
+    {
+      "mechanism_id": "mech_ts_session_break_long_btc5m",
+      "mechanism_name": "opening_range_break_long",
+      "mechanism_family": "time_structure_session_breakout",
+      "exploration_direction": "time_structure",
+      "counterparty_source": "overnight range trapped counter-parties forced to unwind at open",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "5m",
+      "direction": "long",
+      "idea_id": "ts_01",
+      "fingerprint_hash": "cce9876ef036c3cc4e7375356419f515",
+      "family_hash": "899fc87f8b6b9c7658f818e01f5b7982",
+      "dedup_report": {
+        "vs_live": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "vs_peers": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "counts_as_independent": true
+      },
+      "status": "formal_spec_ready"
+    },
+    {
+      "mechanism_id": "mech_tc_thrust_retest_sol5m",
+      "mechanism_name": "momentum_thrust_retest_long",
+      "mechanism_family": "trend_continuation_thrust_retest",
+      "exploration_direction": "trend_continuation",
+      "counterparty_source": "momentum_fade_scalpers",
+      "symbol": "SOL-USDT-SWAP",
+      "timeframe": "5m",
+      "direction": "long",
+      "idea_id": "tc_thrust_01",
+      "fingerprint_hash": "bb69558d828cba3d86528e4d7e7000ad",
+      "family_hash": "1fa655d42483ec62eb3a9799473c5a90",
+      "dedup_report": {
+        "vs_live": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "vs_peers": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "counts_as_independent": true
+      },
+      "status": "formal_spec_ready"
+    },
+    {
+      "mechanism_id": "mech_vr03_eth15m",
+      "mechanism_name": "vol_compression_breakout_continuation",
+      "mechanism_family": "vol_regime_compression_release",
+      "exploration_direction": "vol_regime",
+      "counterparty_source": "range_bound_short_sellers",
+      "symbol": "ETH-USDT-SWAP",
+      "timeframe": "15m",
+      "direction": "long",
+      "idea_id": "vr_03",
+      "fingerprint_hash": "5a9fa0b279d463ec668ccc6ca03dee19",
+      "family_hash": "2f5897037fbef8280d9e567e36a1b4ac",
+      "dedup_report": {
+        "vs_live": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "vs_peers": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "counts_as_independent": true
+      },
+      "status": "formal_spec_ready"
+    },
+    {
+      "mechanism_id": "mech_low_break_fail_reclaim_long_ada5m",
+      "mechanism_name": "low_break_fail_reclaim_long",
+      "mechanism_family": "liquidity_failed_breakout_low",
+      "exploration_direction": "liquidity_failed_breakout",
+      "counterparty_source": "breakdown_shorts",
+      "symbol": "ADA-USDT-SWAP",
+      "timeframe": "5m",
+      "direction": "long",
+      "idea_id": "fb_02",
+      "fingerprint_hash": "98d33db0d4e96847b11256bb391369fa",
+      "family_hash": "42af8e5fb90ca67135578adc0de39f20",
+      "dedup_report": {
+        "vs_live": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "vs_peers": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "counts_as_independent": true
+      },
+      "status": "formal_spec_ready"
+    },
+    {
+      "mechanism_id": "mech_mr_rsi_extreme_sol1h",
+      "mechanism_name": "rsi_extreme_revert_short",
+      "mechanism_family": "mean_reversion_rsi_extreme",
+      "exploration_direction": "mean_reversion",
+      "counterparty_source": "late momentum chasers trapped at top",
+      "symbol": "SOL-USDT-SWAP",
+      "timeframe": "1h",
+      "direction": "short",
+      "idea_id": "mr_rsi_02",
+      "fingerprint_hash": "3392370b4e0cd9a6cd3f3c24c2fb82fd",
+      "family_hash": "cf26542e85ab18dafdc2c534d0c76af4",
+      "dedup_report": {
+        "vs_live": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "vs_peers": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "counts_as_independent": true
+      },
+      "status": "formal_spec_ready"
+    },
+    {
+      "mechanism_id": "mech_mr_zscore_dislocation_sol15m",
+      "mechanism_name": "zscore_dislocation_revert_long",
+      "mechanism_family": "mean_reversion_zscore_dislocation",
+      "exploration_direction": "mean_reversion",
+      "counterparty_source": "forced_liquidators",
+      "symbol": "SOL-USDT-SWAP",
+      "timeframe": "15m",
+      "direction": "long",
+      "idea_id": "mr_zscore_01",
+      "fingerprint_hash": "5246c1d7743cf0ef65c2728f8aa829c7",
+      "family_hash": "55894b6b78ed7205d693b8c74afcf506",
+      "dedup_report": {
+        "vs_live": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "vs_peers": {
+          "hits": [],
+          "is_parameter_variant": false,
+          "is_symbol_clone": false,
+          "is_independent_niche": true,
+          "is_exhaustion_fade_clone": false,
+          "allow_horizontal_expand": false,
+          "counts_as_independent_mechanism": true
+        },
+        "counts_as_independent": true
+      },
+      "status": "formal_spec_ready"
+    }
+  ],
+  "data_eliminated": [
+    {
+      "idea_id": "ca_01",
+      "family": "cross_asset_btc_lead_proxy",
+      "reason": "data_unavailable"
+    },
+    {
+      "idea_id": "ca_02",
+      "family": "cross_asset_corr_break_proxy",
+      "reason": "data_unavailable"
+    }
+  ]
+}

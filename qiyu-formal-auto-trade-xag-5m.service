@@ -1,0 +1,17 @@
+[Unit]
+Description=Qiyu Formal Auto Trade Daemon (XAG 5m Live)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root
+Environment=PYTHONPATH=/root
+Environment=VECTOR_TRADE_SYMBOL=XAG-USDT-SWAP
+Environment=VECTOR_TRADE_TIMEFRAME=5m
+ExecStart=/usr/bin/python3 -c "import auto_trade_formal_daemon as d; d.run_forever()"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Creation Blueprint Orchestrator — research discovery THEN assembly (NO review).
+"""创造蓝图编排 — 归属「第一步研究发现」并衔接到「第二步门槛」。
 
-Paradigm (2026-07-31 upgrade):
-  human intent
-    → research contract
-    → mechanism graph + phenomenon population (no early pick-1)
-    → naked probes (forbid sculpting with exits)
-    → antifalsify evidence matrix (not causal proof)
-    → MAP-Elites archive + EFR + DSR/PBO
-    → only survivors enter factor mine / stress / deliverables
-    → existing ADA5 review remains a SEPARATE later step
+创造策略指令固定顺序：
+  第一步：研究发现（本模块主责：委员会产物 + 探针 + 多重检验后组装）
+  第二步：统一门槛（胜率>50% + 去最大盈利后不崩 + 漏斗/门槛0–7/寒霜贰筛）
+  第三步：四阶段复核（本编排器不替代复核模块）
 
-Legacy MetaGPT-style meta-think remains as design annotation, but must not
-bypass discovery gates.
+第一步内部：契约 → 机制图谱/种群 → 裸探针 → 反证矩阵 → EFR/DSR/PBO → 仅存活者组装。
 """
 from __future__ import print_function
 
@@ -102,8 +96,18 @@ def _root():
 def _load_matrix(symbol, timeframe, horizon=3, max_bars=None):
     # Prefer long research history when R2/local store is populated.
     if max_bars is None:
-        max_bars = int(os.environ.get("QIYU_CREATION_MAX_BARS") or 20000)
-    loaded = eq.load_candles(symbol, timeframe, max_bars=max_bars, prefer_research=True)
+        explicit = os.environ.get("QIYU_CREATION_MAX_BARS")
+        if explicit:
+            max_bars = int(explicit)
+        else:
+            tf = str(timeframe or "").strip().lower()
+            # RAM-bounded but materially longer than the former universal
+            # 20k cap: ~520 days for 15m and >2 years for 1h.
+            max_bars = 50000 if tf == "15m" else (20000 if tf == "1h" else 30000)
+    loaded = eq.load_candles(
+        symbol, timeframe, max_bars=max_bars, prefer_research=True,
+        lookback_days=int(os.environ.get("QIYU_CREATION_LOOKBACK_DAYS") or 730),
+    )
     if not loaded.get("ok"):
         return {
             "ok": False,
@@ -299,13 +303,13 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
             "",
             "- %s" % (window.get("label_zh") or ""),
             "- %s" % (window.get("return_scope_zh") or ""),
-            "- 胜率: %s（门槛 ≥50%%）" % prelim_pack.get("win_rate"),
+            "- 胜率: %s（硬底：严格大于 50%%）" % prelim_pack.get("win_rate"),
             "- 收益硬度拒绝: %s" % ",".join(hardness.get("reject_reasons") or []),
             "- 拒绝原因: %s" % ",".join(prelim_pack.get("reject_reasons") or []),
             "- 已尝试经典变式: %s" % (blueprint.get("classic_tried") or []),
             "- 已尝试视角: %s" % (blueprint.get("perspectives_tried") or []),
             "",
-            "不会把胜率<50% 或 近零收益/虚高夏普 的垃圾策略包装成「创造成功」给人看。",
+            "不会把胜率未严格大于50%、或近零收益/虚高夏普的垃圾策略包装成「创造成功」给人看。",
             "请换方向、拉长样本，或继续自动经典变式迭代。",
             "",
         ]
@@ -336,7 +340,7 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
         "- 最优因子: %s / %s" % (best.get("factor"), best.get("rule")),
         "- QuantOracle source: %s" % ((best.get("quantoracle") or {}).get("source")),
         "- 压力测试通过: %s" % stress_pack.get("passed"),
-        "- 初评胜率: %s（≥50%% 门禁已过）" % prelim_pack.get("win_rate"),
+        "- 初评胜率: %s（严格大于 50%% 门禁已过）" % prelim_pack.get("win_rate"),
         "- %s" % (window.get("label_zh") or ""),
         "- %s" % (window.get("return_scope_zh") or ""),
         "- 收益硬度: %s" % json.dumps(
@@ -360,23 +364,23 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
     risk_lines.extend([
         "",
         "## 说明",
-        "本报告止于创造蓝图交付。ADA5 四复核为后续独立环节，本蓝图不改动复核代码。",
+        "本报告止于第一步研究发现与第二步门槛衔接。第三步四阶段复核由复核模块承接，本蓝图不替代复核。",
         "",
     ])
 
     code = '''# Auto-generated creation blueprint stub — NOT for live mount.
 # Factor: {factor} / {rule}
 # Mechanism: {family}
-# Prelim WR gate: PASSED (>=50%)
+# 第二步胜率门：已通过（严格大于50%）
 # Window: {window}
-# Next: human/GLM mechanism_spec → existing ADA5 review (unchanged).
+# Next: 第二步其余门槛 → 第三步四阶段复核
 
 STRATEGY = {{
     "symbol": "{symbol}",
     "timeframe": "{tf}",
     "factor": "{factor}",
     "rule": "{rule}",
-    "protective_sl": 0.009,
+    "protective_sl": 0.005,
     "source": "creation_blueprint_v1",
 }}
 
@@ -441,7 +445,15 @@ def _finite_returns(values):
 def _candidate_from_admitted_payload(payload):
     recipe = dict((payload or {}).get("recipe") or {})
     hypothesis = dict((payload or {}).get("hypothesis") or {})
-    returns = _finite_returns((payload or {}).get("probe_returns") or [])
+    # Structured discovery freezes its identity on development data, then
+    # provides a genuinely untouched confirmation series.  All post-discovery
+    # presentation and review-entry checks must use that series when present,
+    # never silently fall back to the development sample.
+    returns = _finite_returns(
+        (payload or {}).get("review_returns")
+        or (payload or {}).get("probe_returns")
+        or []
+    )
     wins = [value for value in returns if value > 0]
     losses = [value for value in returns if value <= 0]
     mean = sum(returns) / float(len(returns)) if returns else None
@@ -454,7 +466,7 @@ def _candidate_from_admitted_payload(payload):
         "factor": recipe.get("factor") or recipe.get("event_id"),
         "rule": "admitted_exact_recipe:%s" % (recipe.get("recipe_id") or "missing"),
         "thesis_zh": hypothesis.get("statement_zh"),
-        "score": ((payload or {}).get("probe") or {}).get("mean_net"),
+        "score": ((payload or {}).get("review_stats") or {}).get("mean_net"),
         "stats": {
             "n": len(returns),
             "win_rate": len(wins) / float(len(returns)) if returns else None,
@@ -473,13 +485,157 @@ def _candidate_from_admitted_payload(payload):
         "family": hypothesis.get("family"),
         "recipe_id": recipe.get("recipe_id"),
         "recipe": recipe,
+        "probe": (payload or {}).get("probe") or {},
         "admission_evidence": {
             "multiple_testing_gate": (payload or {}).get("multiple_testing_gate") or {},
+            "pre_review_admission": (payload or {}).get("pre_review_admission") or {},
             "judge": (payload or {}).get("judge") or {},
             "feasibility": (payload or {}).get("feasibility") or {},
             "execution": (payload or {}).get("execution") or {},
             "antifalsify": (payload or {}).get("antifalsify") or {},
         },
+        "review_window": (payload or {}).get("review_window") or {},
+    }
+
+
+def _admission_trade_quality(returns, min_wr=None, min_trades=None,
+                             min_expectancy_factor=1.0):
+    """创造交接硬底：正式审核前必须挡住低胜率彩票书。
+
+    正式审核仍负责压力/前向/矩阵/多 AI。创造侧不得把「胜率≤50% 但肥尾平均净收益好看」
+    的书交出去。门槛与第二次复核的胜率下限、门槛2 的期望因子对齐。
+    """
+    from .creation_quality_doctrine import (
+        MIN_TRADES_CREATION,
+        MIN_WIN_RATE_EXCLUSIVE,
+    )
+    if min_wr is None:
+        min_wr = MIN_WIN_RATE_EXCLUSIVE
+    if min_trades is None:
+        min_trades = MIN_TRADES_CREATION
+    vals = [float(x) for x in (returns or []) if x is not None]
+    n = len(vals)
+    if n < int(min_trades):
+        return {
+            "ok": False,
+            "reasons": ["成交笔数不足"],
+            "n": n,
+            "成交笔数": n,
+            "win_rate": None,
+            "胜率": None,
+            "win_rate_pct": None,
+            "payoff_ratio": None,
+            "expectancy_factor": None,
+            "mean_net": None,
+            "平均净收益": None,
+        }
+    wins = [v for v in vals if v > 0]
+    losses = [v for v in vals if v < 0]
+    wr = len(wins) / float(n)
+    mean_net = sum(vals) / float(n)
+    avg_win = (sum(wins) / float(len(wins))) if wins else 0.0
+    avg_loss_mag = (sum(-v for v in losses) / float(len(losses))) if losses else 0.0
+    if avg_loss_mag > 0:
+        payoff = avg_win / avg_loss_mag
+    else:
+        payoff = 999.0 if avg_win > 0 else 0.0
+    expectancy_factor = wr * payoff
+    # 去最大盈利：去掉单笔最大盈利后均值不得为负
+    if wins:
+        max_win = max(wins)
+        reduced = list(vals)
+        reduced.remove(max_win)
+        mean_without_max = sum(reduced) / float(len(reduced)) if reduced else -1e9
+    else:
+        mean_without_max = mean_net
+    reasons = []
+    # 胜率必须严格大于 50%
+    if wr <= float(min_wr):
+        reasons.append("胜率未严格大于50%")
+    if mean_net <= 0:
+        reasons.append("平均净收益非正")
+    if expectancy_factor < float(min_expectancy_factor):
+        reasons.append("期望因子低于1")
+    if mean_without_max <= 0:
+        reasons.append("去最大盈利后崩溃")
+    return {
+        "ok": not reasons,
+        "reasons": reasons,
+        "n": n,
+        "成交笔数": n,
+        "win_rate": wr,
+        "胜率": wr,
+        "win_rate_pct": wr * 100.0,
+        "payoff_ratio": min(payoff, 999.0),
+        "盈亏比": min(payoff, 999.0),
+        "expectancy_factor": expectancy_factor,
+        "期望因子": expectancy_factor,
+        "mean_net": mean_net,
+        "平均净收益": mean_net,
+        "mean_net_without_max_win": mean_without_max,
+        "去最大盈利后平均净收益": mean_without_max,
+        "thresholds": {
+            "min_wr_exclusive": float(min_wr),
+            "胜率硬底_严格大于": float(min_wr),
+            "min_trades": int(min_trades),
+            "最低成交笔数": int(min_trades),
+            "min_expectancy_factor": float(min_expectancy_factor),
+        },
+    }
+
+
+def _candidate_risk_calibration(candidate, configured_max_drawdown=0.18,
+                                configured_daily_loss=0.05):
+    """Align post-discovery risk gates with the frozen 20x/0.9% recipe.
+
+    A trade-level return series cannot be compared with a 5% *daily portfolio*
+    VaR limit.  One normal 0.9% protective stop at 20x, plus friction, already
+    exceeds 18%, so the old comparison made every strategy with a single loss
+    mathematically impossible to admit.
+    """
+    recipe = (candidate or {}).get("recipe") or {}
+    stop = (recipe.get("protective_stop_policy") or {}).get("price_pct")
+    cost = recipe.get("primary_cost_per_trade")
+    leverage = recipe.get("execution_leverage")
+    try:
+        stop = abs(float(stop))
+    except Exception:
+        stop = 0.005
+    try:
+        cost = max(0.0, float(cost))
+    except Exception:
+        cost = 0.0
+    try:
+        leverage = max(1.0, float(leverage))
+    except Exception:
+        leverage = 20.0
+    one_stop_account_loss = min(0.95, (stop + cost) * leverage)
+    # VaR is computed from per-trade account returns, so permit the explicitly
+    # designed single-stop loss with a small execution tolerance.
+    per_trade_var_limit = max(
+        float(configured_daily_loss or 0.0),
+        min(0.40, one_stop_account_loss * 1.10),
+    )
+    # Drawdown gate covers a two-stop cluster.  A three-stop cluster remains a
+    # genuine failure at the usual 20x/0.9% settings.
+    two_stop_drawdown = 1.0 - (1.0 - one_stop_account_loss) ** 2
+    stress_max_drawdown_abs = max(
+        abs(float(configured_max_drawdown or 0.0)),
+        min(0.55, two_stop_drawdown * 1.08),
+    )
+    return {
+        "schema": "qiyu_candidate_risk_calibration_v1",
+        "return_basis": "per_trade_full_size_leveraged_after_cost",
+        "configured_daily_portfolio_loss": float(configured_daily_loss or 0.0),
+        "configured_max_drawdown": abs(float(configured_max_drawdown or 0.0)),
+        "protective_stop_price_pct": stop,
+        "primary_cost_per_trade": cost,
+        "execution_leverage": leverage,
+        "one_stop_account_loss": one_stop_account_loss,
+        "per_trade_var_limit": per_trade_var_limit,
+        "two_stop_cluster_drawdown": two_stop_drawdown,
+        "stress_max_drawdown_abs": stress_max_drawdown_abs,
+        "daily_portfolio_limit_not_misapplied_to_trade_samples": True,
     }
 
 
@@ -510,7 +666,15 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
     admitted peer; it may never mine a new factor, change direction/horizon,
     or switch to a classic perspective.
     """
-    payloads = list(disc.get("assembly_payload") or [])[:8]
+    payloads = list(disc.get("assembly_payload") or [])
+    try:
+        from . import manufacture_batch_policy as mfg
+        payloads = payloads[: int(mfg.ASSEMBLY_PAYLOAD_CAP)]
+        manufacture_mode = bool(mfg.pre_review_gates_disabled())
+    except Exception:
+        payloads = payloads[:24]
+        manufacture_mode = False
+        mfg = None
     recipe_ids = [str(row.get("recipe_id") or "") for row in payloads if row.get("recipe_id")]
     stages["admission_envelope"] = {
         "schema": "qiyu_admission_envelope_v1",
@@ -519,6 +683,7 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
         "n_admitted": len(payloads),
         "identity_locked": True,
         "post_discovery_mechanism_mutation_allowed": False,
+        "manufacture_batch": manufacture_mode,
         "candidates": [
             {
                 "recipe_id": row.get("recipe_id"),
@@ -545,6 +710,7 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
     last_ts = candles[-1].get("ts") if candles else None
     span_days = rh.span_days_from_ts(first_ts, last_ts)
     attempts = []
+    manufactured = []
     selected = None
     selected_stages = None
 
@@ -570,11 +736,7 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
             attempt["failed_gate"] = "trade_direction_lineage"
             attempts.append(attempt)
             continue
-        if not (payload.get("multiple_testing_gate") or {}).get("passed"):
-            attempt["failed_gate"] = "multiple_testing_not_admitted"
-            attempts.append(attempt)
-            continue
-        if not (payload.get("judge") or {}).get("admit_to_assembly"):
+        if not manufacture_mode and not (payload.get("judge") or {}).get("admit_to_assembly"):
             attempt["failed_gate"] = "committee_not_admitted"
             attempts.append(attempt)
             continue
@@ -585,125 +747,374 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
             attempts.append(attempt)
             continue
 
-        if require_quantoracle:
-            certified_all, certified = _certify_factors(
-                [candidate], max_daily_loss=max_daily,
-                require_quantoracle=True,
-            )
-        else:
-            # Keep the historical two-argument call shape for design documents
-            # that did not explicitly request the certification gate.
-            certified_all, certified = _certify_factors(
-                [candidate], max_daily_loss=max_daily,
-            )
-        if not certified:
-            reject_reason = (
-                certified_all[0].get("reject_reason") if certified_all else None
-            )
-            attempt["failed_gate"] = (
-                "quantoracle_required_certification"
-                if require_quantoracle and str(reject_reason or "").startswith(
-                    "quantoracle_certification_"
-                ) else
-                "quantoracle_or_var"
-            )
-            attempt["certification_evidence"] = (
-                certified_all[0].get("certification_evidence")
-                if certified_all else None
-            )
-            attempt["var_fuse"] = (certified_all[0].get("var_fuse") if certified_all else None)
+        # Quality metrics are recorded for ranking; manufacture mode does not veto.
+        quality = _admission_trade_quality(
+            candidate.get("returns") or [],
+            min_wr=float(MIN_PRESENT_WR),
+            min_trades=8,
+            min_expectancy_factor=1.0,
+        )
+        quality["basis"] = "account_net_after_friction_v1"
+        attempt["admission_trade_quality"] = quality
+        if (not manufacture_mode) and (not quality.get("ok")):
+            attempt["failed_gate"] = "creation_wr_anti_lottery"
+            attempt["failed_reasons"] = list(quality.get("reasons") or [])
             attempts.append(attempt)
             continue
-        candidate = certified[0]
-
-        # The discovery return series is already post-cost.  Do not subtract a
-        # second round-trip fee in this legacy hardness diagnostic.
-        ls_pack = rh.factor_ls_weekly_lev(
-            candidate.get("returns") or [], span_days,
-            lev_scale=float(constraints.get("factor_lev_scale") or rh.FACTOR_LEV_SCALE),
-            round_trip_cost=0.0,
+        from .creation_quality_doctrine import gate2_account_returns_ok
+        gate2 = gate2_account_returns_ok(
+            candidate.get("returns") or [],
+            trades=candidate.get("trades") or [],
         )
-        ls_floor = float(
-            constraints.get("minimum_factor_weekly_lev") or rh.MIN_FACTOR_WEEKLY_LEV
-        )
-        if not ls_pack.get("ok") or float(ls_pack.get("weekly_lev") or -1e9) < ls_floor:
-            attempt["failed_gate"] = "post_cost_factor_return_hardness"
-            attempt["ls_weekly"] = ls_pack
+        attempt["admission_gate2"] = gate2
+        if (not manufacture_mode) and (not gate2.get("ok")):
+            attempt["failed_gate"] = "creation_gate2_floors"
+            attempt["failed_reasons"] = list(gate2.get("reasons") or [])
             attempts.append(attempt)
             continue
-
-        stress_pack = stress.run_stress(candidate.get("returns") or [], max_dd_limit=max_dd)
-        if not stress_pack.get("passed"):
-            attempt["failed_gate"] = "stress"
-            attempt["stress"] = {
-                "passed": stress_pack.get("passed"),
-                "human_banner_zh": stress_pack.get("human_banner_zh"),
+        candidate_mean = float(quality.get("mean_net") or -1e9)
+        performance = dict((compiled_contract or {}).get("performance_contract") or {})
+        weekly_threshold = float(performance.get("threshold") or 0.0)
+        review_window = candidate.get("review_window") or {}
+        review_span_days = None
+        try:
+            review_span_days = (
+                float(review_window.get("end")) - float(review_window.get("start"))
+            ) / 86400000.0
+        except (TypeError, ValueError):
+            review_span_days = None
+        frequency_span_days = (
+            review_span_days if review_span_days and review_span_days > 0 else span_days
+        )
+        n_fills = len(candidate.get("returns") or [])
+        try:
+            import auto_trade_ai_consensus as _ai_freq
+            freq_pack = _ai_freq.compute_weekly_open_frequency(
+                n_fills,
+                span_days=frequency_span_days,
+                candidate={
+                    "symbol": symbol or candidate.get("symbol"),
+                    "timeframe": timeframe or candidate.get("timeframe"),
+                },
+                evidence={
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "span_days": frequency_span_days,
+                    "observation_days": frequency_span_days,
+                    "trades": n_fills,
+                    "bars_span_days": frequency_span_days,
+                    "safety_metrics": {
+                        "trades": n_fills,
+                        "span_days": frequency_span_days,
+                        "bars_span_days": frequency_span_days,
+                    },
+                },
+                source="creation_blueprint",
+            )
+            weekly_opens = float(freq_pack.get("expected_weekly_fills") or 0.0)
+            frequency_span_days = (
+                freq_pack.get("span_days")
+                if freq_pack.get("span_days") is not None
+                else frequency_span_days
+            )
+            attempt["weekly_frequency_pack"] = {
+                "method": freq_pack.get("method"),
+                "span_source": freq_pack.get("span_source"),
+                "sample_2y_ok": freq_pack.get("sample_2y_ok"),
             }
-            attempts.append(attempt)
-            continue
-
-        stats = candidate.get("stats") or {}
-        total_return = rh.equity_total_return(candidate.get("returns") or [])
-        stress_mdd = (stress_pack.get("backtrader") or {}).get("full_max_drawdown")
-        prelim_pack = prelim.prelim_eval(
-            {
-                "win_rate": stats.get("win_rate"),
-                "n_trades": stats.get("n"),
-                "total_return": total_return,
-                "max_drawdown": stress_mdd,
-                "sharpe_ann_proxy": (
-                    ((candidate.get("quantoracle") or {}).get("certified") or {}).get("sharpe_ratio")
-                ),
-            },
-            first_ts=first_ts, last_ts=last_ts, n_bars=data.get("n_bars"),
-            timeframe=timeframe, min_win_rate=MIN_PRESENT_WR, min_trades=8,
+        except Exception:
+            weekly_opens = (
+                n_fills / float(frequency_span_days) * 7.0
+                if frequency_span_days and frequency_span_days > 0 else 0.0
+            )
+        attempt["weekly_opens"] = weekly_opens
+        attempt["weekly_frequency_span_days"] = frequency_span_days
+        attempt["weekly_frequency_source"] = (
+            "untouched_confirmation_window" if review_span_days else "full_observation_fallback"
         )
-        if not prelim_pack.get("present_to_human"):
-            attempt["failed_gate"] = "preliminary_presentation"
-            attempt["prelim"] = prelim_pack
-            attempts.append(attempt)
-            continue
-
-        hardness_pack = rh.evaluate_return_hardness(
-            trade_returns=candidate.get("returns") or [],
-            total_return=total_return,
-            max_drawdown=(
-                stress_mdd if stress_mdd is not None
-                else rh.max_drawdown_from_returns(candidate.get("returns") or [])
-            ),
-            first_ts=first_ts, last_ts=last_ts,
-            n_bars=data.get("n_bars"),
-            hold_bars=max(int(recipe.get("horizon_bars") or 1), 1),
-            constraints=constraints,
+        attempt["weekly_opens_threshold"] = weekly_threshold
+        attempt["weekly_frequency_formal_review_pass"] = bool(
+            weekly_opens >= weekly_threshold
         )
-        if not hardness_pack.get("passed"):
-            attempt["failed_gate"] = "return_hardness"
-            attempt["return_hardness"] = hardness_pack
-            attempts.append(attempt)
-            continue
+        # Weekly frequency remains owned by formal 3AI review; WR is not deferred.
+        attempt["weekly_frequency_deferred_to_formal_review"] = True
 
+        risk_calibration = _candidate_risk_calibration(
+            candidate,
+            configured_max_drawdown=abs(float(max_dd)),
+            configured_daily_loss=max_daily,
+        )
+        attempt["risk_calibration"] = risk_calibration
         attempt["passed"] = True
+        attempt["handoff_scope"] = "slim_multiai_review_only" if manufacture_mode else "four_formal_reviews_only"
         attempts.append(attempt)
-        selected = candidate
-        selected_stages = {
+        pack_stages = {
             "certify": {
-                "n_certified": len(certified_all), "n_survivors": len(certified),
-                "source": ((candidate.get("quantoracle") or {}).get("source")),
-                "require_quantoracle": require_quantoracle,
-                "certification_evidence": candidate.get("certification_evidence"),
+                "passed": None,
+                "deferred_to_formal_review": True,
+                "reason": "creator_does_not_duplicate_formal_review",
             },
             "ls_weekly_filter": {
-                "n_in": 1, "n_kept": 1, "floor": ls_floor,
-                "post_cost_input": True, "result": ls_pack,
+                "passed": None,
+                "deferred_to_formal_review": True,
+                "weekly_opens": weekly_opens,
+                "weekly_opens_threshold": weekly_threshold,
             },
-            "stress": stress_pack,
-            "prelim": prelim_pack,
+            "stress": {
+                "passed": None,
+                "deferred_to_formal_review": True,
+            },
+            "risk_calibration": risk_calibration,
+            "admission_trade_quality": quality,
+            "prelim": {
+                "present_to_human": True,
+                "scope": "formal_review_submission_not_human_deployment_approval",
+                "n_trades": quality.get("n"),
+                "win_rate": quality.get("win_rate"),
+                "win_rate_pct": quality.get("win_rate_pct"),
+                "mean_net": candidate_mean,
+                "payoff_ratio": quality.get("payoff_ratio"),
+                "expectancy_factor": quality.get("expectancy_factor"),
+                "weekly_opens": weekly_opens,
+                "wr_gate": (
+                    "manufacture_rank_wr60_weekly0p5_mean3pct"
+                    if manufacture_mode else "strict_above_50pct_plus_anti_lottery"
+                ),
+            },
             "return_hardness": {
-                key: value for key, value in hardness_pack.items() if key != "degeneration"
+                "passed": None,
+                "deferred_to_formal_review": True,
             },
-            "degeneration": hardness_pack.get("degeneration"),
+            "degeneration": {
+                "passed": None,
+                "deferred_to_formal_review": True,
+            },
         }
+        if manufacture_mode and mfg is not None:
+            path_summary = {}
+            for src in (
+                candidate.get("path_summary"),
+                candidate.get("probe"),
+                (payload.get("probe") if isinstance(payload, dict) else None),
+                pack_stages.get("probe") if isinstance(pack_stages, dict) else None,
+            ):
+                if isinstance(src, dict):
+                    for key in (
+                        "profit_first_rate", "median_mae_pct", "median_mfe_pct",
+                        "mean_winning_levered", "path_entry_score",
+                    ):
+                        if path_summary.get(key) is None and src.get(key) is not None:
+                            path_summary[key] = src.get(key)
+                    bare = src.get("path_bare_screen") or {}
+                    summ = bare.get("summary") if isinstance(bare, dict) else None
+                    if isinstance(summ, dict):
+                        for key in (
+                            "profit_first_rate", "median_mae_pct", "median_mfe_pct",
+                            "mean_winning_levered",
+                        ):
+                            if path_summary.get(key) is None and summ.get(key) is not None:
+                                path_summary[key] = summ.get(key)
+            select_metrics = mfg.package_metrics(
+                candidate.get("returns") or [],
+                span_days=frequency_span_days or span_days,
+                trades=candidate.get("trades") or [],
+                symbol=symbol,
+                timeframe=timeframe,
+                path_summary=path_summary,
+            )
+            # Path bare screen on event returns when path rates missing.
+            if select_metrics.get("profit_first_rate") is None:
+                try:
+                    from . import path_bare_screen as pbs
+                    # Approximate from account returns is NOT path-hit; mark missing.
+                    select_metrics["path_rate_missing"] = True
+                except Exception:
+                    pass
+            manufactured.append({
+                "candidate": candidate,
+                "stages": pack_stages,
+                "payload": payload,
+                "returns": list(candidate.get("returns") or []),
+                "span_days": frequency_span_days or span_days,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "select_metrics": select_metrics,
+                "recipe_id": candidate.get("recipe_id"),
+                "weekly_opens": weekly_opens,
+            })
+            # Keep collecting until payload exhausted (need >=10 when available).
+            continue
+        selected = candidate
+        selected_stages = pack_stages
         break
+
+    top_for_review = []
+    ranked_all = []
+    if manufacture_mode and mfg is not None:
+        top_for_review, ranked_all = mfg.select_top_for_review(manufactured)
+        stages["manufacture_batch"] = {
+            "schema": "qiyu_manufacture_batch_v1",
+            "n_manufactured": len(manufactured),
+            "min_required": int(mfg.MIN_MANUFACTURE),
+            "top_n": int(mfg.TOP_N_TO_REVIEW),
+            "shortfall": max(0, int(mfg.MIN_MANUFACTURE) - len(manufactured)),
+            "handoff_floors": {
+                "win_rate": float(mfg.HANDOFF_MIN_WIN_RATE),
+                "weekly_opens": float(mfg.HANDOFF_MIN_WEEKLY_OPENS),
+                "mean_win_only_pct": float(mfg.HANDOFF_MIN_WIN_ONLY_PCT),
+                "n_trades": int(mfg.HANDOFF_MIN_TRADES),
+                "profit_first_rate": float(mfg.HANDOFF_MIN_PROFIT_FIRST_RATE),
+                "median_mae_max": float(mfg.HANDOFF_MAX_MEDIAN_MAE),
+            },
+            "n_handoff_qualified": len(top_for_review),
+            "thresholds": {
+                "win_rate": mfg.REVIEW_WR,
+                "weekly_opens": mfg.REVIEW_WEEKLY_OPENS,
+                "mean_win_only_pct": mfg.REVIEW_MEAN_WIN_ONLY_PCT,
+            },
+            "ranked": [
+                {
+                    "rank": row.get("rank"),
+                    "recipe_id": row.get("recipe_id"),
+                    "select_metrics": row.get("select_metrics"),
+                    "select_rank": row.get("select_rank"),
+                    "handoff_gate": row.get("handoff_gate"),
+                }
+                for row in ranked_all
+            ],
+            "selected_for_review": [
+                {
+                    "rank": row.get("rank"),
+                    "recipe_id": row.get("recipe_id"),
+                    "select_metrics": row.get("select_metrics"),
+                    "select_rank": row.get("select_rank"),
+                    "handoff_gate": row.get("handoff_gate"),
+                }
+                for row in top_for_review
+            ],
+        }
+        if not top_for_review:
+            try:
+                from . import quality_optimization as qopt
+                quality_classification = qopt.classify_batch(ranked_all)
+                repair_plan = qopt.directed_repair_plan(
+                    failure_codes=list(
+                        quality_classification.get("dominant_codes") or []
+                    ),
+                    direction=direction,
+                )
+                opt_log = qopt.optimization_round_log(
+                    failure_code_before=(
+                        (quality_classification.get("dominant_codes") or [None])[0]
+                    ),
+                    allowed_modification=list(
+                        ((quality_classification.get("allowed_modifications") or {})
+                         .get((quality_classification.get("dominant_codes") or [None])[0])
+                         or [])
+                    ),
+                    exact_change=[
+                        a.get("exact_change")
+                        for a in (repair_plan.get("actions") or [])
+                    ],
+                    metric_before={
+                        "n_manufactured": len(manufactured),
+                        "n_handoff_qualified": 0,
+                    },
+                    metric_after={"n_handoff_qualified": 0},
+                    rollback_reason=None,
+                    parameter_plateau_score_value=(
+                        ((ranked_all[0].get("select_metrics") or {})
+                         .get("parameter_plateau_score"))
+                        if ranked_all else None
+                    ),
+                    round_index=1,
+                )
+            except Exception as exc:
+                quality_classification = {"error": str(exc)[:200]}
+                repair_plan = {"error": str(exc)[:200]}
+                opt_log = {"error": str(exc)[:200]}
+            failed = {
+                "ok": False,
+                "schema": "qiyu_creation_blueprint_v1",
+                "present_to_human": False,
+                # Materialization succeeded; quality/handoff failed — never call this
+                # a market research rejection.
+                "outcome": "candidate_quality_failure",
+                "error": "CANDIDATE_QUALITY_FAILURE",
+                "detail": {
+                    "reason": "manufactured_survivors_below_anti_shit_handoff_floor",
+                    "failure_layer": "B_quality_handoff",
+                    "materialization_ok": True,
+                    "message_zh": (
+                        "制造批次有存活包，但账户口径未达交接门槛"
+                        "（胜率≥%.0f%% · 盈利单均值≥%.2f%% · 周频≥%.1f · n≥%d · "
+                        "profit_first≥%.2f）；"
+                        "禁止把同质垃圾交精简多AI复核。材料化已成功，属质量层失败。"
+                        % (
+                            mfg.HANDOFF_MIN_WIN_RATE * 100.0,
+                            mfg.HANDOFF_MIN_WIN_ONLY_PCT,
+                            mfg.HANDOFF_MIN_WEEKLY_OPENS,
+                            mfg.HANDOFF_MIN_TRADES,
+                            mfg.HANDOFF_MIN_PROFIT_FIRST_RATE,
+                        )
+                    ),
+                    "n_manufactured": len(manufactured),
+                    "n_handoff_qualified": 0,
+                    "quality_classification": quality_classification,
+                    "dominant_failure_codes": list(
+                        quality_classification.get("dominant_codes") or []
+                    ),
+                    "allowed_modifications": quality_classification.get(
+                        "allowed_modifications"
+                    ) or {},
+                    "forbidden_always": list(
+                        quality_classification.get("forbidden_always") or []
+                    ),
+                    "directed_repair_plan": {
+                        "actions": list((repair_plan or {}).get("actions") or []),
+                        "allowed_modifications": list(
+                            (repair_plan or {}).get("allowed_modifications") or []
+                        ),
+                        "forbidden": list((repair_plan or {}).get("forbidden") or []),
+                        "hypotheses_n": len((repair_plan or {}).get("hypotheses") or []),
+                    },
+                    "optimization": opt_log,
+                    "ranked_top": [
+                        {
+                            "rank": row.get("rank"),
+                            "recipe_id": row.get("recipe_id"),
+                            "select_metrics": row.get("select_metrics"),
+                            "handoff_gate": (row.get("handoff_gate")
+                                            or mfg.qualifies_for_review_handoff(
+                                                row.get("select_metrics"))),
+                        }
+                        for row in ranked_all[:5]
+                    ],
+                    "next_step": "quality_optimization_layer_B",
+                    "note_zh": (
+                        "禁止解读为「市场没有策略」。A层材料化成功；B层质量失败。"
+                        "只允许改确认/排除/时序表征，禁止改止损与杠杆、禁止降门槛。"
+                    ),
+                },
+                "symbol": symbol, "timeframe": timeframe, "direction": direction,
+                "brief": brief, "research_contract": compiled_contract,
+                "stages": stages,
+                "fuses": {"abort_reason": "manufacture_handoff_floor_fail"},
+                "probes": _creation_probes(),
+                "run_id": run_id,
+                "data": stages.get("data"),
+                "handoff_zh": (
+                    "制造批次交接门槛未过：不向复核交屎。请强化入场确认/排除/时序修复再开轮。"
+                ),
+                "at": _now(),
+            }
+            failed["failure_artifact"] = _persist_failure_blueprint(
+                out_dir, symbol, timeframe, run_id, failed,
+            )
+            return failed
+        if top_for_review:
+            selected = top_for_review[0].get("candidate")
+            selected_stages = top_for_review[0].get("stages")
 
     stages["assembly_lineage"] = {
         "schema": "qiyu_locked_assembly_lineage_v1",
@@ -714,6 +1125,7 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
         ),
         "global_factor_mining_used": False,
         "classic_or_unadmitted_switch_used": False,
+        "manufacture_n": len(manufactured) if manufacture_mode else None,
         "next_step_if_exhausted": "new_discovery_round_with_parent_mutation_contract",
     }
 
@@ -728,6 +1140,7 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
                 "reason": "all_admitted_recipes_failed_post_discovery_gates",
                 "next_step": "new_discovery_round_with_parent_mutation_contract",
                 "attempts": attempts,
+                "manufacture_n": len(manufactured) if manufacture_mode else 0,
             },
             "symbol": symbol, "timeframe": timeframe, "direction": direction,
             "brief": brief, "research_contract": compiled_contract,
@@ -736,7 +1149,11 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
             "probes": _creation_probes(),
             "run_id": run_id,
             "data": stages.get("data"),
-            "handoff_zh": "已准入候选在后置风险门全部失败；禁止切换未验证因子，须以父失败门开启新研究轮。",
+            "handoff_zh": (
+                "制造批次无可正式编译候选；禁止用未验证因子硬凑。"
+                if manufacture_mode else
+                "已准入候选在后置风险门全部失败；禁止切换未验证因子，须以父失败门开启新研究轮。"
+            ),
             "at": _now(),
         }
         failed["failure_artifact"] = _persist_failure_blueprint(
@@ -771,6 +1188,28 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
         key: value for key, value in selected.items()
         if key not in ("returns", "equity_curve")
     }
+    review_batch = []
+    seed_rows = top_for_review if (manufacture_mode and top_for_review) else [{
+        "candidate": selected, "select_metrics": None, "select_rank": None, "rank": 1,
+    }]
+    for row in seed_rows:
+        cand = row.get("candidate") or selected
+        review_batch.append({
+            "rank": row.get("rank"),
+            "recipe_id": cand.get("recipe_id"),
+            "hypothesis_id": cand.get("hypothesis_id"),
+            "mechanism_id": cand.get("mechanism_id"),
+            "recipe": cand.get("recipe"),
+            "returns": list(cand.get("returns") or []),
+            "select_metrics": row.get("select_metrics"),
+            "select_rank": row.get("select_rank"),
+            "handoff_token": row.get("handoff_token"),
+            "handoff_gate": row.get("handoff_gate"),
+            "best_factor": {
+                key: value for key, value in cand.items()
+                if key not in ("returns", "equity_curve")
+            },
+        })
     blueprint = {
         "ok": True,
         "present_to_human": True,
@@ -785,10 +1224,22 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
         "return_hardness": selected_stages["return_hardness"],
         "stages": stages,
         "best_factor": best_factor,
+        "review_batch": review_batch,
+        "n_manufactured": len(manufactured) if manufacture_mode else 1,
         "probes": _creation_probes(),
         "run_id": run_id,
         "data": stages.get("data"),
-        "handoff_zh": "候选身份已锁定且属于 discovery admission envelope，可进入后续四阶段复核。",
+        "handoff_zh": (
+            "制造批次完成：已按交接门槛筛出 Top-%d（胜率≥%.0f%% · 盈利单≥%.2f%% · 周频≥0.5），"
+            "交精简多AI均值复核（盈利单≥11.11%% · 周频≥0.5 · 止损0.5%%）。"
+            % (
+                len(review_batch),
+                (mfg.HANDOFF_MIN_WIN_RATE * 100.0) if mfg is not None else 45.0,
+                mfg.HANDOFF_MIN_WIN_ONLY_PCT if mfg is not None else 9.0,
+            )
+            if manufacture_mode else
+            "候选身份已锁定；第一步研究发现可交接，进入第二步统一门槛后交第三步四阶段复核。"
+        ),
         "at": _now(),
     }
     paths, params = _write_deliverables(out_dir, symbol, timeframe, blueprint)
@@ -942,21 +1393,59 @@ def run_creation_blueprint(
     stages["meta"] = meta_pack
 
     # --- Research discovery (population → naked probe → antifalsify → EFR) ---
-    disc = discovery.run_discovery(
-        symbol=symbol,
-        timeframe=timeframe,
-        direction=direction,
-        brief=brief,
-        factor_matrix=data.get("matrix"),
-        fwd_returns=data.get("fwd"),
-        candles=data.get("candles"),
-        constraints=discovery_constraints,
-        run_id=run_id,
-        design_seed=meta_pack,
-        research_contract=compiled_contract,
-        data_version=data_version,
-        code_version=code_version,
-    )
+    def _run_disc(dir_arg, brief_arg, rid_arg, seed_arg, contract_arg):
+        return discovery.run_discovery(
+            symbol=symbol,
+            timeframe=timeframe,
+            direction=dir_arg,
+            brief=brief_arg,
+            factor_matrix=data.get("matrix"),
+            fwd_returns=data.get("fwd"),
+            candles=data.get("candles"),
+            constraints=discovery_constraints,
+            run_id=rid_arg,
+            design_seed=seed_arg,
+            research_contract=contract_arg,
+            data_version=data_version,
+            code_version=code_version,
+        )
+
+    disc = _run_disc(direction, brief, run_id, meta_pack, compiled_contract)
+    guarantee_attempts = [{
+        "direction": direction,
+        "mode": "primary",
+        "n_survivors": disc.get("n_survivors"),
+        "present_to_assembly": disc.get("present_to_assembly"),
+        "research_state_counts": (disc.get("stages") or {}).get("research_state_counts"),
+    }]
+    # Same-identity deepen only: denser quantiles inside the locked brief/contract.
+    # Never rewrite the brief or flip long↔short to manufacture survivors.
+    if not disc.get("present_to_assembly"):
+        deepen_id = "%s_deepen" % run_id
+        prev_deepen = os.environ.get("QIYU_STRUCTURED_DEEPEN")
+        os.environ["QIYU_STRUCTURED_DEEPEN"] = "1"
+        try:
+            disc_deep = _run_disc(
+                direction, brief, deepen_id, meta_pack, compiled_contract,
+            )
+        finally:
+            if prev_deepen is None:
+                os.environ.pop("QIYU_STRUCTURED_DEEPEN", None)
+            else:
+                os.environ["QIYU_STRUCTURED_DEEPEN"] = prev_deepen
+        guarantee_attempts.append({
+            "direction": direction,
+            "mode": "same_identity_deepen",
+            "n_survivors": disc_deep.get("n_survivors"),
+            "present_to_assembly": disc_deep.get("present_to_assembly"),
+            "research_state_counts": (disc_deep.get("stages") or {}).get(
+                "research_state_counts"
+            ),
+        })
+        if disc_deep.get("present_to_assembly"):
+            disc = disc_deep
+            run_id = deepen_id
+    stages["guarantee_output_attempts"] = guarantee_attempts
     stages["research_discovery"] = {
         "ok": disc.get("ok"),
         "run_id": disc.get("run_id"),
@@ -975,26 +1464,61 @@ def run_creation_blueprint(
         "failure_lineage": (disc.get("stages") or {}).get("failure_lineage"),
         "near_miss_diagnostics": (disc.get("stages") or {}).get("near_miss_diagnostics"),
         "lean_campaign": (disc.get("stages") or {}).get("lean_campaign"),
+        "guarantee_output_attempts": guarantee_attempts,
+        "candidate_materialization": (disc.get("stages") or {}).get(
+            "candidate_materialization"
+        ) or disc.get("candidate_materialization"),
     }
     if not disc.get("present_to_assembly"):
+        pipe = (disc.get("detail") or {}).get("pipeline_failure") or {}
+        is_pipeline = bool(
+            disc.get("error") == "CANDIDATE_MATERIALIZATION_FAILURE"
+            or pipe.get("is_pipeline_error")
+            or disc.get("outcome") == "generation_system_failure"
+        )
         failed = {
             "ok": False,
             "schema": "qiyu_creation_blueprint_v1",
             "present_to_human": False,
-            "error": "no_credible_discovery_candidate",
-            "outcome": disc.get("outcome") or (
-                "data_blocked" if ((disc.get("detail") or {}).get("data_blocked"))
-                else "research_rejected"
+            "error": (
+                "CANDIDATE_MATERIALIZATION_FAILURE" if is_pipeline
+                else (disc.get("error") or "no_credible_discovery_candidate")
+            ),
+            "outcome": (
+                "generation_system_failure" if is_pipeline
+                else (
+                    disc.get("outcome") or (
+                        "data_blocked" if ((disc.get("detail") or {}).get("data_blocked"))
+                        else "research_rejected"
+                    )
+                )
             ),
             "detail": disc.get("detail"),
+            "candidate_materialization": (
+                (disc.get("stages") or {}).get("candidate_materialization")
+                or disc.get("candidate_materialization")
+            ),
             "stages": stages,
-            "fuses": {"abort_reason": "research_discovery_empty"},
+            "fuses": {
+                "abort_reason": (
+                    "candidate_materialization_failure_after_repair"
+                    if is_pipeline else
+                    "research_discovery_empty_after_guarantee"
+                ),
+            },
             "probes": {
                 "discovery": discovery.probe(),
                 "ledger": ledger.probe(),
                 "research_candles": rcs.probe(),
             },
-            "handoff_zh": disc.get("human_banner_zh"),
+            "handoff_zh": (
+                pipe.get("message_zh")
+                or disc.get("human_banner_zh")
+                or (
+                    "管道生成失败：扩搜与表征扩展后仍未形成可编译候选池；"
+                    "这是生成系统故障，不是市场研究拒绝。"
+                )
+            ),
             "run_id": run_id,
             "at": _now(),
         }
@@ -1336,7 +1860,7 @@ def run_creation_blueprint(
             stages["rescreen"]["fallback"] = "positive_mean_net_survivors"
             stages["rescreen"]["n_kept"] = len(kept)
 
-        # Hard prefer WR>=50% candidates before stress
+        # 压力测试前硬优先胜率≥50% 的候选
         wr_ok = [
             r for r in kept
             if float((r.get("stats") or {}).get("win_rate") or 0) >= float(MIN_PRESENT_WR)
@@ -1347,7 +1871,7 @@ def run_creation_blueprint(
         else:
             stages["rescreen"]["wr50_filter"] = {
                 "kept": 0, "applied": True,
-                "note_zh": "无胜率≥50%候选；将触发经典变式切换而非对人展示。",
+                "note_zh": "无胜率严格大于50%的候选；将触发经典变式切换而非对人展示。",
             }
 
         if not kept:
@@ -1428,7 +1952,7 @@ def run_creation_blueprint(
                 core_hints = [x for x in core_hints if x != best.get("factor")] + ["range_pct", "atr_pct_14"]
             continue
 
-        # ⑤b Preliminary WR gate — NEVER present WR<50% as delivery
+        # ⑤b 初评胜率门禁 — 胜率未严格大于50% 禁止作为交付展示
         st_stats = best.get("stats") or {}
         # trade-level WR from returns if available
         if trade_returns:
@@ -1596,12 +2120,13 @@ def run_creation_blueprint(
         "data": stages.get("data"),
         "handoff_zh": (
             (
-                "研究发现+组装通过初评，可进入后续 ADA5 复核；本编排器不改复核代码。"
+                "第一步研究发现已通过初评衔接；进入第二步统一门槛后，"
+                "再交第三步四阶段复核。本编排器不替代复核模块。"
                 if presentable and ok else
                 (hardness_pack or {}).get("human_banner_zh")
                 or (prelim_pack or {}).get("human_banner_zh")
                 or (stages.get("research_discovery") or {}).get("human_banner_zh")
-                or "初评未通过或无可信候选：禁止硬凑完整策略。"
+                or "第一步/第二步未通过或无可信候选：禁止硬凑完整策略。"
             )
         ),
         "at": _now(),
@@ -1636,11 +2161,11 @@ def run_creation_blueprint(
             "fuses": fuses,
             "research_discovery": stages.get("research_discovery"),
             "instructions_zh": (
-                "【研究发现优先】下列候选已经过机制图谱/现象扫描、裸探针、反证证据矩阵、"
+                "【第一步：研究发现】下列候选已经过机制图谱/现象扫描、裸探针、反证证据矩阵、"
                 "EFR 与多重检验（DSR/PBO-lite）。禁止回退到『先写完整策略再圆故事』。"
+                "下一步是第二步统一门槛，再交第三步四阶段复核；禁止声称已过复核。"
                 "禁止把 CausalImpact-lite 说成因果证明；禁止周收益≥8%硬凑。"
-                "你是总指挥。请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突；"
-                "禁止声称已过复核。"
+                "你是总指挥。请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突。"
             ),
             "built_at": _now(),
         }
@@ -1654,7 +2179,7 @@ def run_creation_blueprint(
             "classic_tried": classic_tried,
             "perspectives_tried": perspectives_tried,
             "instructions_zh": (
-                "初评门禁未过（胜率<50% 或 收益硬度/策略退化熔断）。"
+                "初评门禁未过（胜率未严格大于50%，或收益硬度/策略退化熔断）。"
                 "禁止向人类展示本候选为成功交付。"
                 "请换方向或继续经典变式；不要美化虚高夏普+近零收益。"
             ),

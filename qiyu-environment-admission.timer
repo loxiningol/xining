@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Qiyu environment admission refresh
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=12h
+AccuracySec=2min
+Unit=qiyu-environment-admission.service
+
+[Install]
+WantedBy=timers.target

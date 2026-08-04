@@ -1,0 +1,11 @@
+[Unit]
+Description=Run live strategy probe rotation every hour
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1h
+AccuracySec=1min
+Unit=qiyu-strategy-hour-rotate.service
+
+[Install]
+WantedBy=timers.target

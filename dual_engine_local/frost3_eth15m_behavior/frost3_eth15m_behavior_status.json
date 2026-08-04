@@ -1,0 +1,12 @@
+{
+  "stage": "death_test_done_hypothesis_blocked_on_ssh",
+  "updated_at": "2026-07-26 11:14:41",
+  "artifacts_local": [
+    "frost3_eth15m_behavior_edge_discovery.json",
+    "frost3_eth15m_behavior_edge_discovery.md",
+    "frost3_eth15m_behavior_novelty_ranking.json",
+    "frost3_eth15m_behavior_death_test.json"
+  ],
+  "ssh": "banner_timeout",
+  "next": "sync_to_/root/auto_trade/dual_engine + hypothesis_top_survivors"
+}

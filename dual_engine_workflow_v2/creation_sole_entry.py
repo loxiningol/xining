@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
-"""SOLE strategy-creation entry — the only allowed path before review.
+"""唯一创造入口 — 创造策略指令后的唯一合法起点。
 
-All human / Cursor / Codex / Web / timer creation MUST call:
+固定顺序（禁止旁路、禁止并行分叉叙述）：
+  创造策略指令
+  第一步：研究发现（委员会 + 探针 + 多重检验）
+  第二步：门槛（胜率>50% + 去最大盈利后不崩 + 漏斗L0-L3 + 门槛0至7
+            + 寒霜贰/crec 快速筛与完整筛，全部统一在本步）
+  第三步：四阶段复核（与复核模块对接；本入口不替代复核）
+
+人类 / Cursor / Codex / 网站 / 定时器 创造必须调用：
   dual_engine_workflow_v2.creation_sole_entry.create_strategy(...)
-
-Any other creation pipeline is refused or redirected here.
-Review (STEP A / ADA5) remains separate and unchanged.
 """
 from __future__ import print_function
 
@@ -14,14 +18,15 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from .creation_quality_doctrine import pipeline_order_zh
 from .process_safe_state import atomic_write_json, process_lock, unique_id
 from .research_symbol_policy import require_allowed as require_research_symbol_allowed
 
 
 SOLE_SCHEMA = "qiyu_sole_creation_entry_v1"
 BLOCKED_REASON = (
-    "策略创造途径已统一为蓝图研究发现管道"
-    "（creation_sole_entry → research_discovery → assembly）。"
+    "策略创造已统一为三步顺序："
+    "第一步研究发现 → 第二步统一门槛 → 第三步四阶段复核。"
     "禁止 ecosystem/legacy dual-engine/mass/factory 旁路创造。"
 )
 
@@ -134,9 +139,15 @@ def verify_blueprint_stages(blueprint):
             "候选必须来自 discovery 幸存者",
         )
         add(
-            "candidate_multiple_testing_passed",
-            multiple_testing.get("passed") is True,
-            "至少一个候选必须通过逐候选DSR/PBO",
+            "candidate_pre_review_admitted",
+            multiple_testing.get("review_admission_passed") is True,
+            "至少一个候选须经创造证据门与Kimi独立裁判同意提交正式复核；DSR/PBO结果保留给正式复核裁决",
+        )
+        add(
+            "candidate_statistical_evidence_recorded",
+            multiple_testing.get("ok") is True
+            and isinstance(multiple_testing.get("candidates"), list),
+            "DSR/PBO必须真实记录，禁止把待复核误写成已通过",
         )
         add(
             "candidate_recipe_lineage_locked",
@@ -165,12 +176,15 @@ def verify_blueprint_stages(blueprint):
 def _creation_outcome(blueprint, gate):
     """Classify the research result independently from process completion."""
     blueprint = blueprint if isinstance(blueprint, dict) else {}
-    error = str(blueprint.get("error") or "").strip().lower()
+    error = str(blueprint.get("error") or "").strip()
+    error_l = error.lower()
     detail = blueprint.get("detail") or {}
     detail_error = str(detail.get("error") or "").strip().lower() if isinstance(detail, dict) else ""
+    abort = str(((blueprint.get("fuses") or {}).get("abort_reason") or "")).strip()
+    bp_outcome = str(blueprint.get("outcome") or "").strip()
     technical_failed = bool(
-        blueprint.get("outcome") == "technical_failed"
-        or error in ("creation_pipeline_exception", "technical_failed")
+        bp_outcome == "technical_failed"
+        or error_l in ("creation_pipeline_exception", "technical_failed")
     )
     technical_completed = bool(blueprint) and not technical_failed
     data_markers = (
@@ -178,8 +192,8 @@ def _creation_outcome(blueprint, gate):
         "store_unavailable", "research_candles", "bad_candle_shape",
     )
     data_blocked = technical_completed and (
-        blueprint.get("outcome") == "data_blocked"
-        or any(marker in (error + " " + detail_error) for marker in data_markers)
+        bp_outcome == "data_blocked"
+        or any(marker in (error_l + " " + detail_error) for marker in data_markers)
     )
     candidate_ready = bool(
         technical_completed
@@ -187,12 +201,36 @@ def _creation_outcome(blueprint, gate):
         and blueprint.get("present_to_human") is True
         and (gate or {}).get("passed") is True
     )
+    quality_failure = technical_completed and (
+        bp_outcome == "candidate_quality_failure"
+        or error in ("CANDIDATE_QUALITY_FAILURE", "manufacture_handoff_floor_fail")
+        or abort == "manufacture_handoff_floor_fail"
+        or (
+            isinstance(detail, dict)
+            and detail.get("failure_layer") == "B_quality_handoff"
+        )
+    )
+    materialization_failure = technical_completed and (
+        bp_outcome == "generation_system_failure"
+        or error == "CANDIDATE_MATERIALIZATION_FAILURE"
+        or (
+            isinstance(detail, dict)
+            and (
+                (detail.get("pipeline_failure") or {}).get("is_pipeline_error")
+                or detail.get("is_pipeline_error")
+            )
+        )
+    )
     if technical_failed:
         outcome = "technical_failed"
     elif data_blocked:
         outcome = "data_blocked"
     elif candidate_ready:
         outcome = "candidate_ready"
+    elif quality_failure:
+        outcome = "candidate_quality_failure"
+    elif materialization_failure:
+        outcome = "generation_system_failure"
     elif technical_completed and (
         blueprint.get("ok") is False
         or blueprint.get("present_to_human") is False
@@ -206,6 +244,8 @@ def _creation_outcome(blueprint, gate):
         "technical_completed": technical_completed,
         "technical_failed": outcome == "technical_failed",
         "research_rejected": outcome == "research_rejected",
+        "candidate_quality_failure": outcome == "candidate_quality_failure",
+        "generation_system_failure": outcome == "generation_system_failure",
         "data_blocked": outcome == "data_blocked",
         "candidate_ready": outcome == "candidate_ready",
         "review_submitted": False,
@@ -230,13 +270,14 @@ def _create_strategy_unlocked(
     data_version=None,
     code_version=None,
 ):
-    """Canonical creation. Always research-discovery blueprint first."""
+    """创造策略指令入口：第一步研究发现 → 第二步门槛 →（第三步交复核另走对接）。"""
     from . import creation_blueprint as blueprint_module
 
     symbol = require_research_symbol_allowed(symbol)
 
     brief = str(brief or "").strip() or (
-        "人类下达创造指令：在 %s %s 上寻找可证伪收益机制（研究发现优先，禁止先写完整策略）"
+        "创造策略指令：在 %s %s 上寻找可证伪收益机制。"
+        "顺序：第一步研究发现 → 第二步统一门槛 → 第三步四阶段复核。"
         % (symbol, timeframe)
     )
     mission_id = str(mission_id or unique_id("creation"))
@@ -308,7 +349,7 @@ def _create_strategy_unlocked(
             "passed": False,
             "failed": [{"check": "research_discovery_missing"}],
             "checks": [],
-            "note_zh": "创造管道未进入研究发现阶段",
+            "note_zh": "未完成第一步：研究发现（委员会 + 探针 + 多重检验）",
         }
 
     outcome, outcome_status = _creation_outcome(blueprint, gate)
@@ -319,8 +360,7 @@ def _create_strategy_unlocked(
         or research_contract
     )
     out = {
-        # Compatibility field, now intentionally means a reviewable candidate
-        # exists.  Process completion is exposed separately below.
+        # ok=True 表示已有可交第三步复核的候选；技术是否跑完见 technical_completed
         "ok": outcome == "candidate_ready",
         "technical_completed": bool(outcome_status.get("technical_completed")),
         "outcome": outcome,
@@ -328,6 +368,7 @@ def _create_strategy_unlocked(
         "outcome_status": outcome_status,
         "schema": SOLE_SCHEMA,
         "sole_entry": True,
+        "创造管道顺序": pipeline_order_zh(),
         "symbol": symbol,
         "timeframe": timeframe,
         "direction": direction,
@@ -347,8 +388,8 @@ def _create_strategy_unlocked(
     }
     if with_glm_spec or submit_step_a:
         out["post_note_zh"] = (
-            "GLM spec / STEP A 请使用 scripts/strategy_create_collab.py "
-            "在 sole 管道 present_to_human=True 后继续；本入口只保证创造管道唯一。"
+            "第二步门槛通过后，第三步四阶段复核请用 scripts/strategy_create_collab.py "
+            "或复核模块对接；本入口保证创造指令只走唯一三步顺序。"
         )
         out["with_glm_spec_requested"] = bool(with_glm_spec)
         out["submit_step_a_requested"] = bool(submit_step_a)

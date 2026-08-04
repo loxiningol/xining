@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "formal_pass_n": 0,
+  "formal_passes": [],
+  "pending_human_pass_n": 0,
+  "strategy": null,
+  "four_ai": null,
+  "note_zh": "尚无 formal approved=true 的真实候选；不得伪造 PASS。",
+  "at": "2026-08-04 07:47:50"
+}

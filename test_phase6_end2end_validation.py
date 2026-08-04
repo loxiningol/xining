@@ -333,6 +333,10 @@ class TestProductionInvariants(unittest.TestCase):
         import auto_trade_human_confirm_pipeline as pipeline
         self.assertAlmostEqual(pipeline.GRADE_RATIO["B"], 0.30)
 
+    def test_c_grade_10pct(self):
+        import auto_trade_human_confirm_pipeline as pipeline
+        self.assertAlmostEqual(pipeline.GRADE_RATIO["C"], 0.10)
+
     def test_s_grade_70pct(self):
         import auto_trade_human_confirm_pipeline as pipeline
         self.assertAlmostEqual(pipeline.GRADE_RATIO["S"], 0.70)

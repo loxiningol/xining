@@ -1,0 +1,280 @@
+{
+  "answers": [
+    {
+      "n": 1,
+      "q": "这是完整第三阶段还是局部实施？",
+      "a": "完整第三阶段（3A–3I）。"
+    },
+    {
+      "n": 2,
+      "q": "是否重做了 STEP A/B？",
+      "a": "否。仅扩展 research-layer DSL/data；未重建 STEP A/B。"
+    },
+    {
+      "n": 3,
+      "q": "是否启动第三轮正式策略批次？",
+      "a": "否。明确禁止；仅 4 个 research probes。"
+    },
+    {
+      "n": 4,
+      "q": "是否自动挂载？",
+      "a": "否。"
+    },
+    {
+      "n": 5,
+      "q": "是否迁移 ADA SL？",
+      "a": "否。"
+    },
+    {
+      "n": 6,
+      "q": "是否修改 20x / 30% / 0.9%？",
+      "a": "否。"
+    },
+    {
+      "n": 7,
+      "q": "是否削弱 open→SL→TP/close？",
+      "a": "否。"
+    },
+    {
+      "n": 8,
+      "q": "3A 是否覆盖 Phase1+2 全部机制？",
+      "a": "是。n=16 (p1=8 p2=8)"
+    },
+    {
+      "n": 9,
+      "q": "语义损失 HIGH 数量？",
+      "a": "4"
+    },
+    {
+      "n": 10,
+      "q": "坍缩主层定位？",
+      "a": "codex_implement_from_spec"
+    },
+    {
+      "n": 11,
+      "q": "坍缩路径？",
+      "a": "/root/dual_engine_workflow_v2/pipeline_step_a.py::codex_implement_from_spec"
+    },
+    {
+      "n": 12,
+      "q": "3B 行为不独立 pair 数？",
+      "a": "28"
+    },
+    {
+      "n": 13,
+      "q": "3B verdict？",
+      "a": "BEHAVIORAL_COLLAPSE_CONFIRMED"
+    },
+    {
+      "n": 14,
+      "q": "3C 连接了哪些研究数据类？",
+      "a": "[\"Funding_Basis\", \"OI\", \"Taker_flow\", \"Cross_asset_sync\"]"
+    },
+    {
+      "n": 15,
+      "q": "是否 ≥3/4 数据类？",
+      "a": "True"
+    },
+    {
+      "n": 16,
+      "q": "是否伪造 liquidation/L2？",
+      "a": "否。unavailable_do_not_fabricate 政策。"
+    },
+    {
+      "n": 17,
+      "q": "生产 DSL FEATURES 是否被改？",
+      "a": "否。untouched_by_phase3=true"
+    },
+    {
+      "n": 18,
+      "q": "研究 DSL schema？",
+      "a": "qiyu_strategy_dsl_research_v1"
+    },
+    {
+      "n": 19,
+      "q": "是否支持 state machine / event sequence / multi-asset / dynamic exit / proxy 声明？",
+      "a": "是。"
+    },
+    {
+      "n": 20,
+      "q": "是否 per-strategy 硬编码家族扩展？",
+      "a": "否。generic expressiveness。"
+    },
+    {
+      "n": 21,
+      "q": "结构保真单独是否足以 PASS？",
+      "a": "否。Structural-only ≠ PASS。"
+    },
+    {
+      "n": 22,
+      "q": "因果保真测试有哪些？",
+      "a": "ablation, random_proxy, event_order_destroy, regime_veto, behavioral_independence"
+    },
+    {
+      "n": 23,
+      "q": "probe 数量是否恰好 4？",
+      "a": "是。n=4"
+    },
+    {
+      "n": 24,
+      "q": "4 probes 分别是什么？",
+      "a": "probe_oi_price_crowding_fade_btc_5m, probe_funding_basis_unwind_btc_5m, probe_btc_lead_lag_eth_5m, probe_taker_absorption_btc_5m"
+    },
+    {
+      "n": 25,
+      "q": "probes 是否正式候选？",
+      "a": "否。"
+    },
+    {
+      "n": 26,
+      "q": "是否计入正期望 credit？",
+      "a": "否。"
+    },
+    {
+      "n": 27,
+      "q": "是否要求 Gate3？",
+      "a": "否。"
+    },
+    {
+      "n": 28,
+      "q": "多少 probes 使用真实新数据？",
+      "a": "4"
+    },
+    {
+      "n": 29,
+      "q": "多少 probes 通过因果保真？",
+      "a": "3"
+    },
+    {
+      "n": 30,
+      "q": "多少 probes 行为独立？",
+      "a": "4"
+    },
+    {
+      "n": 31,
+      "q": "多少 probes overall pass？",
+      "a": "3"
+    },
+    {
+      "n": 32,
+      "q": "是否仍坍缩到相似 K 线模板？",
+      "a": "否"
+    },
+    {
+      "n": 33,
+      "q": "核心能力解锁 verdict？",
+      "a": "PASS"
+    },
+    {
+      "n": 34,
+      "q": "生产隔离回归是否通过？",
+      "a": "True"
+    },
+    {
+      "n": 35,
+      "q": "config hash 是否变化？",
+      "a": "True"
+    },
+    {
+      "n": 36,
+      "q": "backup 路径？",
+      "a": "/root/backups/windtalker_phase3_20260728_180201"
+    },
+    {
+      "n": 37,
+      "q": "新数据对生产是否 fail-closed？",
+      "a": "是。"
+    },
+    {
+      "n": 38,
+      "q": "工程执行 3A–3I？",
+      "a": "PASS"
+    },
+    {
+      "n": 39,
+      "q": "自动交易目标实际前进度？",
+      "a": "0%"
+    },
+    {
+      "n": 40,
+      "q": "能力建设进度 %？",
+      "a": "100%"
+    },
+    {
+      "n": 41,
+      "q": "是否允许下一轮正式策略？",
+      "a": "YES"
+    },
+    {
+      "n": 42,
+      "q": "允许/拒绝的证据？",
+      "a": "core=PASS eng=PASS probes_pass=3 data_ge3=True isolation=True"
+    },
+    {
+      "n": 43,
+      "q": "正期望频率缺口？",
+      "a": "+3.5 /week（未因 Phase3 改变）"
+    },
+    {
+      "n": 44,
+      "q": "human-confirm pending？",
+      "a": "0"
+    },
+    {
+      "n": 45,
+      "q": "生产挂载数？",
+      "a": "0"
+    },
+    {
+      "n": 46,
+      "q": "Gate3 通过数（本阶段正式）？",
+      "a": "0（无正式候选）"
+    },
+    {
+      "n": 47,
+      "q": "durable STATUS 路径？",
+      "a": "/root/auto_trade/windtalker_phase3/STATUS.json"
+    },
+    {
+      "n": 48,
+      "q": "交付物是否写入 /root/docs 与 phase3？",
+      "a": "是。"
+    },
+    {
+      "n": 49,
+      "q": "本地 mirror？",
+      "a": "/root/auto_trade/windtalker_phase3/local_mirror"
+    },
+    {
+      "n": 50,
+      "q": "是否保持 do_not_loosen / do_not_force_open？",
+      "a": "是。"
+    },
+    {
+      "n": 51,
+      "q": "Phase1/2 正式候选是否被重新挂 Gate？",
+      "a": "否。"
+    },
+    {
+      "n": 52,
+      "q": "research DSL 能否 live_enabled？",
+      "a": "否（校验拒绝）。"
+    },
+    {
+      "n": 53,
+      "q": "三重裁决分别是什么？",
+      "a": "{\"engineering_execution\": \"PASS\", \"core_capability_unlock\": \"PASS\", \"auto_trade_progress_pct\": 0}"
+    },
+    {
+      "n": 54,
+      "q": "若工程 PASS 但 probes 坍缩？",
+      "a": "核心 FAIL，总体 FAIL，不允许下一轮正式生产。"
+    },
+    {
+      "n": 55,
+      "q": "第三阶段最终总体验收？",
+      "a": "PASS"
+    }
+  ],
+  "n": 55
+}

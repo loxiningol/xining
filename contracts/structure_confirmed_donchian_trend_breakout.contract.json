@@ -1,0 +1,128 @@
+{
+  "schema": "qiyu_invariants_contract_v1",
+  "contract_id": "structure_confirmed_donchian_trend_breakout",
+  "title_zh": "[BTC 15m] 唐奇安结构确认趋势突破",
+  "require_sanity_asserts": false,
+  "must_timeframe": "15m",
+  "max_entry_leaves": 12,
+  "mechanism_pseudocode": {
+    "donchian": "close cross_above prev_high20 (long) / cross_below prev_low20 (short)",
+    "structure": "2-bar rising/falling closes into the break (trend initiation)",
+    "htf_filter": "h1_slope4 > 0.0015 long / < -0.0015 short (magnitude, not vacuous >0)",
+    "volume_accept": "vol_z20 > 1.6 AND vol_ma20_ratio > 1.2",
+    "chop_filter": "atr14 in (close*0.0025, close*0.01)",
+    "body": "close > open long / close < open short",
+    "tp_scaleout": "partial_tp_atr 0.5@2.5 ATR_14",
+    "tp_trail": "atr_trailing n_atr=3.5 atr_period=14",
+    "invalidation": "swing_extreme lookback=20",
+    "outer_sl": "protective 0.9% immutable (engine-level, not DSL exit_op)"
+  },
+  "required_entry_feature_cmps": [
+    {
+      "left": "close",
+      "op": "cross_above",
+      "right": "prev_high20"
+    },
+    {
+      "left": "close",
+      "op": "gt",
+      "right": "close"
+    },
+    {
+      "left": "close",
+      "op": "gt",
+      "right": "open"
+    }
+  ],
+  "required_entry_feature_cmps_short": [
+    {
+      "left": "close",
+      "op": "cross_below",
+      "right": "prev_low20"
+    },
+    {
+      "left": "close",
+      "op": "lt",
+      "right": "close"
+    },
+    {
+      "left": "close",
+      "op": "lt",
+      "right": "open"
+    }
+  ],
+  "required_entry_value_cmps": [
+    {
+      "left": "h1_slope4",
+      "op": "gt",
+      "value": 0.0015
+    },
+    {
+      "left": "vol_z20",
+      "op": "gt",
+      "value": 1.6
+    },
+    {
+      "left": "vol_ma20_ratio",
+      "op": "gt",
+      "value": 1.2
+    }
+  ],
+  "required_exit_ops": [
+    {
+      "exit_op": "partial_tp_atr",
+      "n_atr": 2.5,
+      "partial_tp_ratio": 0.5,
+      "role": "take_profit"
+    },
+    {
+      "exit_op": "atr_trailing",
+      "n_atr": 3.5,
+      "atr_period": 14,
+      "role": "take_profit"
+    },
+    {
+      "exit_op": "swing_extreme",
+      "lookback": 20,
+      "role": "invalidation"
+    }
+  ],
+  "forbidden_features": [
+    "pdh",
+    "pdl",
+    "pdc",
+    "asia_high",
+    "asia_low",
+    "asia_mid",
+    "asia_range",
+    "asia_range_atr_ratio",
+    "cci",
+    "rsi14",
+    "ema21",
+    "ema53",
+    "macd_stick"
+  ],
+  "forbidden_exit_ops": [
+    "fixed_pct_tp"
+  ],
+  "non_negotiable_rules": [
+    "protective_sl_0.9_pct_immutable",
+    "no_fixed_pct_take_profit",
+    "no_ema_rsi_macd_cci_core_filters",
+    "must_keep_donchian20_cross_acceptance",
+    "must_keep_two_bar_structure_filter",
+    "must_keep_htf_slope_magnitude",
+    "must_keep_dual_volume_confirm",
+    "must_keep_atr_regime_band",
+    "must_use_atr_trailing_and_or_swing_extreme",
+    "no_martingale_grid_pyramiding",
+    "no_live_mount_without_human_confirm",
+    "not_rename_into_blocked_vol_accepted_donchian_or_macro_sfp_or_stop_hunt"
+  ],
+  "prune_audit_instructions_zh": [
+    "对比本契约与 DSL：只列多余假设、未授权硬编码、逻辑偏离。",
+    "必须保留：Donchian20穿越、2-bar结构、HTF slope幅度、双成交量确认、ATR带、partial+trail退出。",
+    "禁止改名回 vol_accepted_donchian / macro_sfp / stop_hunt；禁止固定百分比止盈；禁止降低 Gate2。",
+    "若无法在不新增契约外逻辑的情况下修好 → decision=RESET。"
+  ]
+}

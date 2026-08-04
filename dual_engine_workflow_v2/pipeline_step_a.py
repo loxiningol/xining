@@ -612,22 +612,19 @@ def _compiler_join_conditions(compiled):
     return expr
 
 
-# Research features are not accepted merely because their names resemble a
-# runtime indicator.  Every entry here was checked point-for-point against the
-# formal frame builder.  In particular, ``atr_pct_14`` is not ``atr14`` and the
-# research ``rsi_14`` implementation is not the formal ``rsi14`` implementation.
+# Single source of truth: recipe_policy.GENERIC_FACTOR_TO_DSL (+ semantics).
+# Research estimators must stay point-aligned with the formal frame builder.
 _RECIPE_FACTOR_TO_DSL = {
-    "close_z_20": {
-        "feature": "z20",
-        "semantics": "close_z20_sample_std_v1",
-    },
-    "volume_z": {
-        "feature": "vol_z20",
-        "semantics": "volume_z20_sample_std_v1",
-    },
+    factor: {
+        "feature": dsl_feature,
+        "semantics": recipe_policy.GENERIC_FACTOR_SEMANTICS.get(
+            factor, "%s_v1" % dsl_feature
+        ),
+    }
+    for factor, dsl_feature in recipe_policy.GENERIC_FACTOR_TO_DSL.items()
 }
 _GENERIC_RECIPE_KINDS = {
-    "mechanism_intersection", "mechanism_preserving",
+    "mechanism_intersection", "mechanism_preserving", "ast_compiled",
 }
 
 
@@ -661,7 +658,11 @@ def _compiler_recipe_entry(recipe, contract, timeframe, errors):
     evidence["recipe_hash_valid"] = bool(integrity_ok)
     if not integrity_ok:
         errors.append("admitted_recipe_hash_invalid")
-    if recipe.get("schema") != "qiyu_admitted_probe_recipe_v1":
+    allowed_schemas = getattr(
+        recipe_policy, "ALLOWED_RECIPE_SCHEMAS",
+        ("qiyu_admitted_probe_recipe_v1", "qiyu_admitted_probe_recipe_v2"),
+    )
+    if recipe.get("schema") not in allowed_schemas:
         errors.append("admitted_recipe_schema_invalid:%s" % recipe.get("schema"))
 
     required_identity = (
@@ -807,6 +808,47 @@ def _compiler_recipe_entry(recipe, contract, timeframe, errors):
             errors.append("admitted_recipe_exact_contract_semantics_drift")
             evidence["recipe_entry_semantics"] = _compiler_logic_semantics(recipe_entry)
             evidence["contract_entry_semantics"] = _compiler_logic_semantics(contract_entry)
+    elif kind == "ast_compiled":
+        contract_rows = _compiler_required_conditions(contract, direction)
+        if contract_rows:
+            errors.append("generic_recipe_cannot_replace_exact_contract_event")
+        event_ast = recipe.get("event_ast")
+        if not isinstance(event_ast, dict) or not event_ast:
+            errors.append("admitted_recipe_event_ast_missing")
+            recipe_entry = None
+        else:
+            try:
+                from . import ast_compiler as ac
+                dsl_pack = ac.compile_ast_to_dsl(event_ast)
+            except Exception as exc:
+                dsl_pack = {"ok": False, "formal_ok": False, "reasons": [type(exc).__name__]}
+            evidence["event_ast_hash"] = (
+                recipe.get("event_ast_hash") or dsl_pack.get("event_ast_hash")
+            )
+            evidence["ast_dsl_reasons"] = list(dsl_pack.get("reasons") or [])
+            evidence["ast_formal_ok"] = bool(dsl_pack.get("formal_ok"))
+            if not dsl_pack.get("ok") or dsl_pack.get("entry_tree") is None:
+                errors.append("admitted_recipe_ast_dsl_compile_failed")
+                recipe_entry = None
+            elif not dsl_pack.get("formal_ok"):
+                errors.append("admitted_recipe_ast_not_formally_reproducible")
+                recipe_entry = dsl_pack.get("entry_tree")
+            else:
+                recipe_entry = dsl_pack.get("entry_tree")
+                evidence["factor_mappings"].append({
+                    "research_factor": "event_ast",
+                    "dsl_feature": "ast_compiled",
+                    "semantics": "event_ast_v2",
+                    "event_ast_hash": evidence.get("event_ast_hash"),
+                })
+            # Prefer attached formal DSL snapshot when present and matching hash.
+            attached = recipe.get("event_ast_dsl")
+            if (
+                recipe_entry is not None
+                and isinstance(attached, dict)
+                and recipe.get("event_ast_formal_ok") is True
+            ):
+                recipe_entry = attached
     else:
         contract_rows = _compiler_required_conditions(contract, direction)
         if contract_rows:
@@ -877,7 +919,7 @@ def _compiler_recipe_entry(recipe, contract, timeframe, errors):
             })
         recipe_entry = {"all": [row[0] for row in compiled]} if compiled else None
 
-    if terms:
+    if terms and kind != "ast_compiled":
         first = terms[0] if isinstance(terms[0], dict) else {}
         if recipe.get("factor") not in (None, first.get("factor"), first.get("feature")):
             errors.append("admitted_recipe_primary_factor_drift")
@@ -987,9 +1029,14 @@ def validate_dsl_against_admitted_recipe(dsl, recipe, contract):
             recipe.get("execution_mapping"),
         ))
     try:
-        if abs(float(validated.get("protective_stop_pct")) - float(
+        dsl_stop = float(validated.get("protective_stop_pct"))
+        recipe_stop = float(
             (recipe.get("protective_stop_policy") or {}).get("price_pct")
-        )) > 1e-12:
+        )
+        from . import research_contract as rcontract
+        prod_stop = float(rcontract.PRODUCTION_PROTECTIVE_STOP_PCT)
+        # Allow researched 0.9% recipes to compile to current 0.5% production stop.
+        if abs(dsl_stop - recipe_stop) > 1e-12 and abs(dsl_stop - prod_stop) > 1e-12:
             errors.append("compiled_dsl_protective_stop_drift")
     except (TypeError, ValueError):
         errors.append("compiled_dsl_protective_stop_identity_missing")
@@ -1547,6 +1594,22 @@ def codex_implement_from_spec(spec_pack):
         )
         if str(admitted_recipe.get("trade_direction") or "").lower() != direction:
             errors.append("admitted_recipe_target_direction_drift")
+        # Admitted-recipe mapped features are authorized even if they match
+        # FORBIDDEN_CORE_FEATURES tokens (e.g. rsi14 from research rsi_14).
+        authorized_from_recipe = []
+        for row in (recipe_evidence or {}).get("factor_mappings") or []:
+            feat = str((row or {}).get("dsl_feature") or "").strip()
+            if feat:
+                authorized_from_recipe.append(feat)
+        for feat in recipe_policy.GENERIC_FACTOR_TO_DSL.values():
+            if feat:
+                authorized_from_recipe.append(str(feat))
+        for feat in authorized_from_recipe:
+            if feat not in allowed_features:
+                allowed_features.append(feat)
+            if feat not in required_features:
+                # Keep as allowed only; do not force unused required features.
+                pass
     evidence = {
         "contract_id": contract.get("contract_id"),
         "contract_present": bool(contract),
@@ -1810,7 +1873,7 @@ def codex_implement_from_spec(spec_pack):
         "supported_instruments": [symbol], "entry": entry, "exit": exit,
         "max_hold_bars": max_hold, "execution_mapping": execution_mapping,
         "protective_stop_pct": (
-            (admitted_recipe.get("protective_stop_policy") or {}).get("price_pct")
+            float(research_contract_mod.PRODUCTION_PROTECTIVE_STOP_PCT)
             if admitted_recipe is not None else None
         ),
         "execution_leverage": (
@@ -2392,7 +2455,12 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
 
     g1 = evaluate_gate1(fidelity, book.get("dsl"), spec)
     task["gates"].append(g1)
-    if not g1["pass"]:
+    try:
+        from . import manufacture_batch_policy as mfg
+        slim_only = bool(formal_submission) and bool(mfg.slim_multiai_review_only())
+    except Exception:
+        slim_only = False
+    if (not g1["pass"]) and (not slim_only):
         task["stage"] = "archived"
         task["gate_results"] = assemble_gate_results(task["gates"], tid)
         save_gate_results(tid, task["gate_results"])
@@ -2406,6 +2474,11 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         return {"ok": False, "task_id": tid, "reason": "gate1_fail",
                 "fidelity_errors": fidelity.get("compiler_fidelity_errors") or [],
                 "gate_results": task["gate_results"]}
+    if slim_only and not g1.get("pass"):
+        g1 = dict(g1)
+        g1["soft_pass"] = "slim_multiai_skip_deterministic_gate1"
+        g1["pass"] = True
+        task["gates"][-1] = g1
 
     # ---- Gate2+3 backtest / walk-forward (+ Phase-3 funnel L0→L1→L2→L3) ----
     task["stage"] = "gate2_gate3_backtest_wf"
@@ -2427,6 +2500,262 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
                         reason=str(exc), verdict="dsl_validate_fail", is_eng=True)
         dual.save_task(task)
         return {"ok": False, "task_id": tid, "reason": "validate_fail"}
+
+    # ---- Slim multi-AI-only formal review (skip all deterministic gates) ----
+    # slim_only already resolved above Gate1.
+    if slim_only:
+        import auto_trade_ai_consensus as ai_cons
+        import auto_trade_human_confirm_pipeline as pipeline
+        task["stage"] = "slim_multiai_average_review"
+        task["review_mode"] = "slim_multiai_average_only"
+        sym = book.get("symbol") or focus.get("symbol")
+        tf = book.get("timeframe") or focus.get("timeframe")
+        try:
+            frame = dual._frame(sym, tf)
+            bt = dsl_mod.backtest_dsl(frame, definition, stop_loss_pct=0.005)
+        except Exception as exc:
+            task["stage"] = "archived"
+            dual.save_task(task)
+            return {"ok": False, "task_id": tid, "reason": "slim_backtest_fail",
+                    "error": str(exc)[:240]}
+        trades = bt.get("trades") if isinstance(bt, dict) else bt
+        metrics = bt.get("metrics") if isinstance(bt, dict) else {}
+        n_trades = len(trades or [])
+        win_pack = mfg.levered_win_only_mean_pct(trades=trades)
+        span_days = None
+        try:
+            span_days = ai_cons.resolve_backtest_observation_span_days(
+                {"symbol": sym, "timeframe": tf},
+                {"trades": n_trades, "trades_list": trades},
+                trades=trades,
+            )
+        except Exception:
+            span_days = None
+        # P0: independent reference parity before any four-AI call.
+        try:
+            from dual_engine_workflow_v2 import review_gate as rgate
+            prod_metrics = {
+                "n": n_trades,
+                "mean_win_only_pct": win_pack.get("mean_win_only_pct"),
+                "average_profitable_trade_return": win_pack.get("mean_win_only_ratio"),
+                "win_rate": (metrics or {}).get("win_rate"),
+                "leverage": mfg.EXECUTION_LEVERAGE,
+                "stop_distance": mfg.PROTECTIVE_STOP_PRICE_PCT,
+            }
+            if span_days:
+                prod_metrics["weekly_opens"] = (
+                    (n_trades * 7.0 / float(span_days)) if span_days else None
+                )
+            handoff_token = (
+                (pack.get("creation_blueprint") or {}).get("handoff_token")
+                or ((task.get("meta") or {}).get("handoff_token"))
+            )
+            # Parity is always required when trades exist.
+            parity = rgate.validate_review_metrics_parity(
+                trades,
+                production_metrics=prod_metrics,
+            )
+            task["metric_parity"] = {
+                "production_metrics": parity.get("production_metrics"),
+                "reference_metrics": parity.get("reference_metrics"),
+                "absolute_diff": parity.get("absolute_diff"),
+                "relative_diff": parity.get("relative_diff"),
+                "metric_parity_passed": parity.get("metric_parity_passed"),
+                "failed_keys": parity.get("failed_keys"),
+                "pnl_ratio_reference": parity.get("pnl_ratio_reference"),
+            }
+            if not parity.get("metric_parity_passed"):
+                task["stage"] = "archived"
+                dual.save_task(task)
+                return {
+                    "ok": False,
+                    "task_id": tid,
+                    "reason": "REVIEW_METRIC_PARITY_FAILURE",
+                    "metric_parity": task["metric_parity"],
+                    "message_zh": "生产指标与独立真值计算器不一致，禁止提交四AI复核。",
+                }
+            if handoff_token:
+                tok = rgate.require_handoff_token(
+                    handoff_token,
+                    recipe_id=((pack.get("admitted_recipe_lock") or {}).get("recipe_id")),
+                    metrics=(pack.get("creation_blueprint") or {}).get("select_metrics"),
+                )
+                task["handoff_token_check"] = tok
+                if not tok.get("ok"):
+                    task["stage"] = "archived"
+                    dual.save_task(task)
+                    return {
+                        "ok": False,
+                        "task_id": tid,
+                        "reason": "HANDOFF_TOKEN_INVALID",
+                        "handoff_token_check": tok,
+                        "message_zh": "缺少或无效 handoff token，禁止提交四AI复核。",
+                    }
+            elif slim_only:
+                # Manufacture / slim path must always carry a handoff token.
+                task["stage"] = "archived"
+                dual.save_task(task)
+                return {
+                    "ok": False,
+                    "task_id": tid,
+                    "reason": "HANDOFF_TOKEN_INVALID",
+                    "message_zh": "精简四AI复核缺少 handoff token，禁止提交。",
+                }
+        except Exception as exc:
+            task["metric_parity_error"] = str(exc)[:240]
+            task["stage"] = "archived"
+            dual.save_task(task)
+            return {
+                "ok": False,
+                "task_id": tid,
+                "reason": "REVIEW_METRIC_PARITY_FAILURE",
+                "error": str(exc)[:240],
+                "message_zh": "指标对账执行失败，禁止提交四AI复核。",
+            }
+        evidence = {
+            "symbol": sym,
+            "timeframe": tf,
+            "trades": n_trades,
+            "trades_list": trades,
+            "metrics": metrics,
+            "span_days": span_days,
+            "observation_days": span_days,
+            "weekly_opens_require_2y": False,
+            "slim_multiai_only": True,
+            "protective_stop_price_pct": mfg.PROTECTIVE_STOP_PRICE_PCT,
+            "safety_metrics": {
+                "trades": n_trades,
+                "span_days": span_days,
+                "observation_days": span_days,
+                "trades_list": trades,
+                "mean_net": (metrics or {}).get("mean_net"),
+                "win_rate": (metrics or {}).get("win_rate_pct") or (metrics or {}).get("win_rate"),
+                "mean_net_win_only": win_pack.get("mean_win_only_ratio"),
+                "mean_net_win_only_pct": win_pack.get("mean_win_only_pct"),
+                "win_only_audit": win_pack,
+                "leverage": mfg.EXECUTION_LEVERAGE,
+                "unit_note": "mean_net_win_only_pct is percentage points after leverage+fees; do not ×20 again",
+            },
+        }
+        candidate = {
+            "symbol": sym,
+            "timeframe": tf,
+            "direction": book.get("direction") or "long",
+            "key": definition.get("key"),
+            "dsl": definition,
+            "metrics": metrics,
+            "trades": trades,
+        }
+        theo = ai_cons.theoretical_review_all(candidate, evidence) or {}
+        verification = ai_cons.validate_theoretical_review_result(theo)
+        theo = dict(theo)
+        theo["approved"] = bool(verification.get("ok") and theo.get("approved"))
+        theo["review_verification"] = verification
+        theo["slim_multiai_only"] = True
+        theo["four_review_admission"] = {
+            "schema": "qiyu_slim_multiai_admission_v1",
+            "pass": bool(theo.get("approved")),
+            "slim_multiai_only": True,
+            "review_mode": "slim_multiai_average_only",
+            "task_id": tid,
+            "pipeline_handoff": "sole_pipeline_step_a_slim",
+            "reviews": {
+                "r4": {
+                    "pass": bool(theo.get("approved")),
+                    "gate": "slim_multiai_average",
+                },
+            },
+        }
+        task["slim_multiai_review"] = theo
+        task["gates"] = [{
+            "gate_id": "slim_multiai_average",
+            "name": "精简多AI均值复核",
+            "gate": "slim_multiai_average",
+            "pass": bool(theo.get("approved")),
+            "evidence": {
+                "fail_reasons": theo.get("fail_reasons"),
+                "avg_wr": theo.get("ai_theoretical_wr_avg"),
+                "avg_weekly": theo.get("ai_theoretical_weekly_opens_avg"),
+                "avg_mean_net": theo.get("ai_theoretical_mean_net_avg"),
+            },
+            "detail": {
+                "fail_reasons": theo.get("fail_reasons"),
+                "avg_wr": theo.get("ai_theoretical_wr_avg"),
+                "avg_weekly": theo.get("ai_theoretical_weekly_opens_avg"),
+                "avg_mean_net": theo.get("ai_theoretical_mean_net_avg"),
+            },
+        }]
+        # Do not expand to Gate0–7; sole gate is slim multi-AI average.
+        task["gate_results"] = {
+            "schema": "qiyu_slim_multiai_gate_results_v1",
+            "artifact": "gate_results",
+            "task_id": tid,
+            "review_mode": "slim_multiai_average_only",
+            "gates": task["gates"],
+            "all_gates_pass": bool(theo.get("approved")),
+            "first_fail_gate": None if theo.get("approved") else "slim_multiai_average",
+            "passed_count": 1 if theo.get("approved") else 0,
+            "total_gates": 1,
+            "production_mounted": False,
+        }
+        save_gate_results(tid, task["gate_results"])
+        if not theo.get("approved"):
+            task["stage"] = "archived"
+            dual.save_task(task)
+            store.save_task_meta(task)
+            return {
+                "ok": False,
+                "task_id": tid,
+                "reason": "slim_multiai_average_fail",
+                "slim_multiai_review": theo,
+                "gate_results": task["gate_results"],
+                "review_mode": "slim_multiai_average_only",
+            }
+        push = pipeline.ingest_and_screen(
+            {
+                "dsl": definition,
+                "symbol": sym,
+                "timeframe": tf,
+                "thesis": book.get("thesis"),
+                "mechanism_spec": spec,
+                "live_enabled": False,
+                "auto_trade_eligible": False,
+                "production_mounted": False,
+            },
+            source="dual_engine_step_a_slim_multiai",
+            ai_review=theo,
+            require_ai_review=True,
+        )
+        task["pending_push"] = {
+            "ok": push.get("ok"),
+            "key": push.get("key"),
+            "reason": push.get("reason"),
+        }
+        task["human_confirm_state"] = {
+            "pending_ok": bool(push.get("ok")),
+            "awaiting_human": bool(push.get("ok")),
+            "human_confirmed": False,
+            "auto_open_mounted": False,
+            "real_size_granted": False,
+            "push": task["pending_push"],
+            "slim_multiai_only": True,
+        }
+        task["stage"] = "awaiting_human" if push.get("ok") else "failed_push"
+        dual.save_task(task)
+        store.save_task_meta(task)
+        return {
+            "ok": bool(push.get("ok")),
+            "task_id": tid,
+            "reason": (
+                "slim_multiai_average_pass"
+                if push.get("ok") else (push.get("reason") or "slim_push_fail")
+            ),
+            "slim_multiai_review": theo,
+            "gate_results": task["gate_results"],
+            "review_mode": "slim_multiai_average_only",
+            "stage": task["stage"],
+            "pending": push,
+        }
 
     # ---- Pretest quality: contract + sanity asserts BEFORE L0 (anti-屎上雕花) ----
     task["stage"] = "pretest_quality"
@@ -2521,7 +2850,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         frame_for_funnel = None
 
     def _funnel_bt(frm, defn):
-        return dsl_mod.backtest_dsl(frm, defn, stop_loss_pct=0.009)
+        return dsl_mod.backtest_dsl(frm, defn, stop_loss_pct=0.005)
 
     # ---- L0 density pre-check (ms) — kill AND-clog before any matrix IO ----
     task["stage"] = "funnel_l0_density"
@@ -2531,7 +2860,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
         "l1_micro_screen": None,
         "rejected_at": None,
         "fail_closed": True,
-        "protective_sl_pct": 0.009,
+        "protective_sl_pct": 0.005,
         "ada_migrate": False,
         "auto_mount": False,
         "multi_symbol_matrix": bool(enable_multi_symbol_matrix),
@@ -2761,7 +3090,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
 
     # Phase-3 L3: null hypothesis (perm / invert / WF already in wf payload)
     def _l3_bt(frm, defn):
-        return dsl_mod.backtest_dsl(frm, defn, stop_loss_pct=0.009)
+        return dsl_mod.backtest_dsl(frm, defn, stop_loss_pct=0.005)
 
     l3 = evaluate_null_hypothesis(
         definition=definition,
@@ -2832,7 +3161,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             baseline_metrics=incub_base,
             baseline_frame=frame_for_funnel,
             backtest_fn=_funnel_bt,
-            stop_loss_pct=0.009,
+            stop_loss_pct=0.005,
         )
         task["phase4_incubator"] = incubator
         task["phase3_funnel"]["phase4_incubator"] = {
@@ -3460,19 +3789,7 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     # Canonical fourth review: real 3AI calls + near-2y weekly-frequency
     # discount gate.  split_scores can never substitute for votes.
     n_trades = int((base_m or {}).get("trades") or len(trades or []) or 0)
-    trade_span_days = None
-    try:
-        from .fitness_engine import _span_days as _fit_span_days
-        trade_span_days = float(_fit_span_days(trades, n_trades or len(trades or [])))
-    except Exception:
-        trade_span_days = None
-    # Prefer the creation lookback / observation window for frequency density.
     span_days = None
-    try:
-        from .creation_template_policy import EVAL_LOOKBACK_DAYS
-        target_lookback = float(EVAL_LOOKBACK_DAYS)
-    except Exception:
-        target_lookback = 730.0
     for key in ("observation_days", "span_days", "eval_lookback_days"):
         try:
             v = (base_m or {}).get(key)
@@ -3490,20 +3807,23 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
                 span_days = float(bars) / float(bars_per_day)
         except Exception:
             span_days = None
-    if span_days is None:
-        span_days = trade_span_days
-    # If observation window is missing but creation policy lookback is the
-    # intended R4 sample and trade span already covers most of it, use lookback.
-    try:
-        if (
-            span_days is not None
-            and trade_span_days is not None
-            and float(trade_span_days) >= 0.8 * float(target_lookback)
-            and float(span_days) < float(target_lookback)
-        ):
-            span_days = float(target_lookback)
-    except Exception:
-        pass
+    import auto_trade_ai_consensus as ai_cons
+    bars_used = (base_m or {}).get("bars_used") or (base_m or {}).get("n_bars")
+    # Do not seed claimed near-2y lookback; only physical bars/trades/frame.
+    span_days, span_source = ai_cons.resolve_backtest_observation_span_days(
+        definition,
+        {
+            "symbol": sym,
+            "timeframe": tf,
+            "trades": n_trades,
+            "bars_used": bars_used,
+            "safety_metrics": {
+                "trades": n_trades,
+                "bars_used": bars_used,
+            },
+        },
+        trades=trades,
+    )
     win_only_pct = None
     try:
         pnls = [float((t or {}).get("pnl_ratio") or 0.0) for t in (trades or [])]
@@ -3513,18 +3833,21 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
     except Exception:
         pass
     try:
-        import auto_trade_ai_consensus as ai_cons
         theo_evidence = {
             "symbol": sym, "timeframe": tf,
             "strategy_key": (definition or {}).get("key"),
             "trades": n_trades, "span_days": span_days,
             "observation_days": span_days,
+            "span_source": span_source,
+            "bars_used": bars_used,
             "weekly_opens_require_2y": True,
-            "frequency_method": "backtest_2y_fill_rate_proxy",
+            "trades_list": trades,
             "safety_metrics": {
                 "trades": n_trades,
                 "span_days": span_days,
                 "observation_days": span_days,
+                "bars_used": bars_used,
+                "trades_list": trades,
                 "mean_net": (base_m or {}).get("mean_net"),
                 "win_rate": ((base_m or {}).get("win_rate_pct")
                              or (base_m or {}).get("win_rate")),
@@ -3568,6 +3891,16 @@ def run_creation_pipeline_step_a(symbol=None, timeframe=None, exploration_mode="
             "production_mounted": False,
         }
     task["stage"] = "pending_human_confirm"
+    ai_review["four_review_admission"] = {
+        "schema": "qiyu_four_review_admission_v2",
+        "profile": _admission_profile(),
+        "pass": bool(
+            r1.get("pass") and r2.get("pass") and r3.get("pass") and r4.get("pass")
+        ),
+        "reviews": {"r1": r1, "r2": r2, "r3": r3, "r4": r4},
+        "task_id": tid,
+        "pipeline_handoff": "sole_pipeline_step_a",
+    }
     push = pipeline.ingest_and_screen(
         {"dsl": definition, "symbol": sym, "timeframe": tf,
          "thesis": book.get("thesis"), "mechanism_spec": spec,

@@ -1,0 +1,17 @@
+[Unit]
+Description=Qiyu outcome-free slow microstructure primitive discovery
+After=network-online.target qiyu-microstructure-collector.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+EnvironmentFile=-/root/auto_trade/ai_ecosystem.env
+ExecStart=/usr/bin/flock -n /run/qiyu-microstructure-primitives.lock /usr/bin/python3 /root/auto_trade_microstructure_primitives.py
+Nice=18
+CPUQuota=25%
+MemoryMax=160M
+TimeoutStartSec=10min
+NoNewPrivileges=true
+PrivateTmp=true
+

@@ -1,0 +1,9 @@
+[Unit]
+Description=Qiyu Human-Confirm Pipeline Tick (screen + B/C monitor)
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/root
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_human_confirm_pipeline.py --tick
+Nice=5

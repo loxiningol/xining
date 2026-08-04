@@ -1,0 +1,12 @@
+[Unit]
+Description=Qiyu Mass Production Engine (compose/screen/arm)
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/root
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_mass_engine.py --run --n 40 --arm-limit 3
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

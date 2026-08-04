@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu Mass Production Engine Timer (every 30m)
+
+[Timer]
+OnCalendar=*:0/30:00
+Persistent=true
+Unit=qiyu-mass-engine.service
+
+[Install]
+WantedBy=timers.target

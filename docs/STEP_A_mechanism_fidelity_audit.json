@@ -1,0 +1,133 @@
+{
+  "schema": "qiyu_step_a_v1",
+  "code_version": "step_a_strategy_creation_20260726",
+  "audits": [
+    {
+      "task_id": "wsa_20260726_235259_bae0",
+      "fidelity": {
+        "schema": "qiyu_step_a_v1",
+        "artifact": "mechanism_fidelity_diff",
+        "code_version": "step_a_strategy_creation_20260726",
+        "round": 0,
+        "repair_type": null,
+        "created_at": "2026-07-26 23:53:25",
+        "mechanism_id": "mech_liquidity_sweep_reversal_sol5m",
+        "mechanism_family": "liquidity_sweep_reversal",
+        "feature_set": [
+          "close",
+          "ema6"
+        ],
+        "condition_count": 2,
+        "entry_logic_overlap": 0.0,
+        "exit_logic_overlap": 0.0,
+        "forbidden_core_features_present": [
+          "ema6"
+        ],
+        "non_negotiable_violations": [],
+        "stop_logic_in_spec": true,
+        "take_profit_logic_in_spec": true,
+        "dsl_has_entry": true,
+        "dsl_has_exit": true,
+        "feature_drift_vs_prior": [],
+        "fidelity_score": 0.2,
+        "pass": false,
+        "failure_class": "implementation_failure",
+        "notes": [
+          "rule_audit_reject"
+        ],
+        "rule_audit_reject": true
+      }
+    },
+    {
+      "task_id": "wsa_20260727_013520_52ed",
+      "fidelity": {
+        "schema": "qiyu_step_a_v1",
+        "artifact": "mechanism_fidelity_diff",
+        "code_version": "step_a_strategy_creation_20260726",
+        "round": 0,
+        "repair_type": null,
+        "created_at": "2026-07-27 01:36:35",
+        "mechanism_id": "mech_orderbook_imbalance_snapback_sol5m",
+        "mechanism_family": "orderbook_imbalance_snapback",
+        "feature_set": [
+          "low",
+          "close",
+          "vol_z20",
+          "atr14",
+          "vol_z20",
+          "atr14"
+        ],
+        "condition_count": 6,
+        "entry_logic_overlap": 0.0,
+        "exit_logic_overlap": 0.0,
+        "forbidden_core_features_present": [],
+        "non_negotiable_violations": [],
+        "stop_logic_in_spec": true,
+        "take_profit_logic_in_spec": true,
+        "dsl_has_entry": true,
+        "dsl_has_exit": true,
+        "feature_drift_vs_prior": [],
+        "fidelity_score": 0.4,
+        "pass": true,
+        "failure_class": "implementation_failure",
+        "notes": [
+          "pass_via_structural_fidelity_proxies"
+        ],
+        "rule_audit_reject": false,
+        "rule_audit": {
+          "reject": false,
+          "reject_reasons": []
+        }
+      }
+    },
+    {
+      "task_id": "wsa_20260727_013842_ca6c",
+      "fidelity": {
+        "schema": "qiyu_step_a_v1",
+        "artifact": "mechanism_fidelity_diff",
+        "code_version": "step_a_strategy_creation_20260726",
+        "round": 0,
+        "repair_type": null,
+        "created_at": "2026-07-27 01:39:46",
+        "mechanism_id": "mech_micro_range_breakout_trap_sol5m",
+        "mechanism_family": "breakout_trap_reversal",
+        "feature_set": [
+          "high",
+          "close",
+          "vol_z20",
+          "atr14",
+          "vol_z20",
+          "atr14"
+        ],
+        "condition_count": 6,
+        "entry_logic_overlap": 0.0263,
+        "exit_logic_overlap": 0.0,
+        "forbidden_core_features_present": [],
+        "non_negotiable_violations": [],
+        "stop_logic_in_spec": true,
+        "take_profit_logic_in_spec": true,
+        "dsl_has_entry": true,
+        "dsl_has_exit": true,
+        "feature_drift_vs_prior": [],
+        "fidelity_score": 0.4092,
+        "pass": true,
+        "failure_class": "implementation_failure",
+        "notes": [
+          "pass_via_structural_fidelity_proxies"
+        ],
+        "rule_audit_reject": false,
+        "rule_audit": {
+          "reject": false,
+          "reject_reasons": []
+        }
+      }
+    }
+  ],
+  "immutable_specs": [
+    "/root/auto_trade/dual_engine/workflow_v2/mechanism_specs/mech_liq_sweep_reversal_sol5m_mechanism_spec.json",
+    "/root/auto_trade/dual_engine/workflow_v2/mechanism_specs/mech_liquidity_sweep_reversal_sol5m_mechanism_spec.json",
+    "/root/auto_trade/dual_engine/workflow_v2/mechanism_specs/mech_orderbook_imbalance_snapback_sol5m_mechanism_spec.json",
+    "/root/auto_trade/dual_engine/workflow_v2/mechanism_specs/mech_micro_range_breakout_trap_sol5m_mechanism_spec.json"
+  ],
+  "policy": "mechanism_spec immutable; fidelity_diff each round; EMA/RSI injection blocked"
+}

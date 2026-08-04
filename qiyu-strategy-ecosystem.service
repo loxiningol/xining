@@ -1,0 +1,17 @@
+[Unit]
+Description=Qiyu closed-loop strategy ecosystem
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+EnvironmentFile=-/root/auto_trade/ai_ecosystem.env
+ExecStart=/usr/bin/flock -n -E 75 /root/auto_trade/strategy_ecosystem.lock /usr/bin/python3 /root/auto_trade_strategy_ecosystem.py --research
+User=root
+Nice=10
+TimeoutStartSec=6h
+SuccessExitStatus=75
+
+[Install]
+WantedBy=multi-user.target

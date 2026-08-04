@@ -450,8 +450,17 @@ def _role_qa():
 
 def glm_meta_think_system_prompt():
     """Canonical GLM meta-think prompt — divergence instruction MUST be first."""
+    try:
+        from .candidate_materialization import creation_system_prompt_zh
+        materialization_contract = creation_system_prompt_zh()
+    except Exception:
+        materialization_contract = (
+            "禁止以证据不足提前结束；必须先产出可编译策略骨架，再交统计引擎淘汰。"
+        )
     return (
         GLM_META_DIVERGENCE_INSTRUCTION
+        + "\n\n"
+        + materialization_contract
         + "\n\n"
         "你是策略总指挥（元思考）。完成三视角列举与择一深入后，再根据多角色设计草稿输出 JSON：\n"
         "{\n"
@@ -460,13 +469,16 @@ def glm_meta_think_system_prompt():
         "\"economic_actor\":[\"...\"],\"constraints\":[\"...\"],\"observable_proxy\":[\"feature_name\"],"
         "\"factor_hints\":[\"feature_name\"],\"predicted_direction\":\"long|short|both\","
         "\"horizon\":\"...\",\"who_pays\":\"...\",\"failure_conditions\":[\"...\"],"
-        "\"required_data\":[\"...\"],\"max_annual_net_estimate\":0.12},\n"
+        "\"required_data\":[\"...\"],\"max_annual_net_estimate\":0.12,"
+        "\"skeletons\":[{\"event\":\"...\",\"state_before\":\"...\",\"trigger\":[\"...\"],"
+        "\"confirmation\":[\"...\"],\"exclusion\":[\"...\"],\"expected_path\":\"...\","
+        "\"failure_mode\":\"...\"}]},\n"
         "    {\"id\":\"P2\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\","
         "\"observable_proxy\":[\"...\"],\"factor_hints\":[\"...\"],\"who_pays\":\"...\","
-        "\"failure_conditions\":[\"...\"],\"max_annual_net_estimate\":0.08},\n"
+        "\"failure_conditions\":[\"...\"],\"max_annual_net_estimate\":0.08,\"skeletons\":[...]},\n"
         "    {\"id\":\"P3\",\"lens_zh\":\"...\",\"thesis_zh\":\"...\",\"family\":\"...\","
         "\"observable_proxy\":[\"...\"],\"factor_hints\":[\"...\"],\"who_pays\":\"...\","
-        "\"failure_conditions\":[\"...\"],\"max_annual_net_estimate\":0.15}\n"
+        "\"failure_conditions\":[\"...\"],\"max_annual_net_estimate\":0.15,\"skeletons\":[...]}\n"
         "  ],\n"
         "  \"selected_id\":\"P?\",\n"
         "  \"selection_reason_zh\":\"...\",\n"
@@ -479,9 +491,10 @@ def glm_meta_think_system_prompt():
         "}\n"
         "三种视角必须来自不同微观结构机制（库存回归 / 流动性sweep / 波动状态切换 / 趋势回撤等），"
         "不得彼此只改参数。每个视角必须给出可直接映射到现有数据列的 observable_proxy/factor_hints、"
-        "方向、周期、支付者、失效条件、required_data 与 max_annual_net_estimate。"
+        "方向、周期、支付者、失效条件、required_data、max_annual_net_estimate，以及至少2个完整入场骨架。"
         "禁止编造夏普/胜率数字。禁止声称已过复核。"
         "禁止设计靠极低仓位刷低回撤、总收益近零的策略。"
+        "禁止输出「证据不足故本方向无价值」类结论；只能输出候选骨架与待验证失败码。"
     )
 
 

@@ -1,0 +1,53 @@
+{
+  "schema": "qiyu_post_retrospective_audit_operating_policy_v1",
+  "effective_at": "2026-07-23 12:00:00",
+  "exploration": {
+    "enabled": true,
+    "cluster_count": 36,
+    "normal_mission_interval_hours": 2,
+    "full_matrix_restart_round": "sequential_wake_pool_priority_resource_bounded",
+    "negative_cluster_sleep_hours": 168,
+    "early_prune_short_sleep_hours": 72,
+    "wake_after_sleep": true,
+    "fair_meta_controller_rescheduling": true,
+    "portfolio_frequency_gap_weighting": true,
+    "intraday_compute_priority": ["5m", "15m"],
+    "review_gates_unchanged": true
+  },
+  "live_entry": {
+    "mandatory_cognitive_gate": true,
+    "legacy_assignments_paused": 20,
+    "shadow_observation_never_implies_live_permission": true,
+    "automatic_live_restoration": false,
+    "new_or_legacy_strategy_may_not_bypass": true,
+    "conditional_frequency_probe_allowed": true
+  },
+  "position_sizing": {
+    "policy": "absolute_grade_ratio_no_timeframe_multiplier",
+    "S": 0.70,
+    "A": 0.50,
+    "B": 0.30,
+    "C": 0.10,
+    "timeframe_profile_multiplier": null,
+    "sizing_fix_does_not_change_strategy_eligibility": true
+  },
+  "legacy_resolutions": {
+    "CL-USDT-SWAP|1h|conventional_down_arrangement_bottom_up_long": {
+      "classification": "holdout_failed_small_sample",
+      "state": "sealed_no_compute_until_new_sample_threshold",
+      "new_entries_allowed": false,
+      "reason": "10 trades and triple-cost holdout mean -8.059388%"
+    },
+    "BTC-USDT-SWAP|15m|btc15_dual_cycle_downtrend_reentry_short_ai": {
+      "classification": "evidence_insufficient_not_logically_dead",
+      "state": "read_only_forward_shadow",
+      "new_entries_allowed": false,
+      "confirmed_death_rule_matches": 0,
+      "ai_review_classification": {
+        "deepseek": "no_substantive_opinion_provider_parse_failure",
+        "qwen": "evidence_insufficient_and_statistically_fragile",
+        "openai": "evidence_insufficient_execution_and_microstructure_unverified"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Qiyu Strategy Breath Controller Timer
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=20min
+Persistent=true
+Unit=qiyu-strategy-breath.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,434 @@
+{
+  "schema": "qiyu_step_a_v1",
+  "artifact": "gate_results",
+  "code_version": "step_a_strategy_creation_20260729_phase5_ai_kb_loop",
+  "task_id": "wsa_20260802_111434_e83b",
+  "created_at": "2026-08-02 11:19:22",
+  "gates": [
+    {
+      "gate_id": "gate0_mechanism_integrity",
+      "name": "机制完整性",
+      "pass": true,
+      "blocking": true,
+      "evidence": {
+        "spec_complete": true,
+        "counterparty_clear": true,
+        "edge_decay_clear": true,
+        "not_indicator_soup": true,
+        "family_present": true
+      },
+      "notes": [],
+      "at": "2026-08-02 11:14:48"
+    },
+    {
+      "gate_id": "gate1_code_fidelity",
+      "name": "代码忠实度",
+      "pass": true,
+      "blocking": true,
+      "evidence": {
+        "fidelity_pass": true,
+        "has_entry": true,
+        "has_exit_or_exit_logic": true,
+        "stop_in_spec": true,
+        "no_non_negotiable_violations": true,
+        "no_future_feature_tokens": true
+      },
+      "notes": [],
+      "at": "2026-08-02 11:14:49"
+    },
+    {
+      "gate_id": "gate2_base_backtest",
+      "name": "基础回测",
+      "pass": false,
+      "blocking": true,
+      "evidence": {
+        "sample_size": 25,
+        "win_rate_pct": 28.000000000000004,
+        "profit_factor": null,
+        "gross_expectancy": 0.05281686804762049,
+        "cost_after_expectancy": 0.05281686804762049,
+        "max_dd": 0.92047594,
+        "holding": null,
+        "trade_frequency_proxy_trades": 25,
+        "fitness": {
+          "pass": false,
+          "failed_checks": [
+            "calmar_ge_1_5",
+            "expectancy_factor_ge_1_0",
+            "remove_max_win_stable"
+          ],
+          "verdict_tags": [
+            "pseudo_high_WR_low_payoff",
+            "lottery_overfitting",
+            "calmar_below_floor"
+          ],
+          "calmar": -0.787525,
+          "payoff_ratio": 3.437583362509195,
+          "expectancy_factor": 0.9625233415025748,
+          "classic_expectancy": 0.05281686804762049,
+          "worst5_loss_share": 0.280481,
+          "sharpe": 0.449228,
+          "remove_max_win": {
+            "pass": false,
+            "reason": "lottery_overfitting",
+            "calmar_base": -0.787525,
+            "calmar_without_max_win": -1.024529,
+            "calmar_drop": 0.300947,
+            "sharpe_base": 0.449228,
+            "sharpe_without_max_win": -0.575347,
+            "sharpe_drop": 2.280748,
+            "dropped_pnl": 2.324472899505766,
+            "threshold_drop": 0.5,
+            "near_zero_dd_mode": false,
+            "max_drawdown_base": 0.92047594,
+            "max_drawdown_reduced": 0.92047594
+          },
+          "mae_flags_n": 0,
+          "thresholds": {
+            "calmar_min": 1.5,
+            "payoff_min": 2.5,
+            "expectancy_factor_min": 1.0,
+            "worst5_loss_share_max": 0.4,
+            "mae_vs_avg_win_max": 2.0,
+            "remove_max_win_drop_max": 0.5
+          },
+          "formulas": {
+            "expectancy_factor": "win_rate * (avg_win/avg_loss) >= 1.0",
+            "classic_expectancy": "mean(pnl_ratio)",
+            "payoff": "avg_win / avg_loss_magnitude",
+            "calmar": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+          },
+          "checks": {
+            "sample_size_ge_8": true,
+            "calmar_ge_1_5": false,
+            "payoff_ge_2_5": true,
+            "expectancy_factor_ge_1_0": false,
+            "worst5_loss_share_le_40pct": true,
+            "mae_dead_hold_clear": true,
+            "remove_max_win_stable": false
+          }
+        }
+      },
+      "notes": [
+        "gate2_phase2_multi_objective_fitness",
+        "calmar>=1.5; payoff>=2.5; WR*payoff>=1.0; worst5_loss<=40%; MAE>2*avg_win demote; remove-max-win Calmar/Sharpe drop>50% reject",
+        "protective_0.9pct_SL_unchanged",
+        "tags=pseudo_high_WR_low_payoff,lottery_overfitting,calmar_below_floor"
+      ],
+      "at": "2026-08-02 11:17:34"
+    },
+    {
+      "gate_id": "gate3_walk_forward",
+      "name": "Walk-forward",
+      "pass": false,
+      "blocking": true,
+      "evidence": {
+        "pass_count": 3,
+        "total": 10,
+        "requirement": "7/10",
+        "windows": [
+          {
+            "id": "window_0",
+            "pass": false,
+            "metrics": {
+              "trades": 2,
+              "calmar": -2.594028,
+              "classic_expectancy": -0.2161,
+              "mean_net": -0.2161,
+              "calmar_meta": {
+                "annualized_return": -1.0,
+                "max_drawdown": 0.38550079,
+                "span_days": 1.0,
+                "total_compound_return": -0.38550079,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_1",
+            "pass": false,
+            "metrics": {
+              "trades": 3,
+              "calmar": -2.561466,
+              "classic_expectancy": -0.01916028,
+              "mean_net": -0.01916028,
+              "calmar_meta": {
+                "annualized_return": -0.99998073,
+                "max_drawdown": 0.39039392,
+                "span_days": 5.7917,
+                "total_compound_return": -0.15815279,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_2",
+            "pass": false,
+            "metrics": {
+              "trades": 2,
+              "calmar": -2.548603,
+              "classic_expectancy": -0.217225,
+              "mean_net": -0.217225,
+              "calmar_meta": {
+                "annualized_return": -0.98698349,
+                "max_drawdown": 0.38726457,
+                "span_days": 41.2083,
+                "total_compound_return": -0.38726457,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_3",
+            "pass": true,
+            "metrics": {
+              "trades": 3,
+              "calmar": 7819421.073531,
+              "classic_expectancy": 0.27460797,
+              "mean_net": 0.27460797,
+              "calmar_meta": {
+                "annualized_return": 1709325.44667392,
+                "max_drawdown": 0.2186,
+                "span_days": 14.9167,
+                "total_compound_return": 0.79699193,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": null
+          },
+          {
+            "id": "window_4",
+            "pass": false,
+            "metrics": {
+              "trades": 2,
+              "calmar": -2.587452,
+              "classic_expectancy": -0.216725,
+              "mean_net": -0.216725,
+              "calmar_meta": {
+                "annualized_return": -1.0,
+                "max_drawdown": 0.38648067,
+                "span_days": 1.0,
+                "total_compound_return": -0.38648067,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_5",
+            "pass": false,
+            "metrics": {
+              "trades": 3,
+              "calmar": -1.907433,
+              "classic_expectancy": -0.21935,
+              "mean_net": -0.21935,
+              "calmar_meta": {
+                "annualized_return": -1.0,
+                "max_drawdown": 0.52426473,
+                "span_days": 11.1667,
+                "total_compound_return": -0.52426473,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_6",
+            "pass": false,
+            "metrics": {
+              "trades": 2,
+              "calmar": -2.563492,
+              "classic_expectancy": -0.217725,
+              "mean_net": -0.217725,
+              "calmar_meta": {
+                "annualized_return": -0.99475225,
+                "max_drawdown": 0.38804584,
+                "span_days": 34.1667,
+                "total_compound_return": -0.38804584,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_7",
+            "pass": true,
+            "metrics": {
+              "trades": 3,
+              "calmar": 241.324504,
+              "classic_expectancy": 0.23976633,
+              "mean_net": 0.23976633,
+              "calmar_meta": {
+                "annualized_return": 52.69320543,
+                "max_drawdown": 0.21835,
+                "span_days": 25.4167,
+                "total_compound_return": 0.31941059,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": null
+          },
+          {
+            "id": "window_8",
+            "pass": false,
+            "metrics": {
+              "trades": 2,
+              "calmar": -2.94402,
+              "classic_expectancy": -0.03291553,
+              "mean_net": -0.03291553,
+              "calmar_meta": {
+                "annualized_return": -0.64356277,
+                "max_drawdown": 0.2186,
+                "span_days": 37.0,
+                "total_compound_return": -0.09922636,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_9",
+            "pass": true,
+            "metrics": {
+              "trades": 3,
+              "calmar": 733845.903957,
+              "classic_expectancy": 0.7647369,
+              "mean_net": 0.7647369,
+              "calmar_meta": {
+                "annualized_return": 158584.09984514,
+                "max_drawdown": 0.2161,
+                "span_days": 34.4167,
+                "total_compound_return": 2.09035771,
+                "annualization": "Calmar = ((1+R)^(365.25/span_days)-1) / max_DD; span from trade timestamps else n_trades-as-days proxy"
+              }
+            },
+            "fail_reason": null
+          }
+        ],
+        "average_only_forbidden": true,
+        "has_per_window_detail": true,
+        "failed_window_explanations": [
+          {
+            "id": "window_0",
+            "reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_1",
+            "reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_2",
+            "reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_4",
+            "reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_5",
+            "reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_6",
+            "reason": "non_positive_expectancy"
+          },
+          {
+            "id": "window_8",
+            "reason": "non_positive_expectancy"
+          }
+        ],
+        "fitness": {
+          "pass": false,
+          "failed_checks": [
+            "calmar_ge_1_5",
+            "expectancy_factor_ge_1_0",
+            "remove_max_win_stable"
+          ],
+          "verdict_tags": [
+            "pseudo_high_WR_low_payoff",
+            "lottery_overfitting",
+            "calmar_below_floor"
+          ],
+          "checks": {
+            "sample_size_ge_8": true,
+            "calmar_ge_1_5": false,
+            "payoff_ge_2_5": true,
+            "expectancy_factor_ge_1_0": false,
+            "worst5_loss_share_le_40pct": true,
+            "mae_dead_hold_clear": true,
+            "remove_max_win_stable": false
+          },
+          "calmar": -0.787525,
+          "payoff_ratio": 3.437583362509195,
+          "expectancy_factor": 0.9625233415025748
+        },
+        "fitness_enforced_when_trades_provided": true,
+        "phase3_null_hypothesis": {
+          "pass": false,
+          "reject_reasons": [
+            "walk_forward_3_of_10"
+          ],
+          "stage": "funnel_l3_null_hypothesis"
+        },
+        "window_pass_rule_phase3": "Calmar>=1.0 AND classic_expectancy>0 (set by WF builder)"
+      },
+      "notes": [
+        "fitness_failed_on_oos_trades",
+        "phase3_null_hypothesis_fail_closed"
+      ],
+      "at": "2026-08-02 11:19:22"
+    },
+    {
+      "gate_id": "gate4_split_destruction",
+      "name": "gate4_split_destruction",
+      "pass": false,
+      "blocking": true,
+      "evidence": {
+        "missing": true
+      },
+      "notes": [],
+      "at": "2026-08-02 11:19:22"
+    },
+    {
+      "gate_id": "gate5_mc_friction",
+      "name": "gate5_mc_friction",
+      "pass": false,
+      "blocking": true,
+      "evidence": {
+        "missing": true
+      },
+      "notes": [],
+      "at": "2026-08-02 11:19:22"
+    },
+    {
+      "gate_id": "gate6_multi_ai_review",
+      "name": "gate6_multi_ai_review",
+      "pass": false,
+      "blocking": true,
+      "evidence": {
+        "missing": true
+      },
+      "notes": [],
+      "at": "2026-08-02 11:19:22"
+    },
+    {
+      "gate_id": "gate7_human_confirm",
+      "name": "gate7_human_confirm",
+      "pass": false,
+      "blocking": true,
+      "evidence": {
+        "missing": true
+      },
+      "notes": [],
+      "at": "2026-08-02 11:19:22"
+    }
+  ],
+  "all_gates_pass": false,
+  "first_fail_gate": "gate2_base_backtest",
+  "passed_count": 2,
+  "total_gates": 8,
+  "production_mounted": false
+}

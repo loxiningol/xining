@@ -1,0 +1,41 @@
+{
+  "passed": [
+    "A1_statement_complete",
+    "A1b_statement_rejects_empty",
+    "protocol_hash",
+    "A_unapproved_rsi_detected",
+    "A_rsi_classified",
+    "A_rsi_removed_or_reject",
+    "B_necessity_fails_pseudo",
+    "C_high_overfit_flagged",
+    "D_material_drift",
+    "D_terminate",
+    "E_distinct_levels",
+    "E_has_exclusion_rule",
+    "E_rejects_vague_language",
+    "F_dims_distinct",
+    "F_fatal_blocks_pass",
+    "F_aux_wr_cannot_override",
+    "F_backtest_executor_recorded",
+    "F_openai_not_forged",
+    "G_no_success_dsl_key",
+    "G_fingerprints_readable",
+    "G_death_summaries_readable",
+    "G_stripped_recorded",
+    "G_coverage_keys_only",
+    "H_default_entry_legacy",
+    "H_pause_non_live_only",
+    "ABC_replaced_flag"
+  ],
+  "failed": [],
+  "acceptance": {
+    "A": true,
+    "B": true,
+    "C": true,
+    "D": true,
+    "E": true,
+    "F": true,
+    "G": true,
+    "H": true
+  }
+}

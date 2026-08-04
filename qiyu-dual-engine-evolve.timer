@@ -1,0 +1,12 @@
+[Unit]
+Description=Run dual-engine evolution every 2 hours
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=2h
+AccuracySec=1min
+Unit=qiyu-dual-engine-evolve.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

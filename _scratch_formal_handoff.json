@@ -1,0 +1,151 @@
+{
+  "schema": "qiyu_formal_review_handoff_v1",
+  "job_id": "creation_20260802_110422_145444_77650858",
+  "pipeline": 2,
+  "pipeline_label": "管道2",
+  "source": "codex",
+  "research_direction": "SOL 1h主趋势回撤恢复｜正式复核入口二次验收",
+  "job_key": "5dd8a317a8eb0b6524228741",
+  "research_contract": {
+    "schema": "qiyu_research_contract_v2",
+    "target": {
+      "symbol": "SOL-USDT-SWAP",
+      "timeframe": "1h",
+      "direction": "long",
+      "additional_timeframes": []
+    },
+    "event_contract": {
+      "exact_event_text": "这是对“人类指令进入 Codex/Cursor 之后、四次正式复核之前”创造管道的生产验收任务。\n\n研究方向：SOL 1小时主趋势回撤后恢复，做多。\n\n市场机制：只研究已经存在中期上升趋势、短时价格出现真实回撤、随后当前K线重新恢复向上动量的完整时序事件。重点区分健康回撤与趋势破坏；不得把趋势、回撤或恢复中的任意单因子替代为完整信号。允许使用趋势偏离、前三根累计收益与当前单根收益等可由闭合 OHLCV 确定性重建的代理，并使用只读取当前时点以前数据的滚动分位阈值。\n\n研究要求：开发段只用于生成和排序，候选身份、方向、阈值与持有期冻结后再进入独立确认段；确认段不得反向参与选择。所有测试必须内化实际手续费、滑点与半价差，并保留三倍摩擦压力证据。下一根K线开盘执行，20倍杠杆，固定0.9%保护止损。理论周开仓频率必须大于等于0.5。完整候选通过创造端全部既有门禁后，提交四次正式复核。\n\nADA 禁止作为研究标的、回退标的、对照标的或父代。不使用 force，不降低任何正式复核门槛。",
+      "required_clauses": [
+        "下一根K线开盘执行，20倍杠杆，固定0.9%保护止损"
+      ],
+      "diagnostic_clauses": [
+        "不得把趋势、回撤或恢复中的任意单因子替代为完整信号",
+        "研究要求：开发段只用于生成和排序，候选身份、方向、阈值与持有期冻结后再进入独立确认段",
+        "确认段不得反向参与选择",
+        "所有测试必须内化实际手续费、滑点与半价差，并保留三倍摩擦压力证据",
+        "理论周开仓频率必须大于等于0.5",
+        "ADA 禁止作为研究标的、回退标的、对照标的或父代"
+      ],
+      "clause_representations": [
+        {
+          "clause_id": "clause_8125a301829e2381",
+          "text": "下一根K线开盘执行，20倍杠杆，固定0.9%保护止损",
+          "representation_status": "machine_exact",
+          "represented_by": [
+            "entry_timing:next_bar_open",
+            "holding_contract:execution_leverage",
+            "holding_contract:protective_stop"
+          ]
+        }
+      ],
+      "required_conditions": [],
+      "entry_conditions": [],
+      "exit_conditions": [],
+      "session_window": null,
+      "entry_timing": {
+        "mode": "next_bar_open",
+        "signal_evaluation": "closed_bar",
+        "timeframe": "1h"
+      },
+      "require_exact_event_fidelity": false
+    },
+    "holding_contract": {
+      "mode": "allowed_horizons",
+      "allowed_horizons_bars": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        8,
+        10,
+        12,
+        16,
+        18,
+        20,
+        24,
+        30,
+        36,
+        48
+      ],
+      "exact_horizon_bars": null,
+      "exit_policy": {
+        "mode": "fixed_horizon_close_v1",
+        "exit_bar": "entry_plus_horizon_minus_1",
+        "price": "bar_close",
+        "allow_early_take_profit": false
+      },
+      "protective_stop_policy": {
+        "mode": "intrabar_fixed_pct_v1",
+        "price_pct": 0.009,
+        "applies_from": "entry_bar",
+        "precedence": "protective_stop_before_time_exit"
+      },
+      "execution_leverage": 20,
+      "statistical_return_basis": "full_size_leveraged_after_cost_v1",
+      "source": "platform_default"
+    },
+    "feature_contract": {
+      "required_features": [],
+      "allowed_features": [],
+      "allowed_features_enforced": false,
+      "forbidden_substitutions": [],
+      "cross_asset_symbols": []
+    },
+    "data_contract": {
+      "required": [],
+      "available": [
+        "ohlcv_swap_candles",
+        "derived_factors"
+      ],
+      "missing": []
+    },
+    "mutation_contract": {
+      "parent_id": null,
+      "failed_gate": null,
+      "allowed_mutations": [],
+      "structural_delta": null,
+      "data_version": "unversioned-data",
+      "code_version": "src-3c9ea7db64e011fc"
+    },
+    "family_hints": [
+      "trend_pullback"
+    ],
+    "brief": "这是对“人类指令进入 Codex/Cursor 之后、四次正式复核之前”创造管道的生产验收任务。\n\n研究方向：SOL 1小时主趋势回撤后恢复，做多。\n\n市场机制：只研究已经存在中期上升趋势、短时价格出现真实回撤、随后当前K线重新恢复向上动量的完整时序事件。重点区分健康回撤与趋势破坏；不得把趋势、回撤或恢复中的任意单因子替代为完整信号。允许使用趋势偏离、前三根累计收益与当前单根收益等可由闭合 OHLCV 确定性重建的代理，并使用只读取当前时点以前数据的滚动分位阈值。\n\n研究要求：开发段只用于生成和排序，候选身份、方向、阈值与持有期冻结后再进入独立确认段；确认段不得反向参与选择。所有测试必须内化实际手续费、滑点与半价差，并保留三倍摩擦压力证据。下一根K线开盘执行，20倍杠杆，固定0.9%保护止损。理论周开仓频率必须大于等于0.5。完整候选通过创造端全部既有门禁后，提交四次正式复核。\n\nADA 禁止作为研究标的、回退标的、对照标的或父代。不使用 force，不降低任何正式复核门槛。",
+    "family_hints_enforced": false,
+    "performance_contract": {
+      "metric": "theoretical_weekly_opens",
+      "operator": ">=",
+      "threshold": 0.5,
+      "scope": "pre_review_submission",
+      "source": "human_instruction"
+    },
+    "contract_id": "rc_5b2ebe6233068a3b5182fa1d",
+    "immutable": true,
+    "valid": true,
+    "validation_errors": [],
+    "design_seed_present": false,
+    "compiled_at": "2026-08-02 11:04:28",
+    "symbol": "SOL-USDT-SWAP",
+    "timeframe": "1h",
+    "direction": "long",
+    "_truncated_items": 14
+  },
+  "mutation_contract": null,
+  "mutation_parent_validation": null,
+  "parent_evidence_hash": null,
+  "data_version": "unversioned-data",
+  "code_version": "src-3c9ea7db64e011fc",
+  "status": "已交由四阶段复核",
+  "qualified_blueprint": "/root/auto_trade/dual_engine/parallel_creation/artifacts/creation_20260802_110422_145444_77650858/qualified_blueprint.json",
+  "result_receipt": "/root/auto_trade/dual_engine/sole_creation_runs/creation_20260802_110422_145444_77650858.json",
+  "deliverables": {
+    "strategy_code": "/root/auto_trade/dual_engine/parallel_creation/artifacts/creation_20260802_110422_145444_77650858/sol_1h_20260802_110936_881172_strategy_code.py",
+    "params": "/root/auto_trade/dual_engine/parallel_creation/artifacts/creation_20260802_110422_145444_77650858/sol_1h_20260802_110936_881172_params.json",
+    "risk_report": "/root/auto_trade/dual_engine/parallel_creation/artifacts/creation_20260802_110422_145444_77650858/sol_1h_20260802_110936_881172_risk_report.md",
+    "blueprint_json": "/root/auto_trade/dual_engine/parallel_creation/artifacts/creation_20260802_110422_145444_77650858/sol_1h_20260802_110936_881172_blueprint.json"
+  },
+  "created_at": "2026-08-02 11:10:01",
+  "automatic_live_deployment": false
+}

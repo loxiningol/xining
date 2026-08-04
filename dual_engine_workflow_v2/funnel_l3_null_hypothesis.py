@@ -1,28 +1,28 @@
 # -*- coding: utf-8 -*-
-"""Phase-3 Level-3 — null-hypothesis anti-overfitting + walk-forward.
+"""创造管道第二步 · 漏斗 L3 — 空假设反过拟合 + 前向稳健。
 
-Tests:
-  1) Permuted price/returns: shuffle log-returns, rebuild OHLC; if Sharpe on
-     permuted series ≥ 0.5 → reject (coincidence fit).
-  2) Inverted market: reflect OHLC about first close; reject if strategy still
-     shows spurious positive edge (exact rule below).
-  3) Walk-Forward: 10 windows; ≥7/10 with Calmar≥1.0 AND positive expectancy
-     (classic mean pnl > 0). Aligns with Gate3 WF_WINDOW_PASS_REQUIREMENT.
+与胜率门、去最大盈利、门槛0–7、寒霜贰筛同属「第二步：统一门槛」。
 
-Inverted-market REJECT rule (documented):
-  Reject when inverted backtest yields ALL of:
-    - n_trades >= 5
-    - sharpe >= 0.5
-    - classic_expectancy (mean pnl) > 0
-  Rationale: a true directional mechanism should lose edge when the price
-  path is mirrored; retaining Sharpe≥0.5 with positive expectancy implies
-  the apparent edge is path-agnostic noise / coincidence, not mechanism.
+检验：
+  1) 打乱收益：若打乱序列上夏普仍 ≥0.5 → 拒（巧合拟合）
+  2) 镜像市场：价格关于首收盘镜像后仍有伪优势 → 拒
+  3) 前向稳健：
+     - 大样本（成交≥20）：10 窗至少 7 窗，单窗卡尔玛≥1.0 且经典期望>0
+     - 小样本（成交<20）：可用折上比例门（≥0.6 或正折≥5），单窗只需经典期望>0
+
+镜像拒则：成交≥5 且夏普≥0.5 且经典期望>0。
 """
 from __future__ import print_function
 
 import math
 import random
 
+from .creation_quality_doctrine import (
+    SMALL_N_TRADE_BOUNDARY,
+    WF_LARGE_NEED_PASS,
+    WF_LARGE_NEED_TOTAL,
+    wf_pass_for_sample,
+)
 from .fitness_engine import (
     _calmar,
     _pnls,
@@ -257,12 +257,17 @@ def run_inverted_market_test(definition, frame, backtest_fn,
 
 def walk_forward_windows(trades, folds=WF_FOLDS_DEFAULT,
                          calmar_min=WF_CALMAR_MIN):
-    """Build 10 WF windows; pass = Calmar≥1.0 AND positive classic expectancy."""
+    """构建前向窗口；按成交笔数选择小样本比例门或大样本绝对窗数门。"""
     trades = list(trades or [])
     pnls = _pnls(trades)
     n = len(pnls)
     need_pass, need_total = WF_WINDOW_PASS_REQUIREMENT
-    folds = int(folds or need_total)
+    small_n = n > 0 and n < int(SMALL_N_TRADE_BOUNDARY)
+    # 小样本：折数不超过成交笔数，避免大量空窗
+    if small_n:
+        folds = max(2, min(int(folds or need_total), n))
+    else:
+        folds = int(folds or need_total)
     windows = []
     if n <= 0:
         for i in range(folds):
@@ -270,7 +275,7 @@ def walk_forward_windows(trades, folds=WF_FOLDS_DEFAULT,
                 "id": "window_%s" % i,
                 "pass": False,
                 "metrics": {"trades": 0, "calmar": 0.0, "classic_expectancy": 0.0},
-                "fail_reason": "insufficient_trades_to_populate_window",
+                "fail_reason": "成交不足以填充窗口",
             })
     else:
         for i in range(folds):
@@ -287,45 +292,73 @@ def walk_forward_windows(trades, folds=WF_FOLDS_DEFAULT,
                     "id": "window_%s" % i,
                     "pass": False,
                     "metrics": {"trades": 0, "calmar": 0.0, "classic_expectancy": 0.0},
-                    "fail_reason": "empty_window",
+                    "fail_reason": "空窗口",
                 })
                 continue
             calmar, calmar_meta = _calmar(part_pnls, part_trades)
             expect = sum(part_pnls) / float(len(part_pnls))
-            passed = (calmar >= float(calmar_min)) and (expect > 0.0)
-            fail_reason = None
-            if not passed:
-                if expect <= 0:
-                    fail_reason = "non_positive_expectancy"
-                elif calmar < float(calmar_min):
-                    fail_reason = "calmar_lt_%s" % calmar_min
-                else:
-                    fail_reason = "window_fail"
+            if small_n:
+                # 小样本：单窗只需经典期望>0，不强制每窗卡尔玛≥1.0
+                passed = expect > 0.0
+                fail_reason = None if passed else "经典期望非正"
+            else:
+                passed = (calmar >= float(calmar_min)) and (expect > 0.0)
+                fail_reason = None
+                if not passed:
+                    if expect <= 0:
+                        fail_reason = "经典期望非正"
+                    elif calmar < float(calmar_min):
+                        fail_reason = "卡尔玛低于%.1f" % float(calmar_min)
+                    else:
+                        fail_reason = "窗口未通过"
             windows.append({
                 "id": "window_%s" % i,
                 "pass": bool(passed),
                 "metrics": {
                     "trades": len(part_pnls),
+                    "成交笔数": len(part_pnls),
                     "calmar": round(float(calmar), 6),
+                    "卡尔玛": round(float(calmar), 6),
                     "classic_expectancy": round(float(expect), 8),
                     "mean_net": round(float(expect), 8),
+                    "平均净收益": round(float(expect), 8),
                     "calmar_meta": calmar_meta,
                 },
                 "fail_reason": fail_reason,
             })
-    pass_count = sum(1 for w in windows if w.get("pass"))
+    # 可用折 = 非空窗（小样本）；大样本仍看全部窗
+    nonempty = [w for w in windows if int((w.get("metrics") or {}).get("trades") or 0) > 0]
+    available = len(nonempty) if small_n else len(windows)
+    pass_count = sum(1 for w in (nonempty if small_n else windows) if w.get("pass"))
     total = len(windows)
-    ok = total >= need_total and pass_count >= need_pass
+    ok, detail = wf_pass_for_sample(
+        n, pass_count, total if not small_n else max(available, 1),
+        available_folds=available if small_n else total,
+    )
     return {
         "windows": windows,
         "pass_count": pass_count,
         "total": total,
-        "requirement": "%s/%s" % (need_pass, need_total),
+        "available_folds": available,
+        "requirement": (
+            "小样本比例门" if small_n else "%s/%s" % (need_pass, need_total)
+        ),
         "pass": bool(ok),
-        "calmar_min": float(calmar_min),
-        "rule": "window_pass = Calmar>=1.0 AND classic_expectancy>0; need >=7/10",
+        "calmar_min": float(calmar_min) if not small_n else None,
+        "small_sample": bool(small_n),
+        "gate_mode": detail.get("gate_mode"),
+        "forward_detail": detail,
+        "门槛名": "门槛3",
+        "rule": (
+            "小样本：单窗经典期望>0；整体走前向比例门"
+            if small_n else
+            "大样本：单窗卡尔玛≥1.0 且经典期望>0；需至少 %d/%d"
+            % (WF_LARGE_NEED_PASS, WF_LARGE_NEED_TOTAL)
+        ),
+        "label_zh": detail.get("label_zh") or detail.get("label_zh_mode"),
         "trades": trades,
         "oos_trades": trades,
+        "成交笔数": n,
     }
 
 

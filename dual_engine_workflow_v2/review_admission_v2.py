@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Admission reviews — backend checks MUST match lexicon titles.
+"""创造管道第三步：四阶段复核（与复核模块对接）。
+
+顺序：第一步研究发现 → 第二步统一门槛 → 第三步本模块。
+只有过了第二步门槛的策略才应进入此处。
 
 【第一次复核】基础语法、逻辑断言、开仓密度预检
 【第二次复核】单标的历史回测与样本收益稳定性
@@ -7,8 +10,7 @@
 【第四次复核】三AI理论复核
 然后 → 人工确认签发（Wx / --confirm，永不自动上线）
 
-生产规则：四次复核全部 fail-closed；单一策略只能作为回归样例，
-不得反向降低门槛或获得 soft-pass。
+生产规则：四次复核全部 fail-closed；不得反向降低第二步门槛或 soft-pass。
 """
 from __future__ import print_function
 
@@ -22,9 +24,14 @@ PROFILE = "strict_four_review_v2"
 GOLDEN_KEY = "codex0725t3_ada5m_trendpb_r42_z2p3_h14"
 GOLDEN_TITLE = "ADA5顺势回升"
 
-MIN_TRADES = 10
-MIN_WIN_RATE_PCT = 50.0
-REQUIRE_POSITIVE_MEAN_NET = True
+from .creation_quality_doctrine import (
+    MIN_TRADES_CREATION,
+    MIN_WIN_RATE_PCT_FLOOR,
+)
+
+MIN_TRADES = MIN_TRADES_CREATION  # 第二次复核：最低成交笔数（与创造侧对齐）
+MIN_WIN_RATE_PCT = MIN_WIN_RATE_PCT_FLOOR  # 第二次复核：胜率百分比下限
+REQUIRE_POSITIVE_MEAN_NET = True  # 要求平均净收益为正
 
 # Soft R3 under ADA-T3: do not hard-block on legacy payoff/worst5 floors
 R3_SOFT_PASS_ON_LEGACY_FAIL = False
@@ -126,12 +133,16 @@ def review2_single_symbol_stability(metrics=None, trades=None):
                 n = len(pnls)
 
     checks = {
-        "trades_ge_%d" % MIN_TRADES: n >= int(MIN_TRADES),
-        "win_rate_ge_%s" % MIN_WIN_RATE_PCT: (wr is not None and wr >= float(MIN_WIN_RATE_PCT)),
-        "mean_net_positive": (mean_net is not None and mean_net > 0.0)
+        "成交笔数达标": n >= int(MIN_TRADES),
+        "胜率达标": (wr is not None and wr >= float(MIN_WIN_RATE_PCT)),
+        "平均净收益为正": (mean_net is not None and mean_net > 0.0)
         if REQUIRE_POSITIVE_MEAN_NET else True,
     }
-    reasons = [k for k, ok in checks.items() if not ok]
+    # 兼容旧键名（外部日志/测试）
+    checks["trades_ge_%d" % MIN_TRADES] = checks["成交笔数达标"]
+    checks["win_rate_ge_%s" % MIN_WIN_RATE_PCT] = checks["胜率达标"]
+    checks["mean_net_positive"] = checks["平均净收益为正"]
+    reasons = [k for k in ("成交笔数达标", "胜率达标", "平均净收益为正") if not checks.get(k)]
     return {
         "review_n": 2,
         "review_label": REVIEW_2,

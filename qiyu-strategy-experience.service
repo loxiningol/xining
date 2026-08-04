@@ -1,0 +1,16 @@
+[Unit]
+Description=Qiyu strategy experience and lifecycle collector
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+ExecStart=/usr/bin/flock -n -E 75 /root/auto_trade/strategy_ecosystem.lock /usr/bin/python3 /root/auto_trade_strategy_ecosystem.py
+User=root
+Nice=12
+TimeoutStartSec=4min
+SuccessExitStatus=75
+
+[Install]
+WantedBy=multi-user.target

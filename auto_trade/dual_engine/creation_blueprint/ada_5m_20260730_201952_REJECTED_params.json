@@ -1,0 +1,40 @@
+{
+  "symbol": "ADA-USDT-SWAP",
+  "timeframe": "5m",
+  "direction": "long",
+  "mechanism_family": "trend_pullback",
+  "factor": null,
+  "rule": null,
+  "constraints": {
+    "max_ann_vol": 0.35,
+    "max_drawdown": 0.18,
+    "max_daily_loss": 0.05,
+    "protective_sl": 0.009,
+    "raw_hints": [],
+    "expected_annual_return_range": [
+      0.08,
+      0.2
+    ],
+    "minimum_acceptable_annual_return": 0.06,
+    "minimum_weekly_return": 0.0,
+    "minimum_annualized_return": 0.06,
+    "minimum_return_mdd": 1.0,
+    "minimum_window_total_return": 0.01,
+    "minimum_factor_weekly_lev": 0.03,
+    "factor_lev_scale": 8.0,
+    "minimum_exposure": 0.0,
+    "minimum_avg_trade_bp": 1.0,
+    "eval_lookback_days": 730,
+    "note_zh": "收益硬度（ADA5模板校准）：近2年视界年化代理≥6%、收益/回撤≥1.0；因子多空周收益(带杠杆)≥3%；退化：单笔<1bp 或 窗内总收益<1% → 换视角。已撤销：周收益≥8%、暴露≥10%（与 ADA5顺势回升 矛盾）。"
+  },
+  "quantoracle": null,
+  "blueprint_schema": "qiyu_creation_blueprint_v1",
+  "present_to_human": false,
+  "prelim_win_rate": null,
+  "return_hardness": {
+    "passed": null,
+    "metrics": null,
+    "reject_reasons": null
+  },
+  "window": {}
+}

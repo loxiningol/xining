@@ -1,0 +1,94 @@
+{
+  "artifact": "macro_sfp_displacement_step_a_closeout",
+  "at": "2026-07-30",
+  "goal": "Gate7 pending + WxPusher",
+  "achieved": false,
+  "wx_sent": false,
+  "pending_key": null,
+  "confirm_cli": null,
+  "auto_mount": false,
+  "confirm_used": false,
+  "formal_daemons_restarted": false,
+  "family": "macro_sfp_displacement",
+  "family_kb_blocked": false,
+  "research_features_added": {
+    "files": [
+      "backtest_engine_v2.py::precompute_indicators",
+      "auto_trade_strategy_dsl.py::FEATURES",
+      "ATR_TRAIL_N_MAX raised 4.0→5.0"
+    ],
+    "features": ["pdh", "pdl", "pdc", "h4_high24", "h4_low24"],
+    "lookahead_policy": "prior completed UTC day / prior completed 4h only (shift+ffill)",
+    "prod_backup": "/root/backups/macro_sfp_displacement_20260730_021406",
+    "formal_daemons": "NOT restarted (live still on pre-feature code until next restart)"
+  },
+  "kb_avoidance": {
+    "blocked_families_checked": [
+      "stop_hunt_range_reclaim",
+      "htf_ema_align_ltf_cci_vol_pullback",
+      "breakout_trap_reversal",
+      "liquidity_failed_breakout_high",
+      "liquidity_failed_breakout_low",
+      "liquidity_sweep_reversal"
+    ],
+    "new_family": "macro_sfp_displacement"
+  },
+  "submits": [
+    {
+      "pack": "strategy_macro_sfp_displacement_v1.json",
+      "campaign": 1,
+      "symbol": "ETH-USDT-SWAP",
+      "tf": "15m",
+      "direction": "long",
+      "l1_seed_tries": 6,
+      "all_fail": "funnel_l1_fail",
+      "l1_reasons": ["sample_filled_entries_lt_5"],
+      "note": "PDL samebar + volz1.8 + opp-PDH TP — too sparse for 15% L1 slices"
+    },
+    {
+      "pack": "strategy_macro_sfp_displacement_v2.json",
+      "campaign": 2,
+      "redesign": true,
+      "symbol": "ETH-USDT-SWAP",
+      "tf": "15m",
+      "direction": "long",
+      "changes": "removed early opp-PDH TP; swing_extreme lookback=8; kept volz=1.8 atr=5.0",
+      "probe_full_sample": {"n": 15, "mean": 0.095, "pay": 2.514, "calmar_proxy": 2.276},
+      "l1_seed_tries_until_stop": 9,
+      "best_task_id": "wsa_20260730_025405_7398",
+      "gate0": true,
+      "gate1": true,
+      "l1": "passed on try9",
+      "fail": "repair_exhausted_or_drift / gate2_phase2_multi_objective_fitness",
+      "gate2_fitness": {
+        "sample_size": 13,
+        "payoff_ratio": 2.482,
+        "calmar": 26.004,
+        "expectancy_factor": 1.146,
+        "failed_checks": [
+          "payoff_ge_2_5",
+          "worst5_loss_share_le_40pct",
+          "remove_max_win_stable"
+        ],
+        "verdict_tags": [
+          "pseudo_high_WR_low_payoff",
+          "lottery_overfitting",
+          "loss_concentration"
+        ],
+        "worst5_loss_share": 0.893
+      }
+    }
+  ],
+  "max_full_submits_policy": 2,
+  "redesigns_used": 1,
+  "stopped_reason": "max 2 full submits + 1 redesign exhausted; v2 cleared L1 then Gate2 failed (payoff 2.482 just under 2.5 + worst5/remove_max_win lottery). No Gate7/Wx. Stopping honestly.",
+  "packs": [
+    "strategy_macro_sfp_displacement_v1.json",
+    "strategy_macro_sfp_displacement_v2.json"
+  ],
+  "next_if_user_authorizes": [
+    "Raise winner distribution / cut loss concentration (worst5) without EMA/CCI",
+    "Or slightly denser dual-anchor only if L1+Gate2 both can clear — prior dual had pay~1.7 and negative path DD",
+    "Do not auto-mount; human --confirm only after Gate7"
+  ]
+}

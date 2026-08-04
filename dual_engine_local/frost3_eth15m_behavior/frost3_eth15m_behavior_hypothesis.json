@@ -1,0 +1,94 @@
+{
+  "artifact_key": "frost3_eth15m_behavior_hypothesis",
+  "report_title": "Hypothesis — top Death Test survivors",
+  "created_at": "2026-07-26T11:15:00+08:00",
+  "key_prefix": "frost3_eth15m_behavior_",
+  "fixed_params": {
+    "leverage": 20,
+    "stop_loss_pct": 0.009,
+    "position_pct": 0.30,
+    "symbol": "ETH-USDT-SWAP",
+    "timeframe": "15m"
+  },
+  "status": "HYPOTHESIS_SPEC_ONLY — final DSL coding + WF deferred until SSH factory access",
+  "primary": {
+    "id": "D05",
+    "key": "frost3_eth15m_behavior_effort_absorb_s",
+    "logic_class": "effort_result_absorption_fade",
+    "direction": "short",
+    "thesis_zh": "高努力低进度（effort_result）+ 吸收形态后出现负delta，供应释放做空；结构新高失效；硬止损0.9%。",
+    "proxy_entry_all": [
+      {"feature": "session_liq", "op": "gt", "right": 0.5},
+      {"feature": "effort_result", "op": "gt", "right": 2.2},
+      {"feature": "absorb_score", "op": "gt", "right": 0.55},
+      {"feature": "delta_proxy", "op": "lt", "right": 0.0},
+      {"feature": "va_pos", "op": "gt", "right": 0.60}
+    ],
+    "proxy_exit_any": [
+      {"feature": "effort_result", "op": "lt", "right": 1.2, "role": "take_profit"},
+      {"feature": "close", "op": "gt", "right_feature": "prev_high20", "role": "invalidation"}
+    ],
+    "max_hold_bars": 16,
+    "banned_leaves": ["rsi14", "macd_stick", "ema16", "ema8", "cci", "z20"],
+    "expected_opens_per_day": 0.55,
+    "stability_notes_zh": "控频靠 effort/absorb 双确认；避免单阈值收窄"
+  },
+  "secondary": {
+    "id": "D11",
+    "key": "frost3_eth15m_behavior_asia_xfer_s",
+    "logic_class": "asia_inventory_transfer_dump",
+    "direction": "short",
+    "thesis_zh": "亚洲时段推升残留后伦敦初段负流库存移交做空。",
+    "proxy_entry_all": [
+      {"feature": "asia_push_flag", "op": "gt", "right": 0.5},
+      {"feature": "utc_hour", "op": "gte", "right": 7},
+      {"feature": "utc_hour", "op": "lt", "right": 10},
+      {"feature": "delta_proxy", "op": "lt", "right": -0.1},
+      {"feature": "va_pos", "op": "gt", "right": 0.65},
+      {"feature": "vol_pulse", "op": "gt", "right": 0.2}
+    ],
+    "proxy_exit_any": [
+      {"feature": "va_pos", "op": "lt", "right": 0.40, "role": "take_profit"},
+      {"feature": "close", "op": "gt", "right_feature": "prev_high20", "role": "invalidation"}
+    ],
+    "max_hold_bars": 14,
+    "banned_leaves": ["rsi14", "macd_stick", "ema16"],
+    "expected_opens_per_day": 0.55
+  },
+  "tertiary": {
+    "id": "D01",
+    "key": "frost3_eth15m_behavior_auction_imb_l",
+    "logic_class": "session_auction_imbalance",
+    "direction": "long",
+    "thesis_zh": "伦敦开盘拍卖买方接受后做多。",
+    "proxy_entry_all": [
+      {"feature": "session_liq", "op": "gt", "right": 0.5},
+      {"feature": "utc_hour", "op": "gte", "right": 7},
+      {"feature": "utc_hour", "op": "lt", "right": 10},
+      {"feature": "delta_proxy", "op": "gt", "right": 0.15},
+      {"feature": "va_pos", "op": "gt", "right": 0.55},
+      {"feature": "vol_pulse", "op": "gt", "right": 0.3},
+      {"feature": "absorb_score", "op": "lt", "right": 0.5}
+    ],
+    "proxy_exit_any": [
+      {"feature": "va_pos", "op": "gt", "right": 0.85, "role": "take_profit"},
+      {"feature": "sweep_reclaim_high", "op": "gt", "right": 0.5, "role": "invalidation"}
+    ],
+    "max_hold_bars": 16,
+    "banned_leaves": ["rsi14", "macd_stick"],
+    "expected_opens_per_day": 0.6
+  },
+  "gates_pending": {
+    "walk_forward": ">=7/10",
+    "monte_carlo_beat_sign_shuffle": ">=90%",
+    "extreme_friction_sharpe": ">=0",
+    "reviews_avg_wr": ">=75%"
+  },
+  "metrics_placeholder": {
+    "freq_opens_per_day": null,
+    "profit_factor": null,
+    "win_rate_theoretical": null,
+    "friction_sharpe": null,
+    "note": "metrics require factory run on host"
+  }
+}

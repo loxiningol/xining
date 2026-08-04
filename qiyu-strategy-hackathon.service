@@ -1,0 +1,13 @@
+[Unit]
+Description=Qiyu weekly AI strategy creative hackathon
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+Environment=PYTHONPATH=/root
+# Load provider keys if present
+EnvironmentFile=-/root/auto_trade/ai_ecosystem.env
+ExecStart=/usr/bin/python3 /root/auto_trade_strategy_hackathon.py
+Nice=10
+TimeoutStartSec=1800

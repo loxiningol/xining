@@ -1,0 +1,12 @@
+[Unit]
+Description=Run one bounded strategy creation mission every hour
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1h
+AccuracySec=1min
+RandomizedDelaySec=90
+Unit=qiyu-strategy-creator.service
+
+[Install]
+WantedBy=timers.target

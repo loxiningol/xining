@@ -1,0 +1,294 @@
+{
+  "ok": true,
+  "errors": [],
+  "schema": "qiyu_step_a_v1",
+  "artifact": "strategy_candidate_pack",
+  "call_id": "prebuilt_atr_decline_htf_rb_v1",
+  "attempts": 1,
+  "meta": {
+    "symbol": "BTC-USDT-SWAP",
+    "timeframe": "15m",
+    "direction": "short",
+    "title": "atr_decline_htf_range_break",
+    "thesis": "After ATR14 declines vs its value 3 bars ago, realized volatility has compressed and stop density packs near the 20-bar range. A volume-accepted close through prev_low20 (short) / prev_high20 (long) consumes that inventory in a directional cascade larger than round-trip friction; ATR-trailing harvests continuation without fixed micro-TP.",
+    "source": "handcraft_workflow_v2_candidate_v2_round2",
+    "suggested_core_features": [
+      "atr14",
+      "prev_high20",
+      "prev_low20",
+      "vol_z20"
+    ],
+    "holding_horizon": "2_to_24_bars_15m",
+    "kb_avoidance": [
+      "vol_accepted_donchian_h1_continuation (blocked after round1 L1)",
+      "compression_release_structural_breakout",
+      "vol_regime_compression_release / confirmed_vol_release",
+      "fixed micro-TP"
+    ]
+  },
+  "mechanism_spec": {
+    "mechanism_id": "mech_atr_decline_htf_range_break_btc15m_short_v1",
+    "mechanism_name": "atr_decline_htf_range_break",
+    "mechanism_family": "atr_decline_htf_range_break",
+    "market_inefficiency": "After ATR14 declines vs its value 3 bars ago, realized volatility has compressed and stop density packs near the 20-bar range. A volume-accepted close through prev_low20 (short) / prev_high20 (long) consumes that inventory in a directional cascade larger than round-trip friction; ATR-trailing harvests continuation without fixed micro-TP.",
+    "counterparty_source": "Range mean-reverters and tight-stop inventory managers who parked exits just beyond the 20-bar extreme during the ATR decline; their forced exits supply one-sided flow after the break.",
+    "why_edge_exists": "ATR decline is a structural compression of recent ranges, not an arbitraged fair-value signal. Breaks that occur while ATR is still declining vs lag-3 tend to travel farther before new inventory rebuilds. Edge persists while lagging ATR remains below its lag-3 level and volume confirms acceptance; protective 0.9% SL and ATR trail 4.0 capture the cascade.",
+    "edge_decay_conditions": "ATR re-expands before the break (false compression), breakouts become overcrowded with fade liquidity, volume confirmation collapses, or realized continuation cannot cover costs (payoff attractor <=1.2).",
+    "required_market_regime": "Post-compression directional transitions with room for ATR-trailing; avoid deep chop where ATR decline never resolves into a clean range break.",
+    "entry_logic": "SHORT ALL: (1) atr14 < atr14[offset=3] (decline); (2) close cross_below prev_low20; (3) vol_z20 > 0.8; (4) close < open. LONG mirror: atr decline + cross_above prev_high20 + vol_z20>0.8 + close>open.",
+    "exit_logic": "Primary dynamic exit: atr_trailing n_atr=4.0 on ATR_14 (role=take_profit). Protective production stop_loss_pct=0.009 remains engine/daemon-enforced. max_hold_bars=24.",
+    "stop_logic": "Hard protective SL 0.9% (stop_loss_pct=0.009) via backtest engine / formal daemon. Do not widen, do not migrate ADA 0.6%, do not invent fixed 1% TP.",
+    "take_profit_logic": "No fixed percentage take-profit. Use Phase-2 atr_trailing with n_atr in [2.5,4.0] (candidate uses 4.0).",
+    "invalidation_logic": "max_hold_bars=24 forces flat if cascade does not develop; ATR trail also exits when extension reverses by 4 ATR.",
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "no_ema_rsi_macd_cci_core_filters",
+      "must_keep_atr_decline_vs_lag3",
+      "must_use_atr_trailing",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm"
+    ],
+    "tunable_parameters": [
+      "atr_decline_lag",
+      "vol_z20_min",
+      "atr_trail_n",
+      "max_hold_bars"
+    ],
+    "forbidden_transformations": [
+      "convert_to_blocked_compression_release_structural_breakout_clone",
+      "add_fixed_micro_tp_below_2pct",
+      "remove_atr_decline_condition",
+      "weaken_or_widen_0.9_protective_sl",
+      "swap_into_phase1_archived_family_template"
+    ],
+    "expected_trade_frequency_class": "selective_0.4_to_1.5_per_day_15m",
+    "expected_holding_period": "2_to_24_bars_15m",
+    "suitable_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP"
+    ],
+    "suitable_timeframes": [
+      "15m",
+      "5m",
+      "1h"
+    ]
+  },
+  "dsl": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "atr_decline_htf_rb_btc15m_short_v1",
+    "name": "atr_decline_htf_range_break_short",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_atr_decl",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "atr14",
+            "offset": 3
+          }
+        },
+        {
+          "id": "e_break",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_below",
+          "right": {
+            "feature": "prev_low20"
+          }
+        },
+        {
+          "id": "e_vol",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_mom",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        }
+      ]
+    },
+    "max_hold_bars": 24,
+    "description": "step_a|atr_decline_htf_range_break|sl0.9|atr_trail4|btc15m_short|round2",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "atr_decline_htf_rb_btc15m_long_v1",
+    "name": "atr_decline_htf_range_break_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_atr_decl",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "atr14",
+            "offset": 3
+          }
+        },
+        {
+          "id": "e_break",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_above",
+          "right": {
+            "feature": "prev_high20"
+          }
+        },
+        {
+          "id": "e_vol",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_mom",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        }
+      ]
+    },
+    "max_hold_bars": 24,
+    "description": "step_a|atr_decline_htf_range_break|sl0.9|atr_trail4|btc15m_long|round2",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "atr_decline_htf_rb_btc15m_short_v1",
+    "name": "atr_decline_htf_range_break_short",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_atr_decl",
+          "left": {
+            "feature": "atr14"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "atr14",
+            "offset": 3
+          }
+        },
+        {
+          "id": "e_break",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_below",
+          "right": {
+            "feature": "prev_low20"
+          }
+        },
+        {
+          "id": "e_vol",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_mom",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        }
+      ]
+    },
+    "max_hold_bars": 24,
+    "description": "step_a|atr_decline_htf_range_break|sl0.9|atr_trail4|btc15m_short|round2",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 1,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  }
+}

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Qiyu evidence-insufficient legacy shadow watch daily
+
+[Timer]
+OnBootSec=10min
+OnUnitInactiveSec=24h
+AccuracySec=2min
+RandomizedDelaySec=180
+Unit=qiyu-legacy-shadow-watch.service
+
+[Install]
+WantedBy=timers.target

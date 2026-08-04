@@ -1,36 +1,39 @@
 # -*- coding: utf-8 -*-
-"""Multi-objective fitness engine for STEP A Gate2/Gate3 / formal PreGate.
+"""创造管道第二步 · 多目标适应度（门槛0–7 中的适应度逻辑）。
 
-Hard gates (all must pass when enforce=True):
-  - Calmar >= 1.5  (annualized return / |max DD|)
-  - Payoff ratio (avg_win / avg_loss) >= 2.5
-  - Expectancy factor: win_rate * payoff >= 1.0  (user formula; classic mean also reported)
-  - Worst 5 losses <= 40% of total absolute loss sum
-  - MAE demotion: any trade with MAE > 2.0 * avg_win → reject ("dead-hold to BE")
-  - Remove-max-win: drop largest win; if Calmar OR Sharpe drops >50% → reject ("lottery overfitting")
+与胜率门、去最大盈利、漏斗 L0–L3、寒霜贰筛同属「第二步：统一门槛」。
 
-Annualization (documented):
-  If trade timestamps available → span_days from first entry to last exit (min 1 day).
-  Else → assume ~1 trade/day proxy: span_days = max(1, n_trades).
-  annualized_return = (1 + total_compound_return) ** (365.25 / span_days) - 1
-  Calmar = annualized_return / abs(max_drawdown)   (max_dd as positive fraction of equity)
-  Sharpe = mean(pnl) / std(pnl) * sqrt(min(n, 252))  (trade-pnl proxy; same as dual-engine)
+硬条件（enforce=True 时全部必须通过）：
+  - 卡尔玛：大样本 ≥1.5；小样本（成交<15）≥1.0（见质量教义）
+  - 盈亏比：大样本 ≥2.5；小样本 ≥1.8
+  - 期望因子：胜率 × 盈亏比 ≥ 1.0（始终硬）
+  - 最差 5 笔亏损占比（大样本且亏损笔数>5 时）≤ 总亏损绝对和的 40%
+  - 最大不利偏移：任一手 MAE > 2.0 × 平均盈利 → 拒（死扛回本）
+  - 去最大盈利：去掉最大盈利后，若卡尔玛或夏普相对跌超 50% → 拒（彩票过拟合）
 
-Protective 0.9% SL / 20x / 30% size are OUT OF SCOPE here — fitness only.
+年化口径见 compute 内注释。保护止损/杠杆/仓位不在本模块范围。
 """
 from __future__ import print_function
 
 import math
 from datetime import datetime
 
+from .creation_quality_doctrine import (
+    GATE2_CALMAR_LARGE,
+    GATE2_EXPECTANCY_FACTOR_MIN,
+    GATE2_PAYOFF_LARGE,
+    MIN_TRADES_CREATION,
+    gate2_floors,
+)
 
-# ---- Hard thresholds (Phase 2) ----
-CALMAR_MIN = 1.5
-PAYOFF_MIN = 2.5
-EXPECTANCY_FACTOR_MIN = 1.0  # WR * payoff
+
+# ---- 默认大样本地板（兼容旧引用；实际判定走 gate2_floors）----
+CALMAR_MIN = GATE2_CALMAR_LARGE
+PAYOFF_MIN = GATE2_PAYOFF_LARGE
+EXPECTANCY_FACTOR_MIN = GATE2_EXPECTANCY_FACTOR_MIN  # 胜率 × 盈亏比
 WORST5_LOSS_SHARE_MAX = 0.40
 MAE_VS_AVG_WIN_MAX = 2.0
-REMOVE_MAX_WIN_DROP_MAX = 0.50  # 50% relative drop
+REMOVE_MAX_WIN_DROP_MAX = 0.50  # 相对跌幅 50%
 
 
 def _safe_float(x, default=None):
@@ -248,13 +251,15 @@ def mae_dead_hold_flags(trades, avg_win):
     return flags, {"avg_win_ref": avg_win, "n_flagged": len(flags)}
 
 
-def remove_max_win_stress(pnls, trades):
-    """Drop largest winning trade; measure Calmar/Sharpe relative drop.
+def remove_max_win_stress(pnls, trades, calmar_min=None):
+    """去最大盈利压力：去掉最大盈利单，量卡尔玛/夏普相对跌幅。
 
-    When max DD is ~0, Calmar becomes numerically huge and relative drops are
-    unstable. In that regime we require the reduced sample to still clear the
-    Calmar floor (or treat Calmar-drop as non-binding) and rely on Sharpe drop.
+    最大回撤近 0 时卡尔玛数值不稳定；该情形下要求缩样后仍过卡尔玛地板，
+    或以夏普跌幅为准。
     """
+    if calmar_min is None:
+        calmar_min = CALMAR_MIN
+    calmar_min = float(calmar_min)
     if not pnls:
         return {
             "pass": False,
@@ -294,15 +299,14 @@ def remove_max_win_stress(pnls, trades):
 
     near_zero_dd = float(base_meta.get("max_drawdown") or 0) < 1e-4
     if near_zero_dd:
-        # Relative Calmar is unstable; fail only if reduced sample loses Calmar floor
-        # or Sharpe collapses >50%.
-        calmar_fail = red_calmar < CALMAR_MIN and base_calmar >= CALMAR_MIN
+        # 卡尔玛相对跌幅不稳定：缩样丢地板或夏普崩 >50% 才判失败
+        calmar_fail = red_calmar < calmar_min and base_calmar >= calmar_min
         sharpe_fail = s_drop > REMOVE_MAX_WIN_DROP_MAX
         failed = calmar_fail or sharpe_fail
-        reason = "lottery_overfitting" if failed else "ok_near_zero_dd_mode"
+        reason = "去最大盈利后崩溃" if failed else "ok_near_zero_dd_mode"
     else:
         failed = (c_drop > REMOVE_MAX_WIN_DROP_MAX) or (s_drop > REMOVE_MAX_WIN_DROP_MAX)
-        reason = "lottery_overfitting" if failed else "ok"
+        reason = "去最大盈利后崩溃" if failed else "ok"
 
     return {
         "pass": not failed,
@@ -331,23 +335,43 @@ def compute_fitness_metrics(trades, base_metrics=None):
         trades = [{"pnl_ratio": p} for p in pnls]
 
     stats = payoff_stats(pnls)
+    floors = gate2_floors(stats["n"])
+    calmar_min = float(floors["calmar_min"])
+    payoff_min = float(floors["payoff_min"])
     calmar, calmar_meta = _calmar(pnls, trades)
     sharpe = _sharpe(pnls)
     w5_share, w5_meta = worst5_loss_share(pnls)
     mae_flags, mae_meta = mae_dead_hold_flags(trades, stats["avg_win"])
-    lottery = remove_max_win_stress(pnls, trades)
+    lottery = remove_max_win_stress(pnls, trades, calmar_min=calmar_min)
 
+    calmar_ok = calmar >= calmar_min
+    payoff_ok = stats["payoff_ratio"] >= payoff_min
+    n_losses = sum(1 for p in pnls if p < 0)
+    # 小样本或亏损笔数≤5 时，「最差五笔占比」恒接近 100%，无信息量，跳过硬拦
+    worst5_enforce = (not floors.get("small_sample")) and n_losses > 5
+    worst5_ok = True if not worst5_enforce else (w5_share <= WORST5_LOSS_SHARE_MAX)
     checks = {
-        "sample_size_ge_8": stats["n"] >= 8,
-        "calmar_ge_1_5": calmar >= CALMAR_MIN,
-        "payoff_ge_2_5": stats["payoff_ratio"] >= PAYOFF_MIN,
+        "成交笔数达标": stats["n"] >= int(MIN_TRADES_CREATION),
+        "门槛2_卡尔玛达标": calmar_ok,
+        "门槛2_盈亏比达标": payoff_ok,
+        "期望因子达标": stats["expectancy_factor_wr_x_payoff"] >= EXPECTANCY_FACTOR_MIN,
+        "最差五笔亏损不过度集中": worst5_ok,
+        "最大不利偏移可接受": len(mae_flags) == 0,
+        "去最大盈利后不崩": bool(lottery.get("pass")),
+        # 兼容旧键名
+        "sample_size_ge_8": stats["n"] >= int(MIN_TRADES_CREATION),
+        "calmar_ge_1_5": calmar_ok,
+        "payoff_ge_2_5": payoff_ok,
         "expectancy_factor_ge_1_0": stats["expectancy_factor_wr_x_payoff"] >= EXPECTANCY_FACTOR_MIN,
-        "worst5_loss_share_le_40pct": w5_share <= WORST5_LOSS_SHARE_MAX,
+        "worst5_loss_share_le_40pct": worst5_ok,
         "mae_dead_hold_clear": len(mae_flags) == 0,
         "remove_max_win_stable": bool(lottery.get("pass")),
     }
-    # If no MAE recorded on any trade, do not auto-fail MAE (research fixtures
-    # without path data). Formal backtests that emit mae_price_pct are enforced.
+    if not worst5_enforce:
+        w5_meta = dict(w5_meta or {})
+        w5_meta["note"] = "小样本或亏损笔数≤5，跳过最差五笔集中度硬拦"
+        w5_meta["enforced"] = False
+    # 无 MAE 字段时不自动失败（研究夹具）；正式回测若输出 mae 则强制
     has_mae = any(
         isinstance(t, dict) and (
             t.get("mae_price_pct") is not None or t.get("mae") is not None
@@ -355,19 +379,25 @@ def compute_fitness_metrics(trades, base_metrics=None):
         for t in trades
     )
     if not has_mae:
+        checks["最大不利偏移可接受"] = True
         checks["mae_dead_hold_clear"] = True
-        mae_meta["note"] = "no_mae_fields_skip_enforcement"
+        mae_meta["note"] = "无MAE字段，跳过强制"
 
     return {
         "n": stats["n"],
+        "成交笔数": stats["n"],
         "win_rate": stats["win_rate"],
+        "胜率": stats["win_rate"],
         "win_rate_pct": stats["win_rate_pct"],
         "payoff_ratio": stats["payoff_ratio"],
+        "盈亏比": stats["payoff_ratio"],
         "avg_win": stats["avg_win"],
         "avg_loss": stats["avg_loss"],
         "expectancy_factor": stats["expectancy_factor_wr_x_payoff"],
+        "期望因子": stats["expectancy_factor_wr_x_payoff"],
         "classic_expectancy": stats["classic_expectancy_mean_pnl"],
         "calmar": round(calmar, 6),
+        "卡尔玛": round(calmar, 6),
         "sharpe": round(sharpe, 6),
         "calmar_meta": calmar_meta,
         "worst5_loss_share": round(w5_share, 6),
@@ -376,45 +406,55 @@ def compute_fitness_metrics(trades, base_metrics=None):
         "mae_meta": mae_meta,
         "remove_max_win": lottery,
         "checks": checks,
+        "门槛2": floors,
         "thresholds": {
-            "calmar_min": CALMAR_MIN,
-            "payoff_min": PAYOFF_MIN,
+            "calmar_min": calmar_min,
+            "payoff_min": payoff_min,
             "expectancy_factor_min": EXPECTANCY_FACTOR_MIN,
             "worst5_loss_share_max": WORST5_LOSS_SHARE_MAX,
             "mae_vs_avg_win_max": MAE_VS_AVG_WIN_MAX,
             "remove_max_win_drop_max": REMOVE_MAX_WIN_DROP_MAX,
+            "label_zh": floors.get("label_zh"),
         },
         "formulas": {
-            "expectancy_factor": stats["formula_expectancy_factor"],
+            "expectancy_factor": "胜率 × 盈亏比 ≥ 1.0",
             "classic_expectancy": stats["formula_classic_expectancy"],
-            "payoff": "avg_win / avg_loss_magnitude",
+            "payoff": "平均盈利 / 平均亏损幅度",
             "calmar": calmar_meta.get("annualization"),
         },
     }
 
 
-def evaluate_multi_objective(trades, base_metrics=None, enforce=True, min_trades=8):
-    """Return {pass, metrics, failed_checks, verdict_tags}.
+def evaluate_multi_objective(trades, base_metrics=None, enforce=True, min_trades=None):
+    """返回 {pass, metrics, failed_checks, verdict_tags}。
 
-    enforce=True applies all hard gates (Gate2 / formal fitness path).
+    enforce=True 时套用门槛2 全部硬条件。
     """
+    if min_trades is None:
+        min_trades = MIN_TRADES_CREATION
     metrics = compute_fitness_metrics(trades, base_metrics=base_metrics)
     checks = dict(metrics["checks"])
     if min_trades and metrics["n"] < int(min_trades):
+        checks["成交笔数达标"] = False
         checks["sample_size_ge_8"] = False
 
-    failed = [k for k, v in checks.items() if not v]
+    # 失败原因优先用中文键
+    zh_keys = (
+        "成交笔数达标", "门槛2_卡尔玛达标", "门槛2_盈亏比达标", "期望因子达标",
+        "最差五笔亏损不过度集中", "最大不利偏移可接受", "去最大盈利后不崩",
+    )
+    failed = [k for k in zh_keys if not checks.get(k)]
     tags = []
-    if not checks.get("payoff_ge_2_5") or not checks.get("expectancy_factor_ge_1_0"):
-        tags.append("pseudo_high_WR_low_payoff")
-    if not checks.get("mae_dead_hold_clear"):
-        tags.append("dead_hold_to_BE")
-    if not checks.get("remove_max_win_stable"):
-        tags.append("lottery_overfitting")
-    if not checks.get("calmar_ge_1_5"):
-        tags.append("calmar_below_floor")
-    if not checks.get("worst5_loss_share_le_40pct"):
-        tags.append("loss_concentration")
+    if not checks.get("门槛2_盈亏比达标") or not checks.get("期望因子达标"):
+        tags.append("高胜率低盈亏比伪优势")
+    if not checks.get("最大不利偏移可接受"):
+        tags.append("死扛回本")
+    if not checks.get("去最大盈利后不崩"):
+        tags.append("彩票过拟合")
+    if not checks.get("门槛2_卡尔玛达标"):
+        tags.append("卡尔玛低于门槛2地板")
+    if not checks.get("最差五笔亏损不过度集中"):
+        tags.append("亏损过度集中")
 
     passed = (len(failed) == 0) if enforce else True
     return {
@@ -424,11 +464,13 @@ def evaluate_multi_objective(trades, base_metrics=None, enforce=True, min_trades
         "failed_checks": failed,
         "verdict_tags": tags,
         "checks": checks,
+        "门槛名": "门槛2",
     }
 
 
 def evaluate_pregate_fitness(trades, base_metrics=None):
-    """PreGate / Windtalker formal fitness hook — same hard gates as Gate2."""
+    """正式预检适应度钩子 — 与门槛2 同硬条件。"""
     return evaluate_multi_objective(
-        trades, base_metrics=base_metrics, enforce=True, min_trades=8,
+        trades, base_metrics=base_metrics, enforce=True,
+        min_trades=MIN_TRADES_CREATION,
     )

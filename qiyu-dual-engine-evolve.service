@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu dual-engine evolution pool tick
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+EnvironmentFile=-/root/auto_trade/ai_ecosystem.env
+ExecStart=/usr/bin/python3 /root/auto_trade_dual_engine_factory.py --evolve
+Nice=10

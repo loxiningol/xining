@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu Strategy Creation Factory Timer (daily collaborative round)
+
+[Timer]
+OnCalendar=*-*-* 02:10:00
+Persistent=true
+Unit=qiyu-strategy-creation-factory.service
+
+[Install]
+WantedBy=timers.target

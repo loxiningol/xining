@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu Strategy Dynamic Optimizer Timer (UTC 00:00)
+
+[Timer]
+OnCalendar=*-*-* 00:00:00 UTC
+Persistent=true
+Unit=qiyu-strategy-dynamic-optimizer.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,102 @@
+{
+  "ok": true,
+  "approved_at": "2026-08-01 12:00:00",
+  "valid_until": "2028-08-03 07:47:50",
+  "validity_period_days": 730,
+  "validity_period": "2 years",
+  "expiry_enforcement_test": "passed",
+  "renewal_required": true,
+  "renewal_updates_valid_until": true,
+  "recent_2y_metrics_independent": {
+    "n_trades": 5,
+    "n_winning": 5,
+    "average_profitable_trade_return": 0.11199999999999885,
+    "average_profitable_trade_return_pct": 11.199999999999886,
+    "passes_1111": true,
+    "formula": "mean(NetReturn_i * leverage for i in winning); losing trades excluded from denominator"
+  },
+  "weighted_average_profitable_trade_return": 0.13969230769230692,
+  "recent_2y_requirement_passed": true,
+  "old_data_cannot_override_recent_fail": false,
+  "detail": {
+    "stamped": {
+      "valid_from": "2026-08-04 07:47:50",
+      "valid_until": "2028-08-03 07:47:50",
+      "validity_days_total": 730,
+      "approved_at": null,
+      "symbol": "P5-PROBE-USDT-SWAP",
+      "strategy_key": "p5_validity_probe"
+    },
+    "annotate_expired": {
+      "symbol": "P5-PROBE-USDT-SWAP",
+      "timeframe": "15m",
+      "strategy_key": "p5_expiry_probe",
+      "valid_from": "2023-01-01 00:00:00",
+      "valid_until": "2024-01-01 00:00:00",
+      "validity_days_total": 730,
+      "days_remaining": -945,
+      "expired": true,
+      "countdown_label_zh": "已到期",
+      "refreshed_at": "2026-08-04 07:47:50"
+    },
+    "expire_dry_run": {
+      "ok": true,
+      "dry_run": true,
+      "assignment_id": null,
+      "would_delete": true,
+      "reason": "p5_probe"
+    },
+    "renew_before": {
+      "assignment_id": "P5-PROBE-USDT-SWAP|15m|p5_renew_probe",
+      "symbol": "P5-PROBE-USDT-SWAP",
+      "timeframe": "15m",
+      "strategy_key": "p5_renew_probe",
+      "strategy_title": "renew-a",
+      "config_file": null,
+      "validity_days_total": 730,
+      "valid_from": "2026-08-04 07:47:50",
+      "valid_until": "2028-08-03 07:47:50",
+      "stamped_at": "2026-08-04 07:47:50",
+      "policy_zh": "默认有效期=未来2年；到期删除并 WxPusher 通知",
+      "days_remaining": 730,
+      "expired": false,
+      "countdown_label_zh": "剩余 730 天",
+      "refreshed_at": "2026-08-04 07:47:50"
+    },
+    "renew_after": {
+      "assignment_id": "P5-PROBE-USDT-SWAP|15m|p5_renew_probe",
+      "symbol": "P5-PROBE-USDT-SWAP",
+      "timeframe": "15m",
+      "strategy_key": "p5_renew_probe",
+      "strategy_title": "renew-b",
+      "config_file": null,
+      "validity_days_total": 730,
+      "valid_from": "2026-08-04 07:47:50",
+      "valid_until": "2028-08-03 07:47:50",
+      "stamped_at": "2026-08-04 07:47:50",
+      "policy_zh": "默认有效期=未来2年；到期删除并 WxPusher 通知",
+      "days_remaining": 730,
+      "expired": false,
+      "countdown_label_zh": "剩余 730 天",
+      "refreshed_at": "2026-08-04 07:47:50"
+    }
+  },
+  "stamped_sample": {
+    "assignment_id": "P5-PROBE-USDT-SWAP|15m|p5_validity_probe",
+    "symbol": "P5-PROBE-USDT-SWAP",
+    "timeframe": "15m",
+    "strategy_key": "p5_validity_probe",
+    "strategy_title": "P5 validity probe",
+    "config_file": null,
+    "validity_days_total": 730,
+    "valid_from": "2026-08-04 07:47:50",
+    "valid_until": "2028-08-03 07:47:50",
+    "stamped_at": "2026-08-04 07:47:50",
+    "policy_zh": "默认有效期=未来2年；到期删除并 WxPusher 通知",
+    "days_remaining": 730,
+    "expired": false,
+    "countdown_label_zh": "剩余 730 天",
+    "refreshed_at": "2026-08-04 07:47:50"
+  },
+  "at": "2026-08-04 07:47:50"
+}

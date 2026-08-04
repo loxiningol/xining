@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily AI strategy creative hackathon (night low-load)
+
+[Timer]
+OnCalendar=*-*-* 02:10:00
+Persistent=true
+Unit=qiyu-strategy-hackathon.service
+
+[Install]
+WantedBy=timers.target

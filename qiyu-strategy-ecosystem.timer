@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Qiyu strategy learning ecosystem daily
+
+[Timer]
+OnCalendar=*-*-* 00:20:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=300
+Unit=qiyu-strategy-ecosystem.service
+
+[Install]
+WantedBy=timers.target

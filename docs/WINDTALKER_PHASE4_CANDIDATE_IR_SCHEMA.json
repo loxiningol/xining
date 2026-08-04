@@ -1,0 +1,120 @@
+{
+  "schema": "WINDTALKER_PHASE4_CANDIDATE_IR_SCHEMA",
+  "candidate_ir_version": "windtalker_candidate_ir_v1",
+  "compiler_version": "windtalker_phase4_candidate_ir_compiler_v1",
+  "generated_at": "2026-07-28 13:45:28",
+  "pipeline_position": "research_DSL_AST → Candidate_IR → formal_implementation",
+  "ban_freeform_codex": true,
+  "required_sections": [
+    "identity",
+    "data_deps",
+    "state_machine",
+    "event_order",
+    "entry",
+    "exit",
+    "causal_structure",
+    "compile_bans"
+  ],
+  "identity": {
+    "fields": [
+      "candidate_id",
+      "source_probe_id",
+      "source_research_spec_hash",
+      "source_research_ast_hash",
+      "candidate_ir_version",
+      "created_at",
+      "promotion_status"
+    ]
+  },
+  "data_deps": {
+    "fields": [
+      "primary_symbol",
+      "reference_symbol",
+      "timeframes",
+      "oi",
+      "funding_basis",
+      "taker_flow",
+      "cross_asset",
+      "feature_freshness",
+      "missing_data_policy",
+      "fail_closed_rule",
+      "proxy_declarations"
+    ],
+    "missing_data_policy": "NaN → fail-closed (no signal)",
+    "fail_closed_rule": "unsupported or missing core feature → compile FAIL or runtime no-entry"
+  },
+  "state_machine": {
+    "fields": [
+      "states",
+      "transitions",
+      "transition_conditions",
+      "timeouts",
+      "reset_rules",
+      "invalidation",
+      "cooldown"
+    ],
+    "required": true
+  },
+  "event_order": {
+    "fields": [
+      "event_A",
+      "event_B",
+      "maximum_gap",
+      "event_C_veto",
+      "confirmation",
+      "entry_eligibility"
+    ],
+    "ban_unordered_AND": true,
+    "note": "Must compile to ordered event_sequence, never flat AND of same-bar conditions"
+  },
+  "entry": {
+    "fields": [
+      "regime",
+      "setup",
+      "trigger",
+      "confirmation",
+      "veto",
+      "final_entry",
+      "side",
+      "timestamp_semantics"
+    ]
+  },
+  "exit": {
+    "fields": [
+      "production_sl_0_9pct",
+      "mechanism_invalidation",
+      "time_stop",
+      "dynamic_exit",
+      "strategy_close",
+      "tp",
+      "trailing",
+      "cross_asset_invalidation"
+    ],
+    "production_sl_adapter": 0.009
+  },
+  "causal_structure": {
+    "fields": [
+      "core_causal_variables",
+      "supporting_variables",
+      "non_causal_filters",
+      "forbidden_proxies",
+      "expected_ablation_effect",
+      "expected_event_order_destruction_effect"
+    ]
+  },
+  "compile_bans": [
+    "no_legacy_family_template_downgrade",
+    "no_auto_add_RSI_EMA_CCI_VWAP",
+    "no_single_asset_substitute_for_cross_asset",
+    "no_OHLC_proxy_for_real_OI_or_taker",
+    "no_delete_state_machine",
+    "no_event_sequence_to_samebar_AND",
+    "no_modify_exit_logic",
+    "no_silent_unsupported_drop",
+    "no_zero_fill_missing_data"
+  ],
+  "formal_implementation_modes": {
+    "legacy_spec_to_code": "production / Phase1-2 path (preserved)",
+    "candidate_ir_compiler": "Phase4 bridge candidates ONLY"
+  }
+}

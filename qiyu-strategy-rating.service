@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu automatic trading dynamic strategy ratings
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_strategy_rating.py --refresh
+ExecStartPost=/usr/bin/python3 /root/auto_trade_daily_report.py --sync
+Nice=10

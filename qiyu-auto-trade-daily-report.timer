@@ -1,0 +1,11 @@
+[Unit]
+Description=Send Qiyu automatic trading report at 23:59 Beijing time
+
+[Timer]
+OnCalendar=*-*-* 23:59:00 Asia/Shanghai
+AccuracySec=1s
+Persistent=true
+Unit=qiyu-auto-trade-daily-report.service
+
+[Install]
+WantedBy=timers.target

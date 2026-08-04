@@ -51,7 +51,7 @@ class TheoreticalReviewGateTest(unittest.TestCase):
                 {"key": "x"},
                 {"statistical_weekly_opens_expected": 1.0,
                  "frequency_method": "backtest_2y_fill_rate_proxy",
-                 "span_days": 730.0, "trades": 104},
+                 "span_days": 730.0, "bars_span_days": 730.0, "trades": 104},
             )
             self.assertTrue(out["approved"], out.get("fail_reasons"))
             self.assertAlmostEqual(out["ai_theoretical_wr_avg"], 70.0, places=3)
@@ -81,7 +81,7 @@ class TheoreticalReviewGateTest(unittest.TestCase):
             out = ai.theoretical_review_all(
                 {"key": "y"},
                 {"statistical_weekly_opens_expected": 1.0,
-                 "span_days": 730.0, "trades": 104},
+                 "span_days": 730.0, "bars_span_days": 730.0, "trades": 104},
             )
             self.assertFalse(out["approved"])
             self.assertEqual(out["skipped_infra_providers"], ["glm"])
@@ -112,7 +112,7 @@ class TheoreticalReviewGateTest(unittest.TestCase):
             out = ai.theoretical_review_all(
                 {"key": "z"},
                 {"statistical_weekly_opens_expected": 1.0,
-                 "span_days": 730.0, "trades": 104},
+                 "span_days": 730.0, "bars_span_days": 730.0, "trades": 104},
             )
             self.assertFalse(out["approved"])
             self.assertEqual(out["skipped_infra_providers"], ["glm"])
@@ -132,7 +132,7 @@ class TheoreticalReviewGateTest(unittest.TestCase):
                 {"key": "w"},
                 {"statistical_weekly_opens_expected": 1.0,
                  "frequency_method": "backtest_2y_fill_rate_proxy",
-                 "span_days": 730.0, "trades": 104},
+                 "span_days": 730.0, "bars_span_days": 730.0, "trades": 104},
             )
             self.assertFalse(out["approved"])
             self.assertFalse(out["weekly_opens_gate_ok"])

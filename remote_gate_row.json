@@ -1,0 +1,516 @@
+{
+  "tag": "wt1g_01_liquidity_failed_breakou",
+  "task_id": "wsa_20260727_225332_dbd7",
+  "elapsed_sec": 38.66,
+  "ok": false,
+  "stage": "archived",
+  "reason": "repair_exhausted_or_drift",
+  "mechanism_id": "mech_liquidity_failed_breakout_high_xrp15m",
+  "mechanism_family": "liquidity_failed_breakout_high",
+  "mechanism_name": "range_high_breakout_trap_short",
+  "exploration_direction": "liquidity_failed_breakout",
+  "symbol": "XRP-USDT-SWAP",
+  "timeframe": "15m",
+  "direction": "short",
+  "fingerprint": {
+    "directionality": "short",
+    "regime_dependency": "ranging or low-adr compression with prior failed breakout attempts at same level",
+    "signal_origin": "false breakout above 20-bar range high traps momentum longs who must exit on close back below range high",
+    "entry_trigger_type": "bar wick exceeds high20 by at least 0.15*atr but close falls back below high20; enter short on close of that bar",
+    "exit_trigger_type": "exit when price closes below prior bar low for 2 consecutive bars indicating trend continuation or when price reclaims h",
+    "mean_reversion_vs_trend": "trend",
+    "volatility_dependency": "unspecified",
+    "liquidity_dependency": "unspecified",
+    "holding_period": "2_to_12_bars_15m",
+    "symbol_dependency": "xrp-usdt-swap",
+    "timeframe_dependency": "15m",
+    "counterparty_type": "breakout momentum buyers who entered on wick above range high20 and are now underwater",
+    "mechanism_family": "liquidity_failed_breakout_high",
+    "mechanism_id": "mech_liquidity_failed_breakout_high_xrp15m",
+    "fingerprint_hash": "a21209572d1e934e2c698e4345d90e74",
+    "family_hash": "35665f3b027c0b9ce8f192a265eda384"
+  },
+  "dedup_report": {
+    "vs_live": {
+      "hits": [],
+      "is_parameter_variant": false,
+      "is_symbol_clone": false,
+      "is_independent_niche": true,
+      "is_exhaustion_fade_clone": false,
+      "allow_horizontal_expand": false,
+      "counts_as_independent_mechanism": true
+    },
+    "vs_peers": {
+      "hits": [],
+      "is_parameter_variant": false,
+      "is_symbol_clone": false,
+      "is_independent_niche": true,
+      "is_exhaustion_fade_clone": false,
+      "allow_horizontal_expand": false,
+      "counts_as_independent_mechanism": true
+    },
+    "counts_as_independent": true
+  },
+  "fidelity_diff_path": "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225332_dbd7_r0_mechanism_fidelity_diff.json",
+  "fidelity_pass": true,
+  "mechanism_spec_path": "/root/auto_trade/dual_engine/workflow_v2/mechanism_specs/mech_liquidity_failed_breakout_high_xrp15m_mechanism_spec.json",
+  "gate_results": {
+    "schema": "qiyu_step_a_v1",
+    "artifact": "gate_results",
+    "code_version": "step_a_strategy_creation_20260726",
+    "task_id": "wsa_20260727_225332_dbd7",
+    "created_at": "2026-07-27 22:54:10",
+    "gates": [
+      {
+        "gate_id": "gate0_mechanism_integrity",
+        "name": "机制完整性",
+        "pass": true,
+        "blocking": true,
+        "evidence": {
+          "spec_complete": true,
+          "counterparty_clear": true,
+          "edge_decay_clear": true,
+          "not_indicator_soup": true,
+          "family_present": true
+        },
+        "notes": [],
+        "at": "2026-07-27 22:53:32"
+      },
+      {
+        "gate_id": "gate1_code_fidelity",
+        "name": "代码忠实度",
+        "pass": true,
+        "blocking": true,
+        "evidence": {
+          "fidelity_pass": true,
+          "has_entry": true,
+          "has_exit_or_exit_logic": true,
+          "stop_in_spec": true,
+          "no_non_negotiable_violations": true,
+          "no_future_feature_tokens": true
+        },
+        "notes": [],
+        "at": "2026-07-27 22:53:32"
+      },
+      {
+        "gate_id": "gate2_base_backtest",
+        "name": "基础回测",
+        "pass": true,
+        "blocking": true,
+        "evidence": {
+          "sample_size": 212,
+          "win_rate_pct": 24.056603773584907,
+          "profit_factor": null,
+          "gross_expectancy": -0.03542255150987091,
+          "cost_after_expectancy": -0.03542255150987091,
+          "max_dd": null,
+          "holding": null,
+          "trade_frequency_proxy_trades": 212
+        },
+        "notes": [
+          "gate2_records_metrics; quality judged with later gates"
+        ],
+        "at": "2026-07-27 22:54:10"
+      },
+      {
+        "gate_id": "gate3_walk_forward",
+        "name": "Walk-forward",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "pass_count": 1,
+          "total": 10,
+          "requirement": "7/10",
+          "windows": [
+            {
+              "id": "window_0",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 33.33333333333333,
+                "mean_net": -0.02219964631718185,
+                "oos_profit": -0.315426883671041,
+                "sharpe": -1.741,
+                "fold_positive": 3,
+                "folds": 10,
+                "fold_means": [
+                  -0.060042,
+                  -0.012299,
+                  -0.006521,
+                  0.04884,
+                  0.005814,
+                  -0.053598,
+                  0.002423,
+                  -0.017113,
+                  -0.019845,
+                  -0.080504
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_1",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 9.523809523809524,
+                "mean_net": -0.10090326734986292,
+                "oos_profit": -0.7416349257863599,
+                "sharpe": -5.4148,
+                "fold_positive": 0,
+                "folds": 10,
+                "fold_means": [
+                  -0.157349,
+                  -0.119642,
+                  -0.050247,
+                  -0.043618,
+                  -0.001731,
+                  -0.162826,
+                  -0.153254,
+                  -0.122572,
+                  -0.05165,
+                  -0.131063
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_2",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 33.33333333333333,
+                "mean_net": -0.04001156871205294,
+                "oos_profit": -0.2038391457888707,
+                "sharpe": -1.4941,
+                "fold_positive": 2,
+                "folds": 10,
+                "fold_means": [
+                  0.18726,
+                  -0.216925,
+                  -0.009012,
+                  0.004969,
+                  -0.162144,
+                  -0.029954,
+                  -0.092395,
+                  -0.016414,
+                  -0.009099,
+                  -0.050937
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_3",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 19.047619047619047,
+                "mean_net": -0.02959728886965816,
+                "oos_profit": -0.17297364186528816,
+                "sharpe": -2.131,
+                "fold_positive": 1,
+                "folds": 10,
+                "fold_means": [
+                  -0.029901,
+                  -0.109919,
+                  -0.036863,
+                  -0.001093,
+                  0.02038,
+                  -0.051131,
+                  -0.015758,
+                  -0.036864,
+                  -0.023201,
+                  -0.017615
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_4",
+              "pass": true,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 23.809523809523807,
+                "mean_net": 0.0037232621051090328,
+                "oos_profit": 0.048934962215188935,
+                "sharpe": 0.14,
+                "fold_positive": 3,
+                "folds": 10,
+                "fold_means": [
+                  -0.029825,
+                  -0.043872,
+                  0.077962,
+                  -0.023355,
+                  -0.120191,
+                  0.197894,
+                  -0.043986,
+                  -0.036945,
+                  -0.02961,
+                  0.060682
+                ]
+              },
+              "fail_reason": null
+            },
+            {
+              "id": "window_5",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 33.33333333333333,
+                "mean_net": -0.018396419648596656,
+                "oos_profit": 0.2061699656088835,
+                "sharpe": -0.8767,
+                "fold_positive": 3,
+                "folds": 10,
+                "fold_means": [
+                  0.014809,
+                  -0.051632,
+                  -0.036562,
+                  -0.104489,
+                  -0.052088,
+                  -0.029423,
+                  -0.036863,
+                  -0.040062,
+                  0.052697,
+                  0.0603
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_6",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 28.57142857142857,
+                "mean_net": -0.05482708903720902,
+                "oos_profit": -0.513335169211147,
+                "sharpe": -2.8102,
+                "fold_positive": 2,
+                "folds": 10,
+                "fold_means": [
+                  -0.216987,
+                  0.006913,
+                  -0.036831,
+                  -0.010852,
+                  -0.06321,
+                  0.049576,
+                  -0.047626,
+                  -0.143128,
+                  -0.013692,
+                  -0.066565
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_7",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 33.33333333333333,
+                "mean_net": -0.004368888690021374,
+                "oos_profit": -0.11642350251202013,
+                "sharpe": -0.2388,
+                "fold_positive": 4,
+                "folds": 10,
+                "fold_means": [
+                  0.049737,
+                  0.08952,
+                  -0.011361,
+                  0.000999,
+                  -0.063611,
+                  -0.019777,
+                  -0.033169,
+                  -0.028314,
+                  0.019688,
+                  -0.033057
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_8",
+              "pass": false,
+              "metrics": {
+                "trades": 21,
+                "win_rate_pct": 23.809523809523807,
+                "mean_net": -0.044913216261782296,
+                "oos_profit": -0.3143571508156915,
+                "sharpe": -2.3419,
+                "fold_positive": 3,
+                "folds": 10,
+                "fold_means": [
+                  0.08536,
+                  -0.061317,
+                  -0.052,
+                  -0.216925,
+                  0.010368,
+                  -0.057633,
+                  -0.022263,
+                  0.00041,
+                  -0.11098,
+                  -0.031072
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_9",
+              "pass": false,
+              "metrics": {
+                "trades": 23,
+                "win_rate_pct": 4.3478260869565215,
+                "mean_net": -0.04209584094288075,
+                "oos_profit": -0.4783991392118365,
+                "sharpe": -4.019,
+                "fold_positive": 1,
+                "folds": 10,
+                "fold_means": [
+                  -0.02952,
+                  0.004269,
+                  -0.023192,
+                  -0.026091,
+                  -0.026973,
+                  -0.070933,
+                  -0.039611,
+                  -0.087446,
+                  -0.023274,
+                  -0.085653
+                ]
+              },
+              "fail_reason": "chunk_non_positive_or_empty"
+            }
+          ],
+          "average_only_forbidden": true,
+          "has_per_window_detail": true,
+          "failed_window_explanations": [
+            {
+              "id": "window_0",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_1",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_2",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_3",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_5",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_6",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_7",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_8",
+              "reason": "chunk_non_positive_or_empty"
+            },
+            {
+              "id": "window_9",
+              "reason": "chunk_non_positive_or_empty"
+            }
+          ]
+        },
+        "notes": [],
+        "at": "2026-07-27 22:54:10"
+      },
+      {
+        "gate_id": "gate4_split_destruction",
+        "name": "gate4_split_destruction",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 22:54:10"
+      },
+      {
+        "gate_id": "gate5_mc_friction",
+        "name": "gate5_mc_friction",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 22:54:10"
+      },
+      {
+        "gate_id": "gate6_multi_ai_review",
+        "name": "gate6_multi_ai_review",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 22:54:10"
+      },
+      {
+        "gate_id": "gate7_human_confirm",
+        "name": "gate7_human_confirm",
+        "pass": false,
+        "blocking": true,
+        "evidence": {
+          "missing": true
+        },
+        "notes": [],
+        "at": "2026-07-27 22:54:10"
+      }
+    ],
+    "all_gates_pass": false,
+    "first_fail_gate": "gate3_walk_forward",
+    "passed_count": 3,
+    "total_gates": 8,
+    "production_mounted": false
+  },
+  "gate_pass": {
+    "机制完整性": true,
+    "代码忠实度": true,
+    "基础回测": true,
+    "Walk-forward": false,
+    "gate4_split_destruction": false,
+    "gate5_mc_friction": false,
+    "gate6_multi_ai_review": false,
+    "gate7_human_confirm": false
+  },
+  "repair_rounds": 3,
+  "production_mounted": false,
+  "human_confirm_pending": false,
+  "counts_as_independent_mechanism": true,
+  "net_pnl_quality": {
+    "price_change_pct_approx": -0.175353,
+    "leveraged_position_return_pct": -3.507068,
+    "after_cost_position_return_pct": -3.507068,
+    "account_return_at_30pct_equity_pct": -1.05212,
+    "trades_n": 217,
+    "win_rate_pct": 24.42396313364055,
+    "note": "Additive quality view; Gate thresholds unchanged. price_change is approx mean_net/leverage.",
+    "assumptions": {
+      "leverage": 20.0,
+      "equity_fraction": 0.3
+    }
+  },
+  "failure_record_path": "/root/auto_trade/dual_engine/workflow_v2/failure_records/wsa_20260727_225332_dbd7_strategy_failure_record.json",
+  "result_raw_keys": [
+    "gate_results",
+    "ok",
+    "reason",
+    "task_id"
+  ],
+  "error": null
+}

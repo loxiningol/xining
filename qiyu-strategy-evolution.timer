@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Qiyu strategy ecosystem self-evolution every hour
+
+[Timer]
+OnCalendar=*-*-* *:25:00
+Persistent=true
+Unit=qiyu-strategy-evolution.service
+
+[Install]
+WantedBy=timers.target

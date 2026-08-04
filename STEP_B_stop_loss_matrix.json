@@ -1,0 +1,144 @@
+{
+  "schema": "qiyu_step_b_stop_loss_matrix_v1",
+  "updated_at": "2026-07-27 09:53:50",
+  "leverage_policy": 20,
+  "grade_B_position_ratio": 0.3,
+  "strategies": [
+    {
+      "strategy_key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
+      "symbol": "ADA-USDT-SWAP",
+      "timeframe": "5m",
+      "daemon_config_file": "formal_daemon_config_ada_5m.json",
+      "systemd_unit": "qiyu-formal-auto-trade-ada-5m",
+      "daemon_stop_loss_pct": 0.006,
+      "runtime_controls_stop_loss_pct": 0.009,
+      "dsl_stop_loss_pct": null,
+      "last_order_stop_loss_pct": null,
+      "last_order_exchange_distance": null,
+      "last_order_opened_at": null,
+      "frontend_default_stop_loss_pct": 0.009,
+      "order_creation_reads_stop_loss_pct": 0.006,
+      "order_creation_source": "formal_daemon_config via executor._load_stage823_trade_config / _active_stop_loss_pct",
+      "matches_0_9pct": false,
+      "inconsistency": true
+    },
+    {
+      "strategy_key": "ltc5_exhaustion_fade_short_ai",
+      "symbol": "LTC-USDT-SWAP",
+      "timeframe": "5m",
+      "daemon_config_file": "formal_daemon_config_ltc_5m.json",
+      "systemd_unit": "qiyu-formal-auto-trade-ltc-5m",
+      "daemon_stop_loss_pct": 0.009,
+      "runtime_controls_stop_loss_pct": null,
+      "dsl_stop_loss_pct": null,
+      "last_order_stop_loss_pct": 0.009,
+      "last_order_exchange_distance": 0.008888888888888925,
+      "last_order_opened_at": "2026-07-24 15:25:25",
+      "frontend_default_stop_loss_pct": 0.009,
+      "order_creation_reads_stop_loss_pct": 0.009,
+      "order_creation_source": "formal_daemon_config via executor._load_stage823_trade_config / _active_stop_loss_pct",
+      "matches_0_9pct": true,
+      "inconsistency": false
+    },
+    {
+      "strategy_key": "ng5_exhaustion_fade_short_ai",
+      "symbol": "NG-USDT-SWAP",
+      "timeframe": "5m",
+      "daemon_config_file": "formal_daemon_config_ng_5m.json",
+      "systemd_unit": "qiyu-formal-auto-trade-ng-5m",
+      "daemon_stop_loss_pct": 0.009,
+      "runtime_controls_stop_loss_pct": null,
+      "dsl_stop_loss_pct": null,
+      "last_order_stop_loss_pct": null,
+      "last_order_exchange_distance": null,
+      "last_order_opened_at": null,
+      "frontend_default_stop_loss_pct": 0.009,
+      "order_creation_reads_stop_loss_pct": 0.009,
+      "order_creation_source": "formal_daemon_config via executor._load_stage823_trade_config / _active_stop_loss_pct",
+      "matches_0_9pct": true,
+      "inconsistency": false
+    },
+    {
+      "strategy_key": "frost_xrp_rescue_h20_t45",
+      "symbol": "XRP-USDT-SWAP",
+      "timeframe": "15m",
+      "daemon_config_file": "formal_daemon_config_xrp_15m.json",
+      "systemd_unit": "qiyu-formal-auto-trade-xrp-15m",
+      "daemon_stop_loss_pct": 0.009,
+      "runtime_controls_stop_loss_pct": 0.009,
+      "dsl_stop_loss_pct": null,
+      "last_order_stop_loss_pct": 0.009,
+      "last_order_exchange_distance": 0.008935018050541333,
+      "last_order_opened_at": "2026-07-27 09:00:47",
+      "frontend_default_stop_loss_pct": 0.009,
+      "order_creation_reads_stop_loss_pct": 0.009,
+      "order_creation_source": "formal_daemon_config via executor._load_stage823_trade_config / _active_stop_loss_pct",
+      "matches_0_9pct": true,
+      "inconsistency": false
+    },
+    {
+      "strategy_key": "frost3_btc1h_xrpport_exhaustion_fade_slope",
+      "symbol": "BTC-USDT-SWAP",
+      "timeframe": "1h",
+      "daemon_config_file": "formal_daemon_config.json",
+      "systemd_unit": "qiyu-formal-auto-trade",
+      "daemon_stop_loss_pct": 0.009,
+      "runtime_controls_stop_loss_pct": 0.009,
+      "dsl_stop_loss_pct": null,
+      "last_order_stop_loss_pct": null,
+      "last_order_exchange_distance": null,
+      "last_order_opened_at": null,
+      "frontend_default_stop_loss_pct": 0.009,
+      "order_creation_reads_stop_loss_pct": 0.009,
+      "order_creation_source": "formal_daemon_config via executor._load_stage823_trade_config / _active_stop_loss_pct",
+      "matches_0_9pct": true,
+      "inconsistency": false
+    }
+  ],
+  "ada_deep_dive": {
+    "priority_order": [
+      "1. executor._active_stop_loss_pct() <- _load_stage823_trade_config()",
+      "2. DAEMON_CONFIG_FILE from VECTOR_TRADE_SYMBOL/TIMEFRAME",
+      "3. runtime assignments.stop_loss_pct NOT used for attach SL",
+      "4. frontend 0.009 is display/default, not ADA order truth"
+    ],
+    "which_value_order_creation_reads": 0.006,
+    "next_order_will_be": 0.006,
+    "next_order_will_NOT_be": 0.009,
+    "frontend_shows": 0.009,
+    "display_vs_reality_risk": "Frontend/runtime show 0.9% while ADA daemon config remains 0.6%. Next ADA order attaches SL at 0.6%. DO NOT migrate without human confirmation.",
+    "H1_auto_SL_attach_chain": {
+      "result": "PASS",
+      "evidence": "attachAlgoOrds path intact; LTC live used 0.009; STEP B did not change SL code path."
+    },
+    "H2_all_strategies_actually_0_9pct": {
+      "result": "FAIL",
+      "evidence": "ADA formal_daemon_config_ada_5m.json stop_loss_pct=0.006"
+    },
+    "safe_migrate_script": "/root/docs/step_b_ada_sl_migrate_0p6_to_0p9.sh",
+    "safe_rollback_script": "/root/docs/step_b_ada_sl_rollback_0p9_to_0p6.sh",
+    "ada_only_restart_steps": [
+      "Confirm ADA flat / cooldown clear",
+      "Human confirms migrate",
+      "Run migrate script (ADA config only)",
+      "systemctl restart qiyu-formal-auto-trade-ada-5m",
+      "Verify daemon+executor effective SL=0.009",
+      "On next open verify exchange distance ~0.9%"
+    ],
+    "next_order_verification_plan": [
+      "Read ADA formal_v6 state stop_loss_pct / stop_loss_price",
+      "Require |sl-entry|/entry ~0.009",
+      "Require attachAlgoOrds + exchange_side_stop_verified",
+      "Else run rollback + ADA-only restart"
+    ],
+    "DO_NOT_AUTO_MIGRATE": true
+  },
+  "H1": {
+    "result": "PASS",
+    "evidence": "attachAlgoOrds path intact; LTC live used 0.009; STEP B did not change SL code path."
+  },
+  "H2": {
+    "result": "FAIL",
+    "evidence": "ADA formal_daemon_config_ada_5m.json stop_loss_pct=0.006"
+  }
+}

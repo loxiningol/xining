@@ -1,0 +1,7 @@
+{
+  "mechanism_id": "mech_liquidity_failed_breakout_high_xrp15m",
+  "completed_at": "2026-07-27 22:58:07",
+  "stage": "archived",
+  "ok": false,
+  "source": "seeded_from_prior_agent_summary"
+}

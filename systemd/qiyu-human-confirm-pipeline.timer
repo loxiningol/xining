@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu Human-Confirm Pipeline Timer (every 2m)
+
+[Timer]
+OnCalendar=*-*-* *:0/2:00
+Persistent=true
+Unit=qiyu-human-confirm-pipeline.service
+
+[Install]
+WantedBy=timers.target

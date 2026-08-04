@@ -1,0 +1,24 @@
+{
+  "formal_spec_families": {
+    "liquidity_failed_breakout_high": 1,
+    "mean_reversion_vwap_deviation": 1,
+    "time_structure_session_breakout": 1,
+    "trend_continuation_thrust_retest": 1,
+    "vol_regime_compression_release": 1,
+    "liquidity_failed_breakout_low": 1,
+    "mean_reversion_rsi_extreme": 1,
+    "mean_reversion_zscore_dislocation": 1
+  },
+  "independent_family_count": 8,
+  "exploration_directions_covered": {
+    "liquidity_failed_breakout": 2,
+    "mean_reversion": 3,
+    "time_structure": 1,
+    "trend_continuation": 1,
+    "vol_regime": 1
+  },
+  "exploration_direction_count": 5,
+  "rejected_n": 0,
+  "gate_rows_n": 8,
+  "generated_at": "2026-07-27 22:58:07"
+}

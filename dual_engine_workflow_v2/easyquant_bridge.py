@@ -103,6 +103,9 @@ def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookbac
     )
 
     research_meta = None
+    require_research = str(
+        os.environ.get("QIYU_CREATION_REQUIRE_RESEARCH_HISTORY") or "1"
+    ).strip().lower() not in ("0", "false", "no", "off")
     if prefer_research:
         try:
             from . import research_candle_store as rcs
@@ -118,6 +121,7 @@ def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookbac
                 "error": got.get("error"),
                 "start_ts": got.get("start_ts"),
                 "end_ts": got.get("end_ts"),
+                "path": got.get("path"),
             }
             if got.get("ok") and got.get("candles"):
                 rows = got["candles"]
@@ -134,8 +138,33 @@ def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookbac
                     "symbol": symbol,
                     "timeframe": timeframe,
                 }
+            if require_research:
+                return {
+                    "ok": False,
+                    "error": "research_history_required_not_found",
+                    "path": got.get("path"),
+                    "candles": [],
+                    "research": research_meta,
+                    "hint_zh": (
+                        "创造管道禁止静默回退 formal 短窗。"
+                        "请提供研究长历史（R2/分片或 local/*_research.json）。"
+                    ),
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                }
         except Exception as exc:
             research_meta = {"ok": False, "error": str(exc)[:200]}
+            if require_research:
+                return {
+                    "ok": False,
+                    "error": "research_history_load_exception",
+                    "path": None,
+                    "candles": [],
+                    "research": research_meta,
+                    "hint_zh": "创造管道要求研究长历史，加载异常且禁止 formal 短窗兜底。",
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                }
 
     path = resolve_candle_cache(symbol, timeframe)
     if not path.exists():
@@ -210,6 +239,40 @@ def _std(xs, n):
     return out
 
 
+def _delta_series(values, lag=1):
+    """Change-rate feature: x[t] - x[t-lag]."""
+    lag = max(1, int(lag or 1))
+    values = list(values or [])
+    out = [None] * len(values)
+    for i in range(lag, len(values)):
+        a = values[i]
+        b = values[i - lag]
+        if a is None or b is None:
+            continue
+        try:
+            out[i] = float(a) - float(b)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _slope_series(values, window=6):
+    """Simple end-minus-start slope over a trailing window."""
+    window = max(2, int(window or 6))
+    values = list(values or [])
+    out = [None] * len(values)
+    for i in range(window - 1, len(values)):
+        a = values[i]
+        b = values[i - window + 1]
+        if a is None or b is None:
+            continue
+        try:
+            out[i] = (float(a) - float(b)) / float(window - 1)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def _build_factor_matrix(candles):
     c = [r["close"] for r in candles]
     h = [r["high"] for r in candles]
@@ -248,27 +311,30 @@ def _build_factor_matrix(candles):
     rets_abs = [abs(x) if x is not None else None for x in ret1]
     atr_proxy = _sma([((h[i] - l[i]) / c[i]) if c[i] else 0.0 for i in range(n)], 14)
 
-    # RSI-14 (Wilder lite) — needed for exhaustion / oversold recovery research
+    # RSI-14 — must match backtest_engine_v2.rsi14 (ewm alpha=1/14, adjust=False)
+    # so recipe_policy can formally map rsi_14 → rsi14 without estimator drift.
     rsi14 = [None] * n
-    if n >= 16:
-        gains = []
-        losses = []
-        for i in range(1, n):
-            dlt = c[i] - c[i - 1]
-            gains.append(dlt if dlt > 0 else 0.0)
-            losses.append((-dlt) if dlt < 0 else 0.0)
-        ag = sum(gains[:14]) / 14.0
-        al = sum(losses[:14]) / 14.0
-        rsi14[14] = 100.0 - (100.0 / (1.0 + (ag / al if al > 1e-12 else 1e12)))
-        for i in range(15, n):
-            g = gains[i - 1]
-            lss = losses[i - 1]
-            ag = (ag * 13.0 + g) / 14.0
-            al = (al * 13.0 + lss) / 14.0
-            rs = ag / al if al > 1e-12 else 1e12
-            rsi14[i] = 100.0 - (100.0 / (1.0 + rs))
+    alpha = 1.0 / 14.0
+    avg_gain = None
+    avg_loss = None
+    for i in range(1, n):
+        dlt = c[i] - c[i - 1]
+        g = dlt if dlt > 0 else 0.0
+        lss = (-dlt) if dlt < 0 else 0.0
+        if avg_gain is None:
+            avg_gain = g
+            avg_loss = lss
+        else:
+            avg_gain = (1.0 - alpha) * avg_gain + alpha * g
+            avg_loss = (1.0 - alpha) * avg_loss + alpha * lss
+        if avg_loss <= 1e-12:
+            rsi14[i] = 100.0
+        else:
+            rsi14[i] = 100.0 - (100.0 / (1.0 + (avg_gain / avg_loss)))
 
-    # volume z if available
+    # volume_z：有真实成交量用成交量；否则用 bar-range 代理。
+    # 必须与 backtest_engine_v2.vol_z20 一致，否则唯一可正式编译的
+    # close_z_20×volume_z 交集会因 volume 全空而永久 formal_capability_blocked → 存活0。
     vols = []
     for r in candles:
         v = r.get("volume")
@@ -278,16 +344,19 @@ def _build_factor_matrix(candles):
             vols.append(float(v) if v is not None else None)
         except Exception:
             vols.append(None)
-    volume_z = [None] * n
-    if any(v is not None for v in vols):
+    volume_from_ohlc_proxy = not any(v is not None for v in vols)
+    if volume_from_ohlc_proxy:
+        vv = [float(h[i] - l[i]) for i in range(n)]
+    else:
         vv = [float(v) if v is not None else 0.0 for v in vols]
-        vma = _sma(vv, 20)
-        vstd = _std(vv, 20)
-        for i in range(n):
-            if vma[i] is None or vstd[i] is None or vstd[i] <= 1e-12:
-                volume_z[i] = None
-            else:
-                volume_z[i] = (vv[i] - vma[i]) / vstd[i]
+    volume_z = [None] * n
+    vma = _sma(vv, 20)
+    vstd = _std(vv, 20)
+    for i in range(n):
+        if vma[i] is None or vstd[i] is None or vstd[i] <= 1e-12:
+            volume_z[i] = None
+        else:
+            volume_z[i] = (vv[i] - vma[i]) / vstd[i]
 
     # exhaustion score: deep negative z + low RSI + long lower wick (higher = more exhausted)
     exhaustion_score = [None] * n
@@ -326,6 +395,103 @@ def _build_factor_matrix(candles):
         ar = float(rets_abs[i] or 0.0) if rets_abs[i] is not None else 0.0
         expansion_score[i] = prior_compress * 0.55 + min(2.0, rng * 80.0) * 0.25 + min(2.0, ar * 80.0) * 0.20
 
+    # Mechanism-preserving OHLCV proxies.  These are explicitly derived proxies,
+    # never substitutes presented as real order book / OI / liquidation data.
+    close_location = [None] * n
+    signed_volume_pressure = [None] * n
+    impact_per_volume_proxy = [None] * n
+    impact_decay_proxy = [None] * n
+    downside_velocity_decay = [None] * n
+    upside_velocity_decay = [None] * n
+    absorption_proxy = [None] * n
+    reclaim_strength = [None] * n
+    squeeze_persistence = [None] * n
+    volatility_acceleration = [None] * n
+    trend_efficiency_12 = [None] * n
+    breakout_acceptance = [None] * n
+    for i in range(n):
+        bar_range = float(h[i] - l[i])
+        if bar_range > 1e-12:
+            close_location[i] = (c[i] - l[i]) / bar_range
+        vol_ratio = None
+        if vma[i] is not None and float(vma[i]) > 1e-12:
+            vol_ratio = float(vv[i]) / float(vma[i])
+        if ret1[i] is not None and vol_ratio is not None:
+            signed_volume_pressure[i] = (1.0 if ret1[i] >= 0 else -1.0) * vol_ratio
+            impact_per_volume_proxy[i] = abs(float(ret1[i])) / max(vol_ratio, 0.05)
+        if i >= 1 and impact_per_volume_proxy[i - 1] is not None and impact_per_volume_proxy[i] is not None:
+            impact_decay_proxy[i] = float(impact_per_volume_proxy[i - 1]) - float(impact_per_volume_proxy[i])
+        if i >= 3:
+            prior_down = sum(max(0.0, -float(ret1[j] or 0.0)) for j in range(i - 3, i)) / 3.0
+            prior_up = sum(max(0.0, float(ret1[j] or 0.0)) for j in range(i - 3, i)) / 3.0
+            downside_velocity_decay[i] = prior_down - max(0.0, -float(ret1[i] or 0.0))
+            upside_velocity_decay[i] = prior_up - max(0.0, float(ret1[i] or 0.0))
+        if vol_ratio is not None and range_pct[i] is not None and close_location[i] is not None:
+            body = abs(c[i] - o[i]) / max(bar_range, 1e-12)
+            absorption_proxy[i] = vol_ratio * max(0.0, 1.0 - body) * (
+                1.0 - abs(float(close_location[i]) - 0.5)
+            )
+            reclaim_strength[i] = (
+                max(0.0, float(close_location[i]) - 0.5) *
+                (1.0 + max(0.0, float(lower_wick[i] or 0.0) * 100.0))
+            )
+        if i >= 5:
+            sq = [float(squeeze_score[j]) for j in range(i - 5, i + 1)
+                  if squeeze_score[j] is not None]
+            if sq:
+                squeeze_persistence[i] = sum(sq) / float(len(sq))
+        if i >= 1 and atr_proxy[i] is not None and atr_proxy[i - 1] is not None:
+            volatility_acceleration[i] = float(atr_proxy[i]) - float(atr_proxy[i - 1])
+        if i >= 12:
+            path = sum(abs(c[j] - c[j - 1]) for j in range(i - 11, i + 1))
+            trend_efficiency_12[i] = abs(c[i] - c[i - 12]) / path if path > 1e-12 else 0.0
+            prev_hi = max(h[i - 12:i])
+            prev_lo = min(l[i - 12:i])
+            if c[i] > prev_hi:
+                breakout_acceptance[i] = (c[i] - prev_hi) / max(c[i], 1e-12)
+            elif c[i] < prev_lo:
+                breakout_acceptance[i] = (c[i] - prev_lo) / max(c[i], 1e-12)
+            else:
+                breakout_acceptance[i] = 0.0
+
+    # Donchian / trend bias — prior completed bars only (aligned with prev_high20/low20).
+    donchian20_long_break = [None] * n
+    donchian20_short_break = [None] * n
+    trend_bias_50_200 = [None] * n
+    sma50 = _sma(c, 50)
+    sma200 = _sma(c, 200)
+    for i in range(n):
+        if i >= 20:
+            prev_hi = max(h[i - 20:i])
+            prev_lo = min(l[i - 20:i])
+            if prev_hi:
+                donchian20_long_break[i] = c[i] / prev_hi - 1.0
+            if c[i]:
+                donchian20_short_break[i] = prev_lo / c[i] - 1.0
+        if sma50[i] is not None and sma200[i] is not None and c[i]:
+            trend_bias_50_200[i] = (sma50[i] - sma200[i]) / c[i]
+
+    # Bollinger(20,2) — sample std aligned with formal precompute_indicators.
+    bb_lower_dist = [None] * n
+    bb_upper_dist = [None] * n
+    bb_mid_reclaim = [None] * n
+    bb_width = [None] * n
+    sma20 = _sma(c, 20)
+    std20 = _std(c, 20)
+    for i in range(n):
+        if sma20[i] is None or std20[i] is None or not c[i]:
+            continue
+        mid = float(sma20[i])
+        sd = float(std20[i])
+        if mid == 0.0:
+            continue
+        lower = mid - 2.0 * sd
+        upper = mid + 2.0 * sd
+        bb_lower_dist[i] = (c[i] - lower) / c[i]
+        bb_upper_dist[i] = (upper - c[i]) / c[i]
+        bb_mid_reclaim[i] = (c[i] - mid) / c[i]
+        bb_width[i] = (upper - lower) / mid
+
     return {
         "ret_1": ret1,
         "ret_3": ret3,
@@ -343,6 +509,37 @@ def _build_factor_matrix(candles):
         "exhaustion_score": exhaustion_score,
         "squeeze_score": squeeze_score,
         "expansion_score": expansion_score,
+        "close_location": close_location,
+        "signed_volume_pressure": signed_volume_pressure,
+        "impact_per_volume_proxy": impact_per_volume_proxy,
+        "impact_decay_proxy": impact_decay_proxy,
+        "downside_velocity_decay": downside_velocity_decay,
+        "upside_velocity_decay": upside_velocity_decay,
+        "absorption_proxy": absorption_proxy,
+        "reclaim_strength": reclaim_strength,
+        "bullish_reclaim": reclaim_strength,
+        "trend_bias_50_200": trend_bias_50_200,
+        "donchian20_long_break": donchian20_long_break,
+        "donchian20_short_break": donchian20_short_break,
+        "bb_lower_dist": bb_lower_dist,
+        "bb_upper_dist": bb_upper_dist,
+        "bb_mid_reclaim": bb_mid_reclaim,
+        "bb_width": bb_width,
+        "squeeze_persistence": squeeze_persistence,
+        "volatility_acceleration": volatility_acceleration,
+        "trend_efficiency_12": trend_efficiency_12,
+        "breakout_acceptance": breakout_acceptance,
+        # Representation upgrades: change-rate + discrete state axes
+        "delta_rsi_14": _delta_series(rsi14, 2),
+        "delta_volume_z": _delta_series(volume_z, 2),
+        "delta_bb_width": _delta_series(bb_width, 3),
+        "slope_close_6": _slope_series(c, 6),
+        "trend_state": trend_bias_50_200,
+        "volatility_state_compressed": [
+            (1.0 if (w is not None and sp is not None and w < 0.02 and sp > 0.5) else
+             (0.0 if w is not None else None))
+            for w, sp in zip(bb_width, squeeze_persistence)
+        ],
     }
 
 

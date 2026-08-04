@@ -1,0 +1,12 @@
+[Unit]
+Description=Calibrate Qiyu execution friction every 15 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+AccuracySec=30s
+Persistent=true
+Unit=qiyu-execution-cost-calibrator.service
+
+[Install]
+WantedBy=timers.target

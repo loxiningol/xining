@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Hard gate: prelim win_rate < 50% must not be presentable to humans."""
+"""硬门：初评胜率未严格大于 50% 时不得对人展示。"""
 from __future__ import print_function
 
 import os
@@ -23,12 +23,13 @@ class TestCreationPrelimWrGate(unittest.TestCase):
             timeframe="5m",
         )
         self.assertFalse(v["present_to_human"])
-        self.assertIn("win_rate_below_50pct", v["reject_reasons"])
+        self.assertIn("win_rate_not_above_50pct", v["reject_reasons"])
         self.assertIsNotNone(v["human_banner_zh"])
         self.assertAlmostEqual(v["window"]["span_days"], 4.8576, places=3)
         self.assertIn("不是单日收益", v["metrics_note_zh"])
+        self.assertIn("胜率", v["human_banner_zh"])
 
-    def test_wr_at_50_presentable(self):
+    def test_wr_at_50_not_presentable_must_be_strictly_above(self):
         v = prelim.prelim_eval(
             {"win_rate": 0.50, "n_trades": 20, "total_return": 0.01},
             first_ts=1784985900000,
@@ -36,8 +37,8 @@ class TestCreationPrelimWrGate(unittest.TestCase):
             n_bars=1400,
             timeframe="5m",
         )
-        self.assertTrue(v["present_to_human"])
-        self.assertEqual(v["reject_reasons"], [])
+        self.assertFalse(v["present_to_human"])
+        self.assertIn("win_rate_not_above_50pct", v["reject_reasons"])
 
     def test_wr_missing_not_presentable(self):
         v = prelim.prelim_eval({"n_trades": 20})

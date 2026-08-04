@@ -1,0 +1,10 @@
+[Unit]
+Description=Qiyu weekly strategy ecology evolution report
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+Environment=PYTHONPATH=/root
+ExecStart=/usr/bin/python3 /root/auto_trade_strategy_lifecycle.py --weekly-report
+Nice=10

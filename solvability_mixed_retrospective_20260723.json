@@ -1,0 +1,66 @@
+{
+  "schema": "qiyu_system_solvability_codex_retrospective_v1",
+  "reviewed_at": "2026-07-23 17:45:00",
+  "week_bucket": "2026-W30",
+  "acknowledged": true,
+  "alarm": {
+    "sent_at": "2026-07-23 13:32:14",
+    "week_bucket": "2026-W30",
+    "deterministic_state": "SAT_WITNESS",
+    "ai_state": "mixed_requires_codex_review",
+    "trigger_reasons": [
+      "rule_or_major_mutation_changed",
+      "independent_death_evidence_batch"
+    ],
+    "notification_kind": "system_solvability_alarm_sent_verified",
+    "wxpusher_message_id": 2358160594
+  },
+  "context": {
+    "matrix_round_id": "matrix_20260723_124309",
+    "matrix_window": "2026-07-23 12:43:09 -> 2026-07-23 14:02:14",
+    "research_target_count": 36,
+    "round_outcomes": {
+      "sleeping_preserved": 9,
+      "early_pruned_no_empirical_edge": 25,
+      "training": 2,
+      "execution_errors": 0,
+      "ready_candidates": 0
+    },
+    "live_execution_changed": false
+  },
+  "subsequent_heartbeat": {
+    "created_at": "2026-07-23 13:42:24",
+    "deterministic_state": "SAT_WITNESS",
+    "ai_state": "unanimous_logically_feasible",
+    "providers": {
+      "deepseek": {"verdict": "FEASIBLE", "confidence": 100.0},
+      "qwen": {"verdict": "FEASIBLE", "confidence": 95.0},
+      "chatgpt": {"verdict": "FEASIBLE", "confidence": 82.0}
+    },
+    "active_pruning_rule_count": 0,
+    "controlled_mutation_shape_count": 0,
+    "unique_death_evidence_at_heartbeat": 1415
+  },
+  "codex_findings": [
+    "确定性见证持续为 SAT_WITNESS，全部门槛检查为真；规则空间在纯逻辑上仍可满足。",
+    "预警触发原因符合设计：36集群研究矩阵启动改变了 research_target_scopes 结构指纹，同时独立死亡证据批量越过20%门槛。",
+    "mixed_requires_codex_review 是事件驱动心跳的失败关闭态，不是实盘准入变化，也不等于规则空间已被判死。",
+    "约10分钟后的下一次心跳已恢复为三AI一致 FEASIBLE；期间未放宽任何成本、胜率、样本、止损、容量或人工批准门槛。",
+    "旧实现用 week_bucket UNIQUE + 固定 audit_id 的 INSERT OR REPLACE，导致 mixed 审计的三AI原文被覆盖，无法逐供应商还原当时分歧。",
+    "矩阵首轮 live_execution_changed=false；认知门禁与绝对评级仓位未因本次预警改变；无策略因本次预警获得或恢复实盘开仓权。"
+  ],
+  "decisions": {
+    "automatic_rule_relaxation": false,
+    "tighten_or_loosen_gates": "unchanged",
+    "live_entry_permission_change": false,
+    "exploration_continue": true,
+    "requires_human_ack": true,
+    "codex_verdict": "accepted_as_transient_structural_heartbeat_no_gate_change",
+    "follow_up_fix": "append_only_solvability_audit_history_and_alarm_snapshot"
+  },
+  "human_review_checklist": [
+    "确认未因预警而手动放宽门槛或恢复旧策略开仓",
+    "确认网站/状态仍显示自动放宽规则=禁止",
+    "确认 BTC15m 影子验证与 CL1h 封存状态未被动摇"
+  ]
+}

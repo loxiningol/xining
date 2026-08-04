@@ -841,7 +841,7 @@ def api_dual_engine_bootstrap():
 @app.route("/api/dual_engine/start_task", methods=["POST"])
 @auth.login_required
 def api_dual_engine_start_task():
-    """启动策略创造：已强制转入唯一蓝图研究发现入口（creation_sole_entry）。"""
+    """创造策略指令入口：第一步研究发现 → 第二步统一门槛 → 第三步四阶段复核。"""
     try:
         import auto_trade_dual_engine_factory as dual
         payload = request.get_json(silent=True) or {}
@@ -1263,6 +1263,9 @@ def build_process_status_payload():
         ("BTC 1小时", "/root/auto_trade/formal_daemon.pid"),
         ("BTC 15分钟", "/root/auto_trade/formal_daemon_btc_15m.pid"),
         ("BTC 5分钟", "/root/auto_trade/formal_daemon_btc_5m.pid"),
+        ("ETH 5分钟", "/root/auto_trade/formal_daemon_eth_5m.pid"),
+        ("SOL 5分钟", "/root/auto_trade/formal_daemon_sol_5m.pid"),
+        ("XRP 5分钟", "/root/auto_trade/formal_daemon_xrp_5m.pid"),
         ("CL 1小时", "/root/auto_trade/formal_daemon_cl.pid"),
         ("CL 5分钟", "/root/auto_trade/formal_daemon_cl_5m.pid"),
         ("XAU 1小时", "/root/auto_trade/formal_daemon_xau.pid"),
@@ -1293,6 +1296,9 @@ def build_process_status_payload():
     btc_daemon_pid = pid_by_label.get("BTC 1小时")
     btc_15m_daemon_pid = pid_by_label.get("BTC 15分钟")
     btc_5m_daemon_pid = pid_by_label.get("BTC 5分钟")
+    eth_5m_daemon_pid = pid_by_label.get("ETH 5分钟")
+    sol_5m_daemon_pid = pid_by_label.get("SOL 5分钟")
+    xrp_5m_daemon_pid = pid_by_label.get("XRP 5分钟")
     cl_daemon_pid = pid_by_label.get("CL 1小时")
     cl_5m_daemon_pid = pid_by_label.get("CL 5分钟")
     xau_daemon_pid = pid_by_label.get("XAU 1小时")
@@ -1384,14 +1390,17 @@ def build_process_status_payload():
     except Exception as e:
         strategy_read_error = str(e)
 
-    # Expected current live openable set:
-    # ADA/LTC/NG 5m + XRP 15m + BTC 1h (frost3 xrpport exhaustion_fade).
+    # Expected current live openable set.
     expected_live_keys = {
         "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
         "ltc5_exhaustion_fade_short_ai",
         "ng5_exhaustion_fade_short_ai",
         "frost_xrp_rescue_h20_t45",
         "frost3_btc1h_xrpport_exhaustion_fade_slope",
+        "btc5_trend_rebound_ada5_clone_v1",
+        "eth5_trend_rebound_ada5_clone_v1",
+        "sol5_trend_rebound_ada5_clone_v1",
+        "xrp5_trend_rebound_ada5_clone_v1",
     }
     live_keys = {row["key"] for row in live_rows}
     strategy_ok = (
@@ -1487,9 +1496,12 @@ def build_process_status_payload():
         detail_lines=fifteen_lines,
     )
 
-    # --- 5m live layer: ADA/LTC/NG openable; others idle ---
+    # --- 5m live layer ---
     five_minute_expected = {
-        "BTC-USDT-SWAP": [],
+        "BTC-USDT-SWAP": ["btc5_trend_rebound_ada5_clone_v1"],
+        "ETH-USDT-SWAP": ["eth5_trend_rebound_ada5_clone_v1"],
+        "SOL-USDT-SWAP": ["sol5_trend_rebound_ada5_clone_v1"],
+        "XRP-USDT-SWAP": ["xrp5_trend_rebound_ada5_clone_v1"],
         "CL-USDT-SWAP": [],
         "NG-USDT-SWAP": ["ng5_exhaustion_fade_short_ai"],
         "XAU-USDT-SWAP": [],
@@ -1499,6 +1511,9 @@ def build_process_status_payload():
     }
     five_minute_pid = {
         "BTC-USDT-SWAP": btc_5m_daemon_pid,
+        "ETH-USDT-SWAP": eth_5m_daemon_pid,
+        "SOL-USDT-SWAP": sol_5m_daemon_pid,
+        "XRP-USDT-SWAP": xrp_5m_daemon_pid,
         "CL-USDT-SWAP": cl_5m_daemon_pid,
         "NG-USDT-SWAP": ng_5m_daemon_pid,
         "XAU-USDT-SWAP": None,  # no dedicated 5m daemon required
@@ -1532,7 +1547,7 @@ def build_process_status_payload():
     if five_minute_ok:
         five_lines = [
             "可开仓：%s 5分钟" % ("、".join(five_active) if five_active else "无"),
-            "BTC / CL / XAG / XAU 5分钟：关闭或待命",
+            "CL / XAG / XAU 5分钟：关闭或待命",
         ]
     else:
         five_lines = [
@@ -4053,6 +4068,35 @@ def _vector_load_json(path, default=None):
     except Exception:
         return default
 
+def _vector_configured_symbols(timeframe, baseline=()):
+    """Return the baseline plus every valid daemon config for a timeframe.
+
+    The web roster must follow mounted daemon configs. Keeping a separate,
+    hard-coded asset allowlist caused new live strategies to be omitted.
+    """
+    timeframe = str(timeframe or "").strip().lower()
+    symbols = []
+    for symbol in baseline or ():
+        symbol = str(symbol or "").strip().upper()
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+    pattern = "formal_daemon_config_*_%s.json" % timeframe
+    for path in sorted(_VECTOR_AUTO.glob(pattern)):
+        config = _vector_load_json(path, {})
+        if not isinstance(config, dict):
+            continue
+        config_timeframe = str(
+            config.get("timeframe") or config.get("bar") or ""
+        ).strip().lower()
+        symbol = str(config.get("symbol") or "").strip().upper()
+        if (
+            config_timeframe == timeframe
+            and symbol.endswith("-USDT-SWAP")
+            and symbol not in symbols
+        ):
+            symbols.append(symbol)
+    return tuple(symbols)
+
 def _vector_write_json(path, obj):
     try:
         p = _vector_Path(path)
@@ -4647,7 +4691,7 @@ def _vector_trade_dashboard(cur, strategy_key, strategy_name, cfg=None, state_su
                 assignment_row.get("audit_state") or "") == "read_only_shadow":
             lifecycle_grade = "SHADOW"
         max_position_ratio = assignment_row.get("max_position_ratio")
-        grade_ratio_map = {"S": 0.70, "A": 0.50, "B": 0.30, "C": 0.15}
+        grade_ratio_map = {"S": 0.70, "A": 0.50, "B": 0.30, "C": 0.10}
         if max_position_ratio is None and lifecycle_grade in grade_rank_map:
             max_position_ratio = grade_ratio_map.get(lifecycle_grade)
         # Applied B-grade strategies must size at 30% (never legacy 15%).
@@ -5056,7 +5100,12 @@ def _vector_status_payload():
 
     five_minute_assets = []
     five_minute_zones = []
-    for symbol in ("BTC-USDT-SWAP","CL-USDT-SWAP","XAU-USDT-SWAP","NG-USDT-SWAP","XAG-USDT-SWAP","LTC-USDT-SWAP","ADA-USDT-SWAP"):
+    for symbol in _vector_configured_symbols("5m", (
+        "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP",
+        "XRP-USDT-SWAP", "CL-USDT-SWAP", "XAU-USDT-SWAP",
+        "NG-USDT-SWAP", "XAG-USDT-SWAP", "LTC-USDT-SWAP",
+        "ADA-USDT-SWAP",
+    )):
         asset_key = symbol.split("-")[0].lower()
         config = _vector_load_json(_VECTOR_AUTO/("formal_daemon_config_%s_5m.json"%asset_key),{})
         if not isinstance(config,dict):

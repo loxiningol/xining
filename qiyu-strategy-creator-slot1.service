@@ -1,0 +1,24 @@
+[Unit]
+Description=Qiyu secondary strategy creator slot for parallel target chase
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+Environment=QIYU_CREATOR_SLOT=1
+EnvironmentFile=-/root/auto_trade/ai_ecosystem.env
+ExecStart=/usr/bin/flock -n -E 75 /root/auto_trade/strategy_creator_slot1.lock /usr/bin/python3 /root/auto_trade_strategy_ecosystem.py --create-strategy
+User=root
+Nice=15
+CPUAccounting=true
+CPUQuota=50%
+MemoryAccounting=true
+MemoryHigh=480M
+MemoryMax=600M
+TimeoutStartSec=3h
+SuccessExitStatus=75
+
+[Install]
+WantedBy=multi-user.target

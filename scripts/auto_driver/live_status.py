@@ -74,9 +74,10 @@ def humanize_mechanism_title(symbol, timeframe, family=None, mechanism_name=None
             action, scene = "流动性扫荡回收", "Liquidity Sweep Reclaim"
         elif "engulf" in tokens or "displace" in tokens:
             action, scene = "会话流动性吞没置换", "Session Liq Engulf"
+        elif "frost3w2g" in tokens or re.search(r"sol_tp47", tokens):
+            # 寒霜贰 SOL 1h 主趋势回撤恢复 — NOT session_trend_pullback clone
+            action, scene = "主趋势回撤恢复", "Trend Recovery"
         elif re.search(r"(^|_)(tp|h|r|c)\d+", tokens) or re.fullmatch(r"[a-z]{2,6}(_[a-z]*\d+)+", tokens):
-            # Param-soup keys (sol_tp47_h32_r46_c20) → generic trend-pullback family
-            action, scene = "顺势极值回升", "Trend Pullback"
         else:
             pretty = re.sub(r"[_-]+", " ", base).strip() or "未命名机制"
             # still reject pure ascii param soup as display action

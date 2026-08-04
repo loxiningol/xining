@@ -1,0 +1,178 @@
+{
+  "artifact_key": "frost3_eth15m_behavior_death_test",
+  "report_title": "Death Test — ETH15m Market Behaviour",
+  "created_at": "2026-07-26T11:14:30+08:00",
+  "key_prefix": "frost3_eth15m_behavior_",
+  "sources": {
+    "cl_archive": "/root/auto_trade/dual_engine/archive/frost2_cl_15m_entry_exhausted_r3",
+    "cl_lessons_local_fallback": true,
+    "freezer": "PENDING_SSH — host banner timeout; applied known freezer patterns from sibling frost3 runners",
+    "known_live_collisions": [
+      "frost3_eth15m_fade exhaustion_fade",
+      "frost3_eth1h_breakout trend_breakout",
+      "frost3_bnb15m_session session_v_reclaim family",
+      "ADA/LTC/NG/XRP live protect"
+    ]
+  },
+  "death_rules": [
+    {"code": "DATA_UNAVAILABLE", "kill_if": "requires funding/OI and series not fetchable"},
+    {"code": "COLLISION_ETH15M_FADE", "kill_if": "entry skeleton uses rsi+z+macd+ema fade shape"},
+    {"code": "COLLISION_ETH1H_BREAKOUT", "kill_if": "vol-contraction → structure breakout entry"},
+    {"code": "COLLISION_BNB_VRECLAIM", "kill_if": "z20 dump + macd reclaim clone"},
+    {"code": "CL_MARGINAL_EXHAUSTION", "kill_if": "marginal rsi≈54 exhaustion isomorph"},
+    {"code": "SAMPLE_STARVATION", "kill_if": "expected opens/day <<0.5 without repair path OR over-narrow single threshold"},
+    {"code": "OVERTRADING", "kill_if": "expected opens/day >>1.0 without session gate"},
+    {"code": "DISGUISED_INDICATOR", "kill_if": "thesis claims behaviour but edge is RSI/EMA/MACD/ADX"},
+    {"code": "STOP_CLUSTER_RISK", "kill_if": "no structural invalidation; relies on hard SL only"}
+  ],
+  "results": [
+    {
+      "id": "D05",
+      "logic_class": "effort_result_absorption_fade",
+      "verdict": "SURVIVE",
+      "score": 86,
+      "killed_by": [],
+      "flags": ["ensure structural invalidation=prev_high20", "zero rsi/macd in entry"],
+      "notes_zh": "高新颖；需防止修理阶段偷加RSI"
+    },
+    {
+      "id": "D11",
+      "logic_class": "asia_inventory_transfer_dump",
+      "verdict": "SURVIVE",
+      "score": 85,
+      "killed_by": [],
+      "flags": ["asia_push_flag must be OHLCV delta cum, not rsi"],
+      "notes_zh": "时钟控频利好稳态"
+    },
+    {
+      "id": "D01",
+      "logic_class": "session_auction_imbalance",
+      "verdict": "SURVIVE",
+      "score": 84,
+      "killed_by": [],
+      "flags": ["utc window hard gate"],
+      "notes_zh": "实现成本低，优先假设候选"
+    },
+    {
+      "id": "D02",
+      "logic_class": "vwap_acceptance_continuation",
+      "verdict": "SURVIVE",
+      "score": 83,
+      "killed_by": [],
+      "flags": ["BAN mean-reversion polarity (short when far above VWAP)"],
+      "notes_zh": "接受溢价；审查时强调非回归"
+    },
+    {
+      "id": "D08",
+      "logic_class": "cvd_price_divergence_release",
+      "verdict": "SURVIVE",
+      "score": 82,
+      "killed_by": [],
+      "flags": ["HARD BAN rsi divergence substitution", "dest fragility watch"],
+      "notes_zh": "代理诚实已声明；破坏测试敏感"
+    },
+    {
+      "id": "D14",
+      "logic_class": "poc_migration_follow",
+      "verdict": "SURVIVE",
+      "score": 81,
+      "killed_by": [],
+      "flags": ["BAN ema ribbon as required entry"],
+      "notes_zh": "POC迁移跟随"
+    },
+    {
+      "id": "D03",
+      "logic_class": "value_area_edge_rejection",
+      "verdict": "SURVIVE_CONDITIONAL",
+      "score": 76,
+      "killed_by": [],
+      "flags": ["must not converge to eth15m_fade dsl", "zero rsi/z/macd/ema16"],
+      "notes_zh": "语义近拒绝，骨架必须与fade正交否则现场处决"
+    },
+    {
+      "id": "D06",
+      "logic_class": "ny_overlap_participation_pulse",
+      "verdict": "SURVIVE",
+      "score": 80,
+      "killed_by": [],
+      "flags": ["cap vol_pulse to avoid overtrading"],
+      "notes_zh": "重叠窗稳态候选"
+    },
+    {
+      "id": "D04",
+      "logic_class": "liquidity_sweep_reclaim",
+      "verdict": "SURVIVE_CONDITIONAL",
+      "score": 72,
+      "killed_by": [],
+      "flags": ["diff vs BNB: no z20<-1.2 dump + macd>0 reclaim recipe"],
+      "notes_zh": "形态sweep可留；禁止BNB配方克隆"
+    },
+    {
+      "id": "D12",
+      "logic_class": "compression_release_inside_value",
+      "verdict": "SURVIVE_CONDITIONAL",
+      "score": 70,
+      "killed_by": [],
+      "flags": ["HARD BAN entry on close>prev_high20", "VA-inside only"],
+      "notes_zh": "滑向ETH1h breakout则杀"
+    },
+    {
+      "id": "D07",
+      "logic_class": "opening_range_failed_break",
+      "verdict": "SURVIVE_MARGINAL",
+      "score": 64,
+      "killed_by": [],
+      "flags": ["SAMPLE_STARVATION risk opens/day≈0.45", "widen OR definition before adding indicators"],
+      "notes_zh": "保留但假设优先级靠后；WF样本是主要死因风险"
+    },
+    {
+      "id": "D13",
+      "logic_class": "one_sided_book_exhaust_proxy",
+      "verdict": "SURVIVE_CONDITIONAL",
+      "score": 66,
+      "killed_by": [],
+      "flags": ["COLLISION_ETH15M_FADE if any rsi/z/macd/ema16 leaf added"],
+      "notes_zh": "默认观察席；仅纯形态版可进假设"
+    },
+    {
+      "id": "D09",
+      "logic_class": "funding_crowding_unwind",
+      "verdict": "DEAD",
+      "score": 0,
+      "killed_by": ["DATA_UNAVAILABLE"],
+      "flags": [],
+      "notes_zh": "SSH未恢复前无法确认funding序列；按诚实原则先处决。若后续拉取成功可复活重测。",
+      "exact_death_step": "DeathTest.DATA_UNAVAILABLE.funding_skew"
+    },
+    {
+      "id": "D10",
+      "logic_class": "oi_expansion_price_stall",
+      "verdict": "DEAD",
+      "score": 0,
+      "killed_by": ["DATA_UNAVAILABLE"],
+      "flags": [],
+      "notes_zh": "OI不可确认；禁止atr/rsi伪装。",
+      "exact_death_step": "DeathTest.DATA_UNAVAILABLE.oi_z20"
+    }
+  ],
+  "survivors_for_hypothesis": [
+    {"priority": 1, "id": "D05", "logic_class": "effort_result_absorption_fade", "direction": "short"},
+    {"priority": 2, "id": "D11", "logic_class": "asia_inventory_transfer_dump", "direction": "short"},
+    {"priority": 3, "id": "D01", "logic_class": "session_auction_imbalance", "direction": "long"},
+    {"priority": 4, "id": "D02", "logic_class": "vwap_acceptance_continuation", "direction": "long"},
+    {"priority": 5, "id": "D06", "logic_class": "ny_overlap_participation_pulse", "direction": "long"},
+    {"priority": 6, "id": "D08", "logic_class": "cvd_price_divergence_release", "direction": "long"},
+    {"priority": 7, "id": "D14", "logic_class": "poc_migration_follow", "direction": "long"}
+  ],
+  "conditional_bench": ["D03", "D04", "D12", "D13", "D07"],
+  "dead": [
+    {"id": "D09", "exact_death_step": "DeathTest.DATA_UNAVAILABLE.funding_skew"},
+    {"id": "D10", "exact_death_step": "DeathTest.DATA_UNAVAILABLE.oi_z20"}
+  ],
+  "ssh_blocker": {
+    "host": "64.176.47.192",
+    "symptom": "Connection timed out during banner exchange",
+    "impact": "Cannot read live freezer DB / confirm funding-OI / run factory WF yet",
+    "local_progress": "Discovery + Novelty + DeathTest artifacts written; Hypothesis DSL coding deferred until SSH or explicit local-sim path"
+  }
+}

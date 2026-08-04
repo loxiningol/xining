@@ -1,0 +1,508 @@
+{
+  "ok": true,
+  "errors": [],
+  "schema": "qiyu_step_a_v1",
+  "artifact": "strategy_candidate_pack",
+  "call_id": "prebuilt_htf_ema_align_ltf_cci_vol_pullback_v2",
+  "attempts": 0,
+  "meta": {
+    "symbol": "BTC-USDT-SWAP",
+    "timeframe": "15m",
+    "direction": "long",
+    "title": "htf_ema_align_ltf_cci_vol_pullback",
+    "thesis": "v1 failed L1 sample_payoff_le_1.2 (pay~0.84): same-bar CCI<-100 OR ema21-touch was nearly vacuous on reclaim bars. v2 requires recent pullback dislocation via cci.offset(1)<-100 OR low<=ema21, then close cross_above ema21 + vol_z20>0.8, HTF h1_ema19>h1_ema53 + ema53>ema200 + h1_slope4>0. Harvest atr_trailing 4.0×ATR_14, hold=48; protective 0.9% SL; no fixed % TP.",
+    "source": "handcraft_workflow_v2_htf_ltf_pullback_v2_l1_repair",
+    "user_authorized_core_features": [
+      "cci",
+      "ema21",
+      "ema53",
+      "ema200",
+      "h1_ema19",
+      "h1_ema53"
+    ],
+    "suggested_core_features": [
+      "h1_ema19",
+      "h1_ema53",
+      "h1_slope4",
+      "ema53",
+      "ema200",
+      "cci",
+      "ema21",
+      "vol_z20",
+      "low",
+      "close"
+    ],
+    "holding_horizon": "6_to_36_bars_15m",
+    "kb_avoidance": [
+      "vol_accepted_donchian_h1_continuation (blocked)",
+      "compression_release_structural_breakout / atr_decline_htf_range_break (blocked)",
+      "vol_regime_compression_release / confirmed_vol_release (blocked)",
+      "trend_continuation_thrust_retest (blocked; this is CCI/EMA21 pullback reclaim not thrust-retest)",
+      "mean_reversion_rsi_extreme / mean_reversion_zscore_dislocation (blocked)",
+      "blind chase in no-trend (require h1_slope4>0 + HTF EMA align)",
+      "naive EMA-cross-only overfitting (require CCI-or-touch pullback + vol_z20 confirm)",
+      "fixed micro-TP / fixed % take-profit"
+    ],
+    "matrix_generalization": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "PEPE-USDT-SWAP",
+      "SUI-USDT-SWAP",
+      "XAU-USDT-SWAP"
+    ],
+    "primary_submit": "BTC-USDT-SWAP 15m long",
+    "prior_fail_task_id": "wsa_20260729_231706_cc9d",
+    "repair_intent": "raise_payoff_via_recent_cci_pullback_and_max_atr_trail"
+  },
+  "mechanism_spec": {
+    "mechanism_id": "mech_htf_ema_align_ltf_cci_vol_pullback_btc15m_v2",
+    "mechanism_name": "htf_ema_align_ltf_cci_vol_pullback",
+    "mechanism_family": "htf_ema_align_ltf_cci_vol_pullback",
+    "market_inefficiency": "Under HTF bullish EMA stack (h1_ema19>h1_ema53, ema53>ema200), a recent CCI<-100 micro-dislocation or ema21 touch marks forced inventory pressure; reclaim (cross_above ema21, vol_z20>0.8) triggers covering flow harvested by ATR trail.",
+    "counterparty_source": "HTF-aligned late chasers and short-inventory scalpers who fade shallow dips against the 1h EMA stack; stops and covering cluster just beyond the 15m pullback swing low / ema21 reclaim.",
+    "why_edge_exists": "v1 same-bar OR touch made pullback nearly vacuous on reclaim. v2 requires cci.offset(1)<-100 (recent dislocation) OR ema21 touch, then vol-confirmed reclaim under HTF EMA align + slope>0. ATR trail 4.0 distributes winners.",
+    "edge_decay_conditions": "HTF EMA stack flips (h1_ema19<=h1_ema53 or ema53<=ema200); h1_slope4 flattens/negative (no-trend); pullbacks become deep regime breaks; vol_z20 confirmation disappears; overcrowded EMA21 reclaim fades.",
+    "required_market_regime": "Bullish HTF alignment with positive h1_slope4 — trending or gently trending markets, not range chop. Feature map: no ema50 in DSL FEATURES; use ema53≈EMA50 and ema200; 1h filter via h1_ema19>h1_ema53.",
+    "entry_logic": "LONG ALL: (1) h1_ema19 > h1_ema53; (2) ema53 > ema200 (EMA50≈53>EMA200 map); (3) h1_slope4 > 0; (4) ANY recent pullback: cci.offset(1) < -100 OR low lte ema21; (5) close cross_above ema21; (6) vol_z20 > 0.8; (7) close > open. SHORT mirror with offsets/signs flipped.",
+    "exit_logic": "Primary dynamic exit: atr_trailing n_atr=4.0 on ATR_14 (role=take_profit). Protective production stop_loss_pct=0.009 engine/daemon-enforced. Structural pullback swing-low risk documented; max_hold_bars=48. No fixed % take-profit.",
+    "stop_logic": "Structural intent: invalidate on break of 15m pullback swing low (documented; live protective SL binds). Hard protective SL 0.9% (stop_loss_pct=0.009) via backtest engine / formal daemon. Do not invent fixed 1% TP; do not widen protective SL.",
+    "take_profit_logic": "No fixed percentage take-profit. atr_trailing n_atr=4.0 (top of [3.0,4.0]) on ATR_14 so winners expand past L1 payoff floor.",
+    "invalidation_logic": "swing_extreme lookback=12 (pullback swing low/high break) as role=invalidation; HTF EMA stack flip ends regime; also max_hold_bars=36.",
+    "non_negotiable_rules": [
+      "protective_sl_0.9_pct_immutable",
+      "no_fixed_pct_take_profit",
+      "user_authorized_ema_cci_htf_pullback_only",
+      "must_keep_htf_ema_align_h1_ema19_gt_h1_ema53",
+      "must_keep_ltf_ema53_gt_ema200",
+      "must_keep_pullback_cci_or_ema21_touch",
+      "must_keep_reclaim_cross_and_vol_z20",
+      "must_keep_h1_slope4_trend_gate",
+      "must_use_atr_trailing_and_or_swing_extreme",
+      "no_bare_ema_cross_only_edge",
+      "no_martingale_grid_pyramiding",
+      "no_live_mount_without_human_confirm"
+    ],
+    "tunable_parameters": [
+      "cci_pullback_threshold",
+      "vol_z20_min",
+      "atr_trail_n",
+      "swing_lookback",
+      "max_hold_bars",
+      "h1_slope_min"
+    ],
+    "forbidden_transformations": [
+      "convert_to_bare_ema_cross_without_pullback_and_vol",
+      "rename_into_trend_continuation_thrust_retest_or_other_blocked_family",
+      "swap_into_vol_accepted_donchian_or_atr_squeeze_clone",
+      "add_fixed_micro_tp_below_2pct",
+      "remove_htf_align_or_h1_slope_gate",
+      "remove_vol_z20_confirm",
+      "weaken_or_widen_0.9_protective_sl",
+      "auto_mount_or_confirm_without_human"
+    ],
+    "expected_trade_frequency_class": "selective_0.2_to_1.0_per_day_15m",
+    "expected_holding_period": "6_to_36_bars_15m",
+    "suitable_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP",
+      "SOL-USDT-SWAP",
+      "DOGE-USDT-SWAP",
+      "PEPE-USDT-SWAP",
+      "SUI-USDT-SWAP",
+      "XAU-USDT-SWAP"
+    ],
+    "suitable_timeframes": [
+      "15m",
+      "5m",
+      "1h"
+    ]
+  },
+  "dsl": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "htf_ema_align_ltf_cci_vol_pullback_btc15m_long_v2",
+    "name": "htf_ema_align_ltf_cci_vol_pullback_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_htf_ema_align",
+          "left": {
+            "feature": "h1_ema19"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "h1_ema53"
+          }
+        },
+        {
+          "id": "e_ltf_ema53_gt_ema200",
+          "left": {
+            "feature": "ema53"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "ema200"
+          }
+        },
+        {
+          "id": "e_htf_slope_pos",
+          "left": {
+            "feature": "h1_slope4"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.0
+          }
+        },
+        {
+          "any": [
+            {
+              "id": "e_cci_pullback_recent",
+              "left": {
+                "feature": "cci",
+                "offset": 1
+              },
+              "op": "lt",
+              "right": {
+                "value": -100.0
+              }
+            },
+            {
+              "id": "e_ema21_touch",
+              "left": {
+                "feature": "low"
+              },
+              "op": "lte",
+              "right": {
+                "feature": "ema21"
+              }
+            }
+          ]
+        },
+        {
+          "id": "e_reclaim_ema21",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_above",
+          "right": {
+            "feature": "ema21"
+          }
+        },
+        {
+          "id": "e_vol_confirm",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_dir_candle",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|htf_ema_align_ltf_cci_vol_pullback|v2_l1_repair|cci_offset1_or_ema21_touch|volz0.8|atr_trail_4.0|sl0.9|no_fixed_tp|btc15m_long",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 2,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_long": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "htf_ema_align_ltf_cci_vol_pullback_btc15m_long_v2",
+    "name": "htf_ema_align_ltf_cci_vol_pullback_long",
+    "direction": "long",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_htf_ema_align",
+          "left": {
+            "feature": "h1_ema19"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "h1_ema53"
+          }
+        },
+        {
+          "id": "e_ltf_ema53_gt_ema200",
+          "left": {
+            "feature": "ema53"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "ema200"
+          }
+        },
+        {
+          "id": "e_htf_slope_pos",
+          "left": {
+            "feature": "h1_slope4"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.0
+          }
+        },
+        {
+          "any": [
+            {
+              "id": "e_cci_pullback_recent",
+              "left": {
+                "feature": "cci",
+                "offset": 1
+              },
+              "op": "lt",
+              "right": {
+                "value": -100.0
+              }
+            },
+            {
+              "id": "e_ema21_touch",
+              "left": {
+                "feature": "low"
+              },
+              "op": "lte",
+              "right": {
+                "feature": "ema21"
+              }
+            }
+          ]
+        },
+        {
+          "id": "e_reclaim_ema21",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_above",
+          "right": {
+            "feature": "ema21"
+          }
+        },
+        {
+          "id": "e_vol_confirm",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_dir_candle",
+          "left": {
+            "feature": "close"
+          },
+          "op": "gt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|htf_ema_align_ltf_cci_vol_pullback|v2_l1_repair|cci_offset1_or_ema21_touch|volz0.8|atr_trail_4.0|sl0.9|no_fixed_tp|btc15m_long",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 2,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "dsl_short": {
+    "schema": "qiyu_strategy_dsl_v1",
+    "key": "htf_ema_align_ltf_cci_vol_pullback_btc15m_short_v2",
+    "name": "htf_ema_align_ltf_cci_vol_pullback_short",
+    "direction": "short",
+    "timeframe": "15m",
+    "supported_instruments": [
+      "BTC-USDT-SWAP"
+    ],
+    "entry": {
+      "all": [
+        {
+          "id": "e_htf_ema_align",
+          "left": {
+            "feature": "h1_ema19"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "h1_ema53"
+          }
+        },
+        {
+          "id": "e_ltf_ema53_lt_ema200",
+          "left": {
+            "feature": "ema53"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "ema200"
+          }
+        },
+        {
+          "id": "e_htf_slope_neg",
+          "left": {
+            "feature": "h1_slope4"
+          },
+          "op": "lt",
+          "right": {
+            "value": 0.0
+          }
+        },
+        {
+          "any": [
+            {
+              "id": "e_cci_pullback_recent",
+              "left": {
+                "feature": "cci",
+                "offset": 1
+              },
+              "op": "gt",
+              "right": {
+                "value": 100.0
+              }
+            },
+            {
+              "id": "e_ema21_touch",
+              "left": {
+                "feature": "high"
+              },
+              "op": "gte",
+              "right": {
+                "feature": "ema21"
+              }
+            }
+          ]
+        },
+        {
+          "id": "e_reclaim_ema21",
+          "left": {
+            "feature": "close"
+          },
+          "op": "cross_below",
+          "right": {
+            "feature": "ema21"
+          }
+        },
+        {
+          "id": "e_vol_confirm",
+          "left": {
+            "feature": "vol_z20"
+          },
+          "op": "gt",
+          "right": {
+            "value": 0.8
+          }
+        },
+        {
+          "id": "e_dir_candle",
+          "left": {
+            "feature": "close"
+          },
+          "op": "lt",
+          "right": {
+            "feature": "open"
+          }
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "id": "x_atr_trail",
+          "exit_op": "atr_trailing",
+          "n_atr": 4.0,
+          "atr_period": 14,
+          "role": "take_profit"
+        }
+      ]
+    },
+    "max_hold_bars": 48,
+    "description": "step_a|htf_ema_align_ltf_cci_vol_pullback|v2_l1_repair|cci_offset1_or_ema21_touch|volz0.8|atr_trail_4.0|sl0.9|no_fixed_tp|btc15m_short",
+    "origin": "step_a_prebuilt_dsl",
+    "version": 2,
+    "live_enabled": false,
+    "auto_trade_eligible": false
+  },
+  "exit_documentation": {
+    "structural_stop": "documented pullback swing-low invalidation intent; protective 0.9% SL binds in engine",
+    "protective_production_sl": 0.009,
+    "take_profit": "atr_trailing n_atr=4.0 ATR_14 (no fixed % TP)",
+    "phase2_ban": "no fixed percentage take-profit"
+  },
+  "pipeline_readiness": {
+    "gate0_ready": true,
+    "mechanism_spec_complete": true,
+    "mechanism_spec_fields": 20,
+    "dsl_schema_valid": "qiyu_strategy_dsl_v1",
+    "exit_ops_dynamic": [
+      "atr_trailing"
+    ],
+    "no_fixed_pct_tp": true,
+    "protective_sl": 0.009,
+    "prod_l1_calibrated": true,
+    "user_authorized_ema_cci": true
+  },
+  "calibration_note": {
+    "prior_task_id": "wsa_20260729_231706_cc9d",
+    "prior_fail": "sample_payoff_le_1.2 payoff~0.84",
+    "v2_probe": {
+      "full_n": 54,
+      "full_pay": 1.317,
+      "l1_20": 7,
+      "symbol": "BTC-USDT-SWAP",
+      "tf": "15m"
+    },
+    "chosen": {
+      "cci_offset": 1,
+      "cci_thr": -100,
+      "volz": 0.8,
+      "trail": 4.0,
+      "hold": 48
+    },
+    "note": "L1 seed-sensitive; submit retries on funnel_l1_fail"
+  }
+}

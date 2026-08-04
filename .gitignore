@@ -16,6 +16,9 @@ token*
 api_key*
 auto_trade/ai_*.env
 *consent*
+common_local.py
+local_secrets.py
+local_secrets.env
 
 # Python / tooling
 __pycache__/
@@ -44,6 +47,9 @@ market_data/
 *.log
 logs/
 **/logs/
+*.db
+*.sqlite
+*.sqlite3
 
 # Backup dumps / local agent junk
 *.bak
@@ -51,3 +57,32 @@ logs/
 *_backup/
 .cursor/
 agent-transcripts/
+backups/
+_scratch/
+_scratch_*/
+**/_scratch/
+_tmp_*
+tmp_*
+val
+
+# Runtime caches / candle dumps (regenerate on host)
+auto_trade/**/*_candles_cache.json
+auto_trade/research_candle_store/
+auto_trade/dual_engine/workflow_v2/
+auto_trade/dual_engine/tasks/
+auto_trade/dual_engine/sole_creation_runs/
+auto_trade/dual_engine/parallel_creation/
+auto_trade/dual_engine/research_*/
+auto_trade/dual_engine/outcome_attributions/
+auto_trade/dual_engine/generator_scorecards/
+auto_trade/dual_engine/budget_allocator/
+auto_trade/dual_engine/collab_packs/
+auto_trade/dual_engine/data_isolation/
+auto_trade/dual_engine/knowledge_cards/
+auto_trade/dual_engine/mechanism_beliefs/
+auto_trade/dual_engine/prediction_contracts/
+strategies/_scratch/
+
+# Optional: keep example env
+!*.env.example
+!auto_trade/ai_ecosystem.env.example

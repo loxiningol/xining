@@ -161,8 +161,33 @@ def search(
     max_evals=None,
     run_id=None,
     seed=19,
+    candles=None,
+    direction=1,
 ):
-    """Run lite parameter search; every eval logged as param_eval."""
+    """Run lite parameter search; every eval logged as param_eval.
+
+    When ``candles`` is provided, uses path-hit constrained entry search
+    (stop/leverage locked; feasible region before ranking).
+    """
+    if candles is not None:
+        try:
+            from . import entry_constrained_search as ecs
+            return ecs.search_entry(
+                candles,
+                factor_values,
+                direction=direction,
+                space=space,
+                method=method,
+                max_evals=max_evals,
+                run_id=run_id,
+                seed=seed,
+            )
+        except Exception as exc:
+            # Fall through to legacy net-return search only if path search crashes.
+            legacy_note = "entry_path_search_failed:%s" % str(exc)[:120]
+    else:
+        legacy_note = None
+
     max_default = int(os.environ.get("QIYU_PARAM_MAX_EVALS") or 36)
     max_evals = int(max_evals or max_default)
     # Hard RAM-safe cap
@@ -207,6 +232,7 @@ def search(
         "n_passed": n_pass,
         "best": best,
         "top": rows[:8],
+        "legacy_fallback_note": legacy_note,
         "note_zh": (
             "参数平台轻量搜索完成；有效试验已入账。"
             if rows else

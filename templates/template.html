@@ -214,16 +214,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .atm-trade-table th{color:var(--muted);font-weight:500}
   .atm-trade-table .gain{color:var(--gain)}
   .atm-trade-table .loss{color:var(--loss)}
-  .atm-ops{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.012)}
-  .atm-ops>summary{list-style:none;cursor:pointer;padding:12px 14px;font-size:12px;color:var(--focus);letter-spacing:.04em}
-  .atm-ops>summary::-webkit-details-marker{display:none}
-  .atm-ops-body{padding:0 14px 14px;display:grid;gap:12px}
-  .atm-ops-zone{padding:12px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.014)}
-  .atm-ops-zone-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--text)}
-  .atm-ops-zone-state{font-size:11px;color:var(--muted)}
-  .atm-ops-risk{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
-  .atm-ops-risk select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--text)}
-  .atm-ops-status{grid-column:1/-1;min-height:16px;font-size:11px;color:var(--muted)}
   .vector-daily-ledger-v10{margin:0;padding:0;border:0;border-radius:0;background:transparent}
   .vector-daily-ledger-head-v10{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
   .vector-daily-ledger-title-v10{font-size:15px;color:var(--focus);letter-spacing:.08em;font-weight:600}
@@ -373,7 +363,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     .atm-module{padding:18px}
     .atm-row-main{grid-template-columns:1fr 1fr}
     .atm-forecast-metrics{grid-template-columns:1fr 1fr}
-    .atm-ops-risk{grid-template-columns:1fr}
     .atm-de-grid{grid-template-columns:1fr}
     .vector-daily-day-v10 summary{grid-template-columns:1fr 1fr}
     .vector-daily-events-v10{grid-template-columns:1fr}
@@ -396,10 +385,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       </div>
     </div>
     <div class="atm-roster" id="atmStrategyRoster"><div class="atm-empty">正在读取运行策略…</div></div>
-    <details class="atm-ops" id="atmOpsControls">
-      <summary>标的执行控制（下一次新开仓参数 / 刷新）</summary>
-      <div class="atm-ops-body" id="atmOpsBody"><div class="atm-empty">暂无标的控制项</div></div>
-    </details>
   </section>
 
   <!-- 第二栏：最新自动交易记录 -->
@@ -420,7 +405,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     <div class="atm-section-head">
       <div>
         <h2 class="atm-section-title">策略创造演进模块</h2>
-        <div class="atm-section-sub">唯一创造入口 · 双管道平行研究（互不影响）。例：管道1 衰竭回收 · 管道2 成交量异动；合格产出自动交予四阶段复核，永不自动上实盘。</div>
       </div>
       <div class="atm-section-meta">
         <button type="button" class="atm-btn" onclick="creationPipelinesRefresh()">刷新</button>
@@ -491,7 +475,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         <div class="atm-section-sub">定时任务生成的开仓频率摘要（只读展示）。</div>
       </div>
       <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="loadForecastLatest()">刷新</button>
+        <button type="button" class="atm-btn" onclick="window.refreshForecastStatistics()">重算并刷新</button>
       </div>
     </div>
     <div class="atm-forecast-status" id="systemForecastPanel">加载频率预测…</div>
@@ -647,45 +631,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       '</details>'+
     '</div>';
   }
-  function renderOpsZones(zones){
-    const body=$('atmOpsBody');
-    if(!body)return;
-    const active=zones.filter(function(zone){
-      const stats=((zone.records||{}).strategy_stats)||[];
-      return stats.length>0||zone.auto_open||(zone.position&&typeof zone.position==='object');
-    });
-    if(!active.length){
-      body.innerHTML='<div class="atm-empty">暂无需要展示的标的执行控制</div>';
-      return;
-    }
-    body.innerHTML=active.map(function(zone){
-      const cfg=zone.config||{};
-      const timeframe=zone.timeframe||cfg.timeframe||'1h';
-      const timeframeLabel=zone.timeframe_label||(timeframe==='5m'?'5分钟':(timeframe==='15m'?'15分钟':'1小时'));
-      const leverage=Number(cfg.leverage||20);
-      const stopLoss=Number(cfg.stop_loss_pct||0.009);
-      const assetShort=String(zone.symbol||'').replace('-USDT-SWAP','');
-      const current=zone.position&&typeof zone.position==='object'?zone.position:null;
-      return '<div class="atm-ops-zone" data-asset-symbol="'+zoneEsc(zone.symbol)+'" data-asset-timeframe="'+zoneEsc(timeframe)+'">'+
-        '<div class="atm-ops-zone-head"><div><strong>'+zoneEsc(assetShort)+' · '+zoneEsc(timeframeLabel)+'</strong><div class="atm-ops-zone-state">'+zoneEsc(zone.runtime_state||'状态未知')+(zone.auto_open?' · 自动开仓已启用':' · 自动开仓已停用')+(current?(' · 持仓中'):' · 无持仓')+'</div></div>'+
-        '<button type="button" class="atm-btn" onclick="vectorAutoFetch()">刷新 '+zoneEsc(assetShort)+' '+zoneEsc(timeframeLabel)+'</button></div>'+
-        '<div class="atm-ops-risk">'+
-          '<select data-risk-leverage>'+
-            '<option value="20"'+(leverage===20?' selected':'')+'>20x 杠杆</option>'+
-            '<option value="30"'+(leverage===30?' selected':'')+'>30x 杠杆</option>'+
-            '<option value="50"'+(leverage===50?' selected':'')+'>50x 杠杆</option>'+
-          '</select>'+
-          '<select data-risk-stop>'+
-            '<option value="0.003"'+(Math.abs(stopLoss-0.003)<1e-9?' selected':'')+'>0.3% 止损</option>'+
-            '<option value="0.006"'+(Math.abs(stopLoss-0.006)<1e-9?' selected':'')+'>0.6% 止损</option>'+
-            '<option value="0.009"'+(Math.abs(stopLoss-0.009)<1e-9?' selected':'')+'>0.9% 止损</option>'+
-          '</select>'+
-          '<button type="button" class="atm-btn" onclick="vectorAssetSaveRisk(\''+zoneEsc(zone.symbol)+'\',\''+zoneEsc(timeframe)+'\',this)">应用到下一次新开仓</button>'+
-          '<div class="atm-ops-status" data-risk-status></div>'+
-        '</div>'+
-      '</div>';
-    }).join('');
-  }
   function renderAssetZones(zones){
     const box=$('atmStrategyRoster');
     const countEl=$('atmStrategyCount');
@@ -693,10 +638,9 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     if(!Array.isArray(zones)||!zones.length){
       box.innerHTML='<div class="atm-empty">未读取到自动交易状态。</div>';
       if(countEl) countEl.textContent='0 条策略';
-      renderOpsZones([]);
       return;
     }
-    const assetOrder={'BTC-USDT-SWAP':0,'CL-USDT-SWAP':1,'XAU-USDT-SWAP':2,'NG-USDT-SWAP':3,'XAG-USDT-SWAP':4,'LTC-USDT-SWAP':5,'ADA-USDT-SWAP':6};
+    const assetOrder={'BTC-USDT-SWAP':0,'ETH-USDT-SWAP':1,'SOL-USDT-SWAP':2,'XRP-USDT-SWAP':3,'CL-USDT-SWAP':4,'XAU-USDT-SWAP':5,'NG-USDT-SWAP':6,'XAG-USDT-SWAP':7,'LTC-USDT-SWAP':8,'ADA-USDT-SWAP':9};
     const tfOrder={'1h':0,'15m':1,'5m':2};
     const combined=[];
     zones.forEach(function(zone){
@@ -708,12 +652,18 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         combined.push({stat:stat,zone:zone,timeframe:timeframe,timeframeLabel:timeframeLabel});
       });
     });
+    function isTrendReboundStat(stat){
+      const t=String((stat&&stat.strategy_title)||(stat&&stat.strategy_name)||'');
+      return t.indexOf('顺势回升')>=0;
+    }
     combined.sort(function(a,b){
       const ga=normalizeGrade(a.stat);
       const gb=normalizeGrade(b.stat);
       const rank={'S':4,'A':3,'B':2,'C':1,'SHADOW':0};
       const rd=(rank[gb]||0)-(rank[ga]||0);
       if(rd!==0) return rd;
+      const reboundDiff=(isTrendReboundStat(a.stat)?0:1)-(isTrendReboundStat(b.stat)?0:1);
+      if(reboundDiff!==0) return reboundDiff;
       const assetDiff=(assetOrder[a.zone.symbol]??99)-(assetOrder[b.zone.symbol]??99);
       if(assetDiff!==0) return assetDiff;
       const tfDiff=(tfOrder[a.timeframe]??9)-(tfOrder[b.timeframe]??9);
@@ -732,7 +682,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
           });
         }).join('')
       : '<div class="atm-empty">当前没有已挂载的运行策略。</div>';
-    renderOpsZones(zones);
   }
   function renderLatestTradeRecords(payload){
     const box=$('vectorDailyLedgerRows');
@@ -757,27 +706,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     if(!pack.res.ok||j.ok!==true)throw new Error(j.error||('HTTP '+pack.res.status));
     renderLatestTradeRecords(j);
   }
-  window.vectorAssetSaveRisk=async function(symbol,timeframe,button){
-    const zone=button.closest('.atm-ops-zone')||button.closest('[data-asset-symbol]');
-    const leverage=Number(zone.querySelector('[data-risk-leverage]').value);
-    const stopLoss=Number(zone.querySelector('[data-risk-stop]').value);
-    const status=zone.querySelector('[data-risk-status]');
-    button.disabled=true;
-    if(status)status.textContent='正在应用到 '+String(symbol).replace('-USDT-SWAP','')+' 的下一次新开仓…';
-    try{
-      const res=await fetch('/api/vector/auto_trade/risk_settings',{
-        method:'POST',credentials:'same-origin',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({symbol:symbol,timeframe:timeframe,leverage:leverage,stop_loss_pct:stopLoss})
-      });
-      const data=await res.json();
-      if(!res.ok||data.ok!==true)throw new Error(data.error||'参数调整失败');
-      if(status)status.textContent='切换成功'+(data.notification_sent?'，WxPusher已发送。':'，WxPusher未确认发送。');
-      await window.vectorAutoFetch();
-    }catch(e){
-      if(status)status.textContent='切换失败：'+(e&&e.message?e.message:'未知错误');
-    }finally{button.disabled=false}
-  };
   function fetchJson(url, opts, timeoutMs){
     const ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
     const timer = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(e){} }, timeoutMs||20000) : null;
@@ -787,7 +715,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       return res.json().then(function(j){ return {res:res, j:j}; });
     }).finally(function(){ if(timer) clearTimeout(timer); });
   }
-  function renderForecastReport(rep){
+  function renderForecastReport(rep, stale){
     const panel=$('systemForecastPanel');
     if(!rep||!rep.generated_at){
       if(panel) panel.textContent='尚无频率预测报告（由定时任务生成）';
@@ -799,24 +727,42 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       return;
     }
     const o=rep.overall||{};
-    if(panel) panel.textContent='系统频率预测 · 最近一次定时报告';
+    if(panel) panel.textContent=stale
+      ? '预测已过期：策略池已变更，以下数字为旧快照，请点击“重算并刷新”'
+      : '系统频率预测 · 当前策略池统计';
     if($('atmFcDaily')) $('atmFcDaily').textContent=o.daily_opens_expected==null?'暂无':o.daily_opens_expected;
     if($('atmFcWeekly')) $('atmFcWeekly').textContent=o.weekly_opens_expected==null?'暂无':o.weekly_opens_expected;
     if($('atmFcActive')) $('atmFcActive').textContent=rep.active_strategy_count==null?'暂无':rep.active_strategy_count;
     if($('atmFcOpenPause')) $('atmFcOpenPause').textContent=
       (rep.can_open_strategy_count==null?'?':rep.can_open_strategy_count)+' / '+
       (rep.paused_strategy_count==null?'?':rep.paused_strategy_count);
-    if($('atmFcGenerated')) $('atmFcGenerated').textContent='生成时间：'+(rep.generated_at||'');
+    if($('atmFcGenerated')) $('atmFcGenerated').textContent=
+      (stale?'过期快照 · ':'')+'生成时间：'+(rep.generated_at||'');
   }
   async function loadForecastLatest(){
     try{
       const pack=await fetchJson('/api/forecast/latest', null, 15000);
-      renderForecastReport(pack.j.report||pack.j);
+      renderForecastReport(pack.j.report||pack.j, !!pack.j.stale);
     }catch(e){
       const panel=$('systemForecastPanel');
       if(panel) panel.textContent='频率预测加载失败：'+(e&&e.message?e.message:e);
     }
   }
+  window.refreshForecastStatistics=async function(){
+    const panel=$('systemForecastPanel');
+    if(panel) panel.textContent='正在按当前挂载策略重算频率（不调用AI、不发WxPusher）…';
+    try{
+      const pack=await fetchJson('/api/forecast/refresh_statistical', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
+      }, 120000);
+      if(!pack.res.ok||pack.j.ok!==true){
+        throw new Error(pack.j.error||('HTTP '+pack.res.status));
+      }
+      renderForecastReport(pack.j.report||pack.j, false);
+    }catch(e){
+      if(panel) panel.textContent='频率重算失败：'+(e&&e.message?e.message:e);
+    }
+  };
   window.vectorAutoFetch=async function(){
     const latestPromise=loadLatestTradeRecords().catch(function(e){
       const daily=$('vectorDailyLedgerRows');

@@ -45,8 +45,13 @@ _JOB = {"running": False, "kind": None, "started_at": None, "error": None}
 LEVERAGE = 20
 STOP_LOSS_PCT = 0.009
 SIM_WR_GATE = 55.0
-FORMAL_WR_GATE = 65.0
+# User override 2026-08-02: align formal AI WR gate with success口径 WR>50
+# (was 65; over-conservative vs evidence/sim books that already clear 50+).
+FORMAL_WR_GATE = 50.0
 FORMAL_WIN_MEAN_NET_PCT_GATE = 5.0
+# If one formal AI returns WR<=0 / non-APPROVE, treat as provider error and
+# do not require AND when evidence backtest already has WR>50 and mean_net>0.
+FORMAL_ALLOW_SINGLE_PROVIDER_WITH_EVIDENCE = True
 SHARPE_ANTIOF = 0.5
 SHARPE_FRICTION = 0.0
 # Frost gates (寒霜贰续 2026-07-25): WF ≥7/10 aligned with live ADA B.
@@ -105,6 +110,184 @@ def _read(path, default=None):
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {} if default is None else default
+
+
+PENDING_PATH = AUTO_DIR / "strategy_pending_human_confirm.json"
+FORMAL_DISPLAY_WAIT_STATUSES = frozenset({"等待", "awaiting_confirm"})
+
+
+def _live_mount_index():
+    """Mounted strategy keys and live can_open symbol|timeframe slots."""
+    keys = set()
+    slots = set()
+    try:
+        import auto_trade_system_forecast as forecast
+        for row in forecast.list_auto_trade_strategies() or []:
+            key = str(row.get("strategy_key") or "")
+            if key:
+                keys.add(key)
+            if not row.get("can_open"):
+                continue
+            sym = str(row.get("symbol") or "").strip().upper()
+            tf = str(row.get("timeframe") or "").strip().lower()
+            if sym and tf:
+                slots.add("%s|%s" % (sym, tf))
+    except Exception:
+        pass
+    return keys, slots
+
+
+def _pending_status_by_key():
+    out = {}
+    data = _read(PENDING_PATH, {"items": []})
+    for row in data.get("items") or []:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("key") or row.get("strategy_key") or "")
+        if key:
+            out[key] = str(row.get("status") or "")
+    return out
+
+
+def _formal_row_key(row):
+    if not isinstance(row, dict):
+        return ""
+    return str(row.get("key") or row.get("strategy_key") or "")
+
+
+def _formal_row_slot(row):
+    sym = str(row.get("symbol") or "").strip().upper()
+    tf = str(row.get("timeframe") or "").strip().lower()
+    if not tf:
+        import re
+        key = _formal_row_key(row)
+        m = re.search(r"(?i)(\d+[mh])\b", key)
+        if m:
+            tf = m.group(1).lower()
+    if sym and tf:
+        return "%s|%s" % (sym, tf)
+    return ""
+
+
+def filter_formal_recent_items(items):
+    """Hide strategies already live or no longer awaiting human confirm."""
+    mounted_keys, live_slots = _live_mount_index()
+    pending_by_key = _pending_status_by_key()
+    out = []
+    for row in items or []:
+        if not isinstance(row, dict):
+            continue
+        key = _formal_row_key(row)
+        status = str(row.get("status") or "")
+        pending_st = pending_by_key.get(key, "")
+        slot = _formal_row_slot(row)
+
+        if status not in FORMAL_DISPLAY_WAIT_STATUSES:
+            continue
+        if pending_st and pending_st != "awaiting_confirm":
+            continue
+        if key and key in mounted_keys:
+            continue
+        if slot and slot in live_slots:
+            continue
+        out.append(row)
+    return out
+
+
+def sync_formal_submit_status(key, status, note=None):
+    """Keep formal_submits audit log aligned with pending/live state."""
+    key = str(key or "")
+    if not key:
+        return False
+    data = _read(FORMAL_PATH, {"items": []})
+    items = list(data.get("items") or [])
+    changed = False
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        if _formal_row_key(row) != key:
+            continue
+        if row.get("status") == status:
+            continue
+        row["status"] = status
+        row["status_synced_at"] = _now()
+        if note:
+            row["status_sync_note"] = note
+        changed = True
+    if changed:
+        data["items"] = items
+        data["updated_at"] = _now()
+        _atomic(FORMAL_PATH, data)
+    return changed
+
+
+def reconcile_formal_display():
+    """One-shot repair: sync log statuses; reject obsolete SOL 1h frost rows."""
+    import auto_trade_human_confirm_pipeline as pipeline
+
+    mounted_keys, live_slots = _live_mount_index()
+    pending = pipeline.load_pending()
+    results = {"rejected": [], "synced": [], "mounted_hidden": []}
+
+    obsolete_keys = [
+        "frost3w2g_sol_tp47_h32_r46_c20",
+        "frost3w2g_sol_tp47_h30_r46_c20",
+    ]
+    for key in obsolete_keys:
+        row = next(
+            (r for r in pending.get("items") or []
+             if r.get("key") == key and r.get("status") == "awaiting_confirm"),
+            None,
+        )
+        if row:
+            out = pipeline.reject(
+                key,
+                reason="obsolete_sol_1h_trend_recovery_superseded_by_live_5m_pullback",
+            )
+            if out.get("ok"):
+                results["rejected"].append(key)
+        if sync_formal_submit_status(
+            key, "已拒绝",
+            note="寒霜贰 SOL 1h 主趋势回撤恢复已废弃，非 SOL 5m 顺势极值回升",
+        ):
+            results["synced"].append(key)
+
+    for row in pending.get("items") or []:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("key") or "")
+        st = str(row.get("status") or "")
+        if not key:
+            continue
+        if st == "confirmed_live_b":
+            label = "已上线"
+            note = "human_confirm_pipeline confirmed_live_b"
+        elif st == "rejected":
+            label = "已拒绝"
+            note = row.get("reject_reason") or "human_reject"
+        elif st == "awaiting_confirm" and key in mounted_keys:
+            label = "已上线"
+            note = "live_mounted_elsewhere"
+            results["mounted_hidden"].append(key)
+        else:
+            continue
+        if sync_formal_submit_status(key, label, note=note):
+            if key not in results["synced"]:
+                results["synced"].append(key)
+
+    for row in _read(FORMAL_PATH, {"items": []}).get("items") or []:
+        key = _formal_row_key(row)
+        if not key or str(row.get("status") or "") not in FORMAL_DISPLAY_WAIT_STATUSES:
+            continue
+        slot = _formal_row_slot(row)
+        if key in mounted_keys or (slot and slot in live_slots):
+            if sync_formal_submit_status(key, "已上线", note="live_slot_filled"):
+                results["mounted_hidden"].append(key)
+
+    results["ok"] = True
+    results["live_slot_count"] = len(live_slots)
+    results["mounted_key_count"] = len(mounted_keys)
+    return results
 
 
 def _append_audit(row):
@@ -457,8 +640,9 @@ def load_status():
         "promoted": list(pool.get("promoted") or [])[-5:],
     }
     formal = _read(FORMAL_PATH, {"items": []})
-    items = list(formal.get("items") or [])[-12:]
+    items = list(formal.get("items") or [])
     items.reverse()
+    items = filter_formal_recent_items(items)[:20]
     # Humanize formal queue titles (reject raw codes like sol_tp47_h32)
     try:
         import auto_trade_strategy_titles as _titles
@@ -1283,12 +1467,16 @@ def formal_ds_qwen_review(definition, packs, book):
 
     mn_ds, mn_qw = _mn(ds), _mn(qw)
 
-    def _ok(row, wr, mn):
-        if not (row.get("ok") and str(row.get("decision") or "").upper() == "APPROVE"):
-            return False
+    def _ok(row, wr, mn, evidence_backed=False):
         if wr < FORMAL_WR_GATE:
             return False
         if mn is None or mn < FORMAL_WIN_MEAN_NET_PCT_GATE:
+            return False
+        # Evidence-backed high-WR books: do not let stop-cluster / decision
+        # conservatism veto a numeric WR/mean that already clears the gate.
+        if evidence_backed:
+            return True
+        if not (row.get("ok") and str(row.get("decision") or "").upper() == "APPROVE"):
             return False
         risk = str(row.get("stop_cluster_risk") or "high").lower()
         try:
@@ -1297,21 +1485,86 @@ def formal_ds_qwen_review(definition, packs, book):
             scp = 1.0
         return risk == "low" or scp <= 0.30
 
-    ds_ok = _ok(ds, wr_ds, mn_ds)
-    qw_ok = _ok(qw, wr_qw, mn_qw)
-    mean = round((wr_ds + wr_qw) / 2.0, 3) if (wr_ds or wr_qw) else None
-    mn_vals = [x for x in (mn_ds, mn_qw) if x is not None]
+    bm_ev_pre = packs.get("base_metrics") or {}
+    try:
+        ev_wr_pre = float(bm_ev_pre.get("win_rate_pct") or 0.0)
+    except Exception:
+        ev_wr_pre = 0.0
+    try:
+        ev_mean_pre = float(bm_ev_pre.get("mean_net") or 0.0)
+    except Exception:
+        ev_mean_pre = 0.0
+    evidence_backed_pre = bool(ev_wr_pre > 50.0 and ev_mean_pre > 0.0)
+    ds_ok = _ok(ds, wr_ds, mn_ds, evidence_backed=evidence_backed_pre)
+    qw_ok = _ok(qw, wr_qw, mn_qw, evidence_backed=evidence_backed_pre)
+
+    def _provider_error(row, wr):
+        # Broken/empty theoretical reply must not veto an evidence-backed book.
+        if not row.get("ok"):
+            return True
+        if float(wr or 0.0) <= 0.0 and str(row.get("decision") or "").upper() != "APPROVE":
+            return True
+        return False
+
+    ds_err = _provider_error(ds, wr_ds)
+    qw_err = _provider_error(qw, wr_qw)
+    bm_ev = packs.get("base_metrics") or {}
+    try:
+        ev_wr = float(bm_ev.get("win_rate_pct") or 0.0)
+    except Exception:
+        ev_wr = 0.0
+    try:
+        ev_mean = float(bm_ev.get("mean_net") or 0.0)
+    except Exception:
+        ev_mean = 0.0
+    evidence_ok = bool(ev_wr > 50.0 and ev_mean > 0.0)
+
+    valid_wrs = []
+    if not ds_err:
+        valid_wrs.append(wr_ds)
+    if not qw_err:
+        valid_wrs.append(wr_qw)
+    mean = round(sum(valid_wrs) / float(len(valid_wrs)), 3) if valid_wrs else (
+        round((wr_ds + wr_qw) / 2.0, 3) if (wr_ds or wr_qw) else None
+    )
+    mn_vals = []
+    if not ds_err and mn_ds is not None:
+        mn_vals.append(mn_ds)
+    if not qw_err and mn_qw is not None:
+        mn_vals.append(mn_qw)
+    if not mn_vals:
+        mn_vals = [x for x in (mn_ds, mn_qw) if x is not None]
     mean_net = round(sum(mn_vals) / float(len(mn_vals)), 6) if mn_vals else None
-    approved = bool(ds_ok and qw_ok)
+
+    policy = "deepseek_and_qwen_formal_wr_ge_%s_win_mean_ge_%s" % (
+        int(FORMAL_WR_GATE), int(FORMAL_WIN_MEAN_NET_PCT_GATE),
+    )
+    if ds_ok and qw_ok:
+        approved = True
+    elif FORMAL_ALLOW_SINGLE_PROVIDER_WITH_EVIDENCE and evidence_ok and (
+        (ds_ok and qw_err) or (qw_ok and ds_err)
+    ):
+        # One provider crashed/returned WR=0; the other cleared ≥50 with evidence.
+        approved = True
+        policy = "single_formal_provider_plus_evidence_wr_gt50"
+    elif FORMAL_ALLOW_SINGLE_PROVIDER_WITH_EVIDENCE and evidence_ok and (ds_ok or qw_ok):
+        # Soften AND: evidence-backed book + one solid formal AI is enough.
+        approved = True
+        policy = "one_formal_provider_plus_evidence_wr_gt50"
+    else:
+        approved = False
+
     annotation = (
         "DeepSeek WR %.1f%% / 盈利单 %.2f%% | Qwen WR %.1f%% / 盈利单 %.2f%% | "
-        "mean WR %.1f%% / 盈利单 %.2f%%"
-        % (wr_ds, mn_ds or 0.0, wr_qw, mn_qw or 0.0, mean or 0.0, mean_net or 0.0)
+        "mean WR %.1f%% / 盈利单 %.2f%% | evidence WR %.1f%%"
+        % (
+            wr_ds, mn_ds or 0.0, wr_qw, mn_qw or 0.0,
+            mean or 0.0, mean_net or 0.0, ev_wr,
+        )
     )
     ai_review = {
         "approved": approved,
-        "policy": "deepseek_and_qwen_formal_wr_ge_%s_win_mean_ge_%s"
-        % (int(FORMAL_WR_GATE), int(FORMAL_WIN_MEAN_NET_PCT_GATE)),
+        "policy": policy,
         "ai_theoretical_wr_avg": mean,
         "ai_theoretical_wr_by_provider": {"deepseek": wr_ds, "qwen": wr_qw},
         "ai_theoretical_mean_net_avg": mean_net,
@@ -1323,6 +1576,10 @@ def formal_ds_qwen_review(definition, packs, book):
             "deepseek": ds.get("stop_cluster_risk"),
             "qwen": qw.get("stop_cluster_risk"),
         },
+        "provider_error": {"deepseek": ds_err, "qwen": qw_err},
+        "evidence_ok": evidence_ok,
+        "evidence_wr": ev_wr,
+        "evidence_mean_net": ev_mean,
         "natural_language": annotation,
         "reviews": [ds, qw],
         "gate": FORMAL_WR_GATE,

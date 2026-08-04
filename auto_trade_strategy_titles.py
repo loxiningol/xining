@@ -42,6 +42,9 @@ _FALLBACK = {
     "xau15_h1_breakout_long_ai": "XAU 15分钟顺势放量突破（AI创造）",
     "frost_xrp_rescue_h20_t45": "[XRP 15m] 动量衰竭反转 (Exhaustion Fade)",
     "frost3_btc1h_xrpport_exhaustion_fade_slope": "[BTC 1h] 动量衰竭反转 (Exhaustion Fade)",
+    "frost3w2g_sol_tp47_h32_r46_c20": "[SOL 1h] 主趋势回撤恢复（寒霜贰·废弃）",
+    "frost3w2g_sol_tp47_h30_r46_c20": "[SOL 1h] 主趋势回撤恢复·H30（寒霜贰·废弃）",
+    "sol5_trend_rebound_ada5_clone_v1": "[SOL] 顺势极值回升",
 }
 
 _CACHE = None

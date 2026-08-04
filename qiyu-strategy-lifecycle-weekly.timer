@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly Qiyu strategy ecology evolution report (disabled — bundled Mon 08:00)
+
+[Timer]
+OnCalendar=Mon 2099-01-01 00:00:00 Asia/Shanghai
+Persistent=false
+
+[Install]
+WantedBy=timers.target

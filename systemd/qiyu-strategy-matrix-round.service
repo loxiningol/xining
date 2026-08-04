@@ -1,0 +1,20 @@
+[Unit]
+Description=Qiyu one full sequential 36-cluster exploration round
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root
+Environment=VECTOR_ROOT=/root
+EnvironmentFile=-/root/auto_trade/ai_ecosystem.env
+ExecStart=/usr/bin/flock -w 7200 -E 75 /root/auto_trade/strategy_ecosystem.lock /usr/bin/python3 /root/auto_trade_strategy_matrix_round.py
+User=root
+Nice=15
+CPUAccounting=true
+CPUQuota=75%
+MemoryAccounting=true
+MemoryHigh=540M
+MemoryMax=680M
+TimeoutStartSec=24h
+SuccessExitStatus=75

@@ -4,14 +4,28 @@
 from pathlib import Path
 import json, time, os, importlib.util, sys, re
 
-ROOT = Path("/root")
+def _vector_root():
+    return Path(os.environ.get("VECTOR_ROOT") or "/root")
+
+
+ROOT = _vector_root()
 AUTO_DIR = ROOT / "auto_trade"
 CONFIG_FILE = AUTO_DIR / "formal_notify_config.json"
 AUDIT_LOG_FILE = AUTO_DIR / "formal_notification_audit.log"
 
-REAL_NOTIFY_MODULE = "/root/common.py"
 REAL_NOTIFY_FUNCTION = "send_wx"
 WXPUSHER_URL = "https://wxpusher.zjiecode.com/api/send/message"
+
+
+def _resolve_notify_module_path():
+    """Prefer VECTOR_ROOT/common.py；生产默认 /root/common.py。"""
+    local = _vector_root() / "common.py"
+    if local.exists():
+        return str(local)
+    return "/root/common.py"
+
+
+REAL_NOTIFY_MODULE = _resolve_notify_module_path()
 # Hard-blocked Wx kinds/markers (cannot be overridden by callers).
 HARD_BLOCKED_WX_KINDS = frozenset({"strategy_triple_friction_tip"})
 HARD_BLOCKED_WX_MARKERS = ("三倍摩擦风险提示", "三倍摩擦压力提示（非淘汰）")
@@ -54,6 +68,12 @@ def default_config():
     }
 
 def get_config():
+    global REAL_NOTIFY_MODULE, ROOT, AUTO_DIR, CONFIG_FILE, AUDIT_LOG_FILE
+    ROOT = _vector_root()
+    AUTO_DIR = ROOT / "auto_trade"
+    CONFIG_FILE = AUTO_DIR / "formal_notify_config.json"
+    AUDIT_LOG_FILE = AUTO_DIR / "formal_notification_audit.log"
+    REAL_NOTIFY_MODULE = _resolve_notify_module_path()
     cfg = _read_json(CONFIG_FILE, None)
     if not isinstance(cfg, dict):
         cfg = default_config()
@@ -316,7 +336,7 @@ def _grade_from_ratio(ratio):
     except Exception:
         return None
     # Match human-confirm GRADE_RATIO bands (prefer exact/nearest known).
-    bands = (("S", 0.70), ("A", 0.50), ("B", 0.30), ("C", 0.15))
+    bands = (("S", 0.70), ("A", 0.50), ("B", 0.30), ("C", 0.10))
     best = None
     best_diff = 1e9
     for g, v in bands:
@@ -504,6 +524,103 @@ def notify_close(closed):
     )
     data = {"strategy_key": closed.get("strategy_key") or "unknown", "strategy_name": strategy_name, "side_label": "SHORT / 做空" if side == "short" else "LONG / 做多", "close_type": closed.get("close_type") or closed.get("close_reason") or "策略平仓", "sz": closed.get("real_position_sz") or closed.get("sz") or "", "entry_price": closed.get("entry_price") or "", "close_price": closed.get("close_price") or "", "pnl": closed.get("pnl") if closed.get("pnl") is not None else "", "pnl_rate_suffix": rate.get("pnl_rate_suffix"), "ordId": ack.get("ordId") or close_order.get("ordId") or "", "time": closed.get("closed_at") or _now(), **rate}
     return send_message(format_close(data), kind="strategy_closed", meta=data)
+
+
+def notify_strategy_review_outcome(payload=None, dry_run=False):
+    """策略进入四阶段复核后的结果推送（通过/未通过均发）。
+
+    走已有 WxPusher 通道（common.send_wx / formal_notify）。
+    """
+    payload = dict(payload or {})
+    passed = bool(payload.get("passed"))
+    status_zh = str(payload.get("status_zh") or ("通过" if passed else "未通过"))
+    stage = payload.get("review_stage") or payload.get("reason") or "—"
+    reason = payload.get("reason") or stage
+    try:
+        from dual_engine_workflow_v2 import review_lexicon as lex
+        review_n = lex.review_n_from_reason(reason, stage=stage)
+        gate_zh = lex.review_label_from_reason(reason, stage=stage) or lex.pipe_label(stage, stage)
+        cause_zh = lex.scrub(str(payload.get("message_zh") or reason or "—"))
+    except Exception:
+        review_n = None
+        gate_zh = str(stage)
+        cause_zh = str(payload.get("message_zh") or reason or "—")
+    name = (
+        payload.get("strategy_name")
+        or payload.get("strategy_key")
+        or payload.get("research_direction")
+        or "未命名策略"
+    )
+    try:
+        import auto_trade_strategy_titles as titles
+        name = titles.resolve_strategy_name(payload.get("strategy_key"), name) or name
+    except Exception:
+        pass
+    symbol = payload.get("symbol") or "—"
+    timeframe = payload.get("timeframe") or "—"
+    direction = payload.get("direction") or payload.get("trade_direction") or "—"
+    pipeline_label = payload.get("pipeline_label") or (
+        "管道%s" % payload.get("pipeline") if payload.get("pipeline") else "—"
+    )
+    task_id = payload.get("task_id") or "—"
+    job_id = payload.get("job_id") or "—"
+    next_zh = (
+        "已进入人工确认队列（永不自动上线）"
+        if passed else
+        "未进入人工确认；候选停留在复核否决"
+    )
+    msg = (
+        "【策略复核结果】\n"
+        "结果: {status}\n"
+        "名称: {name}\n"
+        "标的/周期/方向: {symbol} / {timeframe} / {direction}\n"
+        "管道: {pipeline}\n"
+        "复核关卡: {gate}\n"
+        "原因: {cause}\n"
+        "复核任务: {task}\n"
+        "创造任务: {job}\n"
+        "后续: {nxt}\n"
+        "时间: {t}"
+    ).format(
+        status=status_zh,
+        name=name,
+        symbol=symbol,
+        timeframe=timeframe,
+        direction=direction,
+        pipeline=pipeline_label,
+        gate=gate_zh if not review_n else "%s（第%s次）" % (gate_zh, review_n),
+        cause=str(cause_zh)[:280],
+        task=task_id,
+        job=job_id,
+        nxt=next_zh,
+        t=_now(),
+    )
+    meta = {
+        "strategy_name": name,
+        "strategy_key": payload.get("strategy_key"),
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "direction": direction,
+        "pipeline": payload.get("pipeline"),
+        "pipeline_label": pipeline_label,
+        "passed": passed,
+        "status_zh": status_zh,
+        "review_stage": stage,
+        "reason": reason,
+        "task_id": task_id,
+        "job_id": job_id,
+        "review_n": review_n,
+        "channel": "auto_trade_formal_notify",
+    }
+    result = send_message(
+        msg,
+        kind="strategy_review_outcome",
+        meta=meta,
+        dry_run=dry_run,
+    )
+    result["message"] = msg
+    result["meta"] = meta
+    return result
 
 def get_status():
     ch = get_channel()

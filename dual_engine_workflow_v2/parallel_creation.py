@@ -1400,14 +1400,55 @@ def _compact_result(result):
             outcome = "data_blocked"
         elif business_ok:
             outcome = "candidate_ready"
+        elif str(top_error or "") == "CANDIDATE_MATERIALIZATION_FAILURE" or (
+            isinstance(detail, dict)
+            and (
+                (detail.get("pipeline_failure") or {}).get("is_pipeline_error")
+                or detail.get("is_pipeline_error")
+            )
+        ):
+            outcome = "generation_system_failure"
+        elif (
+            str(top_error or "") in (
+                "CANDIDATE_QUALITY_FAILURE", "manufacture_handoff_floor_fail",
+            )
+            or str(blueprint.get("outcome") or "") == "candidate_quality_failure"
+            or str((blueprint.get("fuses") or {}).get("abort_reason") or "")
+            == "manufacture_handoff_floor_fail"
+            or (
+                isinstance(detail, dict)
+                and (
+                    detail.get("failure_layer") == "B_quality_handoff"
+                    or str(detail.get("reason") or "").startswith(
+                        "manufactured_survivors_below"
+                    )
+                )
+            )
+        ):
+            outcome = "candidate_quality_failure"
         elif technical_completed:
             outcome = "research_rejected"
         else:
             outcome = "technical_failed"
+    # Normalize stale labels: quality failures must never stay as research_rejected.
+    if (
+        outcome == "research_rejected"
+        and (
+            str(top_error or "") in (
+                "CANDIDATE_QUALITY_FAILURE", "manufacture_handoff_floor_fail",
+            )
+            or str(blueprint.get("outcome") or "") == "candidate_quality_failure"
+            or str((blueprint.get("fuses") or {}).get("abort_reason") or "")
+            == "manufacture_handoff_floor_fail"
+        )
+    ):
+        outcome = "candidate_quality_failure"
     outcome_status = dict((result or {}).get("outcome_status") or {})
     outcome_status.update({
         "technical_completed": bool(technical_completed),
         "research_rejected": outcome == "research_rejected",
+        "generation_system_failure": outcome == "generation_system_failure",
+        "candidate_quality_failure": outcome == "candidate_quality_failure",
         "data_blocked": outcome == "data_blocked",
         "candidate_ready": outcome == "candidate_ready",
         "review_submitted": outcome == "review_submitted",
@@ -1653,6 +1694,25 @@ def execute_claimed(job, running_path, slot):
         and formal_review.get("review_submitted") is True
         and formal_review.get("task_id")
     )
+    # bridge 内已推送；此处落盘回执，便于审计（不重复发）。
+    if review_submitted and formal_review.get("wx_notify") is not None:
+        try:
+            wx = formal_review.get("wx_notify") or {}
+            atomic_write_json(artifact_dir / "formal_review_wx_notify.json", {
+                "schema": "qiyu_formal_review_wx_notify_v1",
+                "at": _now(),
+                "task_id": formal_review.get("task_id"),
+                "job_id": job.get("job_id"),
+                "passed": bool(formal_review.get("ok")),
+                "sent": bool(wx.get("sent")),
+                "ok": bool(wx.get("ok")),
+                "wx_notify": {
+                    k: wx.get(k)
+                    for k in ("ok", "sent", "blocked", "error", "notification_error", "dry_run")
+                },
+            })
+        except Exception:
+            pass
     if review_submitted:
         final_status = "等待人工审批" if formal_review.get("ok") else "正式复核未通过"
         final_outcome = "review_submitted"
@@ -1662,6 +1722,20 @@ def execute_claimed(job, running_path, slot):
     elif summary.get("outcome") == "data_blocked":
         final_status = "研究数据不可用"
         final_outcome = "data_blocked"
+    elif summary.get("outcome") == "generation_system_failure" or str(
+        summary.get("error") or ""
+    ) == "CANDIDATE_MATERIALIZATION_FAILURE":
+        final_status = "管道生成失败：候选材料化不足"
+        final_outcome = "generation_system_failure"
+    elif summary.get("outcome") == "candidate_quality_failure" or str(
+        summary.get("error") or ""
+    ) in ("CANDIDATE_QUALITY_FAILURE", "manufacture_handoff_floor_fail") or str(
+        ((summary.get("failure_evidence") or {}).get("error") or "")
+    ) in ("CANDIDATE_QUALITY_FAILURE", "manufacture_handoff_floor_fail") or str(
+        ((summary.get("failure_evidence") or {}).get("abort_reason") or "")
+    ) == "manufacture_handoff_floor_fail":
+        final_status = "候选质量失败：材料化已完成但未过交接门槛"
+        final_outcome = "candidate_quality_failure"
     elif summary.get("technical_completed"):
         final_status = "本轮研究已拒绝：未形成可信候选"
         final_outcome = "research_rejected"
@@ -1671,6 +1745,8 @@ def execute_claimed(job, running_path, slot):
     outcome_status = {
         "technical_completed": bool(summary.get("technical_completed")),
         "research_rejected": final_outcome == "research_rejected",
+        "generation_system_failure": final_outcome == "generation_system_failure",
+        "candidate_quality_failure": final_outcome == "candidate_quality_failure",
         "data_blocked": final_outcome == "data_blocked",
         "candidate_ready": final_outcome == "candidate_ready",
         "review_submitted": final_outcome == "review_submitted",

@@ -1,0 +1,253 @@
+{
+  "STATUS.json": [
+    {
+      "path": "/root/auto_trade/windtalker_phase1/STATUS.json",
+      "content": {
+        "phase": "DONE",
+        "current_candidate": null,
+        "note": "assembling final report",
+        "updated_at": "2026-07-27 23:10:18",
+        "pid": 2229854,
+        "counts": {
+          "ideas": 14,
+          "specs": 8,
+          "families": 8,
+          "gates": 8,
+          "human_pending": 0,
+          "kb_added": 25
+        },
+        "ran_orchestrator": false,
+        "verdict": "PASS",
+        "done_path": "/root/auto_trade/windtalker_phase1/DONE.json",
+        "report_path": "/root/auto_trade/windtalker_phase1/WINDTALKER_PHASE1_final_report.md",
+        "creation_input_v2": {
+          "schema": "qiyu_strategy_creation_frequency_input_v2",
+          "forecast_id": "fc_2026-07-27_224622_a51a90ee3c99",
+          "priority": "positive_expectancy_frequency_gap",
+          "positive_expectancy_frequency_gap": {
+            "gap_daily_to_band": 0.5,
+            "gap_weekly_to_band": 3.5,
+            "note": "creation must prioritize positive-E gap, not raw open-count gap",
+            "status": "shortfall",
+            "target_daily": [
+              0.5,
+              1.0
+            ],
+            "target_weekly": [
+              3.5,
+              7.0
+            ]
+          },
+          "do_not_loosen_entries": true,
+          "do_not_force_open": true
+        }
+      }
+    }
+  ],
+  "DONE.json": [
+    {
+      "path": "/root/auto_trade/windtalker_phase1/DONE.json",
+      "content": {
+        "generated_at": "2026-07-27 23:10:18",
+        "pid": 2229854,
+        "verdict": "PASS",
+        "criteria_pass_n": 12,
+        "criteria_total": 12,
+        "initial_ideas_n": 14,
+        "formal_specs_n": 8,
+        "independent_families_n": 8,
+        "gate_tested_n": 8,
+        "gate0_6_all_pass_n": 0,
+        "human_confirm_pending_n": 0,
+        "production_mounted_n": 0,
+        "kb_added_n": 25,
+        "auto_trade_target_progress": "0%",
+        "functional_drift": "0%",
+        "report_path": "/root/auto_trade/windtalker_phase1/WINDTALKER_PHASE1_final_report.md",
+        "report_docs_path": "/root/docs/WINDTALKER_PHASE1_final_report.md",
+        "status_path": "/root/auto_trade/windtalker_phase1/STATUS.json"
+      }
+    }
+  ],
+  "find_counts": {
+    "mechanism_spec.json": {
+      "count": 8,
+      "sample_paths": [
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_vwap_dev_btc15m/mechanism_spec.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_low_break_fail_reclaim_long_ada5m/mechanism_spec.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_ts_session_break_long_btc5m/mechanism_spec.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_zscore_dislocation_sol15m/mechanism_spec.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_vr03_eth15m/mechanism_spec.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_rsi_extreme_sol1h/mechanism_spec.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_tc_thrust_retest_sol5m/mechanism_spec.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_liquidity_failed_breakout_high_xrp15m/mechanism_spec.json"
+      ]
+    },
+    "fidelity": {
+      "count": 54,
+      "sample_paths": [
+        "/root/docs/STEP_A_mechanism_fidelity_audit.json",
+        "/root/backups/windtalker_phase1_20260727_220043/STEP_A_mechanism_fidelity_audit.json",
+        "/root/backups/step_a_strategy_creation_20260726_234045/STEP_A_mechanism_fidelity_audit.json",
+        "/root/dual_engine_workflow_v2/fidelity.py",
+        "/root/dual_engine_workflow_v2/fidelity_diff.py",
+        "/root/dual_engine_workflow_v2/__pycache__/fidelity.cpython-311.pyc",
+        "/root/dual_engine_workflow_v2/__pycache__/fidelity_diff.cpython-36.pyc",
+        "/root/dual_engine_workflow_v2/__pycache__/fidelity_diff.cpython-311.pyc",
+        "/root/dual_engine_workflow_v2/__pycache__/fidelity.cpython-36.pyc",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_vwap_dev_btc15m/fidelity_diff.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_low_break_fail_reclaim_long_ada5m/fidelity_diff.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_ts_session_break_long_btc5m/fidelity_diff.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_zscore_dislocation_sol15m/fidelity_diff.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_vr03_eth15m/fidelity_diff.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_rsi_extreme_sol1h/fidelity_diff.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_tc_thrust_retest_sol5m/fidelity_diff.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_liquidity_failed_breakout_high_xrp15m/fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225524_c811_r2_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_224607_480f_r0_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225613_f668_r2_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225701_fc41_r0_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225434_6fc8_r2_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225701_fc41_r1_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225410_58ca_r0_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_224607_c4c6_r0_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225410_58ca_r2_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_013842_ca6c_r2_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_013520_52ed_r0_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_224606_479c_r0_mechanism_fidelity_diff.json",
+        "/root/auto_trade/dual_engine/workflow_v2/fidelity_diffs/wsa_20260727_225613_f668_r0_mechanism_fidelity_diff.json"
+      ]
+    },
+    "gate": {
+      "count": 52,
+      "sample_paths": [
+        "/root/windtalker_phase1_gate_rerun.py",
+        "/root/test_theoretical_review_gate.py",
+        "/root/windtalker_phase1_rerun_gates.py",
+        "/root/docs/windtalker_phase1_gate_results.json",
+        "/root/docs/STEP_A_gate_results.json",
+        "/root/backups/windtalker_phase1_20260727_220043/STEP_A_gate_results.json",
+        "/root/backups/step_a_strategy_creation_20260726_234045/STEP_A_gate_results.json",
+        "/root/dual_engine_workflow_v2/gates.py",
+        "/root/dual_engine_workflow_v2/__pycache__/gates.cpython-311.pyc",
+        "/root/dual_engine_workflow_v2/__pycache__/gates.cpython-36.pyc",
+        "/root/auto_trade/formal_live_gate_xag.json",
+        "/root/auto_trade/formal_live_gate_ltc.json",
+        "/root/auto_trade/formal_live_gate_ada.json",
+        "/root/auto_trade/temp_test_real_order_gate_v8_18.json",
+        "/root/auto_trade/live_cognitive_gate_required.json",
+        "/root/auto_trade/formal_live_gate_xau.json",
+        "/root/auto_trade/quality_gate_backup_20260722_181939.tgz",
+        "/root/auto_trade/formal_live_gate_xrp.json",
+        "/root/auto_trade/test_theoretical_review_gate.py",
+        "/root/auto_trade/formal_live_gate.json",
+        "/root/auto_trade/windtalker_phase1/windtalker_phase1_gate_results.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_vwap_dev_btc15m/gate_row.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_low_break_fail_reclaim_long_ada5m/gate_row.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_ts_session_break_long_btc5m/gate_row.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_zscore_dislocation_sol15m/gate_row.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_vr03_eth15m/gate_row.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_rsi_extreme_sol1h/gate_row.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_tc_thrust_retest_sol5m/gate_row.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_liquidity_failed_breakout_high_xrp15m/gate_row.json",
+        "/root/auto_trade/dual_engine/frost2_cont_gates.json"
+      ]
+    },
+    "failure": {
+      "count": 23,
+      "sample_paths": [
+        "/root/backups/windtalker_phase1_20260727_220043/failure_kb_before.json",
+        "/root/backups/windtalker_phase1_20260727_220043/failure_knowledgebase.json",
+        "/root/backups/phase2_strategy_binding_v2_20260710_150823/failure_report.json",
+        "/root/backups/phase2_strategy_binding_v2_20260710_154638/failure_report.json",
+        "/root/backups/phase2_strategy_binding_v2_20260710_181401/failure_report.json",
+        "/root/backups/strategy_workflow_upgrade_20260726_183043/db/failure_experiences_count.txt",
+        "/root/backups/phase2_strategy_binding_v2_20260710_145153/failure_report.json",
+        "/root/dual_engine_workflow_v2/failure_kb.py",
+        "/root/dual_engine_workflow_v2/failure_archive.py",
+        "/root/dual_engine_workflow_v2/__pycache__/failure_archive.cpython-311.pyc",
+        "/root/dual_engine_workflow_v2/__pycache__/failure_kb.cpython-311.pyc",
+        "/root/dual_engine_workflow_v2/__pycache__/failure_archive.cpython-36.pyc",
+        "/root/dual_engine_workflow_v2/__pycache__/failure_kb.cpython-36.pyc",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_vwap_dev_btc15m/failure_record.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_low_break_fail_reclaim_long_ada5m/failure_record.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_ts_session_break_long_btc5m/failure_record.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_zscore_dislocation_sol15m/failure_record.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_vr03_eth15m/failure_record.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_mr_rsi_extreme_sol1h/failure_record.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_tc_thrust_retest_sol5m/failure_record.json",
+        "/root/auto_trade/windtalker_phase1/candidates/mech_liquidity_failed_breakout_high_xrp15m/failure_record.json",
+        "/root/auto_trade/dual_engine/workflow_v2/failure_knowledgebase.json",
+        "/root/auto_trade/dual_engine/workflow_v2/failure_archives.jsonl"
+      ]
+    }
+  },
+  "candidate_dirs": [
+    "/root/auto_trade/windtalker_phase1",
+    "/root/auto_trade/windtalker_phase1_deploy"
+  ],
+  "final_report_paths": [
+    "/root/auto_trade/dual_engine/workflow_v2/windtalker_phase1/WINDTALKER_PHASE1_final_report.md",
+    "/root/auto_trade/windtalker_phase1/WINDTALKER_PHASE1_final_report.md",
+    "/root/docs/WINDTALKER_PHASE1_final_report.md"
+  ],
+  "WINDTALKER_PHASE1_final_report_under_root": true,
+  "final_report_head_path": "/root/auto_trade/dual_engine/workflow_v2/windtalker_phase1/WINDTALKER_PHASE1_final_report.md",
+  "final_report_head": "# WINDTALKER PHASE 1 \u2014 High-Quality Strategy Candidate Pool Final Report\n\nGenerated: 2026-07-27 23:10:18\nRunner PID: 2229854\nDurable root: `/root/auto_trade/windtalker_phase1`\n\n---\n\n## \u00a7\u5341\u4e94 \u9996\u9875\u603b\u89c8\uff08\u6700\u663e\u773c\uff09\n\n| \u9879 | \u503c |\n|---|---|\n| \u5f53\u524d\u6210\u679c | **\u5b8c\u6574\u7b2c\u4e00\u9636\u6bb5**\uff081A\u20131G\uff09 |\n| \u7b2c\u4e00\u9636\u6bb5\u9a8c\u6536 | **PASS**\uff0812/12 criteria\uff09 |\n| \u521d\u59cb\u673a\u5236\u6784\u60f3\u6570 | 14 |\n| \u6b63\u5f0f mechanism_spec \u6570 | 8 |\n| \u72ec\u7acb\u673a\u5236\u5bb6\u65cf\u6570 | 8 |\n| \u5b9e\u73b0\u5b8c\u6210\u6570 | 8 |\n| Gate\u6d4b\u8bd5\u6570 | 8 |\n| Gate0\u20136\u5168\u90e8\u901a\u8fc7\u6570 | 0 |\n| human-confirm pending\u6570 | 0 |\n| \u751f\u4ea7\u6302\u8f7d\u6570 | 0 |\n| failure KB\u65b0\u589e\u6570 | 25 |\n| \u5f53\u524d\u6b63\u671f\u671b\u9891\u7387 | 0.0 /week |\n| \u5f53\u524d\u6b63\u671f\u671b\u9891\u7387\u7f3a\u53e3 | +3.5 /week |\n| \u81ea\u52a8\u4ea4\u6613\u76ee\u6807\u5b9e\u9645\u524d\u8fdb\u5ea6 | **0%** |\n| \u539f\u521d\u529f\u80fd\u504f\u79bb\u5ea6 | **0% (low)** |\n| H1\uff08\u9ad8\u8d28\u91cf\u6b63\u671f\u671b\u673a\u4f1a\uff09 | \u672a\u6539\u5584\uff080 \u6761 Gate0\u20136 \u5168\u8fc7\uff09 |\n| H2\uff08\u5355\u7b14\u51c0\u76c8\u5229\u8d28\u91cf\uff09 | \u672a\u6539\u5584\uff08\u5931\u8d25\u5019\u9009\u6210\u672c\u540e\u5747\u503c\u591a\u4e3a\u8d1f/\u96f6\uff09 |\n| \u662f\u5426\u524a\u5f31 open\u2192SL\u2192TP/close | **\u5426** |\n\n### \u4e24\u79cd\u8fdb\u5ea6\uff08\u5fc5\u987b\u5206\u5f00\uff09\n\n1. **\u672c\u9636\u6bb5\u5de5\u7a0b\u6267\u884c\u8fdb\u5ea6\uff1a100%** \u2014 \u5019\u9009\u751f\u6210 / \u673a\u5236\u4e66 / \u5b9e\u73b0 / Gate / \u4fee\u590d / KB / \u62a5\u544a\u5df2\u5b8c\u6210\u3002\n2. **\u81ea\u52a8\u4ea4\u6613\u76ee\u6807\u5b9e\u9645\u524d\u8fdb\u5ea6\uff1a0%** \u2014 \u65e0\u65b0\u7b56\u7565\u751f\u4ea7\u6302\u8f7d\uff0c\u65e0\u65b0\u589e\u5df2\u6821\u51c6\u6b63\u671f\u671b\u9891\u7387\u3002\n\n---\n\n## \u6210\u529f\u6807\u51c6\uff08\u00a7\u5341\u4e09\uff09\u6838\u5bf9\n\n- [x] 1_read_positive_E_gap\n- [x] 2_ge_8_formal_specs\n- [x] 3_ge_5_independent_families\n- [x] 4_immutable_specs\n- [x] 5_fidelity_diffs\n- [x] 6_dedup_review\n- [x] 7_gate_entered\n- [x] 8_repair_le_3_archived\n- [x] 9_failure_kb_added\n- [x] 10_pools_and_family_stats\n- [x] 11_no_loosened_forged_results\n- [x] 12_trade_chain_not_weakened\n\nVerdict: **PASS**\n\n---\n\n## \u57fa\u7ebf\u5bf9\u7167\n\n| \u6307\u6807 | \u63d0\u793a\u8bcd\u57fa\u7ebf | \u6267\u884c\u65f6\u7ebf\u4e0a | \u0394 |\n|---|---:|---:|---:|\n| fillable_weekly | 2.3472 | 2.3472 | 0.0 |\n| calibrated_positive_E_weekly | 0.0 | 0.0 | 0.0 |\n| positive_E_gap_weekly | 3.5 | 3.5 | 0.0 |\n\n- creation_priority: `positive_expectancy_frequency_gap`\n- do_not_loosen_entries: `True`\n- do_not_force_open: `True`\n- forecast_id / pool: `fc_2026-07-27_214622_a51a90ee3c99` / `a51a90ee3c993ebe`\n\n---\n\n## \u5019\u9009\u4e0e\u5bb6\u65cf\n\n### Formal specs (8)\n\n| mechanism_id | family | direction | symbol | tf | side |\n|---|---|---|---|---|---|\n| mech_liquidity_failed_breakout_high_xrp15m | liquidity_failed_breakout_high | liquidity_failed_breakout | XRP-USDT-SWAP | 15m | short |\n| mech_mr_vwap_dev_btc15m | mean_reversion_vwap_deviation | mean_reversion | BTC-USDT-SWAP | 15m | long |\n",
+  "metrics_from_json": {
+    "production_mounted_n": [
+      {
+        "path": "/root/docs/windtalker_phase1_summary.json",
+        "value": 0
+      },
+      {
+        "path": "/root/auto_trade/windtalker_phase1/windtalker_phase1_summary.json",
+        "value": 0
+      },
+      {
+        "path": "/root/auto_trade/windtalker_phase1/DONE.json",
+        "value": 0
+      },
+      {
+        "path": "/root/auto_trade/dual_engine/workflow_v2/windtalker_phase1/windtalker_phase1_summary.json",
+        "value": 0
+      },
+      {
+        "path": "/root/auto_trade/windtalker_phase1/windtalker_phase1_summary.json",
+        "value": 0
+      },
+      {
+        "path": "/root/auto_trade/windtalker_phase1/DONE.json",
+        "value": 0
+      },
+      {
+        "path": "/root/docs/windtalker_phase1_summary.json",
+        "value": 0
+      }
+    ],
+    "gate_all_pass": []
+  },
+  "strategy_creation_frequency_input": {
+    "path": "/root/backups/windtalker_phase1_20260727_220043/strategy_creation_frequency_input.json",
+    "PEG": null,
+    "keys": [
+      "creation_brief",
+      "forecast_id",
+      "frequency_gap",
+      "generated_at",
+      "mandatory_niches_hint",
+      "mechanism_families",
+      "near_zero_contribution",
+      "negative_contribution",
+      "portfolio_frequency",
+      "positive_expectancy_frequency",
+      "positive_expectancy_frequency_gap",
+      "priority",
+      "schema",
+      "strategy_pool_version",
+      "uncalibrated_contribution",
+      "updated_at"
+    ]
+  },
+  "mechanism_spec_family_dirs_sample": 8
+}

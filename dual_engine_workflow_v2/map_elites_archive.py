@@ -65,6 +65,28 @@ def _path_bucket(path):
     return "other"
 
 
+PATH_HIT_BUCKETS = ("path_high", "path_mid", "path_low", "path_unknown")
+
+
+def _path_hit_bucket(probe_best=None):
+    pfr = None
+    if probe_best:
+        pfr = probe_best.get("profit_first_rate")
+        if pfr is None:
+            pfr = ((probe_best.get("path_bare_screen") or {}).get("summary") or {}).get(
+                "profit_first_rate"
+            )
+    try:
+        v = float(pfr)
+    except Exception:
+        return "path_unknown"
+    if v >= 0.55:
+        return "path_high"
+    if v >= 0.40:
+        return "path_mid"
+    return "path_low"
+
+
 def behavior_descriptor(hypothesis, probe_best=None, n_bars=None):
     family = str(hypothesis.get("family") or "other")
     if family not in FAMILIES:
@@ -78,6 +100,7 @@ def behavior_descriptor(hypothesis, probe_best=None, n_bars=None):
     freq = _freq_bucket(n_hits, n_bars)
     cost = _cost_bucket((probe_best or {}).get("mean_net"))
     path = _path_bucket(hypothesis.get("path"))
+    path_hit = _path_hit_bucket(probe_best)
     side = str((probe_best or {}).get("side") or hypothesis.get("side") or "na")[:8]
     direction = str(hypothesis.get("predicted_direction") or "unknown")[:24]
     return {
@@ -86,18 +109,38 @@ def behavior_descriptor(hypothesis, probe_best=None, n_bars=None):
         "freq_bucket": freq,
         "cost_bucket": cost,
         "path_bucket": path,
+        "path_hit_bucket": path_hit,
         "side": side,
         "direction": direction,
-        # Richer cell: family × horizon × freq × cost × path
-        "cell": "%s|%s|%s|%s|%s" % (family, horizon, freq, cost, path),
+        # Richer cell: family × horizon × freq × path_hit
+        "cell": "%s|%s|%s|%s|%s" % (family, horizon, freq, path_hit, path),
     }
 
 
 def quality_score(probe_best=None, antifalsify=None, efr=None):
+    """Path-first quality: profit_first_rate dominates; mean_net is secondary."""
     q = 0.0
     if probe_best and probe_best.get("passed"):
-        q += max(0.0, float(probe_best.get("mean_net") or 0.0) * 1000.0)
-        q += min(3.0, abs(float(
+        pfr = probe_best.get("profit_first_rate")
+        if pfr is None:
+            pfr = ((probe_best.get("path_bare_screen") or {}).get("summary") or {}).get(
+                "profit_first_rate"
+            )
+        try:
+            q += 10.0 * max(0.0, float(pfr or 0.0))
+        except Exception:
+            pass
+        if probe_best.get("path_review_eligible"):
+            q += 4.0
+        elif probe_best.get("path_packaging_ok"):
+            q += 1.5
+        entry = probe_best.get("path_entry_score")
+        try:
+            q += 3.0 * max(0.0, float(entry or 0.0))
+        except Exception:
+            pass
+        q += max(0.0, float(probe_best.get("mean_net") or 0.0) * 200.0)
+        q += min(2.0, abs(float(
             probe_best.get("hac_t_stat")
             if probe_best.get("hac_t_stat") is not None
             else (probe_best.get("t_stat") or 0.0)

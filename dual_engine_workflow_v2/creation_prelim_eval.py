@@ -1,19 +1,22 @@
 # -*- coding: utf-8 -*-
-"""Creation preliminary evaluation gate (pre-human display).
+"""创造初评门禁（对人展示前）。
 
-Hard rule (human-mandated 2026-07-30):
-  If preliminary win_rate < 50%, DO NOT present the strategy as a delivery.
-  System must switch direction or try a classic-strategy variant instead.
+硬规则：初评胜率未严格大于 50% 时，禁止把策略展示为交付物。
+系统必须换方向或套用经典策略变式。
 
-Also forces explicit calendar window labeling so "total_return" is never
-ambiguous (must state first_ts / last_ts / span_days).
+同时强制标注回测日历窗口，避免「总收益」口径歧义。
 """
 from __future__ import print_function
 
 from datetime import datetime
 
+from .creation_quality_doctrine import (
+    MIN_TRADES_CREATION,
+    MIN_WIN_RATE_EXCLUSIVE,
+)
 
-MIN_WIN_RATE = 0.50
+
+MIN_WIN_RATE = MIN_WIN_RATE_EXCLUSIVE  # 胜率硬底（严格大于）
 
 
 def _ts_to_iso(ts):
@@ -102,10 +105,11 @@ CLASSIC_VARIANTS = (
 
 
 def prelim_eval(stats, first_ts=None, last_ts=None, n_bars=None, timeframe=None,
-                min_win_rate=MIN_WIN_RATE, min_trades=10):
-    """Return presentable / reject decision for creation output.
+                min_win_rate=MIN_WIN_RATE, min_trades=MIN_TRADES_CREATION):
+    """创造输出是否可对人展示。
 
-    stats keys expected: win_rate, n_trades|n, total_return, max_drawdown, ...
+    stats 期望字段：胜率 win_rate、成交笔数 n_trades|n、总收益、最大回撤等。
+    胜率硬底为严格大于 min_win_rate（默认 50%）。
     """
     stats = stats or {}
     wr = stats.get("win_rate")
@@ -127,9 +131,9 @@ def prelim_eval(stats, first_ts=None, last_ts=None, n_bars=None, timeframe=None,
     if wr_f is None:
         presentable = False
         reasons.append("win_rate_missing")
-    elif wr_f < float(min_win_rate):
+    elif wr_f <= float(min_win_rate):
         presentable = False
-        reasons.append("win_rate_below_50pct")
+        reasons.append("win_rate_not_above_50pct")
     if n_i < int(min_trades):
         presentable = False
         reasons.append("insufficient_trades")
@@ -139,8 +143,11 @@ def prelim_eval(stats, first_ts=None, last_ts=None, n_bars=None, timeframe=None,
         "schema": "qiyu_creation_prelim_eval_v1",
         "present_to_human": presentable,
         "min_win_rate": float(min_win_rate),
+        "min_win_rate_rule_zh": "胜率必须严格大于 50%",
         "win_rate": wr_f,
+        "胜率": wr_f,
         "n_trades": n_i,
+        "成交笔数": n_i,
         "total_return": stats.get("total_return"),
         "max_drawdown": stats.get("max_drawdown"),
         "sharpe_ann_proxy": stats.get("sharpe_ann_proxy") or stats.get("sharpe"),
@@ -148,7 +155,7 @@ def prelim_eval(stats, first_ts=None, last_ts=None, n_bars=None, timeframe=None,
         "reject_reasons": reasons,
         "human_banner_zh": (
             None if presentable else (
-                "【初评未通过·禁止展示为交付】胜率 %s < 50%%（或样本不足）。"
+                "【初评未通过·禁止展示为交付】胜率 %s 未严格大于 50%%（或成交笔数不足）。"
                 "系统将自动换方向 / 套用经典策略变式，不把垃圾包推给人看。"
                 % ("%.1f%%" % (100 * wr_f) if wr_f is not None else "缺失")
             )
@@ -181,7 +188,7 @@ def apply_variant_to_design(design_doc, variant):
         },
         {
             "id": "H2_wr_gate",
-            "statement_zh": "初评胜率必须 ≥50%，否则不得对人展示",
+            "statement_zh": "初评胜率必须严格大于 50%，否则不得对人展示",
             "testable_factor_hints": list(variant.get("factor_hints") or [])[:3],
         },
     ]

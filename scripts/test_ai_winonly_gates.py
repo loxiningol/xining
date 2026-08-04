@@ -103,8 +103,13 @@ class EmpiricWinOnlyTests(unittest.TestCase):
 class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
     def test_r4_prefers_near_2y_backtest_density(self):
         pack = ai.resolve_statistical_weekly_opens(
-            {"key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14"},
-            {"trades": 104, "span_days": 728.0, "weekly_opens_require_2y": True},
+            {"key": "codex0725t3_ada5m_trendpb_r42_z2p3_h14", "timeframe": "5m"},
+            {
+                "trades": 104,
+                "span_days": 728.0,
+                "bars_span_days": 728.0,
+                "weekly_opens_require_2y": True,
+            },
         )
         self.assertAlmostEqual(pack["expected_weekly_fills"], 1.0, places=4)
         self.assertEqual(pack["method"], "backtest_2y_fill_rate_proxy")
@@ -117,6 +122,35 @@ class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
         self.assertFalse(pack["ai_may_override"])
         self.assertTrue(pack["ai_may_discount"])
         self.assertEqual(pack["ai_role"], "limited_discount")
+
+    def test_ada5_caps_claimed_730_to_honest_short_window(self):
+        bars = int(37.3 * 288)
+        pack = ai.compute_weekly_open_frequency(
+            17,
+            span_days=730.0,
+            candidate={"timeframe": "5m", "key": "ada5"},
+            evidence={
+                "timeframe": "5m",
+                "trades": 17,
+                "span_days": 730.0,
+                "bars_used": bars,
+            },
+        )
+        self.assertAlmostEqual(pack["expected_weekly_fills"], 17 * 7 / (bars / 288.0), places=2)
+        self.assertAlmostEqual(pack["expected_weekly_fills"], 3.19, places=1)
+        self.assertFalse(pack["sample_2y_ok"])
+        self.assertIn("capped_claimed", str(pack.get("span_source") or ""))
+
+    def test_claimed_730_without_physical_rejected(self):
+        pack = ai.compute_weekly_open_frequency(
+            17,
+            span_days=730.0,
+            candidate={"key": "x"},
+            evidence={"trades": 17, "span_days": 730.0},
+        )
+        self.assertIsNone(pack["expected_weekly_fills"])
+        self.assertEqual(pack["span_source"], "claimed_unverified")
+        self.assertIn(pack["method"], ("missing_physical_span", "missing_2y_sample"))
 
     def test_live_14d_rejected_when_2y_required(self):
         pack = ai.resolve_statistical_weekly_opens(
@@ -166,12 +200,14 @@ class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
         try:
             ai.theoretical_review_one = (
                 lambda name, c, e, _retry=True: self._passing_vote(name, 0.9))
-            out = ai.theoretical_review_all(
-                {"key": "x"},
-                {"statistical_weekly_opens_expected": 1.0,
-                 "frequency_method": "backtest_2y_fill_rate_proxy",
-                 "span_days": 730.0, "trades": 104},
-            )
+            evidence_2y = {
+                "trades": 104,
+                "span_days": 728.0,
+                "bars_span_days": 728.0,
+                "timeframe": "5m",
+                "weekly_opens_require_2y": True,
+            }
+            out = ai.theoretical_review_all({"key": "x", "timeframe": "5m"}, evidence_2y)
             self.assertTrue(out["approved"], out.get("fail_reasons"))
             self.assertAlmostEqual(out["ai_theoretical_weekly_opens_avg"], 0.9)
             self.assertAlmostEqual(out["statistical_weekly_opens_expected"], 1.0)
@@ -181,12 +217,7 @@ class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
             # AI discounts below floor → fail even if statistical anchor is high
             ai.theoretical_review_one = (
                 lambda name, c, e, _retry=True: self._passing_vote(name, 0.2))
-            low = ai.theoretical_review_all(
-                {"key": "x"},
-                {"statistical_weekly_opens_expected": 1.0,
-                 "frequency_method": "backtest_2y_fill_rate_proxy",
-                 "span_days": 730.0, "trades": 104},
-            )
+            low = ai.theoretical_review_all({"key": "x", "timeframe": "5m"}, evidence_2y)
             self.assertFalse(low["approved"])
             self.assertFalse(low["weekly_opens_gate_ok"])
         finally:
@@ -205,10 +236,9 @@ class WeeklyFrequencyAndConsensusTests(unittest.TestCase):
         try:
             ai.theoretical_review_one = fake
             out = ai.theoretical_review_all(
-                {"key": "x"},
-                {"statistical_weekly_opens_expected": 1.0,
-                 "frequency_method": "backtest_2y_fill_rate_proxy",
-                 "span_days": 730.0, "trades": 104},
+                {"key": "x", "timeframe": "5m"},
+                {"trades": 104, "span_days": 730.0, "bars_span_days": 730.0,
+                 "timeframe": "5m", "weekly_opens_require_2y": True},
             )
             self.assertFalse(out["approved"])
             self.assertFalse(ai.validate_theoretical_review_result(out)["ok"])
