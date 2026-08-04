@@ -1,0 +1,83 @@
+{
+  "task": "phase0_region_to_formal_strategy_conversion",
+  "accepted_at": "2026-08-04T23:55:00+08:00",
+  "contract_locked": {
+    "leverage": 20,
+    "protective_stop_price_distance": 0.005,
+    "win_rate_minimum": 0.65,
+    "average_profitable_trade_return_leveraged_net_minimum": 0.1111,
+    "average_weekly_entry_frequency_minimum": 0.1,
+    "automatic_creation_required": true,
+    "production_formal_pass_required": true,
+    "forbidden": ["raise_wr_to_0.70", "restore_weekly_0.5"]
+  },
+  "sole_success_kpi": {
+    "name": "production_formal_pass_strategy_count",
+    "required": ">0",
+    "actual": 0,
+    "passed": false
+  },
+  "regions": {
+    "A": {
+      "status": "PHASE0_FALSE_POSITIVE",
+      "strict_oos_reproduced": false,
+      "may_strategize": false,
+      "failure_stage": "region_oos_reproduce",
+      "holdout_tail": {
+        "win_rate": 0.5138,
+        "average_profitable_trade_return_leveraged_net": 0.1046,
+        "weekly_frequency": 105.7,
+        "trade_count": 109
+      },
+      "recent_2y_passed": false,
+      "recent_2y_reason": "data_span_41.7d_lt_600d"
+    },
+    "B": {
+      "status": "PHASE0_FALSE_POSITIVE",
+      "strict_oos_reproduced": false,
+      "may_strategize": false,
+      "failure_stage": "region_oos_reproduce",
+      "test": {
+        "win_rate": 0.1429,
+        "average_profitable_trade_return_leveraged_net": 0.0967,
+        "weekly_frequency": 124.8,
+        "trade_count": 7
+      },
+      "holdout_tail": {
+        "win_rate": 0.4286,
+        "average_profitable_trade_return_leveraged_net": 0.1312,
+        "weekly_frequency": 72.8,
+        "trade_count": 49
+      },
+      "recent_2y_passed": false,
+      "recent_2y_reason": "wr_lt_0.65_and_data_span_41.7d_lt_600d"
+    }
+  },
+  "pipeline_stages": {
+    "phase0_region": "DONE_INPUT",
+    "region_oos_reproduce": "FAILED_BOTH",
+    "event_trigger_discovery": "SKIPPED_RULE_BLOCK",
+    "entry_rule": "SKIPPED_RULE_BLOCK",
+    "exit_hold_search": "SKIPPED_RULE_BLOCK",
+    "production_backtest": "SKIPPED_RULE_BLOCK",
+    "recent_2y_validation": "FAILED_AT_OOS",
+    "formal": "NOT_STARTED"
+  },
+  "eight_answers": {
+    "1_region_a_strict_oos": false,
+    "2_region_b_strict_oos": false,
+    "3_formal_strategy_formed": false,
+    "4_wr_ge_0.65_oos": false,
+    "5_mean_win_net_ge_0.1111_oos": false,
+    "6_weekly_ge_0.1_joint_pass": false,
+    "7_production_formal_pass": false,
+    "8_failure_stage": "region_oos_reproduce"
+  },
+  "acceptance_verdict": "FAIL",
+  "acceptance_reason": "Both Phase0 regions failed strict time-split OOS; may_strategize=false blocks Event/Exit/Formal. Sole KPI production_formal_pass_strategy_count remains 0.",
+  "evidence": [
+    "alpha_discovery/project_prometheus/region_conversion/REGION_OOS_REPRODUCE.json",
+    "alpha_discovery/project_prometheus/region_conversion/REGION_OOS_REPRODUCE.md",
+    "alpha_discovery/project_prometheus/region_conversion/REGION_CONVERSION_REPORT.md"
+  ]
+}

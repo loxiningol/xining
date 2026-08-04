@@ -1,0 +1,281 @@
+{
+  "schema": "qiyu_constraint_ecology_round1_v1",
+  "at": "2026-08-04 23:30 CST",
+  "project": "Qiyu Constraint Ecology / 栖语约束生态网络",
+  "phase": "round1_mechanism_universe_only",
+  "not_a_platform": true,
+  "not_near_success": true,
+  "production_formal_pass_strategy_count": 0,
+  "immutable_contract": {
+    "leverage": 20,
+    "protective_stop_price_distance": 0.005,
+    "win_rate_minimum": 0.65,
+    "average_profitable_trade_return_leveraged_net_minimum": 0.1111,
+    "per_strategy_average_weekly_frequency_minimum": 0.1,
+    "automatic_creation_required": true,
+    "production_formal_pass_required": true,
+    "note": "weekly 0.1 is PER STRATEGY, not portfolio minimum"
+  },
+  "negative_controls": {
+    "Region_A": "ETH 5m long vol=LO trend=MID session=EU H=96 — full-sample ok, holdout/rolling collapse → PHASE0_FALSE_POSITIVE",
+    "Region_B": "ETH 5m short vol=MID trend=LO session=US H=12 — test/holdout collapse → PHASE0_FALSE_POSITIVE",
+    "lesson": "Static state regions are not mechanisms. Forbidden as strategy basis."
+  },
+  "forbidden_as_mechanism": [
+    "RSI", "Bollinger", "MA/EMA crossover", "pure volatility tercile",
+    "pure trend tercile", "session label alone", "candle patterns",
+    "AI natural-language stories without constraint chain"
+  ],
+  "data_observability_audit": {
+    "OHLCV_research_candles": {
+      "status": "AVAILABLE",
+      "use": "outcome measurement + auxiliary only; NOT primary mechanism evidence"
+    },
+    "OI": {
+      "status": "PARTIAL",
+      "evidence": "OKX open-interest history endpoints + frost3 caches; not continuous multi-year replay for all symbols"
+    },
+    "Funding_Basis": {
+      "status": "PARTIAL",
+      "evidence": "OKX funding-rate-history fetchable; production friction-only historically"
+    },
+    "Taker_flow": {
+      "status": "PARTIAL_FORWARD",
+      "evidence": "microstructure_telemetry.db (~191k samples); forward-sampled subwindows; retention ~35d; NOT continuous historical replay"
+    },
+    "L2_depth_historical_replay": {
+      "status": "MECHANISM_NOT_OBSERVABLE",
+      "evidence": "execution_cost_model + windtalker matrix: no historical L2 book replay stored"
+    },
+    "liquidation_continuous_feed": {
+      "status": "MECHANISM_NOT_OBSERVABLE",
+      "evidence": "no continuous liquidation replay; cascade ideas must declare proxy or eliminate"
+    },
+    "cross_exchange_depth": {
+      "status": "MECHANISM_NOT_OBSERVABLE",
+      "evidence": "no multi-venue depth replay in current store"
+    },
+    "policy": "Missing required data => MECHANISM_NOT_OBSERVABLE; forbid OHLCV/RSI disguise"
+  },
+  "mechanism_hypotheses": [
+    {
+      "mechanism_id": "M01_ENDOGENOUS_LIQ_CASCADE_EXHAUSTION_REVERSAL",
+      "family": "liquidation_and_margin_constraints",
+      "actor": "leveraged_accounts_near_maintenance_margin",
+      "constraint": "exchange_maintenance_margin_and_auto_deleveraging_rules",
+      "pressure_accumulation": "OI_crowding + adverse_price_move shrinks distance_to_liquidation",
+      "mechanical_trigger": "mark_price_crosses_liq_threshold_for_cohort",
+      "forced_action": "market_orders_to_close_positions",
+      "observable_trajectory": "liq_print_burst → taker_imbalance_spike → temporary_depth_thinning_proxy → burst_decay",
+      "liquidity_response": "passive_quotes_absorb_or_withdraw; after exhaustion refill",
+      "edge_payer": "late_forced_sellers_buyers_crossing_spread_into_thinned_book",
+      "capture_window": "FORCED_FLOW_EXHAUSTION → CAPTURE_REVERSAL",
+      "failure_modes": ["exogenous_shock_news", "continued_cascade_multi_wave", "ADL_asymmetry", "proxy_mislabel"],
+      "event_origin_required": "endogenous_buildup",
+      "observability": "PARTIAL — needs liq feed; currently MECHANISM_NOT_OBSERVABLE for true liq prints; OI+taker may be weak proxy only if explicitly labeled PROXY_NOT_MECH",
+      "automaton_focus_states": ["ACCUMULATING", "ARMED", "FORCED_FLOW", "EXHAUSTION", "CAPTURE"],
+      "rank_candidate": true
+    },
+    {
+      "mechanism_id": "M02_LIQ_VACUUM_CONTINUATION",
+      "family": "liquidation_and_margin_constraints",
+      "actor": "same_as_M01",
+      "constraint": "same_as_M01",
+      "pressure_accumulation": "same_as_M01",
+      "mechanical_trigger": "liq_cascade_still_feeding",
+      "forced_action": "continued_market_closes",
+      "observable_trajectory": "FORCED_FLOW without EXHAUSTION; imbalance persists",
+      "liquidity_response": "book_stays_one_sided",
+      "edge_payer": "liquidity_providers_and_late_contrarians",
+      "capture_window": "FORCED_FLOW → CAPTURE_CONTINUATION",
+      "failure_modes": ["false_exhaustion", "exchange_halt", "exogenous_shock"],
+      "event_origin_required": "endogenous_buildup",
+      "observability": "MECHANISM_NOT_OBSERVABLE without continuous liquidation+L2",
+      "rank_candidate": false
+    },
+    {
+      "mechanism_id": "M03_EXOGENOUS_SHOCK_NO_TRADE",
+      "family": "liquidation_and_margin_constraints",
+      "actor": "all_leveraged_cohorts",
+      "constraint": "margin_rules_still_apply_but_trigger_is_external",
+      "pressure_accumulation": "none_or_insufficient_endogenous_track",
+      "mechanical_trigger": "external_jump_gap_or_oracle_move",
+      "forced_action": "mass_liquidations_and_discretionary_panic",
+      "observable_trajectory": "sudden_gap_without_prior_ACCUMULATING",
+      "liquidity_response": "unpredictable",
+      "edge_payer": "undefined",
+      "capture_window": "NO_TRADE / ABSTAIN_only",
+      "failure_modes": ["any_early_entry"],
+      "event_origin_required": "exogenous_shock",
+      "observability": "classification_gate_only — not a trading mech",
+      "rank_candidate": false,
+      "note": "Exists to FORCE abstain; not a profit mechanism"
+    },
+    {
+      "mechanism_id": "M04_TAKER_PRESSURE_THEN_ABSORPTION_EXHAUSTION",
+      "family": "liquidity_withdrawal_and_refill",
+      "actor": "aggressive_takers",
+      "constraint": "need_immediate_execution_vs_resting_liquidity",
+      "pressure_accumulation": "persistent_taker_imbalance + rising_impact_efficiency",
+      "mechanical_trigger": "imbalance_persistence_threshold_with_impact_decay_start",
+      "forced_action": "continued_aggressive_orders_until_inventory_or_edge_gone",
+      "observable_trajectory": "taker_imbalance_high → impact_per_notional_up → imbalance_fade",
+      "liquidity_response": "quotes_widen_then_refill_after_fade",
+      "edge_payer": "late_aggressors_after_information_already_in_price",
+      "capture_window": "EXHAUSTION → CAPTURE_REVERSAL_or_REFILL",
+      "failure_modes": ["informed_flow_continues", "BTC_beta_drive", "session_confound"],
+      "event_origin_required": "endogenous_buildup",
+      "observability": "PARTIAL_FORWARD — taker windows in microstructure_telemetry.db (~35d); insufficient for 2y Formal; OK for small event study if span declared",
+      "rank_candidate": true
+    },
+    {
+      "mechanism_id": "M05_QUOTE_WITHDRAWAL_IMPACT_EFFICIENCY_SPIKE",
+      "family": "liquidity_withdrawal_and_refill",
+      "actor": "market_makers_and_passive_lps",
+      "constraint": "inventory_and_adverse_selection_risk_limits",
+      "pressure_accumulation": "cancel_heavy_or_depth_thinning_under_flow",
+      "mechanical_trigger": "depth_collapse_proxy_crossed_with_aggressor_surge",
+      "forced_action": "quote_pull_widening_spread",
+      "observable_trajectory": "spread_up + depth_down + impact_up",
+      "liquidity_response": "temporary_vacuum_then_refill_or_trend",
+      "edge_payer": "urgency_traders_crossing_wide_spread",
+      "capture_window": "ABSORPTION_FAIL → ACCELERATION or EXHAUSTION→REVERSAL",
+      "failure_modes": ["no_L2_replay", "using_OHLC_range_as_fake_depth"],
+      "event_origin_required": "endogenous_buildup",
+      "observability": "MECHANISM_NOT_OBSERVABLE — historical L2 replay missing",
+      "rank_candidate": false
+    },
+    {
+      "mechanism_id": "M06_POST_SHOCK_DEPTH_REFILL_LAG",
+      "family": "liquidity_withdrawal_and_refill",
+      "actor": "passive_liquidity_providers",
+      "constraint": "risk_limits_delay_requote",
+      "pressure_accumulation": "after_forced_or_aggressive_burst",
+      "mechanical_trigger": "flow_ends_but_mid_not_mean_reverted_to_microprice_anchor",
+      "forced_action": "delayed_refill_orders",
+      "observable_trajectory": "imbalance_normalize_before_price_normalize",
+      "liquidity_response": "book_rebuild",
+      "edge_payer": "position_holders_marked_at_dislocated_mid",
+      "capture_window": "RESOLUTION_EXHAUSTION → CAPTURE_REVERSAL",
+      "failure_modes": ["no_microprice_L2", "trend_regime"],
+      "observability": "MECHANISM_NOT_OBSERVABLE without L2/microprice history",
+      "rank_candidate": false
+    },
+    {
+      "mechanism_id": "M07_MICROPRICE_SKEW_INVENTORY_PROXY_REVERSION",
+      "family": "market_maker_inventory_and_hedging",
+      "actor": "market_makers",
+      "constraint": "inventory_bands_and_skew_quotes",
+      "pressure_accumulation": "one_sided_aggressor_flow_skews_quotes",
+      "mechanical_trigger": "microprice_deviation_vs_mid_exceeds_band",
+      "forced_action": "skewed_quoting_then_hedge_or_mean_revert_inventory",
+      "observable_trajectory": "microprice_mid_gap → subsequent_mid_move_toward_microprice",
+      "liquidity_response": "quote_recenter",
+      "edge_payer": "uninformed_flow_hitting_skewed_quotes",
+      "capture_window": "ARMED_SKEW → CAPTURE_CONVERGENCE",
+      "failure_modes": ["informed_toxic_flow", "no_L2"],
+      "observability": "MECHANISM_NOT_OBSERVABLE — needs L2 microprice replay",
+      "rank_candidate": false
+    },
+    {
+      "mechanism_id": "M08_PERSISTENT_TAKER_SKEW_THEN_HEDGE_CONTINUATION",
+      "family": "market_maker_inventory_and_hedging",
+      "actor": "market_makers_hedging_on_perp_or_spot",
+      "constraint": "hedge_urgency_after_inventory_breach",
+      "pressure_accumulation": "taker_imbalance_persistence",
+      "mechanical_trigger": "imbalance_duration_threshold",
+      "forced_action": "hedge_market_orders_same_direction",
+      "observable_trajectory": "imbalance_persist → short_horizon_continuation",
+      "liquidity_response": "temporary_same_side_pressure",
+      "edge_payer": "lagged_liquidity_on_opposite_side",
+      "capture_window": "FORCED_FLOW_HEDGE → CAPTURE_CONTINUATION",
+      "failure_modes": ["BTC_beta", "imbalance_noise", "short_telemetry_span"],
+      "observability": "PARTIAL_FORWARD — taker imbalance only; hedge not directly observed (multi-proxy, falsifiable)",
+      "rank_candidate": true
+    },
+    {
+      "mechanism_id": "M09_FUNDING_CROWDING_UNWIND_AFTER_EXTREME",
+      "family": "cross_market_basis_and_arbitrage_constraints",
+      "actor": "crowded_perp_position_holders",
+      "constraint": "funding_payment_schedule_and_carry_cost",
+      "pressure_accumulation": "funding_z_extreme + OI_elevated",
+      "mechanical_trigger": "funding_print_or_threshold_cross_with_oi_still_high",
+      "forced_action": "reduce_or_flip_positions_to_stop_paying_funding",
+      "observable_trajectory": "funding_extreme → post_settlement_or_post_threshold_flow",
+      "liquidity_response": "basis_and_price_partial_mean_reversion",
+      "edge_payer": "crowded_side_paying_funding_then_crossing_to_exit",
+      "capture_window": "post_trigger_UNWIND → CAPTURE_REVERSAL_or_BASIS_CONVERGENCE",
+      "failure_modes": ["funding_regime_change", "trend_overrides_carry", "insufficient_history"],
+      "event_origin_required": "endogenous_buildup",
+      "observability": "PARTIAL — funding+OI fetchable (OKX); not Formal-ready without long aligned path labels",
+      "rank_candidate": true
+    },
+    {
+      "mechanism_id": "M10_SPOT_PERP_BASIS_ARBITRAGE_CONSTRAINT",
+      "family": "cross_market_basis_and_arbitrage_constraints",
+      "actor": "cash_and_carry_desks",
+      "constraint": "capital_margin_and_inventory_limits_on_basis_trade",
+      "pressure_accumulation": "basis_dislocation_beyond_cost_band",
+      "mechanical_trigger": "basis_exceeds_fee_borrow_funding_band",
+      "forced_action": "multi_leg_convergence_orders",
+      "observable_trajectory": "basis_widen → convergence_orders → basis_compress",
+      "liquidity_response": "cross_venue_or_spot_perp_catchup",
+      "edge_payer": "urgent_directional_flow_that_dislocated_basis",
+      "capture_window": "CAPTURE_CONVERGENCE (relative_value species)",
+      "failure_modes": ["leg_risk", "DSL_single_leg_only", "latency"],
+      "observability": "PARTIAL — mark/index candles possible; dual-leg Formal may be separate species",
+      "rank_candidate": false,
+      "note": "Relative-value species; do not force into single-leg DSL until Formal supports legs"
+    },
+    {
+      "mechanism_id": "M11_BTC_LEAD_FORCED_ETH_CATCHUP",
+      "family": "cross_market_basis_and_arbitrage_constraints",
+      "actor": "ETH_perp_traders_and_basis_desks",
+      "constraint": "relative_value_and_risk_parity_limits_vs_BTC",
+      "pressure_accumulation": "BTC_impulse_with_ETH_lag_and_basis_or_beta_breach",
+      "mechanical_trigger": "lead_lag_gap_exceeds_band_with_flow_confirm",
+      "forced_action": "ETH_orders_to_restore_relative_exposure",
+      "observable_trajectory": "BTC_move → ETH_lag → ETH_catchup",
+      "liquidity_response": "ETH_book_absorbs_catchup_flow",
+      "edge_payer": "slow_ETH_rebalancers",
+      "capture_window": "CAPTURE_CONTINUATION_on_ETH",
+      "failure_modes": ["idiosyncratic_ETH_news", "lead_lag_unstable", "session_confound_like_RegionAB"],
+      "observability": "PARTIAL — multi-symbol OHLCV + optional taker; must beat BTC-beta placebo hard",
+      "rank_candidate": true
+    },
+    {
+      "mechanism_id": "M12_FUNDING_SETTLEMENT_CLOCK_FLOW",
+      "family": "periodic_execution_and_institutional_clocks",
+      "actor": "perp_accounts_optimizing_funding_window",
+      "constraint": "fixed_funding_settlement_schedule",
+      "pressure_accumulation": "positioning_into_settlement",
+      "mechanical_trigger": "settlement_timestamp",
+      "forced_action": "pre_post_settlement_repositioning_orders",
+      "observable_trajectory": "systematic_flow_around_funding_time",
+      "liquidity_response": "transient_imbalance_around_clock",
+      "edge_payer": "accounts_forced_by_schedule_not_by_alpha",
+      "capture_window": "clock_window CAPTURE — only if orderflow cycle verified",
+      "failure_modes": ["session_label_alone_like_RegionA", "no_real_flow_cycle", "fee_edge_too_small"],
+      "observability": "PARTIAL — funding timestamps known; must verify orderflow cycle not just hour-of-day",
+      "rank_candidate": false,
+      "note": "EU/US session alone is FORBIDDEN; this mech requires settlement-tied flow proof"
+    }
+  ],
+  "top3_for_small_scale_validation": [
+    "M09_FUNDING_CROWDING_UNWIND_AFTER_EXTREME",
+    "M04_TAKER_PRESSURE_THEN_ABSORPTION_EXHAUSTION",
+    "M11_BTC_LEAD_FORCED_ETH_CATCHUP"
+  ],
+  "elimination_rules": [
+    "No complete actor-constraint-forced_action chain → reject",
+    "Required data missing → MECHANISM_NOT_OBSERVABLE (no OHLCV disguise)",
+    "event_origin unknown → no strategy creation",
+    "exogenous_shock → ABSTAIN species only",
+    "No treated vs control path difference → eliminate",
+    "Static state / session / RSI / BB / MA → reject as mechanism",
+    "Region A/B style full-sample pass with OOS collapse → FALSE_POSITIVE",
+    "Parameter clone without novelty_dimension → reject",
+    "Cannot meet per-strategy WR0.65 / mean_win_net0.1111 / weekly0.1 on strict OOS → no Formal",
+    "No Formal PASS ⇒ research evidence only; never claim system success"
+  ]
+}

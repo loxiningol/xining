@@ -1,0 +1,327 @@
+{
+  "at": "2026-08-04 23:12:57",
+  "contract": {
+    "win_rate_minimum": 0.65,
+    "mean_win_net_minimum": 0.1111,
+    "weekly_minimum": 0.1,
+    "stop": 0.005,
+    "leverage": 20
+  },
+  "regions": {
+    "A": {
+      "region_id": "A",
+      "spec": {
+        "symbol": "ETH-USDT-SWAP",
+        "timeframe": "5m",
+        "direction": "long",
+        "vol": "LO",
+        "trend": "MID",
+        "session": "EU",
+        "horizon": 96
+      },
+      "phase0_observed": {
+        "win_rate": 0.665,
+        "sample_count": 194,
+        "mean_win_net": 0.129,
+        "weekly": 34.6
+      },
+      "n_candles": 12000,
+      "data_span_days": 41.66319444444444,
+      "n_region_signals_full": 593,
+      "full_sample": {
+        "win_rate": 0.6649305555555556,
+        "average_profitable_trade_return_leveraged_net": 0.1267334770281812,
+        "weekly_frequency": 103.192749244713,
+        "trade_count": 576,
+        "n_signals": 593,
+        "n_labeled": 593,
+        "mean_winning_levered_gross": 0.1547334770281812,
+        "gates_ok": true,
+        "fail_reasons": []
+      },
+      "train": {
+        "win_rate": 0.6116838487972509,
+        "average_profitable_trade_return_leveraged_net": 0.13294175877018555,
+        "weekly_frequency": 100.73076923076923,
+        "trade_count": 291,
+        "n_signals": 291,
+        "n_labeled": 291,
+        "mean_winning_levered_gross": 0.16094175877018554,
+        "gates_ok": false,
+        "fail_reasons": [
+          "win_rate_lt_0.65"
+        ]
+      },
+      "validation": {
+        "win_rate": 0.92,
+        "average_profitable_trade_return_leveraged_net": 0.13299135961326794,
+        "weekly_frequency": 167.30290456431536,
+        "trade_count": 100,
+        "n_signals": 100,
+        "n_labeled": 100,
+        "mean_winning_levered_gross": 0.16099135961326794,
+        "gates_ok": true,
+        "fail_reasons": []
+      },
+      "test": {
+        "win_rate": 0.75,
+        "average_profitable_trade_return_leveraged_net": 0.11900124058390779,
+        "weekly_frequency": 130.83600837404046,
+        "trade_count": 76,
+        "n_signals": 93,
+        "n_labeled": 93,
+        "mean_winning_levered_gross": 0.1470012405839078,
+        "gates_ok": true,
+        "fail_reasons": []
+      },
+      "holdout_tail": {
+        "win_rate": 0.5137614678899083,
+        "average_profitable_trade_return_leveraged_net": 0.1045895150535174,
+        "weekly_frequency": 105.6969696969697,
+        "trade_count": 109,
+        "n_signals": 109,
+        "n_labeled": 109,
+        "mean_winning_levered_gross": 0.1325895150535174,
+        "gates_ok": false,
+        "fail_reasons": [
+          "win_rate_lt_0.65",
+          "mean_win_net_lt_0.1111"
+        ]
+      },
+      "rolling_oos": {
+        "rolling_oos_1": {
+          "win_rate": 0.92,
+          "average_profitable_trade_return_leveraged_net": 0.13299135961326794,
+          "weekly_frequency": 167.30290456431536,
+          "trade_count": 100,
+          "n_signals": 100,
+          "n_labeled": 100,
+          "mean_winning_levered_gross": 0.16099135961326794,
+          "gates_ok": true,
+          "fail_reasons": []
+        },
+        "rolling_oos_2": {
+          "win_rate": 0.9622641509433962,
+          "average_profitable_trade_return_leveraged_net": 0.11910494161967555,
+          "weekly_frequency": 268.2889733840304,
+          "trade_count": 53,
+          "n_signals": 70,
+          "n_labeled": 70,
+          "mean_winning_levered_gross": 0.14710494161967555,
+          "gates_ok": true,
+          "fail_reasons": []
+        },
+        "rolling_oos_3": {
+          "win_rate": 0.44594594594594594,
+          "average_profitable_trade_return_leveraged_net": 0.10667233389034081,
+          "weekly_frequency": 103.31301939058172,
+          "trade_count": 74,
+          "n_signals": 74,
+          "n_labeled": 74,
+          "mean_winning_levered_gross": 0.1346723338903408,
+          "gates_ok": false,
+          "fail_reasons": [
+            "win_rate_lt_0.65",
+            "mean_win_net_lt_0.1111"
+          ]
+        },
+        "rolling_oos_4": {
+          "win_rate": 0.5,
+          "average_profitable_trade_return_leveraged_net": 0.10501877638948334,
+          "weekly_frequency": 97.27787021630616,
+          "trade_count": 58,
+          "n_signals": 58,
+          "n_labeled": 58,
+          "mean_winning_levered_gross": 0.13301877638948334,
+          "gates_ok": false,
+          "fail_reasons": [
+            "win_rate_lt_0.65",
+            "mean_win_net_lt_0.1111"
+          ]
+        }
+      },
+      "recent_2y": {
+        "win_rate": 0.6649305555555556,
+        "average_profitable_trade_return_leveraged_net": 0.1267334770281812,
+        "weekly_frequency": 103.192749244713,
+        "trade_count": 576,
+        "n_signals": 593,
+        "n_labeled": 593,
+        "mean_winning_levered_gross": 0.1547334770281812,
+        "gates_ok": false,
+        "fail_reasons": [
+          "recent_2y_data_span_lt_600d(got=41.7)"
+        ],
+        "n_bars_in_window": 12000,
+        "window_days_available": 41.66319444444444,
+        "requires_730d": true,
+        "data_coverage_insufficient": true
+      },
+      "status": "PHASE0_FALSE_POSITIVE",
+      "strict_oos_pass": false,
+      "recent_2y_pass": false,
+      "may_strategize": false,
+      "rolling_oos_pass_count": "2/4"
+    },
+    "B": {
+      "region_id": "B",
+      "spec": {
+        "symbol": "ETH-USDT-SWAP",
+        "timeframe": "5m",
+        "direction": "short",
+        "vol": "MID",
+        "trend": "LO",
+        "session": "US",
+        "horizon": 12
+      },
+      "phase0_observed": {
+        "win_rate": 0.66,
+        "sample_count": 53,
+        "mean_win_net": 0.123,
+        "weekly": 25.2
+      },
+      "n_candles": 12000,
+      "data_span_days": 41.66319444444444,
+      "n_region_signals_full": 414,
+      "full_sample": {
+        "win_rate": 0.6424242424242425,
+        "average_profitable_trade_return_leveraged_net": 0.12246451145686102,
+        "weekly_frequency": 73.95215311004785,
+        "trade_count": 165,
+        "n_signals": 414,
+        "n_labeled": 414,
+        "mean_winning_levered_gross": 0.15046451145686102,
+        "gates_ok": false,
+        "fail_reasons": [
+          "win_rate_lt_0.65"
+        ]
+      },
+      "train": {
+        "win_rate": 0.7837837837837838,
+        "average_profitable_trade_return_leveraged_net": 0.1224551719424625,
+        "weekly_frequency": 70.46009389671362,
+        "trade_count": 74,
+        "n_signals": 201,
+        "n_labeled": 201,
+        "mean_winning_levered_gross": 0.1504551719424625,
+        "gates_ok": true,
+        "fail_reasons": []
+      },
+      "validation": {
+        "win_rate": 0.7428571428571429,
+        "average_profitable_trade_return_leveraged_net": 0.11639746299420575,
+        "weekly_frequency": 105.28,
+        "trade_count": 35,
+        "n_signals": 94,
+        "n_labeled": 94,
+        "mean_winning_levered_gross": 0.14439746299420575,
+        "gates_ok": true,
+        "fail_reasons": []
+      },
+      "test": {
+        "win_rate": 0.14285714285714285,
+        "average_profitable_trade_return_leveraged_net": 0.09671110145961584,
+        "weekly_frequency": 124.8440366972477,
+        "trade_count": 7,
+        "n_signals": 54,
+        "n_labeled": 54,
+        "mean_winning_levered_gross": 0.12471110145961584,
+        "gates_ok": false,
+        "fail_reasons": [
+          "trade_count_lt_15",
+          "win_rate_lt_0.65",
+          "mean_win_net_lt_0.1111"
+        ]
+      },
+      "holdout_tail": {
+        "win_rate": 0.42857142857142855,
+        "average_profitable_trade_return_leveraged_net": 0.13122824297407043,
+        "weekly_frequency": 72.75957801221543,
+        "trade_count": 49,
+        "n_signals": 65,
+        "n_labeled": 65,
+        "mean_winning_levered_gross": 0.15922824297407043,
+        "gates_ok": false,
+        "fail_reasons": [
+          "win_rate_lt_0.65"
+        ]
+      },
+      "rolling_oos": {
+        "rolling_oos_1": {
+          "win_rate": 0.6896551724137931,
+          "average_profitable_trade_return_leveraged_net": 0.12007880800620432,
+          "weekly_frequency": 95.42399999999999,
+          "trade_count": 29,
+          "n_signals": 71,
+          "n_labeled": 71,
+          "mean_winning_levered_gross": 0.14807880800620432,
+          "gates_ok": true,
+          "fail_reasons": []
+        },
+        "rolling_oos_2": {
+          "win_rate": 0.5,
+          "average_profitable_trade_return_leveraged_net": 0.10412631295421051,
+          "weekly_frequency": 65.91044776119404,
+          "trade_count": 12,
+          "n_signals": 46,
+          "n_labeled": 46,
+          "mean_winning_levered_gross": 0.1321263129542105,
+          "gates_ok": false,
+          "fail_reasons": [
+            "win_rate_lt_0.65",
+            "mean_win_net_lt_0.1111"
+          ]
+        },
+        "rolling_oos_3": {
+          "win_rate": 0.6111111111111112,
+          "average_profitable_trade_return_leveraged_net": 0.12796122157302178,
+          "weekly_frequency": 114.93728620296466,
+          "trade_count": 18,
+          "n_signals": 50,
+          "n_labeled": 50,
+          "mean_winning_levered_gross": 0.15596122157302178,
+          "gates_ok": false,
+          "fail_reasons": [
+            "win_rate_lt_0.65"
+          ]
+        },
+        "rolling_oos_4": {
+          "win_rate": 0.34375,
+          "average_profitable_trade_return_leveraged_net": 0.1313573424192596,
+          "weekly_frequency": 102.13215859030836,
+          "trade_count": 32,
+          "n_signals": 46,
+          "n_labeled": 46,
+          "mean_winning_levered_gross": 0.15935734241925958,
+          "gates_ok": false,
+          "fail_reasons": [
+            "win_rate_lt_0.65"
+          ]
+        }
+      },
+      "recent_2y": {
+        "win_rate": 0.6424242424242425,
+        "average_profitable_trade_return_leveraged_net": 0.12246451145686102,
+        "weekly_frequency": 73.95215311004785,
+        "trade_count": 165,
+        "n_signals": 414,
+        "n_labeled": 414,
+        "mean_winning_levered_gross": 0.15046451145686102,
+        "gates_ok": false,
+        "fail_reasons": [
+          "win_rate_lt_0.65",
+          "recent_2y_data_span_lt_600d(got=41.7)"
+        ],
+        "n_bars_in_window": 12000,
+        "window_days_available": 41.66319444444444,
+        "requires_730d": true,
+        "data_coverage_insufficient": true
+      },
+      "status": "PHASE0_FALSE_POSITIVE",
+      "strict_oos_pass": false,
+      "recent_2y_pass": false,
+      "may_strategize": false,
+      "rolling_oos_pass_count": "1/4"
+    }
+  }
+}
