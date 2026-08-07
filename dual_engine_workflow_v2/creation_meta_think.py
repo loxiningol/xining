@@ -289,6 +289,53 @@ def _diverge_then_select(brief, symbol, timeframe):
 
     perspectives = [dict(p) for p in _DEFAULT_PERSPECTIVES]
 
+    if any(k in text for k in ("均线", "金叉", "死叉")) or any(
+        k in text_l for k in ("moving average", "ma cross", "ema cross", "golden cross")
+    ):
+        perspectives = [
+            {
+                "id": "MA_golden_cross_trend",
+                "lens_zh": "均线金叉趋势跟踪",
+                "thesis_zh": "短期均线上穿长期均线且价格位于均线上方时顺势做多",
+                "family": "trend_continuation",
+                "factor_hints": ["trend_bias_50_200", "ret_12", "ret_3"],
+                "required_factor_intersection": ["trend_bias_50_200", "ret_12"],
+                "factor_side_constraints": {
+                    "trend_bias_50_200": "high",
+                    "ret_12": "high",
+                },
+                "predicted_direction": "long",
+                "who_pays": "趋势跟随者支付震荡洗盘成本",
+                "failure_conditions": ["震荡市反复金叉死叉", "趋势末端追高"],
+            },
+            {
+                "id": "MA_pullback_reclaim",
+                "lens_zh": "趋势回撤后再度站上均线",
+                "thesis_zh": "大趋势向上时，回撤至均线附近并再度收复做多",
+                "family": "trend_pullback",
+                "factor_hints": ["trend_bias_50_200", "close_z_20", "bullish_reclaim"],
+                "required_factor_intersection": ["trend_bias_50_200", "close_z_20"],
+                "factor_side_constraints": {
+                    "trend_bias_50_200": "high",
+                    "close_z_20": "low",
+                },
+                "predicted_direction": "long",
+                "who_pays": "短线止损盘与逆势空头",
+                "failure_conditions": ["趋势反转", "低流动性滑点放大"],
+            },
+            {
+                "id": "MA_false_cross_filter",
+                "lens_zh": "均线假交叉过滤（对照）",
+                "thesis_zh": "无趋势背景的金叉多为噪声，用作负对照",
+                "family": "failed_breakout_fade",
+                "factor_hints": ["trend_bias_50_200", "rsi_14"],
+                "factor_side_constraints": {"rsi_14": "high"},
+                "predicted_direction": "long",
+                "who_pays": "追涨散户",
+                "failure_conditions": ["真趋势启动"],
+            },
+        ]
+
     if any(k in text_l for k in (
         "成交量异动", "异常成交量", "放量突破", "volume anomaly",
     )):

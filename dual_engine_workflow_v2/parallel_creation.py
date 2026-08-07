@@ -42,12 +42,16 @@ PROGRESS_STAGES = (
     ("population", "机制种群生成", 22),
     ("committee", "异构委员会评估", 35),
     ("map_elites", "质量—多样性搜索（MAP-Elites）", 48),
-    ("probe", "裸探测 / 摩擦检验", 60),
-    ("antifalsify", "抗证伪与稳健性", 72),
-    ("assembly", "蓝图装配与门控", 82),
-    ("formal_review", "交予四阶段复核", 92),
+    ("probe", "裸探测", 60),
+    ("antifalsify", "稳健性诊断", 72),
+    ("assembly", "蓝图装配", 82),
+    ("formal_review", "交予质检器", 92),
     ("done", "本轮结束", 100),
 )
+# Floor percent for each stage; upper bound = next stage floor (or 100).
+_PROGRESS_FLOOR = {key: pct for key, _zh, pct in PROGRESS_STAGES}
+_PROGRESS_THROTTLE_SEC = 1.0
+_LAST_PROGRESS_EMIT = {"ts": 0.0, "stage": None, "path": None}
 
 
 def _now():
@@ -810,7 +814,24 @@ def slot_from_pipeline(pipeline):
     return None if p is None else (p - 1)
 
 
-def _progress_payload(stage_key, detail="", percent=None, extras=None):
+def stage_percent_band(stage_key):
+    """Return [lo, hi) percent span owned by this stage until the next milestone."""
+    keys = [k for k, _zh, _pct in PROGRESS_STAGES]
+    lo = float(_PROGRESS_FLOOR.get(stage_key, 0))
+    try:
+        idx = keys.index(stage_key)
+    except ValueError:
+        return lo, min(100.0, lo + 8.0)
+    if idx + 1 < len(keys):
+        hi = float(_PROGRESS_FLOOR[keys[idx + 1]])
+    else:
+        hi = 100.0
+    if hi <= lo:
+        hi = min(100.0, lo + 1.0)
+    return lo, hi
+
+
+def _progress_payload(stage_key, detail="", percent=None, extras=None, done=None, total=None):
     label = stage_key
     pct = percent
     for key, zh, default_pct in PROGRESS_STAGES:
@@ -819,8 +840,24 @@ def _progress_payload(stage_key, detail="", percent=None, extras=None):
             if pct is None:
                 pct = default_pct
             break
+    extras = dict(extras or {})
+    if done is not None:
+        extras["done"] = int(done)
+    if total is not None:
+        extras["total"] = int(total)
+    # Sub-progress inside a stage band so UI does not freeze at the stage floor
+    # (classic bug: stuck at population 22% for the entire discovery run).
     if pct is None:
         pct = 0
+    if done is not None and total is not None and int(total) > 0 and percent is None:
+        lo, hi = stage_percent_band(stage_key)
+        frac = max(0.0, min(1.0, float(done) / float(total)))
+        pct = lo + (hi - lo) * frac
+        label = stage_key
+        for key, zh, _default_pct in PROGRESS_STAGES:
+            if key == stage_key:
+                label = zh
+                break
     out = {
         "stage": stage_key,
         "stage_zh": label,
@@ -834,7 +871,10 @@ def _progress_payload(stage_key, detail="", percent=None, extras=None):
     return out
 
 
-def update_job_progress(job_or_path, stage_key, detail="", percent=None, extras=None):
+def update_job_progress(
+    job_or_path, stage_key, detail="", percent=None, extras=None,
+    done=None, total=None,
+):
     """Persist live progress onto a running/pending job JSON."""
     path = None
     job = None
@@ -852,23 +892,39 @@ def update_job_progress(job_or_path, stage_key, detail="", percent=None, extras=
         job = _read(path) or {}
     if not path:
         return None
-    progress = _progress_payload(stage_key, detail=detail, percent=percent, extras=extras)
+    progress = _progress_payload(
+        stage_key, detail=detail, percent=percent, extras=extras,
+        done=done, total=total,
+    )
     job["progress"] = progress
     job["heartbeat_at"] = progress["updated_at"]
     job["heartbeat_ts"] = progress["updated_ts"]
     job["status"] = job.get("status") or "研究中"
     if stage_key == "formal_review":
-        job["status"] = "正式复核中"
+        job["status"] = "复核中"
     atomic_write_json(path, job)
     return progress
 
 
-def report_progress(stage_key, detail="", percent=None, extras=None):
-    """Worker-side helper: update the job pointed by QIYU_JOB_PROGRESS_PATH."""
-    path = os.environ.get("QIYU_JOB_PROGRESS_PATH")
-    if not path:
-        return None
-    return update_job_progress(path, stage_key, detail=detail, percent=percent, extras=extras)
+def report_progress(
+    stage_key, detail="", percent=None, extras=None,
+    done=None, total=None, force=False, min_interval_sec=None,
+):
+    """Worker-side helper: update the job pointed by QIYU_JOB_PROGRESS_PATH.
+
+    Delegates to job_progress so discovery can emit without circular imports.
+    """
+    from . import job_progress as jp
+    return jp.report_progress(
+        stage_key,
+        detail=detail,
+        percent=percent,
+        extras=extras,
+        done=done,
+        total=total,
+        force=force,
+        min_interval_sec=min_interval_sec,
+    )
 
 
 def start_workers(preferred_pipeline=None):
@@ -1608,10 +1664,13 @@ def execute_claimed(job, running_path, slot):
         }
     else:
         from .creation_sole_entry import create_strategy
+        # Do NOT freeze a fake combined "population/committee/MAP-Elites @22%"
+        # banner here — discovery must emit real stage + subprogress via
+        # report_progress. Only mark that the sole entry has been entered.
         update_job_progress(
-            running_path, "population",
-            detail="机制种群 / 委员会 / 质量—多样性搜索进行中",
-            percent=22,
+            running_path, "contract",
+            detail="契约已编译，进入研究发现（后续进度由 discovery 实时上报）",
+            percent=12,
         )
         result = create_strategy(
             symbol=job["symbol"],
@@ -1661,7 +1720,7 @@ def execute_claimed(job, running_path, slot):
             "parent_evidence_hash": job.get("parent_evidence_hash"),
             "data_version": job.get("data_version"),
             "code_version": job.get("code_version"),
-            "status": "已交由四阶段复核",
+            "status": "已交复核",
             "qualified_blueprint": str(artifact_dir / "qualified_blueprint.json"),
             "result_receipt": summary.get("receipt_path"),
             "deliverables": summary.get("deliverables"),
@@ -1670,7 +1729,7 @@ def execute_claimed(job, running_path, slot):
         })
         update_job_progress(
             running_path, "formal_review",
-            detail="合格产出已交予四阶段复核",
+            detail="合格产出已交予复核",
             percent=92,
             extras={"handoff_ready": True},
         )
@@ -1714,10 +1773,10 @@ def execute_claimed(job, running_path, slot):
         except Exception:
             pass
     if review_submitted:
-        final_status = "等待人工审批" if formal_review.get("ok") else "正式复核未通过"
+        final_status = "等待人工审批" if formal_review.get("ok") else "复核未通过"
         final_outcome = "review_submitted"
     elif ready:
-        final_status = "等待正式复核"
+        final_status = "等待复核"
         final_outcome = "candidate_ready"
     elif summary.get("outcome") == "data_blocked":
         final_status = "研究数据不可用"
@@ -2014,7 +2073,7 @@ def review_status():
             {"id": 4, "name": "第四次复核", "scope": "三AI理论复核"},
         ]
         human_gate = "人工确认签发"
-        note = "四阶段复核通过后进入人工确认；永不自动上线"
+        note = "复核通过后进入人工确认；永不自动上线"
 
     st = status()
     handoffs = []
@@ -2022,7 +2081,7 @@ def review_status():
         for row in st.get(state) or []:
             fr = row.get("formal_review") or {}
             if row.get("formal_review_started") or fr.get("started") or row.get("status") in (
-                "正式复核中", "等待人工审批", "等待正式复核", "正式复核未通过",
+                "复核中", "等待人工审批", "等待复核", "复核未通过",
             ):
                 handoffs.append({
                     "job_id": row.get("job_id"),
@@ -2049,7 +2108,7 @@ def review_status():
         "ok": True,
         "schema": "qiyu_strategy_creation_review_board_v1",
         "module_zh": "策略创造复核模块",
-        "review_name_zh": "四阶段复核",
+        "review_name_zh": "复核",
         "stages": stages,
         "human_confirm_gate": human_gate,
         "note_zh": note,

@@ -188,7 +188,7 @@ def search(
     else:
         legacy_note = None
 
-    max_default = int(os.environ.get("QIYU_PARAM_MAX_EVALS") or 36)
+    max_default = int(os.environ.get("QIYU_PARAM_MAX_EVALS") or 48)
     max_evals = int(max_evals or max_default)
     # Hard RAM-safe cap
     max_evals = max(8, min(max_evals, 80))

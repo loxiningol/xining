@@ -226,7 +226,11 @@ def _narrative_required_features(text):
         feats.append("bb_width")
     if ("布林" in blob or "bollinger" in lower) and not feats:
         feats.extend(["bb_lower_dist", "bb_mid_reclaim"])
-    if "rsi" in lower or "超卖" in blob or "超买" in blob:
+    # Negated mentions ("非超卖" / "no RSI") must not inject rsi_14 defaults.
+    neg_rsi = any(t in blob.lower() for t in (
+        "非超卖", "非超买", "no rsi", "禁止rsi", "不用rsi", "禁止 rsi",
+    ))
+    if (not neg_rsi) and ("rsi" in lower or "超卖" in blob or "超买" in blob):
         feats.append("rsi_14")
     return _uniq(feats)
 
@@ -280,10 +284,15 @@ def _is_policy_meta_clause(text):
         "ada 禁止", "ada禁止", "禁止作为研究", "禁止研究 ada", "禁止研究ada",
         "禁止：ada", "禁止:ada", "ada 研究", "ada研究",
         "不得自动上线", "禁止自动上线", "不得挂载", "禁止挂载",
-        "不得伪造", "禁止伪造", "不使用 force", "不降低任何正式复核",
+        "不得伪造", "禁止伪造", "不使用 force", "不降低任何正式复核", "不降低任何复核",
         "不得自动", "不自动上线", "automatic_live", "auto-mount", "automount",
         "四次正式复核", "提交四次正式复核", "正式复核门槛",
+        "四次复核", "提交复核", "复核门槛",
         "创造端全部既有门禁", "生产验收任务",
+        # Cursor/ops run notes — not executable entry events.
+        "人类指令", "进度心跳", "机制树命中", "机制树", "廉价探针预算",
+        "不放松", "硬杀", "重跑", "已修", "生成端", "质控已切", "mmvq",
+        "branch_mgr", "unboundlocal", "修复生成", "评价后修复",
     )
     if any(token in blob for token in policy_tokens):
         return True
@@ -292,6 +301,16 @@ def _is_policy_meta_clause(text):
         "优先密集", "优先使用较密", "搜索偏好", "prefer dense",
     )) and not any(token in blob for token in (
         "开仓", "入场", "平仓", "止盈", "止损", "持有",
+    )):
+        return True
+    # Negation-only indicator bans are search policy, not executable events.
+    # "no RSI/BB/MA" was killing rhyme Stage2 before discovery ran.
+    if re.search(
+        r"(?:no|禁止|不得|不要)\s*(?:使用)?\s*"
+        r"(?:rsi|bb|ma|ema|sma|bollinger|布林|均线)",
+        blob,
+    ) and not any(token in blob for token in (
+        "开仓", "入场", "触及", "回收", "突破",
     )):
         return True
     return False
@@ -400,7 +419,10 @@ def _parse_holding_contract(text, supplied, constraints):
             normalized.append(value)
     allow_early = bool(raw.get("allow_early_take_profit", False))
     if any(token in str(text or "") for token in (
-        "不得提前止盈", "禁止提前止盈", "仅到期平仓", "固定持有到期",
+        "不得提前止盈", "禁止提前止盈",
+        "仅定时平仓", "固定持有定时", "定时平仓",
+        # legacy synonyms (scrubbed to 定时)
+        "仅到期平仓", "固定持有到期", "到期平仓",
     )):
         allow_early = False
     stop_in = raw.get("protective_stop_policy") or {}
@@ -414,25 +436,57 @@ def _parse_holding_contract(text, supplied, constraints):
     except Exception:
         stop_pct = None
     source = raw.get("source")
-    if source not in ("platform_default", "structured_or_human_exact"):
+    if source not in (
+        "platform_default", "structured_or_human_exact", "rhyme_stage1_frozen",
+    ):
         source = "structured_or_human_exact" if (raw or text_match) else "platform_default"
-    return {
-        "mode": "exact_horizon" if exact is not None else "allowed_horizons",
-        "allowed_horizons_bars": sorted(normalized),
-        "exact_horizon_bars": exact,
-        "exit_policy": {
+    target_dist = raw.get("target_price_distance")
+    if target_dist is None:
+        target_dist = (raw.get("exit_policy") or {}).get("target_price_pct")
+    try:
+        target_dist = float(target_dist) if target_dist is not None else None
+    except Exception:
+        target_dist = None
+    exit_in = raw.get("exit_policy") if isinstance(raw.get("exit_policy"), dict) else {}
+    exit_mode = str(exit_in.get("mode") or "")
+    barrier = (
+        exit_mode == "intrabar_fixed_pct_target_v1"
+        or source == "rhyme_stage1_frozen"
+        or (target_dist is not None and bool(raw.get("barrier_exit")))
+    )
+    if barrier and target_dist is None and stop_pct is not None:
+        target_dist = float(stop_pct)
+    if barrier and target_dist is not None:
+        exit_policy = {
+            "mode": "intrabar_fixed_pct_target_v1",
+            "target_price_pct": float(target_dist),
+            "exit_bar": "first_touch_target_or_stop_else_horizon",
+            "price": "barrier_or_bar_close",
+            "allow_early_take_profit": False,
+        }
+    else:
+        exit_policy = {
             "mode": "fixed_horizon_close_v1",
             "exit_bar": "entry_plus_horizon_minus_1",
             "price": "bar_close",
             "allow_early_take_profit": allow_early,
-        },
+        }
+    out = {
+        "mode": "exact_horizon" if exact is not None else "allowed_horizons",
+        "allowed_horizons_bars": sorted(normalized),
+        "exact_horizon_bars": exact,
+        "exit_policy": exit_policy,
         "protective_stop_policy": {
             "mode": "intrabar_fixed_pct_v1",
             "price_pct": stop_pct,
             "applies_from": "entry_bar",
             "precedence": "protective_stop_before_time_exit",
         },
-        "execution_leverage": PRODUCTION_EXECUTION_LEVERAGE,
+        "execution_leverage": (
+            float(raw["execution_leverage"])
+            if raw.get("execution_leverage") is not None
+            else PRODUCTION_EXECUTION_LEVERAGE
+        ),
         "statistical_return_basis": "full_size_leveraged_after_cost_v1",
         # Recompiling an already-compiled immutable contract must preserve its
         # provenance.  Treating the supplied normalized holding payload as a
@@ -440,6 +494,9 @@ def _parse_holding_contract(text, supplied, constraints):
         # produced a different body hash inside discovery.
         "source": source,
     }
+    if target_dist is not None:
+        out["target_price_distance"] = float(target_dist)
+    return out
 
 
 def stable_contract_payload(contract):
@@ -741,6 +798,34 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
             "布林带宽", "带宽压缩", "带宽扩张",
         )) or "bb_width" in lower_clause or "bollinger width" in lower_clause:
             represented_by.append("factor:bb_width")
+        if any(token in text_clause for token in (
+            "波动扩张", "波动从低", "低波动转", "ATR", "atr", "波动压缩", "压缩后突破",
+        )) or "vol_squeeze" in lower_clause:
+            represented_by.append("factor:atr_pct_14")
+            represented_by.append("family:vol_squeeze_break")
+        if any(token in text_clause for token in (
+            "RSI", "rsi", "超卖", "超买", "相对强弱",
+        )):
+            represented_by.append("factor:rsi_14")
+        if any(token in text_clause for token in (
+            "收盘偏离", "close_z", "z20", "标准化偏离",
+        )):
+            represented_by.append("factor:close_z_20")
+        if any(token in text_clause for token in (
+            "收回", "reclaim", "反弹确认", "看涨收回",
+        )):
+            represented_by.append("factor:bullish_reclaim")
+            represented_by.append("factor:reclaim_strength")
+        if any(token in text_clause for token in (
+            "趋势同向", "趋势方向", "顺势", "trend sign", "trend_sign", "突破追多", "追多",
+        )):
+            represented_by.append("family:trend_pullback")
+            represented_by.append("factor:atr_pct_14")
+            represented_by.append("factor:donchian20_long_break")
+        if any(token in text_clause for token in (
+            "K线走完后下一根开盘", "下一根开盘入场", "下一根开盘",
+        )) and timing_mode.get("mode") == "next_bar_open":
+            represented_by.append("entry_timing:next_bar_open")
         if (
             ("布林" in text_clause or "bollinger" in lower_clause or " boll" in lower_clause)
             and not any(x.startswith("factor:bb_") for x in represented_by)
@@ -861,6 +946,9 @@ def compile_contract(brief, symbol, timeframe, direction="long", constraints=Non
         "design_seed_present": bool(design_seed),
         "compiled_at": _now(),
     })
+    # Runtime pin (not part of immutable body hash): Stage1 arm lock for discovery.
+    if isinstance(supplied.get("pinned_rhyme_arm"), dict):
+        stable["pinned_rhyme_arm"] = dict(supplied.get("pinned_rhyme_arm"))
     return stable
 
 

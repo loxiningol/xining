@@ -8,9 +8,10 @@ from __future__ import print_function
 
 from datetime import datetime
 
-# Minimum yield (plan §5 / §11)
-MIN_COMPILED_CANDIDATES = 30
-TARGET_COMPILED_CANDIDATES = 60
+# Minimum yield (plan §5 / §11). Floor raised so skeleton injection has room
+# to diagnose compile-vs-edge failures; MMVQ E/WR/R gates stay untouched.
+MIN_COMPILED_CANDIDATES = 60
+TARGET_COMPILED_CANDIDATES = 90
 MAX_REPAIR_ROUNDS = 3  # Wave1 direct + Wave2 state + Wave3 combo
 
 # Failure taxonomy (plan §6)
@@ -43,27 +44,42 @@ def classify_empty_batch(metrics):
     codes = []
     if n_repr < 8:
         codes.append(FAIL_SEARCH)
-    if n_compile_attempt > 0 and n_compile_ok == 0:
+    # Upstream historically aliased survivors as compile_success_count. When
+    # probes actually ran, survivors=0 is an edge/AF kill — not a dead compiler.
+    if n_probe > 0 and n_survivors == 0:
+        codes.append(FAIL_HYPOTHESIS)
+    elif n_compile_attempt > 0 and n_compile_ok == 0 and n_probe == 0:
         codes.append(FAIL_COMPILE)
     if n_compile_ok > 0 and n_survivors == 0 and n_near == 0 and n_probe > 0:
-        codes.append(FAIL_HYPOTHESIS)
-    if n_repr >= 8 and n_compile_ok < MIN_COMPILED_CANDIDATES:
+        if FAIL_HYPOTHESIS not in codes:
+            codes.append(FAIL_HYPOTHESIS)
+    if n_repr >= 8 and n_compile_ok < MIN_COMPILED_CANDIDATES and n_probe == 0:
         codes.append(FAIL_REPRESENTATION)
     if not codes:
         codes.append(FAIL_MATERIALIZATION)
     primary = codes[0]
-    if n_compile_ok < MIN_COMPILED_CANDIDATES:
+    if n_probe == 0 and n_compile_ok < MIN_COMPILED_CANDIDATES:
         primary = FAIL_MATERIALIZATION
+    if n_probe > 0 and n_survivors == 0:
+        message_zh = (
+            "管道生成失败：探针后幸存者=0（survivors=%d / probes=%d / hyp=%d）；"
+            "常见根因是 lean 地图空转或期望为负被 AF 硬杀——不得伪装成「市场无可信策略」，"
+            "也不得误报为编译器宕机。"
+            % (n_survivors, n_probe, n_hyp)
+        )
+        primary = FAIL_HYPOTHESIS
+    else:
+        message_zh = (
+            "管道生成失败：候选材料化不足（compiled=%d < min=%d），"
+            "不得伪装成「市场无可信策略」。"
+            % (n_compile_ok, MIN_COMPILED_CANDIDATES)
+        )
     return {
         "primary": primary,
         "codes": codes,
         "is_pipeline_error": True,
         "is_market_research_rejection": False,
-        "message_zh": (
-            "管道生成失败：候选材料化不足（compiled=%d < min=%d），"
-            "不得伪装成「市场无可信策略」。"
-            % (n_compile_ok, MIN_COMPILED_CANDIDATES)
-        ),
+        "message_zh": message_zh,
         "metrics": {
             "hypothesis_count": n_hyp,
             "representation_count": n_repr,
@@ -545,7 +561,7 @@ def ensure_minimum_population(
             break
     # If still short (dedupe collision), keep appending indexed copies.
     extra = 0
-    while len(rows) < max(8, min(floor, 36)):
+    while len(rows) < max(8, min(floor, 90)):
         sk = skeleton_templates_for_family(fams[0], direction)[extra % 6]
         row = skeleton_to_hypothesis(
             sk, family=fams[0], index=1000 + extra, wave=WAVE_STATE,

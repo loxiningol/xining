@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Manufacture-batch policy: quantity first, then select Top-N for slim multi-AI review.
+"""Manufacture-batch policy → 质检器唯一门槛。
 
-User lock (2026-08-03 evening):
-- Cancel ALL pre-review hard gates.
-- Manufacture ≥ MIN_MANUFACTURE packages; hand Top-N to review.
-- Formal review sole gate = multi-AI AVERAGE of:
-    weekly_opens >= 0.5
-    mean_win_only_pct (levered, fees included, winning trades ONLY) >= 11.11
-- Providers: deepseek + qwen + glm + kimi
-- Protective stop: 0.5% price (unlevered)
+User lock (2026-08-05 QI-only):
+- 取消摩擦检验 / AF / 泄漏 / MMVQ 等一切管道硬杀
+- 唯一硬门槛（与 quality_inspector 一致）：四AI平均 E>0 且周开仓频率>0.5
+- W/R/n/span 等仅作诊断与排序，不再拦截交接
 """
 from __future__ import print_function
 
@@ -19,140 +15,39 @@ MIN_MANUFACTURE = 10
 TOP_N_TO_REVIEW = 3
 ASSEMBLY_PAYLOAD_CAP = 24
 
-# ---- Sole review thresholds (multi-AI average) ----
-# Win-rate is advisory only for ranking; NOT a sole-review hard average gate.
-REVIEW_WR = 0.60
-REVIEW_WR_PCT = 60.0
+# ---- Sole review thresholds (QI-only) ----
+REVIEW_WR = 0.50  # report / ranking advisory only
+REVIEW_WR_PCT = 50.0
 REVIEW_WEEKLY_OPENS = 0.5
-# Levered equity return on winning trades only, percentage points.
-# Example: pnl_ratio=+0.1111 → 11.11 percentage points after 20x + fees.
-REVIEW_MEAN_WIN_ONLY_PCT = 11.11
+REVIEW_MEAN_WIN_ONLY_PCT = 10.0  # legacy alias / ranking
 REVIEW_MEAN_TRADE_RETURN = REVIEW_MEAN_WIN_ONLY_PCT / 100.0
-REVIEW_MEAN_TRADE_PCT = REVIEW_MEAN_WIN_ONLY_PCT  # alias for older callers
+REVIEW_MEAN_TRADE_PCT = REVIEW_MEAN_WIN_ONLY_PCT
 
-# Price stop (unlevered). 0.5% of price, NOT 0.5% of equity.
 PROTECTIVE_STOP_PRICE_PCT = 0.005
 EXECUTION_LEVERAGE = 20
+LEVERAGE_MIN = 20
+LEVERAGE_MAX = 50
 
+# Pre-QI diagnostic gates must not hard-kill (摩擦/AF/泄漏/因果等).
 PRE_REVIEW_HARD_GATES_DISABLED = True
 
-# Handoff floors: manufacture may collect junk survivors, but Top-N must NOT be
-# submitted to slim multi-AI if account evidence already proves they are shit.
-# These are NOT the old Gate0–7 vetoes; they only block wasting review on clones
-# that already fail the sole review axes on the backtest ledger.
-HANDOFF_MIN_WIN_ONLY_PCT = 9.0          # account win-only (levered); review needs 11.11
-HANDOFF_MIN_WIN_RATE = 0.45             # 胜率 floor for handoff (advisory in review)
-HANDOFF_MIN_WEEKLY_OPENS = REVIEW_WEEKLY_OPENS
-HANDOFF_MIN_TRADES = 12
-HANDOFF_MIN_PROFIT_FIRST_RATE = 0.55
-HANDOFF_MAX_MEDIAN_MAE = 0.0035
+HANDOFF_MIN_WIN_ONLY_PCT = 10.0      # ranking advisory only
+HANDOFF_MIN_WIN_RATE = 0.35          # creation READY / ranking advisory
+HANDOFF_WIN_RATE_STRICT_GT = True
+HANDOFF_MIN_WEEKLY_OPENS = REVIEW_WEEKLY_OPENS  # QI: weekly > 0.5
+HANDOFF_MIN_TRADES = 1               # no n-floor kill at QI
+HANDOFF_MIN_SPAN_DAYS = 180          # short windows → weekly untrusted / reject load
+HANDOFF_MIN_PROFIT_FIRST_RATE = 0.0  # ranking artifact only
+HANDOFF_MAX_MEDIAN_MAE = 1.0
+HANDOFF_EXPECTANCY_STRICT_GT = 0.0   # QI: E > 0
+HANDOFF_MIN_PAYOFF_R = 0.0           # ranking advisory only
 HANDOFF_DEDUPE_METRIC_TOL = {
     "win_rate_pct": 0.05,
     "mean_win_only_pct": 0.05,
     "weekly_opens": 0.05,
     "profit_first_rate": 0.02,
+    "expectancy_E": 0.05,
 }
-
-
-def pre_review_gates_disabled():
-    return bool(PRE_REVIEW_HARD_GATES_DISABLED)
-
-
-def slim_multiai_review_only():
-    """Formal path: skip L0–L7 / Gate0–6 / Phase5; only multi-AI average."""
-    return True
-
-
-def qualifies_for_review_handoff(metrics):
-    """Refuse to hand lottery/shit packages to slim multi-AI review."""
-    m = metrics or {}
-    reasons = []
-    n = int(_safe_float(m.get("n") or m.get("n_trades"), 0) or 0)
-    wr = _safe_float(m.get("win_rate"))
-    wr_pct = _safe_float(m.get("win_rate_pct"))
-    if wr is None and wr_pct is not None:
-        wr = wr_pct / 100.0
-    weekly = _safe_float(m.get("weekly_opens"))
-    mean_win = _safe_float(m.get("mean_win_only_pct"))
-    if mean_win is not None and 0 < abs(mean_win) < 0.5:
-        mean_win = mean_win * 100.0
-    pfr = _safe_float(m.get("profit_first_rate"))
-    med_mae = _safe_float(m.get("median_mae_pct"))
-    if n < HANDOFF_MIN_TRADES:
-        reasons.append("handoff_n_trades_below_%d" % HANDOFF_MIN_TRADES)
-    if wr is None or wr < HANDOFF_MIN_WIN_RATE - 1e-12:
-        reasons.append("handoff_win_rate_below_%.0f_pct" % (HANDOFF_MIN_WIN_RATE * 100.0))
-    if weekly is None or weekly < HANDOFF_MIN_WEEKLY_OPENS - 1e-9:
-        reasons.append("handoff_weekly_below_%.1f" % HANDOFF_MIN_WEEKLY_OPENS)
-    if mean_win is None or mean_win < HANDOFF_MIN_WIN_ONLY_PCT - 1e-9:
-        reasons.append("handoff_mean_win_only_below_%.2f_pct" % HANDOFF_MIN_WIN_ONLY_PCT)
-    if pfr is None or pfr < HANDOFF_MIN_PROFIT_FIRST_RATE - 1e-12:
-        reasons.append("handoff_profit_first_rate_below_%.2f" % HANDOFF_MIN_PROFIT_FIRST_RATE)
-    if med_mae is not None and abs(med_mae) > HANDOFF_MAX_MEDIAN_MAE + 1e-12:
-        reasons.append("handoff_median_mae_above_%.4f" % HANDOFF_MAX_MEDIAN_MAE)
-    # Explicit recent-2y fail is a hard handoff veto (missing = not scored yet).
-    if m.get("recent_2y_requirement_passed") is False:
-        reasons.append("handoff_recent_2y_failed")
-    # P4 execution / stability vetoes when scored (never bypass floor by omission).
-    if m.get("cost_stress_passed") is False:
-        reasons.append("handoff_cost_stress_failed")
-    if m.get("delay_stress_passed") is False:
-        reasons.append("handoff_delay_stress_failed")
-    if m.get("pnl_concentrated") is True:
-        reasons.append("handoff_pnl_concentration")
-    top_share = _safe_float(m.get("top_trade_pnl_share"))
-    if top_share is not None and top_share > 0.40 + 1e-12:
-        reasons.append("handoff_top_trade_pnl_share_above_0.40")
-    if m.get("parameter_spike") is True:
-        reasons.append("handoff_parameter_spike")
-    plateau = _safe_float(m.get("parameter_plateau_score"))
-    if plateau is not None and plateau < 0.55 - 1e-12:
-        reasons.append("handoff_parameter_plateau_below_0.55")
-    if m.get("regime_stable") is False:
-        reasons.append("handoff_regime_unstable")
-    return {
-        "ok": not reasons,
-        "reasons": reasons,
-        "thresholds": {
-            "n_trades": HANDOFF_MIN_TRADES,
-            "win_rate": HANDOFF_MIN_WIN_RATE,
-            "weekly_opens": HANDOFF_MIN_WEEKLY_OPENS,
-            "mean_win_only_pct": HANDOFF_MIN_WIN_ONLY_PCT,
-            "profit_first_rate": HANDOFF_MIN_PROFIT_FIRST_RATE,
-            "median_mae_max": HANDOFF_MAX_MEDIAN_MAE,
-            "recent_2y_required_when_present": True,
-            "top_trade_pnl_share_max": 0.40,
-            "parameter_plateau_min": 0.55,
-            "cost_delay_required_when_present": True,
-        },
-        "observed": {
-            "n": n,
-            "win_rate": wr,
-            "weekly_opens": weekly,
-            "mean_win_only_pct": mean_win,
-            "profit_first_rate": pfr,
-            "median_mae_pct": med_mae,
-            "recent_2y_requirement_passed": m.get("recent_2y_requirement_passed"),
-            "cost_stress_passed": m.get("cost_stress_passed"),
-            "delay_stress_passed": m.get("delay_stress_passed"),
-            "top_trade_pnl_share": top_share,
-            "parameter_plateau_score": plateau,
-            "regime_stable": m.get("regime_stable"),
-        },
-    }
-
-
-def _near_duplicate(a_metrics, b_metrics):
-    a = a_metrics or {}
-    b = b_metrics or {}
-    for key, tol in HANDOFF_DEDUPE_METRIC_TOL.items():
-        av = _safe_float(a.get(key))
-        bv = _safe_float(b.get(key))
-        if av is None or bv is None:
-            return False
-        if abs(av - bv) > tol:
-            return False
-    return True
 
 
 def _safe_float(value, default=None):
@@ -165,6 +60,203 @@ def _safe_float(value, default=None):
         return out
     except Exception:
         return default
+
+
+def mean_win_floor_pct(metrics=None):
+    """Legacy helper: stop_pct * leverage * 100. Not a hard gate anymore."""
+    m = metrics or {}
+    stop = _safe_float(m.get("protective_stop_price_pct"))
+    if stop is None:
+        stop = _safe_float(m.get("stop_pct"))
+    if stop is None:
+        stop = PROTECTIVE_STOP_PRICE_PCT
+    lev = _safe_float(m.get("execution_leverage"))
+    if lev is None:
+        lev = _safe_float(m.get("leverage"))
+    if lev is None:
+        lev = EXECUTION_LEVERAGE
+    lev = max(float(LEVERAGE_MIN), min(float(LEVERAGE_MAX), float(lev)))
+    return float(stop) * float(lev) * 100.0
+
+
+def expectancy_E(win_rate, payoff_R):
+    """E = W×R − (1−W)."""
+    w = _safe_float(win_rate)
+    r = _safe_float(payoff_R)
+    if w is None or r is None:
+        return None
+    if w < 0:
+        return None
+    if w > 1.0 and w <= 100.0:
+        w = w / 100.0
+    if w > 1.0 or r <= 0:
+        return None
+    return float(w) * float(r) - (1.0 - float(w))
+
+
+def payoff_ratio(mean_win, mean_loss):
+    """R = average win / |average loss|."""
+    mw = _safe_float(mean_win)
+    ml = _safe_float(mean_loss)
+    if mw is None or ml is None or mw <= 0:
+        return None
+    abs_loss = abs(ml)
+    if abs_loss <= 1e-15:
+        return None
+    return float(mw) / float(abs_loss)
+
+
+def resolve_expectancy_inputs(metrics=None, wr_avg_pct=None, mean_win_avg_pct=None):
+    """Build W/R/E from **account** metrics (+ optional AI averages for W / mean_win).
+
+    Handoff/review MUST NOT use stop×leverage as mean_loss. Missing observed
+    mean_loss → E unavailable → failed.
+    """
+    m = dict(metrics or {})
+    # Account W only — never path profit-first overwrite.
+    w = _safe_float(m.get("account_win_rate"))
+    if w is None:
+        wp = _safe_float(m.get("account_win_rate_pct"))
+        if wp is not None:
+            w = wp / 100.0
+    # Fallback only when account fields absent AND basis is still account.
+    if w is None and str(m.get("win_rate_basis") or "") in ("", "account_pnl_ratio", "None"):
+        w = _safe_float(m.get("win_rate"))
+        if w is None:
+            wp = _safe_float(m.get("win_rate_pct"))
+            if wp is not None:
+                w = wp / 100.0
+    if wr_avg_pct is not None:
+        aw = _safe_float(wr_avg_pct)
+        if aw is not None:
+            w = aw / 100.0 if aw > 1.0 else aw
+
+    mean_win = _safe_float(m.get("account_mean_win_only_pct"))
+    if mean_win is None:
+        mean_win = _safe_float(m.get("mean_win_only_pct"))
+    if mean_win is not None and 0 < abs(mean_win) < 0.5:
+        mean_win = mean_win * 100.0
+    if mean_win_avg_pct is not None:
+        awm = _safe_float(mean_win_avg_pct)
+        if awm is not None:
+            if 0 < abs(awm) < 0.5:
+                awm = awm * 100.0
+            mean_win = awm
+
+    mean_loss = _safe_float(m.get("account_mean_loss_only_pct"))
+    if mean_loss is None:
+        mean_loss = _safe_float(m.get("mean_loss_only_pct"))
+    if mean_loss is not None and 0 < abs(mean_loss) < 0.5:
+        mean_loss = mean_loss * 100.0
+    if mean_loss is None or abs(mean_loss) <= 1e-15:
+        # No stop×L fallback — E unavailable (质检器也会判不合格).
+        return {
+            "W": w,
+            "R": None,
+            "E": None,
+            "mean_win_pct": mean_win,
+            "mean_loss_pct": None,
+            "loss_basis": "missing_observed_mean_loss",
+            "passed": False,
+        }
+
+    r = payoff_ratio(mean_win, mean_loss)
+    e = expectancy_E(w, r)
+    return {
+        "W": w,
+        "R": r,
+        "E": e,
+        "mean_win_pct": mean_win,
+        "mean_loss_pct": abs(mean_loss),
+        "loss_basis": "mean_loss_only_pct",
+        "passed": (e is not None and e > HANDOFF_EXPECTANCY_STRICT_GT + 1e-15),
+    }
+
+
+def pre_review_gates_disabled():
+    return bool(PRE_REVIEW_HARD_GATES_DISABLED)
+
+
+def slim_multiai_review_only():
+    """复核路径：跳过 L0–L7 / Gate0–6 / Phase5，只走精简多模型均值。"""
+    return True
+
+
+def qualifies_for_review_handoff(metrics):
+    """质检器唯一门槛：E>0 且周开仓频率>0.5（与 quality_inspector 一致）。"""
+    m = metrics or {}
+    reasons = []
+    n = int(_safe_float(m.get("n") or m.get("n_trades"), 0) or 0)
+    weekly = _safe_float(m.get("weekly_opens"))
+    if weekly is None:
+        weekly = _safe_float(m.get("weekly_open_freq"))
+    span = _safe_float(m.get("span_days") or m.get("observation_days"))
+    exp = resolve_expectancy_inputs(m)
+    e = _safe_float(exp.get("E"))
+    if e is None:
+        e = _safe_float(m.get("expectancy_E"))
+
+    if e is None:
+        reasons.append("expectancy_E_unavailable")
+    elif e <= HANDOFF_EXPECTANCY_STRICT_GT + 1e-15:
+        reasons.append("expectancy_E_not_gt_0(E=%s)" % round(float(e), 6))
+    if weekly is None:
+        reasons.append("weekly_open_freq_unavailable")
+    elif m.get("weekly_opens_trusted") is False:
+        reasons.append("weekly_open_freq_untrusted_short_span")
+    elif weekly <= HANDOFF_MIN_WEEKLY_OPENS + 1e-15:
+        reasons.append("weekly_open_freq_not_gt_0.5(weekly=%s)" % weekly)
+    if span is not None and span < HANDOFF_MIN_SPAN_DAYS - 1e-9:
+        reasons.append("span_days_below_%d" % int(HANDOFF_MIN_SPAN_DAYS))
+
+    seen = set()
+    uniq = []
+    for rsn in reasons:
+        if rsn not in seen:
+            seen.add(rsn)
+            uniq.append(rsn)
+    reasons = uniq
+    return {
+        "ok": not reasons,
+        "reasons": reasons,
+        "thresholds": {
+            "weekly_opens_strict_gt": HANDOFF_MIN_WEEKLY_OPENS,
+            "expectancy_E_strict_gt": HANDOFF_EXPECTANCY_STRICT_GT,
+            "expectancy_formula": "E = W*R - (1-W)",
+            "R_formula": "mean_win / |mean_loss|",
+            "W_basis": "account_win_rate_only",
+            "loss_fallback": "forbidden",
+            "qi_only": True,
+            "mmvq": False,
+            "leverage_range": [LEVERAGE_MIN, LEVERAGE_MAX],
+        },
+        "observed": {
+            "n": n,
+            "span_days": span,
+            "weekly_opens": weekly,
+            "W": exp.get("W"),
+            "R": exp.get("R"),
+            "E": e,
+            "mean_win_pct": exp.get("mean_win_pct"),
+            "mean_loss_pct": exp.get("mean_loss_pct"),
+            "loss_basis": exp.get("loss_basis"),
+            "recent_2y_requirement_passed": m.get("recent_2y_requirement_passed"),
+        },
+        "expectancy": exp,
+    }
+
+
+def _near_duplicate(a_metrics, b_metrics):
+    a = a_metrics or {}
+    b = b_metrics or {}
+    for key, tol in HANDOFF_DEDUPE_METRIC_TOL.items():
+        av = _safe_float(a.get(key))
+        bv = _safe_float(b.get(key))
+        if av is None or bv is None:
+            return False
+        if abs(av - bv) > float(tol) + 1e-15:
+            return False
+    return True
 
 
 def levered_win_only_mean_pct(returns=None, trades=None):
@@ -196,12 +288,25 @@ def levered_win_only_mean_pct(returns=None, trades=None):
             if v is not None:
                 vals.append(v)
     wins = [v for v in vals if v > 0]
+    losses = [v for v in vals if v <= 0]
+    mean_loss_ratio = None
+    mean_loss_pct = None
+    if losses:
+        mean_loss_ratio = sum(losses) / float(len(losses))
+        if abs(mean_loss_ratio) >= 0.5:
+            mean_loss_pct = mean_loss_ratio
+            mean_loss_ratio = mean_loss_ratio / 100.0
+        else:
+            mean_loss_pct = mean_loss_ratio * 100.0
     if not wins:
         return {
             "n_trades": len(vals),
             "n_wins": 0,
+            "n_losses": len(losses),
             "mean_win_only_ratio": None,
             "mean_win_only_pct": None,
+            "mean_loss_only_ratio": mean_loss_ratio,
+            "mean_loss_only_pct": mean_loss_pct,
             "unit": "percentage_points_levered_after_fees",
             "leverage_applied_in_pnl_ratio": True,
             "do_not_multiply_leverage_again": True,
@@ -216,8 +321,11 @@ def levered_win_only_mean_pct(returns=None, trades=None):
     return {
         "n_trades": len(vals),
         "n_wins": len(wins),
+        "n_losses": len(losses),
         "mean_win_only_ratio": mean_ratio,
         "mean_win_only_pct": mean_pct,
+        "mean_loss_only_ratio": mean_loss_ratio,
+        "mean_loss_only_pct": mean_loss_pct,
         "unit": "percentage_points_levered_after_fees",
         "leverage_applied_in_pnl_ratio": True,
         "do_not_multiply_leverage_again": True,
@@ -257,11 +365,14 @@ def package_metrics(returns, span_days=None, trades=None, symbol=None, timeframe
             "median_mae_pct": path_summary.get("median_mae_pct"),
             "median_mfe_pct": path_summary.get("median_mfe_pct"),
             "mean_winning_levered": path_summary.get("mean_winning_levered"),
+            "win_rate_basis": None,
+            "mean_win_basis": None,
         }
     wins = [v for v in vals if v > 0]
     wr = len(wins) / float(n)
     mean_net = sum(vals) / float(n)
     weekly = None
+    weekly_trusted = False
     try:
         import auto_trade_ai_consensus as ai
         pack = ai.compute_weekly_open_frequency(
@@ -276,12 +387,21 @@ def package_metrics(returns, span_days=None, trades=None, symbol=None, timeframe
             },
             source="manufacture_batch_policy",
         )
-        weekly = _safe_float(pack.get("expected_weekly_fills"))
         if pack.get("span_days") is not None:
             span_days = pack.get("span_days")
+        span_f = _safe_float(span_days)
+        if span_f is not None and span_f >= HANDOFF_MIN_SPAN_DAYS - 1e-9:
+            weekly = _safe_float(pack.get("expected_weekly_fills"))
+            weekly_trusted = True
+        else:
+            # Keep diagnostic density but mark untrusted for handoff.
+            weekly = _safe_float(pack.get("expected_weekly_fills"))
+            weekly_trusted = False
     except Exception:
-        if span_days and float(span_days) > 0:
-            weekly = n * 7.0 / float(span_days)
+        span_f = _safe_float(span_days)
+        if span_f and span_f > 0:
+            weekly = n * 7.0 / float(span_f)
+            weekly_trusted = bool(span_f >= HANDOFF_MIN_SPAN_DAYS - 1e-9)
     out = {
         "n": n,
         "win_rate": wr,
@@ -290,6 +410,7 @@ def package_metrics(returns, span_days=None, trades=None, symbol=None, timeframe
         "mean_trade_pct": mean_net * 100.0,
         "mean_win_only_pct": win_pack.get("mean_win_only_pct"),
         "weekly_opens": weekly,
+        "weekly_opens_trusted": weekly_trusted,
         "span_days": span_days,
         "n_trades": n,
         "win_only_audit": win_pack,
@@ -298,7 +419,47 @@ def package_metrics(returns, span_days=None, trades=None, symbol=None, timeframe
         "median_mfe_pct": path_summary.get("median_mfe_pct"),
         "mean_winning_levered": path_summary.get("mean_winning_levered"),
         "path_entry_score": path_summary.get("path_entry_score"),
+        # Account ledger is the only handoff identity for W / mean_win / mean_loss.
+        "win_rate_basis": "account_pnl_ratio",
+        "mean_win_basis": "account_pnl_ratio_win_only",
+        "account_win_rate": wr,
+        "account_win_rate_pct": wr * 100.0,
+        "account_mean_win_only_pct": win_pack.get("mean_win_only_pct"),
+        "mean_loss_only_pct": win_pack.get("mean_loss_only_pct"),
+        "account_mean_loss_only_pct": win_pack.get("mean_loss_only_pct"),
     }
+    # Path / barrier diagnostics — never overwrite account win_rate used for E.
+    pfr = _safe_float(path_summary.get("profit_first_rate"))
+    exit_pol = path_summary.get("exit_policy") or {}
+    barrier = (
+        str((exit_pol or {}).get("mode") or "") == "intrabar_fixed_pct_target_v1"
+        or path_summary.get("path_identity") == "rhyme_barrier_resolved"
+        or path_summary.get("win_rate_basis") == "path_profit_first_resolved"
+    )
+    probe_wr = _safe_float(path_summary.get("win_rate"))
+    if barrier and probe_wr is not None:
+        out["path_win_rate"] = probe_wr
+        out["path_win_rate_pct"] = probe_wr * 100.0
+        out["path_win_rate_basis"] = "path_profit_first_resolved"
+        if pfr is None:
+            out["profit_first_rate"] = probe_wr
+    elif barrier and pfr is not None:
+        out["path_win_rate"] = pfr
+        out["path_win_rate_pct"] = pfr * 100.0
+        out["path_win_rate_basis"] = "path_profit_first_resolved"
+    mw_lev = _safe_float(path_summary.get("mean_winning_levered"))
+    if barrier and mw_lev is not None and mw_lev > 0:
+        out["path_mean_win_only_pct"] = mw_lev * 100.0 if mw_lev < 1.5 else mw_lev
+    exp = resolve_expectancy_inputs(out)
+    out["expectancy_E"] = exp.get("E")
+    out["expectancy_W"] = exp.get("W")
+    out["expectancy_R"] = exp.get("R")
+    out["expectancy"] = exp
+    if path_summary.get("execution_leverage") is not None:
+        out["execution_leverage"] = path_summary.get("execution_leverage")
+    stop_pol = path_summary.get("protective_stop_policy") or {}
+    if isinstance(stop_pol, dict) and stop_pol.get("price_pct") is not None:
+        out["protective_stop_price_pct"] = stop_pol.get("price_pct")
     # Optional recent-2y gate when timestamped trades are available.
     if trades:
         try:
@@ -344,40 +505,47 @@ def package_metrics(returns, span_days=None, trades=None, symbol=None, timeframe
 def score_package(metrics):
     """Higher is better. Soft score for manufacture ranking (not a hard gate)."""
     m = metrics or {}
-    wr = _safe_float(m.get("win_rate"), 0.0) or 0.0
+    wr = _safe_float(m.get("account_win_rate"))
+    if wr is None:
+        wr = _safe_float(m.get("win_rate"), 0.0) or 0.0
     weekly = _safe_float(m.get("weekly_opens"), 0.0) or 0.0
-    mean_win = _safe_float(m.get("mean_win_only_pct"), -1.0)
+    mean_win = _safe_float(m.get("account_mean_win_only_pct"))
+    if mean_win is None:
+        mean_win = _safe_float(m.get("mean_win_only_pct"), -1.0)
     if mean_win is None:
         mean_win = (_safe_float(m.get("mean_trade_pct"), -1.0) or -1.0)
-    pfr = _safe_float(m.get("profit_first_rate"), 0.0) or 0.0
-    wr_score = max(0.0, min(2.0, wr / REVIEW_WR))
+    e = _safe_float(m.get("expectancy_E"))
+    if e is None:
+        e = _safe_float((m.get("expectancy") or {}).get("E"), -1.0) or -1.0
+    wr_score = max(0.0, min(2.0, wr / max(HANDOFF_MIN_WIN_RATE, 1e-9)))
     weekly_score = max(0.0, min(2.0, weekly / REVIEW_WEEKLY_OPENS))
     mean_score = max(
         0.0,
         min(2.0, (mean_win / REVIEW_MEAN_WIN_ONLY_PCT) if REVIEW_MEAN_WIN_ONLY_PCT else 0.0),
     )
-    path_score = max(0.0, min(2.0, pfr / HANDOFF_MIN_PROFIT_FIRST_RATE))
+    e_score = max(0.0, min(2.0, e / max(HANDOFF_EXPECTANCY_STRICT_GT, 1e-9)))
     hit = (
         int(weekly >= REVIEW_WEEKLY_OPENS)
         + int(mean_win >= REVIEW_MEAN_WIN_ONLY_PCT)
-        + int(pfr >= HANDOFF_MIN_PROFIT_FIRST_RATE)
+        + int(wr > HANDOFF_MIN_WIN_RATE)
+        + int(e > HANDOFF_EXPECTANCY_STRICT_GT)
     )
     return {
         "score": round(
-            0.30 * path_score + 0.30 * mean_score + 0.20 * weekly_score
-            + 0.10 * wr_score + 0.10 * hit,
+            0.35 * e_score + 0.25 * mean_score + 0.20 * weekly_score
+            + 0.20 * wr_score,
             6,
         ),
         "hits": hit,
-        "wr_ok": wr >= REVIEW_WR,
+        "wr_ok": wr > HANDOFF_MIN_WIN_RATE,
         "weekly_ok": weekly >= REVIEW_WEEKLY_OPENS,
         "mean_ok": mean_win >= REVIEW_MEAN_WIN_ONLY_PCT,
-        "path_ok": pfr >= HANDOFF_MIN_PROFIT_FIRST_RATE,
+        "e_ok": e > HANDOFF_EXPECTANCY_STRICT_GT,
         "axes": {
-            "win_rate": wr,
+            "account_win_rate": wr,
             "weekly_opens": weekly,
             "mean_win_only_pct": mean_win,
-            "profit_first_rate": pfr,
+            "expectancy_E": e,
         },
     }
 
@@ -499,35 +667,51 @@ def handoff_bypass_audit(qualified_top, ranked_all=None):
     }
 
 
-def multiai_average_pass(wr_avg_pct, weekly_avg, mean_net_avg_pct):
-    """Sole formal review gate: AI averages of win-only mean + weekly.
-
-    ``wr_avg_pct`` retained for API compatibility / report; not a hard fail.
-    ``mean_net_avg_pct`` MUST be win-only levered percentage points.
-    """
+def multiai_average_pass(wr_avg_pct, weekly_avg, mean_net_avg_pct, metrics=None):
+    """四AI平均质检：仅 E>0 且周开仓频率>0.5。"""
     weekly = _safe_float(weekly_avg)
     mean_pct = _safe_float(mean_net_avg_pct)
-    # Auto-correct ratio-scale mistakes (0.1111 → 11.11) once.
     if mean_pct is not None and 0 < abs(mean_pct) < 0.5:
         mean_pct = mean_pct * 100.0
+    m = dict(metrics or {})
+    exp = resolve_expectancy_inputs(
+        m, wr_avg_pct=wr_avg_pct, mean_win_avg_pct=mean_pct,
+    )
     reasons = []
-    if weekly is None or weekly < REVIEW_WEEKLY_OPENS - 1e-9:
-        reasons.append("weekly_avg_below_%.1f" % REVIEW_WEEKLY_OPENS)
-    if mean_pct is None or mean_pct < REVIEW_MEAN_WIN_ONLY_PCT - 1e-9:
-        reasons.append("mean_win_only_avg_below_%.2f_pct" % REVIEW_MEAN_WIN_ONLY_PCT)
+    span = _safe_float(m.get("span_days") or m.get("observation_days"))
+    e = _safe_float(exp.get("E"))
+    if e is None:
+        e = _safe_float(m.get("expectancy_E"))
+    if weekly is None:
+        reasons.append("weekly_open_freq_unavailable")
+    elif weekly <= REVIEW_WEEKLY_OPENS + 1e-15:
+        reasons.append("weekly_open_freq_not_gt_0.5(weekly=%s)" % weekly)
+    if e is None:
+        reasons.append("expectancy_E_unavailable")
+    elif e <= HANDOFF_EXPECTANCY_STRICT_GT + 1e-15:
+        reasons.append("expectancy_E_not_gt_0(E=%s)" % round(float(e), 6))
     return {
         "passed": not reasons,
         "reasons": reasons,
         "thresholds": {
-            "weekly_opens": REVIEW_WEEKLY_OPENS,
-            "mean_win_only_pct": REVIEW_MEAN_WIN_ONLY_PCT,
-            "win_rate_pct_advisory": REVIEW_WR_PCT,
+            "weekly_opens_strict_gt": REVIEW_WEEKLY_OPENS,
+            "expectancy_E_strict_gt": HANDOFF_EXPECTANCY_STRICT_GT,
+            "expectancy_formula": "E = W*R - (1-W)",
+            "loss_fallback": "forbidden",
+            "qi_only": True,
         },
         "observed": {
             "win_rate_pct": _safe_float(wr_avg_pct),
             "weekly_opens": weekly,
             "mean_win_only_pct": mean_pct,
+            "span_days": span,
+            "W": exp.get("W"),
+            "R": exp.get("R"),
+            "E": e,
+            "mean_loss_pct": exp.get("mean_loss_pct"),
+            "loss_basis": exp.get("loss_basis"),
         },
+        "expectancy": exp,
         "mean_net_scope": "winning_trades_only_levered_after_fees",
         "unit": "percentage_points",
     }
@@ -539,21 +723,22 @@ def probe():
     return {
         "ok": True,
         "pre_review_hard_gates_disabled": PRE_REVIEW_HARD_GATES_DISABLED,
+        "qi_only": True,
+        "mmvq": False,
         "min_manufacture": MIN_MANUFACTURE,
         "top_n_to_review": TOP_N_TO_REVIEW,
         "slim_multiai_review_only": True,
         "protective_stop_price_pct": PROTECTIVE_STOP_PRICE_PCT,
         "review_thresholds": {
-            "weekly_opens": REVIEW_WEEKLY_OPENS,
-            "mean_win_only_pct": REVIEW_MEAN_WIN_ONLY_PCT,
+            "weekly_opens_strict_gt": REVIEW_WEEKLY_OPENS,
+            "expectancy_E_strict_gt": HANDOFF_EXPECTANCY_STRICT_GT,
         },
         "handoff_floors": {
-            "win_rate": HANDOFF_MIN_WIN_RATE,
-            "weekly_opens": HANDOFF_MIN_WEEKLY_OPENS,
-            "mean_win_only_pct": HANDOFF_MIN_WIN_ONLY_PCT,
-            "n_trades": HANDOFF_MIN_TRADES,
-            "profit_first_rate": HANDOFF_MIN_PROFIT_FIRST_RATE,
-            "median_mae_max": HANDOFF_MAX_MEDIAN_MAE,
+            "weekly_opens_strict_gt": HANDOFF_MIN_WEEKLY_OPENS,
+            "expectancy_E_strict_gt": HANDOFF_EXPECTANCY_STRICT_GT,
+            "formula": "E=W*R-(1-W)",
+            "qi_only": True,
+            "loss_fallback": "forbidden",
         },
         "win_only_unit_audit": audit,
     }

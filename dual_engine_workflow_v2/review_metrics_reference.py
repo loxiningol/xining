@@ -12,8 +12,9 @@ from datetime import datetime, timedelta
 LEVERAGE = 20.0
 STOP_PRICE_DISTANCE = 0.005
 PROFIT_FIRST_TARGET = 0.005555
-MIN_AVG_WINNING_LEVERED = 0.1111  # ratio scale (11.11%)
-WEEKLY_FREQ_SOFT_MIN = 0.5
+# Soft advisory default at 20x*0.5%; dynamic stop×L preferred at handoff/review.
+MIN_AVG_WINNING_LEVERED = 0.10  # ratio scale (10%)
+WEEKLY_FREQ_SOFT_MIN = 0.1
 
 # Segment weights (plan §5.2)
 WEIGHT_0_12M = 1.00

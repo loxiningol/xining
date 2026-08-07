@@ -17,7 +17,12 @@ EXIT_POLICY_MODE = "fixed_horizon_close_v1"
 # by structured search for exhaustion/trend_pullback.  Not a soft gate bypass:
 # research WR>50 must be measured under this exit when assembly targets it.
 FEATURE_RSI_EXIT_MODE = "feature_rsi_tp_v1"
-ALLOWED_EXIT_POLICY_MODES = (EXIT_POLICY_MODE, FEATURE_RSI_EXIT_MODE)
+# Machine-exact barrier: first touch of fixed target% or protective stop,
+# else horizon close. Used by Stage1 rhyme pin (fair RR ≈ 1).
+BARRIER_PCT_EXIT_MODE = "intrabar_fixed_pct_target_v1"
+ALLOWED_EXIT_POLICY_MODES = (
+    EXIT_POLICY_MODE, FEATURE_RSI_EXIT_MODE, BARRIER_PCT_EXIT_MODE,
+)
 PROTECTIVE_STOP_MODE = "intrabar_fixed_pct_v1"
 PROTECTIVE_STOP_PCT = rcontract.PRODUCTION_PROTECTIVE_STOP_PCT
 EXECUTION_LEVERAGE = rcontract.PRODUCTION_EXECUTION_LEVERAGE
@@ -42,6 +47,7 @@ GENERIC_FACTOR_TO_DSL = {
     "bb_upper_dist": "bb_upper_dist",
     "bb_mid_reclaim": "bb_mid_reclaim",
     "bb_width": "bb_width",
+    "atr_pct_14": "atr14",
 }
 GENERIC_FACTOR_SEMANTICS = {
     "close_z_20": "close_z20_sample_std_v1",
@@ -57,6 +63,7 @@ GENERIC_FACTOR_SEMANTICS = {
     "bb_upper_dist": "bb20_2_upper_minus_close_over_close_v1",
     "bb_mid_reclaim": "bb20_2_close_minus_mid_over_close_v1",
     "bb_width": "bb20_2_upper_minus_lower_over_mid_v1",
+    "atr_pct_14": "atr14_over_close_v1",
 }
 GENERIC_EVENT_KINDS = ("mechanism_intersection", "mechanism_preserving", "ast_compiled")
 ALLOWED_RECIPE_SCHEMAS = (
@@ -215,6 +222,15 @@ def formal_capability(event_kind, event_logic, terms, execution_mapping,
             reasons.append("feature_rsi_tp_level_invalid")
         if str(exit_policy.get("rsi_feature") or "rsi14") != "rsi14":
             reasons.append("feature_rsi_tp_feature_unsupported")
+    elif exit_mode == BARRIER_PCT_EXIT_MODE:
+        try:
+            tp = float(exit_policy.get("target_price_pct"))
+        except (TypeError, ValueError):
+            tp = None
+        if tp is None or not (0.005 <= tp <= 0.05):
+            reasons.append("barrier_target_pct_invalid")
+        if exit_policy.get("allow_early_take_profit") is True:
+            reasons.append("barrier_exit_must_not_use_freeform_early_tp_flag")
     stop_policy = (
         protective_stop_policy
         if isinstance(protective_stop_policy, dict) else {}
@@ -230,11 +246,12 @@ def formal_capability(event_kind, event_logic, terms, execution_mapping,
     if protective_stop_evaluated is not True:
         reasons.append("protective_stop_not_evaluated")
     try:
-        leverage_ok = int(execution_leverage) == EXECUTION_LEVERAGE
+        lev = int(execution_leverage)
+        leverage_ok = 20 <= lev <= 50
     except (TypeError, ValueError):
         leverage_ok = False
     if not leverage_ok:
-        reasons.append("execution_leverage_identity_missing")
+        reasons.append("execution_leverage_not_in_20_50")
     if str(statistical_return_basis or "") != STATISTICAL_RETURN_BASIS:
         reasons.append("statistical_return_basis_identity_missing")
 

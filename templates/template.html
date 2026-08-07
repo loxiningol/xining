@@ -49,24 +49,17 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 .bt-combo-summary{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
 .bt-result-block{margin-top:14px;padding-top:2px}.bt-result-title{margin:14px 0 8px;color:var(--focus);font-size:15px;letter-spacing:.06em}
 .bt-data-coverage{width:100%;font-size:12px;color:var(--muted);line-height:1.65}
-.market-monitor{min-height:290px;padding:30px}
-.market-monitor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px}
-.market-monitor-head .title{margin:0}
-.market-monitor-subtitle{margin-top:7px;color:var(--muted);font-size:12px}
-.market-monitor-time{color:var(--soft);font-size:12px;white-space:nowrap}
-.market-monitor-assets{display:grid;gap:18px}
-.market-monitor-asset{padding:16px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.012)}
-.market-monitor-asset-title{font-size:14px;color:var(--focus);margin:0 0 13px 2px;letter-spacing:.08em}
-.market-monitor-grid{display:grid;grid-template-columns:1.15fr 1.6fr repeat(4,minmax(110px,.7fr));gap:12px}
-.market-monitor-card{min-height:112px;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
-.market-monitor-card.wide{min-width:0}
-.market-monitor-label{color:var(--muted);font-size:11px;letter-spacing:.08em;margin-bottom:12px}
-.market-monitor-value{font-size:20px;color:var(--text);line-height:1.35}
-.market-monitor-value.price{font-size:28px}
-.market-monitor-value.compact{font-size:14px;word-break:break-word}
-.market-monitor-foot{margin-top:9px;color:var(--soft);font-size:11px}
-.market-monitor-state{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;border:1px solid rgba(155,191,154,.28);color:var(--gain);background:rgba(155,191,154,.08);font-size:12px}
-.market-monitor-state.error{color:var(--loss);border-color:rgba(197,143,132,.32);background:rgba(197,143,132,.08)}
+.market-monitor-compact{padding:16px 18px}
+.market-monitor-head-compact{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.market-monitor-head-compact .title{margin:0}
+.market-monitor-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.market-monitor-time-compact{color:var(--muted);font-size:11px;white-space:nowrap}
+.market-monitor-table{width:100%;border-collapse:collapse;font-size:12px}
+.market-monitor-table th,.market-monitor-table td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}
+.market-monitor-table th{color:var(--muted);font-weight:500;font-size:11px}
+.market-monitor-table .sym{color:var(--focus);white-space:nowrap}
+.market-monitor-table .ma{color:var(--muted);font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.market-monitor-table .err{color:var(--loss)}
 .system-timeline{position:relative;margin-top:2px;padding-left:20px}
 .system-timeline:before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:1px;background:var(--line)}
 .system-timeline-item{position:relative;display:grid;grid-template-columns:120px 1fr;gap:18px;padding:0 0 22px}
@@ -75,8 +68,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 .system-timeline-date{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--focus);font-size:13px}
 .system-timeline-event{color:var(--text);font-size:13px;line-height:1.6}
 @media(max-width:900px){.grid{grid-template-columns:1fr}.param-row{grid-template-columns:1fr}}
-@media(max-width:1100px){.market-monitor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:620px){.market-monitor{padding:22px}.market-monitor-head{display:block}.market-monitor-time{margin-top:10px}.market-monitor-grid{grid-template-columns:1fr}.system-timeline-item{grid-template-columns:1fr;gap:5px}}
+@media(max-width:620px){.system-timeline-item{grid-template-columns:1fr;gap:5px}}
 .site-health-head-v7{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
 .site-health-summary-v7{font-size:15px;color:var(--focus);letter-spacing:.06em}
 .site-health-meta-v7{margin-top:6px;color:var(--muted);font-size:12px}
@@ -101,78 +93,6 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 <div class="subtitle">量化工作台</div>
 
 <div class="grid">
-  <div class="panel full market-monitor">
-    <div class="market-monitor-head">
-      <div>
-        <div class="title">盘面状态监控</div>
-        <div class="market-monitor-subtitle" id="marketMonitorSubtitle">BTC / CL / XAU / NG / XAG / LTC / ADA · 多周期行情指标与均线状态</div>
-      </div>
-      <div>
-        <select id="market_timeframe" aria-label="盘面监控周期" onchange="loadDialysis()">
-          <option value="1h" selected>1小时</option>
-          <option value="15m">15分钟</option>
-          <option value="5m">5分钟</option>
-        </select>
-        <div id="marketMonitorTime" class="market-monitor-time">正在读取最新行情…</div>
-      </div>
-    </div>
-    <div id="dialysisBox">加载中...</div>
-  </div>
-  <div class="panel full"><div class="title">实验策略模块</div><div id="experimentalStrategies">加载中...</div></div>
-
-  <div class="panel full">
-    <div class="title">策略回测控制台</div>
-    <div class="row">
-      <div id="active_strat" class="bt-strategy-picker"></div>
-      <div id="btSelectionNote" class="bt-selection-note">请选择至少一条策略；可同时选择任意数量进行等权组合回测。</div>
-      <select id="bt_instrument" aria-label="回测标的" onchange="onBacktestScopeChange()">
-        <option value="BTC-USDT-SWAP">BTC 永续合约</option>
-        <option value="CL-USDT-SWAP">CL 永续合约</option>
-        <option value="XAU-USDT-SWAP">XAU 永续合约</option>
-        <option value="NG-USDT-SWAP">NG 永续合约</option>
-        <option value="XAG-USDT-SWAP">XAG 永续合约</option>
-        <option value="LTC-USDT-SWAP">LTC 永续合约</option>
-        <option value="ADA-USDT-SWAP">ADA 永续合约</option>
-        <option value="ETH-USDT-SWAP">ETH 永续合约</option>
-        <option value="SOL-USDT-SWAP">SOL 永续合约</option>
-        <option value="XRP-USDT-SWAP">XRP 永续合约</option>
-        <option value="DOGE-USDT-SWAP">DOGE 永续合约</option>
-        <option value="BNB-USDT-SWAP">BNB 永续合约</option>
-      </select>
-      <select id="bt_timeframe" aria-label="回测周期" onchange="onBacktestScopeChange()">
-        <option value="1h" selected>1小时周期</option>
-        <option value="15m">15分钟周期</option>
-        <option value="5m">5分钟周期</option>
-      </select>
-      <div class="bt-selection-note">切换至“BTC 永续合约＋15分钟周期”后，BTC 15分钟专用策略会置顶并自动选中。专用策略可读取上一根已闭合1小时K线作为背景；回测资格与自动交易资格相互独立。</div>
-      <input id="bt_start" type="datetime-local" value="2026-01-01T00:00">
-      <input id="bt_end" type="datetime-local" value="2026-06-28T00:00">
-      <button id="btRunButton" onclick="executeBacktest()">开始回测</button>
-    </div>
-    <div id="btDataCoverage" class="bt-data-coverage">正在读取所选标的与周期的历史覆盖…</div>
-    <div id="btProgress"></div>
-    <div id="btResult"></div>
-  </div>
-
-  <div class="panel full" id="strategyEditorPanel">
-    <div class="title">实验策略优化工作台</div>
-    <div class="row">
-      <select id="editor_strategy_select" onchange="loadEditorStrategy()"></select>
-      <button onclick="saveStrategyConfig(false)">仅保存配置</button>
-      <button onclick="saveStrategyConfig(true)">保存并记录回测快照</button>
-    </div>
-    <div class="row">
-      <label><input id="editor_enabled" type="checkbox"> 启用策略</label>
-      <input id="editor_version" placeholder="版本号">
-    </div>
-    <div class="row">
-      <textarea id="editor_trigger" placeholder="触发条件"></textarea>
-      <textarea id="editor_exit" placeholder="止盈/止损条件"></textarea>
-    </div>
-    <div id="editor_params"></div>
-    <div id="editor_status" class="muted"></div>
-  </div>
-
   <div class="panel full">
 <!-- VECTOR_AUTO_TRADE_STATE_V5_NOGUESS_START -->
 <style>
@@ -264,13 +184,59 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .atm-pipe-bar{height:100%;background:linear-gradient(90deg,#8f7a5f,#d6aa82);width:0%;transition:width .4s ease}
   .atm-pipe-pct{font-size:11px;color:var(--muted);margin-bottom:6px}
   .atm-pipe-detail{font-size:12px;color:var(--text);line-height:1.55;min-height:2.8em}
-  .atm-review-stages{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
-  .atm-review-stage{padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
-  .atm-review-stage b{display:block;font-size:12px;color:var(--focus);margin-bottom:6px}
-  .atm-review-stage span{font-size:11px;color:var(--muted);line-height:1.55}
-  .atm-review-human{font-size:12px;color:var(--text);padding:10px 12px;border:1px dashed var(--line);border-radius:10px;margin-bottom:4px}
+  .atm-qi-flow{display:flex;flex-direction:column;align-items:center;margin:6px 0 14px;gap:0}
+  .atm-qi-join{
+    width:min(420px,92%);height:28px;position:relative;margin-top:2px;
+  }
+  .atm-qi-join:before,.atm-qi-join:after{
+    content:"";position:absolute;top:0;width:1px;height:100%;
+    background:linear-gradient(180deg,rgba(214,170,130,.55),rgba(214,170,130,.15));
+  }
+  .atm-qi-join:before{left:22%}
+  .atm-qi-join:after{right:22%}
+  .atm-qi-join-base{
+    position:absolute;left:22%;right:22%;bottom:0;height:1px;
+    background:rgba(214,170,130,.4);
+  }
+  .atm-qi-stem{
+    width:1px;height:18px;background:rgba(214,170,130,.45);margin:0 auto;
+  }
+  .atm-qi-cube{
+    width:132px;height:132px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border:1px solid rgba(214,170,130,.45);border-radius:10px;
+    background:linear-gradient(145deg,rgba(214,170,130,.14),rgba(255,255,255,.03));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 10px 28px rgba(0,0,0,.18);
+    text-align:center;padding:10px;
+  }
+  .atm-qi-cube strong{font-size:16px;letter-spacing:.12em;color:var(--focus);font-weight:650}
+  .atm-qi-cube span{display:block;margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5}
+  .atm-qi-split{
+    width:min(720px,96%);height:28px;position:relative;margin:4px auto 0;
+  }
+  .atm-qi-split:before{
+    content:"";position:absolute;left:50%;top:0;width:1px;height:50%;
+    background:rgba(214,170,130,.4);transform:translateX(-50%);
+  }
+  .atm-qi-split:after{
+    content:"";position:absolute;left:18%;right:18%;top:50%;height:1px;
+    background:rgba(214,170,130,.35);
+  }
+  .atm-qi-split-leg-l,.atm-qi-split-leg-r{
+    position:absolute;top:50%;width:1px;height:50%;
+    background:rgba(214,170,130,.4);
+  }
+  .atm-qi-split-leg-l{left:18%}
+  .atm-qi-split-leg-r{right:18%}
+  .atm-qi-tables{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
+  .atm-qi-table-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
+  .atm-qi-table-card.is-pass{border-color:rgba(155,191,154,.32)}
+  .atm-qi-table-card.is-fail{border-color:rgba(197,143,132,.28)}
+  .atm-qi-table-card h3{margin:0 0 10px;font-size:13px;letter-spacing:.04em;font-weight:600}
+  .atm-qi-table-card.is-pass h3{color:var(--gain)}
+  .atm-qi-table-card.is-fail h3{color:var(--loss)}
+  .atm-qi-gate{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 10px;text-align:center}
   @media (max-width:900px){
-    .atm-pipe-grid,.atm-review-stages,.atm-de-grid{grid-template-columns:1fr}
+    .atm-pipe-grid,.atm-qi-tables,.atm-de-grid{grid-template-columns:1fr}
   }
   .atm-de-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px}
   .atm-de-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
@@ -372,36 +338,8 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 <div class="atm-module" id="vectorAutoTradeModule" data-atm-layout="unified-v14">
   <div class="atm-module-title">自动交易模块</div>
 
-  <!-- 第一栏：运行策略 -->
-  <section class="atm-section" id="atmSectionStrategies" data-atm-section="1">
-    <div class="atm-section-head">
-      <div>
-        <h2 class="atm-section-title">运行策略</h2>
-        <div class="atm-section-sub">全部已挂载/运行中的自动交易策略合集（全标的 · 全周期），每条一行；展开可查看近10组开平仓记录。</div>
-      </div>
-      <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="vectorAutoFetch()">刷新</button>
-        <div class="atm-count" id="atmStrategyCount">0 条策略</div>
-      </div>
-    </div>
-    <div class="atm-roster" id="atmStrategyRoster"><div class="atm-empty">正在读取运行策略…</div></div>
-  </section>
-
-  <!-- 第二栏：最新自动交易记录 -->
-  <section class="atm-section" id="atmSectionDaily" data-atm-section="2">
-    <div class="vector-daily-ledger-v10" id="vectorDailyLedger">
-      <div class="vector-daily-ledger-head-v10">
-        <div>
-          <div class="vector-daily-ledger-title-v10">最新自动交易记录</div>
-          <div class="vector-daily-ledger-sub-v10">按平仓时间倒序展示最近20笔正式自动交易；超过20笔后自动移除最旧记录，不修改原始成交历史。</div>
-        </div>
-      </div>
-      <div id="vectorDailyLedgerRows"><div class="vector-auto-empty-v5">正在读取最新自动交易记录…</div></div>
-    </div>
-  </section>
-
-  <!-- 第三栏：策略创造演进（唯一入口 · 管道1/管道2） -->
-  <section class="atm-section" id="atmSectionCreation" data-atm-section="3">
+  <!-- 第一栏：策略创造演进（唯一入口 · 管道1/管道2） -->
+  <section class="atm-section" id="atmSectionCreation" data-atm-section="1">
     <div class="atm-section-head">
       <div>
         <h2 class="atm-section-title">策略创造演进模块</h2>
@@ -411,7 +349,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         <div class="atm-count" id="atmCreationWorking">0 管在研</div>
       </div>
     </div>
-    <div class="atm-pipe-link" id="atmCreationReviewLink">对接 → 策略创造复核模块（四阶段复核）</div>
+    <div class="atm-pipe-link" id="atmCreationReviewLink">汇流 → 质检器（四AI平均：E&gt;0 且周开仓频率&gt;0.5）</div>
     <div class="atm-pipe-grid" id="atmCreationPipelines">
       <div class="atm-pipe-card" data-pipeline="1">
         <div class="atm-pipe-head"><strong>管道1</strong><span class="atm-pipe-state" id="atmPipe1State">读取中…</span></div>
@@ -428,38 +366,69 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         <div class="atm-pipe-detail" id="atmPipe2Detail">正在连接唯一创造入口…</div>
       </div>
     </div>
+    <div class="atm-qi-flow" aria-hidden="true">
+      <div class="atm-qi-join"><div class="atm-qi-join-base"></div></div>
+      <div class="atm-qi-stem"></div>
+    </div>
   </section>
 
-  <!-- 第四栏：策略创造复核（四阶段） -->
-  <section class="atm-section" id="atmSectionReview" data-atm-section="4">
+  <!-- 第二栏：质检器（取代四阶段复核） -->
+  <section class="atm-section" id="atmSectionReview" data-atm-section="2">
     <div class="atm-section-head">
       <div>
-        <h2 class="atm-section-title">策略创造复核模块</h2>
-        <div class="atm-section-sub">承接策略创造演进模块双管道的合格产出 · 四阶段复核写清 · 通过后仅人工审批签发，禁止自动挂载。</div>
+        <h2 class="atm-section-title">质检器</h2>
+        <div class="atm-section-sub">双管道汇流后的唯一简化复核：四AI平均数 E&gt;0 且周开仓频率&gt;0.5。</div>
       </div>
       <div class="atm-section-meta">
         <button type="button" class="atm-btn" onclick="creationReviewRefresh()">刷新</button>
+        <div class="atm-count" id="atmQiCount">0 / 0</div>
       </div>
     </div>
-    <div class="atm-pipe-link" id="atmReviewPipeLink">← 连接自 管道1 / 管道2</div>
-    <div class="atm-review-stages" id="atmReviewStages"></div>
-    <div class="atm-review-human" id="atmReviewHuman">人工确认签发：四阶段复核通过后进入 Wx / CLI --confirm；永不自动上线。</div>
-    <div class="atm-de-grid" style="margin-top:12px">
-      <div class="atm-de-card">
-        <h3>管道交接手</h3>
+    <div class="atm-qi-gate" id="atmQiGate">门槛：四AI平均 E&gt;0 · 周开仓频率&gt;0.5 · 禁止自动挂载</div>
+    <div class="atm-qi-flow">
+      <div class="atm-qi-cube" id="atmQiCube">
+        <strong>质检器</strong>
+        <span id="atmQiCubeMeta">等待管道产出</span>
+      </div>
+      <div class="atm-qi-split">
+        <span class="atm-qi-split-leg-l"></span>
+        <span class="atm-qi-split-leg-r"></span>
+      </div>
+    </div>
+    <div class="atm-qi-tables">
+      <div class="atm-qi-table-card is-pass">
+        <h3>质检合格策略</h3>
         <div style="overflow-x:auto">
           <table class="atm-de-table">
-            <thead><tr><th>管道</th><th>方向</th><th>来源</th><th>状态</th></tr></thead>
-            <tbody id="atmReviewHandoffRows"><tr><td colspan="4" style="color:var(--muted)">暂无交接</td></tr></tbody>
+            <thead>
+              <tr>
+                <th>策略名称</th>
+                <th>E值</th>
+                <th>周开仓频率</th>
+                <th>盈利单平均盈利率</th>
+              </tr>
+            </thead>
+            <tbody id="atmQiPassRows">
+              <tr><td colspan="4" style="color:var(--muted)">读取中…</td></tr>
+            </tbody>
           </table>
         </div>
       </div>
-      <div class="atm-de-card">
-        <h3>待人工审批</h3>
+      <div class="atm-qi-table-card is-fail">
+        <h3>质检不合格策略</h3>
         <div style="overflow-x:auto">
           <table class="atm-de-table">
-            <thead><tr><th>时间</th><th>策略</th><th>标的</th><th>状态</th><th>标注</th></tr></thead>
-            <tbody id="atmReviewFormalRows"><tr><td colspan="5" style="color:var(--muted)">暂无</td></tr></tbody>
+            <thead>
+              <tr>
+                <th>策略名称</th>
+                <th>E值</th>
+                <th>周开仓频率</th>
+                <th>盈利单平均盈利率</th>
+              </tr>
+            </thead>
+            <tbody id="atmQiFailRows">
+              <tr><td colspan="4" style="color:var(--muted)">读取中…</td></tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -467,8 +436,70 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     <div class="atm-forecast-status" id="atmReviewStatus"></div>
   </section>
 
-  <!-- 第五栏：系统频率预测（置底 · 只读） -->
-  <section class="atm-section" id="atmSectionForecast" data-atm-section="5">
+  <!-- 第三栏：策略待优化（人工/机器优化） -->
+  <section class="atm-section" id="atmSectionPendingOptimize" data-atm-section="3">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">策略待优化</h2>
+        <div class="atm-section-sub">质检合格后的优化池。展示标题、近2年账户胜率、盈利单平均盈利率、周开仓频率、期望值（E）。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn" onclick="pendingOptimizeRefresh()">刷新</button>
+        <div class="atm-count" id="atmPendingOptimizeCount">0 条</div>
+      </div>
+    </div>
+    <div class="atm-pipe-link" id="atmPendingOptimizeNote">承接质检合格策略的参数打磨；未挂载实盘。</div>
+    <div class="atm-de-card">
+      <div style="overflow-x:auto">
+        <table class="atm-de-table">
+          <thead>
+            <tr>
+              <th>策略标题</th>
+              <th>近2年账户胜率</th>
+              <th>盈利单平均盈利率</th>
+              <th>周开仓频率</th>
+              <th>期望值（E）</th>
+            </tr>
+          </thead>
+          <tbody id="atmPendingOptimizeRows">
+            <tr><td colspan="5" style="color:var(--muted)">读取中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="atm-forecast-status" id="atmPendingOptimizeStatus"></div>
+  </section>
+
+  <!-- 第四栏：运行策略 -->
+  <section class="atm-section" id="atmSectionStrategies" data-atm-section="4">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">运行策略</h2>
+        <div class="atm-section-sub">全部已挂载/运行中的自动交易策略合集（全标的 · 全周期），每条一行；展开可查看近10组开平仓记录。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn" onclick="vectorAutoFetch()">刷新</button>
+        <div class="atm-count" id="atmStrategyCount">0 条策略</div>
+      </div>
+    </div>
+    <div class="atm-roster" id="atmStrategyRoster"><div class="atm-empty">正在读取运行策略…</div></div>
+  </section>
+
+  <!-- 第五栏：最新自动交易记录 -->
+  <section class="atm-section" id="atmSectionDaily" data-atm-section="5">
+    <div class="vector-daily-ledger-v10" id="vectorDailyLedger">
+      <div class="vector-daily-ledger-head-v10">
+        <div>
+          <div class="vector-daily-ledger-title-v10">最新自动交易记录</div>
+          <div class="vector-daily-ledger-sub-v10">按平仓时间倒序展示最近20笔正式自动交易；超过20笔后自动移除最旧记录，不修改原始成交历史。</div>
+        </div>
+      </div>
+      <div id="vectorDailyLedgerRows"><div class="vector-auto-empty-v5">正在读取最新自动交易记录…</div></div>
+    </div>
+  </section>
+
+  <!-- 第六栏：系统频率预测（置底 · 只读） -->
+  <section class="atm-section" id="atmSectionForecast" data-atm-section="6">
     <div class="atm-section-head">
       <div>
         <h2 class="atm-section-title">系统频率预测</h2>
@@ -816,7 +847,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     const n=pipes.filter(function(p){return p.working;}).length;
     if($('atmCreationWorking')) $('atmCreationWorking').textContent=n+' 管在研';
     if($('atmCreationReviewLink')){
-      $('atmCreationReviewLink').textContent='对接 → 策略创造复核模块（四阶段复核） · 更新 '+(data.updated_at||'');
+      $('atmCreationReviewLink').textContent='汇流 → 质检器（四AI平均：E>0 且周开仓频率>0.5） · 更新 '+(data.updated_at||'');
     }
   }
   window.creationPipelinesRefresh=async function(){
@@ -829,52 +860,102 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       if($('atmPipe2Detail')) $('atmPipe2Detail').textContent='管道状态读取失败：'+(e&&e.message?e.message:e);
     }
   };
+  function qiFmtPct(v, digits){
+    if(v===null||v===undefined||v==='') return '—';
+    const n=Number(v);
+    if(!isFinite(n)) return '—';
+    const d=(digits===undefined||digits===null)?2:digits;
+    return n.toFixed(d)+'%';
+  }
+  function qiFmtNum(v, digits){
+    if(v===null||v===undefined||v==='') return '—';
+    const n=Number(v);
+    if(!isFinite(n)) return '—';
+    const d=(digits===undefined||digits===null)?3:digits;
+    return n.toFixed(d);
+  }
+  function qiRowHtml(r){
+    const name=zoneEsc(r.title_zh||r.strategy_name||r.id||'-');
+    const scope=zoneEsc(((r.symbol||'')+'').replace('-USDT-SWAP','')+(r.timeframe?(' · '+r.timeframe):''));
+    const eCls=(Number(r.expectancy_E)>0)?'gain':'loss';
+    const wCls=(Number(r.weekly_open_freq)>0.5)?'gain':'loss';
+    const mCls=(Number(r.mean_win_only_pct)>=0)?'gain':'loss';
+    return '<tr><td><div class="atm-row-title">'+name+'</div><div class="atm-row-scope">'+scope+
+      '</div></td><td class="'+eCls+'">'+qiFmtNum(r.expectancy_E,3)+
+      '</td><td class="'+wCls+'">'+qiFmtNum(r.weekly_open_freq,3)+
+      '</td><td class="'+mCls+'">'+qiFmtPct(r.mean_win_only_pct,2)+'</td></tr>';
+  }
   function renderCreationReview(data){
-    const stages=Array.isArray(data.stages)?data.stages:[];
-    if($('atmReviewStages')){
-      $('atmReviewStages').innerHTML=stages.map(function(s){
-        return '<div class="atm-review-stage"><b>'+zoneEsc(s.name||('第'+s.id+'次复核'))+
-          '</b><span>'+zoneEsc(s.scope||'')+'</span></div>';
-      }).join('') || '<div class="atm-empty">四阶段定义缺失</div>';
+    const passed=Array.isArray(data.passed)?data.passed:[];
+    const failed=Array.isArray(data.failed)?data.failed:[];
+    if($('atmQiCount')) $('atmQiCount').textContent=passed.length+' 合格 / '+failed.length+' 不合格';
+    if($('atmQiGate')) $('atmQiGate').textContent=(data.gate_zh||'四AI平均数：E>0 且周开仓频率>0.5')+' · 禁止自动挂载';
+    if($('atmQiCubeMeta')){
+      $('atmQiCubeMeta').textContent=passed.length+failed.length
+        ? ('已检 '+(passed.length+failed.length)+' · 合格 '+passed.length)
+        : '等待管道产出';
     }
-    if($('atmReviewHuman')){
-      $('atmReviewHuman').textContent=(data.human_confirm_gate||'人工确认签发')+'：'+(data.note_zh||'四阶段复核通过后进入人工审批；永不自动上线。');
+    if($('atmQiPassRows')){
+      $('atmQiPassRows').innerHTML=passed.length
+        ? passed.map(qiRowHtml).join('')
+        : '<tr><td colspan="4" style="color:var(--muted)">暂无质检合格策略</td></tr>';
     }
-    const pipes=Array.isArray(data.pipelines)?data.pipelines:[];
-    const working=pipes.filter(function(p){return p.working;}).map(function(p){return p.pipeline_label||('管道'+p.pipeline);});
-    if($('atmReviewPipeLink')){
-      $('atmReviewPipeLink').textContent=working.length
-        ? ('← 连接自 管道1 / 管道2 · 当前在研：'+working.join('、'))
-        : '← 连接自 管道1 / 管道2 · 当前无在研任务';
-    }
-    const handoffs=Array.isArray(data.handoffs_from_pipelines)?data.handoffs_from_pipelines:[];
-    if($('atmReviewHandoffRows')){
-      $('atmReviewHandoffRows').innerHTML=handoffs.length?handoffs.map(function(h){
-        return '<tr><td>'+zoneEsc(h.pipeline_label||('管道'+h.pipeline)||'-')+'</td><td>'+
-          zoneEsc(h.research_direction||'-')+'</td><td>'+zoneEsc(h.source||'-')+'</td><td>'+
-          zoneEsc(h.status||'-')+'</td></tr>';
-      }).join(''):'<tr><td colspan="4" style="color:var(--muted)">暂无管道交接（合格产出后出现）</td></tr>';
-    }
-    const formal=Array.isArray(data.formal_recent)?data.formal_recent:[];
-    if($('atmReviewFormalRows')){
-      $('atmReviewFormalRows').innerHTML=formal.length?formal.map(function(r){
-        const title=r.title_zh||r.title||r.key||'-';
-        return '<tr><td>'+zoneEsc(r.time||'-')+'</td><td>'+zoneEsc(title)+'</td><td>'+
-          zoneEsc(String(r.symbol||'').replace('-USDT-SWAP',''))+'/'+zoneEsc(r.timeframe||'')+
-          '</td><td>'+zoneEsc(r.status||'-')+'</td><td>'+zoneEsc(r.annotation||'-')+'</td></tr>';
-      }).join(''):'<tr><td colspan="5" style="color:var(--muted)">暂无待人工审批策略</td></tr>';
+    if($('atmQiFailRows')){
+      $('atmQiFailRows').innerHTML=failed.length
+        ? failed.map(qiRowHtml).join('')
+        : '<tr><td colspan="4" style="color:var(--muted)">暂无质检不合格策略</td></tr>';
     }
     if($('atmReviewStatus')){
-      $('atmReviewStatus').textContent='四阶段复核板 · 更新 '+(data.updated_at||'')+' · 禁止自动挂载';
+      $('atmReviewStatus').textContent='质检器 · 更新 '+(data.updated_at||'')+' · '+(data.note_zh||'');
     }
   }
   window.creationReviewRefresh=async function(){
     try{
-      const pack=await fetchJson('/api/creation/review', null, 12000);
+      const pack=await fetchJson('/api/creation/quality_inspector', null, 12000);
       if(!pack.res.ok || pack.j.ok===false) throw new Error(pack.j.error||('HTTP '+pack.res.status));
       renderCreationReview(pack.j);
     }catch(e){
-      if($('atmReviewStatus')) $('atmReviewStatus').textContent='复核板读取失败：'+(e&&e.message?e.message:e);
+      if($('atmReviewStatus')) $('atmReviewStatus').textContent='质检器读取失败：'+(e&&e.message?e.message:e);
+      if($('atmQiPassRows')) $('atmQiPassRows').innerHTML='<tr><td colspan="4" style="color:var(--muted)">读取失败</td></tr>';
+      if($('atmQiFailRows')) $('atmQiFailRows').innerHTML='<tr><td colspan="4" style="color:var(--muted)">读取失败</td></tr>';
+    }
+  };
+  function renderPendingOptimize(data){
+    const rows=Array.isArray(data.strategies)?data.strategies:[];
+    if($('atmPendingOptimizeCount')) $('atmPendingOptimizeCount').textContent=rows.length+' 条';
+    if($('atmPendingOptimizeNote')){
+      $('atmPendingOptimizeNote').textContent=(data.note_zh||'策略待优化展示区')+' · 更新 '+(data.updated_at||'');
+    }
+    if($('atmPendingOptimizeRows')){
+      $('atmPendingOptimizeRows').innerHTML=rows.length?rows.map(function(r){
+        const wr=Number(r.account_win_rate_pct);
+        const mw=Number(r.mean_win_only_pct);
+        const ee=Number(r.expectancy_E);
+        const wrCls=isFinite(wr)?(wr>=50?'gain':'loss'):'';
+        const mwCls=isFinite(mw)?(mw>=0?'gain':'loss'):'';
+        const eCls=isFinite(ee)?(ee>0?'gain':'loss'):'';
+        return '<tr><td><div class="atm-row-title">'+zoneEsc(r.title_zh||'-')+
+          '</div><div class="atm-row-scope">'+zoneEsc((r.symbol||'').replace('-USDT-SWAP',''))+
+          ' / '+zoneEsc(r.timeframe||'')+' · '+zoneEsc(r.direction_zh||r.direction||'')+
+          '</div></td><td class="'+wrCls+'">'+zoneEsc(qiFmtPct(r.account_win_rate_pct,2))+
+          '</td><td class="'+mwCls+'">'+zoneEsc(qiFmtPct(r.mean_win_only_pct,2))+
+          '</td><td>'+zoneEsc(qiFmtNum(r.weekly_open_freq,3))+
+          '</td><td class="'+eCls+'">'+zoneEsc(qiFmtNum(r.expectancy_E,4))+
+          '</td></tr>';
+      }).join(''):'<tr><td colspan="5" style="color:var(--muted)">暂无待优化策略</td></tr>';
+    }
+    if($('atmPendingOptimizeStatus')){
+      $('atmPendingOptimizeStatus').textContent='待优化板 · '+rows.length+' 条 · 未自动挂载';
+    }
+  }
+  window.pendingOptimizeRefresh=async function(){
+    try{
+      const pack=await fetchJson('/api/strategy/pending_optimize', null, 12000);
+      if(!pack.res.ok || pack.j.ok===false) throw new Error(pack.j.error||('HTTP '+pack.res.status));
+      renderPendingOptimize(pack.j);
+    }catch(e){
+      if($('atmPendingOptimizeStatus')) $('atmPendingOptimizeStatus').textContent='待优化板读取失败：'+(e&&e.message?e.message:e);
+      if($('atmPendingOptimizeRows')) $('atmPendingOptimizeRows').innerHTML='<tr><td colspan="5" style="color:var(--muted)">读取失败</td></tr>';
     }
   };
   function bootAtmModules(){
@@ -882,6 +963,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     loadForecastLatest();
     creationPipelinesRefresh();
     creationReviewRefresh();
+    pendingOptimizeRefresh();
   }
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded', bootAtmModules);
@@ -891,6 +973,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   setInterval(window.vectorAutoFetch,15000);
   setInterval(creationPipelinesRefresh,4000);
   setInterval(creationReviewRefresh,8000);
+  setInterval(pendingOptimizeRefresh,15000);
   setInterval(loadForecastLatest,60000);
 })();
 </script>
@@ -1029,6 +1112,54 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       })();
     </script>
   </section>
+  <div class="panel full">
+    <div class="title">策略回测控制台</div>
+    <div class="row">
+      <div id="active_strat" class="bt-strategy-picker"></div>
+      <div id="btSelectionNote" class="bt-selection-note">请选择至少一条策略；可同时选择任意数量进行等权组合回测。</div>
+      <select id="bt_instrument" aria-label="回测标的" onchange="onBacktestScopeChange()">
+        <option value="BTC-USDT-SWAP">BTC 永续合约</option>
+        <option value="CL-USDT-SWAP">CL 永续合约</option>
+        <option value="XAU-USDT-SWAP">XAU 永续合约</option>
+        <option value="NG-USDT-SWAP">NG 永续合约</option>
+        <option value="XAG-USDT-SWAP">XAG 永续合约</option>
+        <option value="LTC-USDT-SWAP">LTC 永续合约</option>
+        <option value="ADA-USDT-SWAP">ADA 永续合约</option>
+        <option value="ETH-USDT-SWAP">ETH 永续合约</option>
+        <option value="SOL-USDT-SWAP">SOL 永续合约</option>
+        <option value="XRP-USDT-SWAP">XRP 永续合约</option>
+        <option value="DOGE-USDT-SWAP">DOGE 永续合约</option>
+        <option value="BNB-USDT-SWAP">BNB 永续合约</option>
+      </select>
+      <select id="bt_timeframe" aria-label="回测周期" onchange="onBacktestScopeChange()">
+        <option value="1h" selected>1小时周期</option>
+        <option value="15m">15分钟周期</option>
+        <option value="5m">5分钟周期</option>
+      </select>
+      <div class="bt-selection-note">切换至“BTC 永续合约＋15分钟周期”后，BTC 15分钟专用策略会置顶并自动选中。专用策略可读取上一根已闭合1小时K线作为背景；回测资格与自动交易资格相互独立。</div>
+      <input id="bt_start" type="datetime-local" value="2026-01-01T00:00">
+      <input id="bt_end" type="datetime-local" value="2026-06-28T00:00">
+      <button id="btRunButton" onclick="executeBacktest()">开始回测</button>
+    </div>
+    <div id="btDataCoverage" class="bt-data-coverage">正在读取所选标的与周期的历史覆盖…</div>
+    <div id="btProgress"></div>
+    <div id="btResult"></div>
+  </div>
+  <div class="panel full"><div class="title">实验策略模块</div><div id="experimentalStrategies">加载中...</div></div>
+  <div class="panel full market-monitor-compact">
+    <div class="market-monitor-head-compact">
+      <div class="title">盘面状态监控</div>
+      <div class="market-monitor-tools">
+        <select id="market_timeframe" aria-label="盘面监控周期" onchange="loadDialysis()">
+          <option value="1h" selected>1小时</option>
+          <option value="15m">15分钟</option>
+          <option value="5m">5分钟</option>
+        </select>
+        <span id="marketMonitorTime" class="market-monitor-time-compact">读取中…</span>
+      </div>
+    </div>
+    <div id="dialysisBox">加载中...</div>
+  </div>
   <div class="panel full">
     <div class="title">网站运行状态</div>
     <div id="processBox">加载中...</div>
@@ -1175,6 +1306,7 @@ function updateBacktestSelectionNote(){
 
 function renderEditorSelector(){
   let sel=document.getElementById('editor_strategy_select');
+  if(!sel) return;
   let old=sel.value || '';
   sel.innerHTML=STRATEGIES.map(function(s){return `<option value="${safe(s.key)}">${strategyTitle(s)}</option>`;}).join('');
   if(STRATEGIES.some(function(s){return s.key===old;})){sel.value=old;}
@@ -1182,22 +1314,30 @@ function renderEditorSelector(){
 }
 
 function currentEditorStrategy(){
-  let key=document.getElementById('editor_strategy_select').value;
+  let sel=document.getElementById('editor_strategy_select');
+  if(!sel) return null;
+  let key=sel.value;
   return STRATEGIES.find(function(s){return s.key===key;});
 }
 
 function loadEditorStrategy(){
   let s=currentEditorStrategy();
   if(!s) return;
-  document.getElementById('editor_enabled').checked = s.enabled !== false;
-  document.getElementById('editor_version').value = s.version || '';
-  document.getElementById('editor_trigger').value = s.trigger || '';
-  document.getElementById('editor_exit').value = s.exit || '';
+  let enabled=document.getElementById('editor_enabled');
+  let version=document.getElementById('editor_version');
+  let trigger=document.getElementById('editor_trigger');
+  let exit=document.getElementById('editor_exit');
+  if(!enabled || !version || !trigger || !exit) return;
+  enabled.checked = s.enabled !== false;
+  version.value = s.version || '';
+  trigger.value = s.trigger || '';
+  exit.value = s.exit || '';
   renderParams(s.params || {}, s.param_meta || {});
 }
 
 function renderParams(params, meta){
   let box=document.getElementById('editor_params');
+  if(!box) return;
   let keys=Object.keys(params||{}).sort();
   if(!keys.length){ box.innerHTML='<div class="muted">暂无可调参数</div>'; return; }
   box.innerHTML = keys.map(function(k){
@@ -1409,34 +1549,22 @@ function renderBacktestResult(r){
 function loadDialysis(){
   const timeframe=(document.getElementById('market_timeframe')||{}).value||'1h';
   apiGet('/api/dialysis?timeframe='+encodeURIComponent(timeframe)).then(function(d){
-    const signalCount=Array.isArray(d.signals)?d.signals.length:(d.signals&&typeof d.signals==='object'?Object.keys(d.signals).length:0);
-    const timeframeLabel=d.timeframe_label||(timeframe==='15m'?'15分钟':'1小时');
-    document.getElementById('marketMonitorSubtitle').textContent='BTC / CL / XAU / NG / XAG / LTC / ADA · '+timeframeLabel+'行情指标与均线状态';
-    document.getElementById('marketMonitorTime').textContent=timeframeLabel+'｜更新时间：'+(d.updated_at||new Date().toLocaleString('zh-CN',{hour12:false}));
+    const timeframeLabel=d.timeframe_label||(timeframe==='15m'?'15分钟':(timeframe==='5m'?'5分钟':'1小时'));
+    const timeEl=document.getElementById('marketMonitorTime');
+    if(timeEl) timeEl.textContent=timeframeLabel+' · '+(d.updated_at||'-');
     const markets=Array.isArray(d.markets)&&d.markets.length?d.markets:[d];
-    document.getElementById('dialysisBox').innerHTML='<div class="market-monitor-assets">'+markets.map(function(m){
+    const rows=markets.map(function(m){
+      const sym=String(m.symbol||'').replace('-USDT-SWAP','');
       const ok=!!m.ok&&Number(m.price||0)>0;
-      return `<div class="market-monitor-asset">
-      <div class="market-monitor-asset-title">${safe(m.symbol||'BTC-USDT-SWAP')}</div>
-      <div class="market-monitor-grid">
-        <div class="market-monitor-card">
-          <div class="market-monitor-label">最新确认价格</div>
-          <div class="market-monitor-value price number">${Number(m.price||0).toFixed(2)}</div>
-          <div class="market-monitor-foot"><span class="market-monitor-state ${ok?'':'error'}">${ok?'行情连接正常':'行情获取异常'}</span></div>
-        </div>
-        <div class="market-monitor-card wide">
-          <div class="market-monitor-label">均线排列</div>
-          <div class="market-monitor-value compact">${safe(m.ma_status||'-')}</div>
-          <div class="market-monitor-foot">由高至低排列</div>
-        </div>
-        <div class="market-monitor-card"><div class="market-monitor-label">KDJ · K</div><div class="market-monitor-value number">${Number(m.kdj_k||0).toFixed(2)}</div></div>
-        <div class="market-monitor-card"><div class="market-monitor-label">KDJ · D</div><div class="market-monitor-value number">${Number(m.kdj_d||0).toFixed(2)}</div></div>
-        <div class="market-monitor-card"><div class="market-monitor-label">KDJ · J</div><div class="market-monitor-value number">${Number(m.kdj_j||0).toFixed(2)}</div></div>
-        <div class="market-monitor-card"><div class="market-monitor-label">CCI</div><div class="market-monitor-value number">${Number(m.cci||0).toFixed(2)}</div><div class="market-monitor-foot">当前激活信号 ${signalCount} 个</div></div>
-      </div></div>`;
-    }).join('')+'</div>';
+      if(!ok){
+        return '<tr><td class="sym">'+safe(sym)+'</td><td colspan="6" class="err">读取失败</td></tr>';
+      }
+      return '<tr><td class="sym">'+safe(sym)+'</td><td class="number">'+Number(m.price||0).toFixed(2)+'</td><td class="ma" title="'+safe(m.ma_status||'-')+'">'+safe(m.ma_status||'-')+'</td><td class="number">'+Number(m.kdj_k||0).toFixed(1)+'</td><td class="number">'+Number(m.kdj_d||0).toFixed(1)+'</td><td class="number">'+Number(m.kdj_j||0).toFixed(1)+'</td><td class="number">'+Number(m.cci||0).toFixed(0)+'</td></tr>';
+    }).join('');
+    document.getElementById('dialysisBox').innerHTML='<table class="market-monitor-table"><thead><tr><th>标的</th><th>价格</th><th>均线</th><th>K</th><th>D</th><th>J</th><th>CCI</th></tr></thead><tbody>'+rows+'</tbody></table>';
   }).catch(function(err){
-    document.getElementById('marketMonitorTime').textContent='行情读取失败';
+    const timeEl=document.getElementById('marketMonitorTime');
+    if(timeEl) timeEl.textContent='读取失败';
     document.getElementById('dialysisBox').innerHTML='<span class="loss">盘面状态读取失败：'+safe(err.message)+'</span>';
   });
 }
@@ -1549,7 +1677,7 @@ function init(){
   loadBacktestCoverage();
   loadDialysis();
   loadProcessStatus();
-  setInterval(loadDialysis,5000);
+  setInterval(loadDialysis,15000);
   setInterval(loadProcessStatus,10000);
 }
 

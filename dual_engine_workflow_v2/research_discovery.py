@@ -42,6 +42,26 @@ def _now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _emit_progress(stage_key, detail="", done=None, total=None, force=False, percent=None):
+    """Best-effort live progress for parallel_creation job JSON.
+
+    Uses job_progress (no import of parallel_creation) so circular-import
+    cannot silently swallow updates and freeze the UI at population 22%.
+    """
+    try:
+        from . import job_progress as jp
+        return jp.report_progress(
+            stage_key,
+            detail=detail,
+            percent=percent,
+            done=done,
+            total=total,
+            force=force,
+        )
+    except Exception:
+        return None
+
+
 def assembly_recipe(hypothesis, probe_best, contract):
     """Freeze the exact post-discovery implementation identity."""
     hypothesis = hypothesis or {}
@@ -237,7 +257,15 @@ def _design_seed_hypotheses(design_seed, contract):
             "constraint_used": p.get("constraint") or p.get("constraints") or [],
             "observable_proxy": list(p.get("observable_proxy") or hints),
             "factor_hints": list(hints),
-            "predicted_direction": target.get("direction") or design.get("direction"),
+            "required_factor_intersection": list(
+                p.get("required_factor_intersection") or []
+            ),
+            "factor_side_constraints": dict(
+                p.get("factor_side_constraints") or {}
+            ),
+            "predicted_direction": (
+                p.get("predicted_direction") or target.get("direction") or design.get("direction")
+            ),
             "horizon": p.get("horizon") or target.get("timeframe"),
             "conditional_on": list(p.get("conditional_on") or []),
             "failure_conditions": list(
@@ -254,7 +282,51 @@ def _design_seed_hypotheses(design_seed, contract):
             # ran before discovery too, but only GLM rows are AI-generated.
             "ai_generated_before_discovery": bool(glm),
             "structured_generated_before_discovery": True,
-            "priority_boost": 4.0,
+            "priority_boost": 8.0 if glm else (
+                6.0 if p.get("required_factor_intersection") else 4.0
+            ),
+        }
+        rows.append(rcontract.apply_to_hypothesis(row, contract))
+    for index, raw_hyp in enumerate(design.get("hypotheses") or []):
+        if not isinstance(raw_hyp, dict):
+            continue
+        hints = list(
+            raw_hyp.get("testable_factor_hints")
+            or raw_hyp.get("factor_hints")
+            or raw_hyp.get("observable_proxy")
+            or []
+        )
+        if not hints:
+            continue
+        identity = "%s|arch|%s|%s" % (
+            (contract or {}).get("contract_id"),
+            raw_hyp.get("id") or index,
+            raw_hyp.get("statement_zh") or raw_hyp.get("statement"),
+        )
+        hid = "H_arch_%s" % hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+        target = (contract or {}).get("target") or {}
+        row = {
+            "hypothesis_id": hid,
+            "source": "architect_refined_hypothesis",
+            "path": "design_to_data",
+            "mechanism_id": raw_hyp.get("mechanism_id") or "arch_%s" % (raw_hyp.get("id") or index),
+            "family": raw_hyp.get("family") or design.get("mechanism_family") or "design_generated",
+            "statement_zh": raw_hyp.get("statement_zh") or raw_hyp.get("statement"),
+            "factor_hints": hints,
+            "observable_proxy": hints,
+            "required_factor_intersection": list(
+                raw_hyp.get("required_factor_intersection") or []
+            ),
+            "factor_side_constraints": dict(
+                raw_hyp.get("factor_side_constraints") or {}
+            ),
+            "predicted_direction": (
+                raw_hyp.get("predicted_direction") or target.get("direction") or design.get("direction")
+            ),
+            "required_data": list(raw_hyp.get("required_data") or ["derived_ohlcv_proxy"]),
+            "ai_generated_before_discovery": bool(glm),
+            "structured_generated_before_discovery": True,
+            "priority_boost": 7.0,
         }
         rows.append(rcontract.apply_to_hypothesis(row, contract))
     return rows
@@ -267,6 +339,134 @@ SOFT_PASS_ALLOWED_GATES = frozenset({
 SOFT_PASS_FORBIDDEN_GATES = frozenset({
     "antifalsify", "leakage", "causal",
 })
+
+
+def _creation_skip_llm(explicit=None):
+    """Return True to skip LLM enrichment. QIYU_CREATION_WITH_LLM=1 forces enable."""
+    if explicit is not None:
+        return bool(explicit)
+    return str(os.environ.get("QIYU_CREATION_WITH_LLM") or "").lower() not in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _try_param_rescue_after_probe(
+    pr,
+    factor_matrix,
+    fwd_returns,
+    candles,
+    symbol,
+    timeframe,
+    direction,
+    run_id,
+):
+    """Tune entry q/hold/side on the best naked factor before writing off a hypothesis."""
+    if str(os.environ.get("QIYU_PARAM_PREPROBE_RESCUE") or "1").lower() in (
+        "0", "false", "no", "off",
+    ):
+        return pr
+    from . import probe_protocol as probes
+    from . import parameter_platform as paramplat
+    from . import manufacture_batch_policy as mfg
+
+    best = dict(pr.get("best") or {})
+    factor = best.get("factor")
+    if not factor:
+        return pr
+    n = int(best.get("n_independent_events") or 0)
+    if n < int(probes.MIN_INDEPENDENT_EVENTS):
+        return pr
+    factor_vals = (factor_matrix or {}).get(factor) or []
+    if not factor_vals:
+        return pr
+    side_dir = 1
+    if str(best.get("trade_direction") or direction or "").lower() in ("short", "-1"):
+        side_dir = -1
+    max_evals = int(os.environ.get("QIYU_PARAM_MAX_EVALS") or 48)
+    rescue_pack = {
+        "ran": True,
+        "factor": factor,
+        "old_mean_net": best.get("mean_net"),
+        "old_win_rate": best.get("win_rate"),
+    }
+    psearch = paramplat.search(
+        factor_vals,
+        fwd_returns,
+        method="sobol",
+        max_evals=max_evals,
+        run_id=run_id,
+        candles=candles,
+        direction=side_dir,
+    )
+    pb = psearch.get("best") or {}
+    if not pb and candles is not None:
+        psearch = paramplat.search(
+            factor_vals,
+            fwd_returns,
+            method="sobol",
+            max_evals=max_evals,
+            run_id=run_id,
+            candles=None,
+            direction=side_dir,
+        )
+        pb = psearch.get("best") or {}
+        rescue_pack["fallback"] = "legacy_net_return_grid"
+    rescue_pack["n_evaluated"] = psearch.get("n_evaluated")
+    if not pb:
+        pr["param_rescue"] = dict(rescue_pack, improved=False, reason="no_param_candidate")
+        return pr
+    new_wr = pb.get("win_rate")
+    if new_wr is None:
+        new_wr = pb.get("profit_first_rate")
+    new_mean = pb.get("mean_net")
+    if new_mean is None and isinstance(pb.get("summary"), dict):
+        pfr = pb["summary"].get("profit_first_rate")
+        if pfr is not None:
+            new_wr = new_wr if new_wr is not None else pfr
+    old_mean = float(best.get("mean_net") if best.get("mean_net") is not None else -1e9)
+    new_mean_f = float(new_mean if new_mean is not None else -1e9)
+    old_wr = float(best.get("win_rate") if best.get("win_rate") is not None else 0.0)
+    new_wr_f = float(new_wr if new_wr is not None else 0.0)
+    improved = (
+        new_mean_f > old_mean + 1e-9
+        or (new_wr_f > old_wr + 1e-9 and new_mean_f >= old_mean - 1e-9)
+    )
+    rescue_pack.update({
+        "improved": improved,
+        "new_mean_net": new_mean_f if new_mean is not None else None,
+        "new_win_rate": new_wr_f if new_wr is not None else None,
+        "best_params": pb.get("params"),
+    })
+    pr["param_rescue"] = rescue_pack
+    if not improved:
+        return pr
+    best.update({
+        "mean_net": new_mean_f if new_mean is not None else best.get("mean_net"),
+        "win_rate": new_wr_f if new_wr is not None else best.get("win_rate"),
+        "win_rate_pct": (
+            (new_wr_f * 100.0) if new_wr is not None else best.get("win_rate_pct")
+        ),
+        "param_platform_best": pb,
+        "param_rescue_applied": True,
+    })
+    manufacture_mode = bool(mfg.pre_review_gates_disabled())
+    if manufacture_mode and n >= probes.MIN_INDEPENDENT_EVENTS:
+        if new_mean_f > 0 and new_wr_f > 0.35:
+            best["research_state"] = "READY_FOR_ASSEMBLY"
+            best["passed"] = True
+            pr["passed"] = True
+            pr["research_state"] = "READY_FOR_ASSEMBLY"
+            pr["research_state_zh"] = probes.RESEARCH_STATES_ZH["READY_FOR_ASSEMBLY"]
+        elif new_mean_f > 0:
+            best["research_state"] = "NEAR_MISS_DIAGNOSTIC"
+            pr["research_state"] = "NEAR_MISS_DIAGNOSTIC"
+            pr["research_state_zh"] = probes.RESEARCH_STATES_ZH["NEAR_MISS_DIAGNOSTIC"]
+        else:
+            best["research_state"] = "NO_DIRECTIONAL_EFFECT"
+            pr["research_state"] = "NO_DIRECTIONAL_EFFECT"
+            pr["research_state_zh"] = probes.RESEARCH_STATES_ZH["NO_DIRECTIONAL_EFFECT"]
+    pr["best"] = best
+    return pr
 
 
 def evaluate_oos_confirmation_gate(confirmation_returns, confirmation_stats=None):
@@ -340,10 +540,12 @@ def evaluate_oos_confirmation_gate(confirmation_returns, confirmation_stats=None
 def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_returns,
                                 max_mechanisms=14, max_phenomena=24, run_id=None,
                                 budget_plan=None, candles=None, design_seed=None,
-                                research_contract=None):
-    """Independent heterogeneous committee submissions (no early pick-1, no chat).
+                                research_contract=None, alpha_stride=3,
+                                skip_alpha_discovery=False):
+    """Independent submissions with Alpha Discovery as primary rule source.
 
-    budget_plan (from learning allocator) reshapes counts and re-ranks by beliefs.
+    Data → Rule Discovery → AST hypotheses are prepended. LLM must not invent
+    trading rules when discovery produces accepted candidates.
     """
     run_id = run_id or ledger.new_run_id("pop")
     budget_plan = budget_plan or learn.plan_next_budget(context={
@@ -363,9 +565,189 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
     }
     board.write(run_id, "research_director", "budget", director)
 
-    mech = committee.run_mechanism_scientist(
-        brief, symbol, timeframe, run_id, limit=max_mechanisms,
+    design_hypotheses = _design_seed_hypotheses(design_seed, research_contract)
+    pinned_hypotheses = []
+    pin_cfg = None
+    if isinstance(research_contract, dict):
+        pin_cfg = research_contract.get("pinned_rhyme_arm")
+    if isinstance(pin_cfg, dict) and pin_cfg.get("family_id") and candles:
+        try:
+            from project_prometheus import rhyme_arm_pin as rap
+            pinned_hypotheses = [
+                rap.build_pinned_hypothesis(
+                    candles,
+                    direction=(pin_cfg.get("direction") or "long"),
+                    family_id=pin_cfg.get("family_id"),
+                    contract=research_contract,
+                )
+            ]
+            _emit_progress(
+                "population",
+                "注入 Stage1 原样臂 %s n_signals=%s"
+                % (
+                    pin_cfg.get("family_id"),
+                    (pinned_hypotheses[0] or {}).get("pinned_signal_count"),
+                ),
+                done=1, total=5, force=True,
+            )
+        except Exception as exc:
+            pinned_hypotheses = []
+            board.write(run_id, "rhyme_pin", "error", {"error": str(exc)[:300]})
+
+    pin_only = bool(isinstance(pin_cfg, dict) and pin_cfg.get("pin_only"))
+    if pin_only and pinned_hypotheses:
+        # Do not remine Alpha / committee noise over a Stage1-admitted arm.
+        hypotheses = list(pinned_hypotheses)
+        alpha_pack = {
+            "ok": True,
+            "skipped": True,
+            "skip_reason": "pinned_rhyme_arm_pin_only",
+            "hypotheses": [],
+            "n_accepted": 0,
+        }
+        discovery_hyps = []
+        # Skip rest of generic population builders by jumping to annotate.
+        # (branch_mgr / rcontract already imported at module scope — do NOT
+        # re-import here: a conditional local import would make branch_mgr local
+        # for the whole function and crash the non-pin path with UnboundLocalError.)
+        annotated = []
+        for h in hypotheses:
+            row = rcontract.apply_to_hypothesis(h, research_contract)
+            row = branch_mgr.annotate_hypothesis(row, brief)
+            annotated.append(row)
+        return {
+            "ok": True,
+            "hypotheses": annotated,
+            "mechanisms": {"n": 1, "source": "rhyme_stage1_pinned_arm"},
+            "phenomena": {"n": 1, "source": "rhyme_stage1_pinned_arm"},
+            "committee": {
+                "symbolic_searcher": {"n": 0},
+                "design_scientist": {"n": 0},
+                "mechanism_scientist": {
+                    "n": 1,
+                    "saw_returns": False,
+                    "source": "rhyme_stage1_pinned_arm",
+                    "note_zh": "Stage1 原样臂锁定：机制身份由 pin 注入，跳过盲搜机制科学家",
+                },
+                "empirical_scientist": {
+                    "n": 1,
+                    "wrote_trade_rules": False,
+                    "source": "rhyme_stage1_pinned_arm",
+                    "note_zh": "Stage1 原样臂锁定：信号掩码已 empirically 冻结，跳过盲搜数据科学家",
+                },
+            },
+            "ai_committee": {"ok": True, "skipped": True, "skip_reason": "pinned_rhyme_arm"},
+            "budget_plan": budget_plan,
+            "dedupe": {"dropped": []},
+            "pinned_rhyme_arm": pin_cfg,
+            "alpha_discovery": alpha_pack,
+        }
+
+    # --- Alpha Discovery (primary; no LLM rule invention) ---
+    target_direction = (
+        ((research_contract or {}).get("target") or {}).get("direction") or "long"
     )
+    alpha_pack = {"ok": False, "hypotheses": [], "n_accepted": 0}
+    discovery_hyps = []
+    if skip_alpha_discovery:
+        alpha_pack = {
+            "ok": True,
+            "skipped": True,
+            "skip_reason": "QIYU_SKIP_ALPHA_DISCOVERY",
+            "hypotheses": [],
+            "n_accepted": 0,
+        }
+        _emit_progress(
+            "population",
+            "跳过 Alpha Discovery（精简模式）",
+            done=2, total=5, force=True,
+        )
+    elif candles and factor_matrix:
+        try:
+            from . import alpha_discovery as adeng
+            from . import ast_compiler as ac
+            _emit_progress(
+                "population",
+                "Alpha Discovery 规则挖掘进行中",
+                done=1, total=5, force=True,
+            )
+            alpha_pack = adeng.discover_hypotheses_for_population(
+                candles,
+                factor_matrix,
+                symbol=symbol,
+                timeframe=timeframe,
+                direction=target_direction,
+                persist=False,
+                stride=max(2, int(alpha_stride or 3)),
+                min_support=40,
+                feature_names=list(ac.RESEARCH_FEATURES),
+            )
+            discovery_hyps = list(alpha_pack.get("hypotheses") or [])
+            _emit_progress(
+                "population",
+                "Alpha Discovery 完成 accepted=%s" % alpha_pack.get("n_accepted"),
+                done=2, total=5, force=True,
+            )
+            # Phase2: Rule → Strategy Construction (structure variants only).
+            # Prefer built strategies over bare Discovery rules when available.
+            if discovery_hyps and candles and factor_matrix:
+                try:
+                    from . import alpha_rule_strategy as ars
+                    _emit_progress(
+                        "population",
+                        "规则→策略结构变体构建",
+                        done=3, total=5, force=True,
+                    )
+                    builder_pack = ars.build_hypotheses_for_population(
+                        alpha_pack,
+                        candles=candles,
+                        factor_matrix=factor_matrix,
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        direction=target_direction,
+                        persist=False,
+                        stride=3,
+                        max_signals=600,
+                    )
+                    alpha_pack["builder"] = {
+                        "ok": builder_pack.get("ok"),
+                        "phase2_pass": builder_pack.get("phase2_pass"),
+                        "conversion": builder_pack.get("conversion"),
+                        "funnel_accepted": builder_pack.get("funnel_accepted"),
+                        "n_builder_accepted": builder_pack.get("n_builder_accepted"),
+                    }
+                    builder_hyps = list(builder_pack.get("hypotheses") or [])
+                    if builder_hyps:
+                        discovery_hyps = list(builder_hyps) + list(discovery_hyps)
+                except Exception as b_exc:
+                    alpha_pack["builder"] = {
+                        "ok": False,
+                        "error": "%s:%s" % (type(b_exc).__name__, str(b_exc)[:200]),
+                    }
+            scorecard.record_hypothesis(
+                "alpha_discovery", n=len(discovery_hyps),
+            )
+        except Exception as exc:
+            alpha_pack = {
+                "ok": False,
+                "error": "%s:%s" % (type(exc).__name__, str(exc)[:200]),
+                "hypotheses": [],
+                "n_accepted": 0,
+            }
+
+    discovery_primary = bool(discovery_hyps)
+    if discovery_primary:
+        # Bypass brief-driven mechanism invention as main source.
+        mech = {
+            "n": 0,
+            "hypotheses": [],
+            "skipped": "alpha_discovery_primary",
+            "note_zh": "机制委员会发明已旁路；规则仅来自数据发现。",
+        }
+    else:
+        mech = committee.run_mechanism_scientist(
+            brief, symbol, timeframe, run_id, limit=max_mechanisms,
+        )
     emp = committee.run_empirical_scientist(
         factor_matrix, fwd_returns, run_id, max_phenomena=max_phenomena,
         candles=candles, timeframe=timeframe,
@@ -384,20 +766,16 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
 
     hyps = committee.merge_independent_hypotheses(mech, emp, sym_pack)
     design_hypotheses = _design_seed_hypotheses(design_seed, research_contract)
-    # AI/local structured design is a population member, never an untested winner.
-    # It is inserted before deterministic discovery so the evidence gates test the
-    # requested mechanisms instead of deciding whether AI is allowed to run.
-    hyps = list(design_hypotheses) + list(hyps)
+    # Discovery first, then design seed, then residual empirical/symbolic.
+    hyps = list(discovery_hyps) + list(design_hypotheses) + list(hyps)
 
-    # P3 §11: multi-AI early AST committee (anonymous round-2 + deterministic gate).
-    target_direction = (
-        ((research_contract or {}).get("target") or {}).get("direction") or "long"
-    )
+    # P3 AI committee: only syntax/duplicate checks — never invent rules.
+    # Force skip_llm when discovery is primary.
     p3_committee = {"ok": False, "n_hypotheses": 0}
     _p3_enabled = str(os.environ.get("QIYU_P3_AI_COMMITTEE") or "1").lower() not in (
         "0", "false", "no", "off",
     )
-    if _p3_enabled:
+    if _p3_enabled and not discovery_primary:
         try:
             from . import ai_ast_committee as p3c
             _skip = True
@@ -417,7 +795,7 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
             )
             p3_hyps = list(p3_committee.get("hypotheses") or [])
             if p3_hyps:
-                hyps = list(p3_hyps) + list(hyps)
+                hyps = list(hyps) + list(p3_hyps)  # append, never replace discovery
         except Exception as exc:
             p3_committee = {
                 "ok": False,
@@ -428,8 +806,9 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
         p3_committee = {
             "ok": False,
             "n_hypotheses": 0,
-            "disabled": True,
+            "disabled": bool(discovery_primary),
             "skip_llm": True,
+            "reason": "alpha_discovery_primary" if discovery_primary else "disabled",
         }
     # Every evaluable named branch in the human-requested mechanism tree must
     # have at least one explicit research row.  Committee diversity is useful,
@@ -543,6 +922,12 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
             row.get("source") == "forced_materialization_skeleton"
             or row.get("materialization_skeleton")
         )
+        alpha_discovered = bool(
+            row.get("alpha_discovery")
+            or row.get("alpha_rule_builder")
+            or row.get("source") in ("alpha_discovery", "alpha_rule_builder")
+            or row.get("path") in ("alpha_discovery", "alpha_rule_strategy")
+        )
         # Family/feature match keeps the population alive when trees_for_brief
         # misses a synonym (e.g. 「超卖衰竭」) but family_hints already fired.
         if (
@@ -552,6 +937,7 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
             or branch_control
             or family_match
             or materialization_seed
+            or alpha_discovered
         ):
             row["contract_focus_reason"] = (
                 "named_mechanism_branch" if named_branch else
@@ -559,6 +945,7 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
                 "required_branch_control" if branch_control else
                 "contract_family_match" if family_match else
                 "forced_materialization" if materialization_seed else
+                "alpha_discovery" if alpha_discovered else
                 "unrestricted_contract"
             )
             focused.append(row)
@@ -588,7 +975,7 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
             brief=brief,
             contract=research_contract,
             direction=target_direction,
-            min_n=max(16, min(int(mat.MIN_COMPILED_CANDIDATES), 48)),
+            min_n=max(24, min(int(mat.MIN_COMPILED_CANDIDATES), 90)),
         )
         hyps = ensured.get("hypotheses") or hyps
         materialization_inject = {
@@ -614,6 +1001,37 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
         }
     except Exception as exc:
         diversity_inject = {"error": str(exc)[:200], "injected_n": 0}
+    # P7: inject structural rebuild families (never RSI/BB threshold clones)
+    # Skip when Alpha Discovery already supplies primary rules.
+    p7_inject = None
+    if discovery_primary:
+        p7_inject = {
+            "injected_n": 0,
+            "skipped": "alpha_discovery_primary",
+            "parameter_only_variants": 0,
+        }
+    else:
+        try:
+            from . import p7_structural_rebuild as p7
+            # Drop frozen-family parameter expansions before inject
+            from . import family_freeze_policy as ffp
+            filt = ffp.filter_hypotheses_not_frozen(hyps)
+            hyps = filt.get("kept") or hyps
+            built = p7.build_structural_hypotheses(
+                direction=target_direction, limit=12,
+            )
+            add = list(built.get("hypotheses") or [])
+            if add:
+                hyps = list(hyps) + add
+            p7_inject = {
+                "injected_n": len(add),
+                "families": built.get("families"),
+                "structural_changes": built.get("structural_changes"),
+                "parameter_only_variants": 0,
+                "frozen_blocked": len(filt.get("blocked") or []),
+            }
+        except Exception as exc:
+            p7_inject = {"error": str(exc)[:200], "injected_n": 0}
     hyps = learn.apply_population_priors(
         hyps, family_priority=budget_plan.get("family_priority"),
     )
@@ -623,10 +1041,22 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
         "run_id": run_id,
         "population_first": True,
         "early_pick_one": False,
+        "alpha_discovery": {
+            "ok": bool(alpha_pack.get("ok")),
+            "primary": discovery_primary,
+            "n_hypotheses": len(discovery_hyps),
+            "n_accepted": alpha_pack.get("n_accepted"),
+            "n_q1_eligible": alpha_pack.get("n_q1_eligible"),
+            "baseline_profit_first_rate": alpha_pack.get("baseline_profit_first_rate"),
+            "best_profit_first_rate": alpha_pack.get("best_profit_first_rate"),
+            "phase1_pass": alpha_pack.get("phase1_pass"),
+            "error": alpha_pack.get("error"),
+        },
         "human_direction_focus_enforced": bool(strict_contract),
         "contract_branch_seeds_added": int(branch_seed_n),
         "excluded_unrelated_hypotheses_n": len(excluded_by_focus),
         "materialization_inject": materialization_inject,
+        "p7_structural_inject": p7_inject,
         "diversity_inject": diversity_inject,
         "ai_committee": {
             "ok": bool(p3_committee.get("ok")),
@@ -655,6 +1085,10 @@ def build_hypothesis_population(brief, symbol, timeframe, factor_matrix, fwd_ret
                     h.get("source") == "glm_meta_design" for h in design_hypotheses
                 ),
                 "ran_before_discovery": True,
+            },
+            "alpha_discovery": {
+                "n": len(discovery_hyps),
+                "primary": discovery_primary,
             },
             "p3_ai_ast": {
                 "n": int(p3_committee.get("n_hypotheses") or 0),
@@ -697,24 +1131,75 @@ def run_discovery(
         max_hypotheses_probe
         or (constraints or {}).get("max_hypotheses_probe")
         or os.environ.get("QIYU_MAX_HYP_PROBE")
-        or 72
+        or 96
     )
     # Tiny-VPS cap: more breadth, but a strict global trial budget below.
     max_hypotheses_probe = max(16, min(int(max_hypotheses_probe), 96))
+    # Lean / VPS knobs (env overrides constraints defaults).
+    def _env_int(name, default):
+        raw = os.environ.get(name)
+        if raw is None or str(raw).strip() == "":
+            return int(default)
+        try:
+            return int(raw)
+        except Exception:
+            return int(default)
+
+    lean_max_mechanisms = _env_int(
+        "QIYU_MAX_MECHANISMS",
+        (constraints or {}).get("max_mechanisms") or 20,
+    )
+    lean_max_phenomena = _env_int(
+        "QIYU_MAX_PHENOMENA",
+        (constraints or {}).get("max_phenomena") or 36,
+    )
+    lean_max_cells = _env_int(
+        "QIYU_MAX_MECHANISM_CELLS",
+        (constraints or {}).get("max_mechanism_cells") or 96,
+    )
+    lean_max_cheap = _env_int(
+        "QIYU_MAX_CHEAP_PROBES",
+        (constraints or {}).get("max_cheap_probes") or 320,
+    )
+    lean_alpha_stride = _env_int("QIYU_ALPHA_STRIDE", 3)
+    lean_skip_alpha = str(os.environ.get("QIYU_SKIP_ALPHA_DISCOVERY") or "").lower() in (
+        "1", "true", "yes", "on",
+    )
     stages = {}
     contract_constraints = dict(constraints or {})
     if research_contract:
         contract_constraints["research_contract"] = research_contract
-    contract = compile_research_contract(
-        brief, symbol, timeframe, contract_constraints,
-        direction=direction, design_seed=design_seed,
-        available_data=contract_constraints.get("available_data"),
-        data_version=data_version, code_version=code_version,
+    _emit_progress("contract", "编译研究契约", force=True)
+    # Re-compiling an already-immutable valid contract changes clause/meta
+    # representation across code deploys and trips integrity_mismatch before
+    # any probe runs. Reuse the upstream identity when it still verifies.
+    reuse_contract = (
+        isinstance(research_contract, dict)
+        and research_contract.get("valid") is True
+        and research_contract.get("immutable") is True
+        and research_contract.get("contract_id")
+        and rcontract.verify_contract_integrity(research_contract).get("ok")
     )
+    if reuse_contract:
+        contract = dict(research_contract)
+    else:
+        contract = compile_research_contract(
+            brief, symbol, timeframe, contract_constraints,
+            direction=direction, design_seed=design_seed,
+            available_data=contract_constraints.get("available_data"),
+            data_version=data_version, code_version=code_version,
+        )
     contract = micro.enrich_contract(contract, symbol=symbol)
     stages["contract"] = contract
     contract_integrity = rcontract.verify_contract_integrity(contract)
     stages["contract_integrity"] = contract_integrity
+    stages["contract_reuse"] = bool(reuse_contract)
+    _emit_progress(
+        "contract",
+        "契约%s valid=%s"
+        % (("复用" if reuse_contract else "编译完成"), bool(contract.get("valid"))),
+        force=True,
+    )
     # Inject forward micro snapshots into factor matrix when overlap exists.
     micro_meta = {}
     if factor_matrix is not None and candles:
@@ -727,6 +1212,7 @@ def run_discovery(
     try:
         from . import path_sample_library as pslib
         if candles:
+            _emit_progress("population", "构建/加载路径样本库", done=0, total=4, force=True)
             path_library = pslib.load_or_build(
                 candles,
                 factor_matrix=factor_matrix,
@@ -847,8 +1333,8 @@ def run_discovery(
 
     # Learning: allocate next budget BEFORE population (closes prior loop)
     budget_plan = learn.plan_next_budget(context={
-        "base_max_mechanisms": int((constraints or {}).get("max_mechanisms") or 20),
-        "base_max_phenomena": int((constraints or {}).get("max_phenomena") or 36),
+        "base_max_mechanisms": lean_max_mechanisms,
+        "base_max_phenomena": lean_max_phenomena,
         "base_max_hyp_probe": max_hypotheses_probe,
         "symbol": symbol,
     })
@@ -856,51 +1342,96 @@ def run_discovery(
         "knobs": budget_plan.get("knobs"),
         "family_priority": budget_plan.get("family_priority"),
         "top_arms": (budget_plan.get("top_arms") or [])[:5],
+        "lean_env": {
+            "max_mechanisms": lean_max_mechanisms,
+            "max_phenomena": lean_max_phenomena,
+            "max_mechanism_cells": lean_max_cells,
+            "max_cheap_probes": lean_max_cheap,
+            "alpha_stride": lean_alpha_stride,
+            "skip_alpha_discovery": lean_skip_alpha,
+            "max_hyp_probe": max_hypotheses_probe,
+        },
     }
     max_hypotheses_probe = int(
         (budget_plan.get("knobs") or {}).get("max_hypotheses_probe") or max_hypotheses_probe
     )
     max_hypotheses_probe = max(16, min(int(max_hypotheses_probe), 96))
 
+    _emit_progress(
+        "population",
+        "生成机制种群（Alpha Discovery / 委员会 / 符号搜索）",
+        done=1, total=4, force=True,
+    )
     pop = build_hypothesis_population(
         brief, symbol, timeframe, factor_matrix, fwd_returns,
-        max_mechanisms=int((constraints or {}).get("max_mechanisms") or 20),
-        max_phenomena=int((constraints or {}).get("max_phenomena") or 36),
+        max_mechanisms=lean_max_mechanisms,
+        max_phenomena=lean_max_phenomena,
         run_id=run_id,
         budget_plan=budget_plan,
         candles=candles,
         design_seed=design_seed,
         research_contract=contract,
+        alpha_stride=lean_alpha_stride,
+        skip_alpha_discovery=lean_skip_alpha,
+    )
+    _emit_progress(
+        "population",
+        "机制种群完成 n=%s" % len(pop.get("hypotheses") or []),
+        done=3, total=4, force=True,
+    )
+    _emit_progress(
+        "committee",
+        "委员会产物落盘 n_hyp=%s" % len(pop.get("hypotheses") or []),
+        force=True,
     )
 
     # Deterministic strategy creation: turn the requested mechanism into
     # complete composite events, select only on a development segment, and
     # freeze finalists before inspecting the confirmation segment.  These rows
     # still traverse every antifalsification/execution/statistical gate below.
-    structured_pack = structured_search.search(
-        candles=candles,
-        factor_matrix=factor_matrix,
-        symbol=symbol,
-        timeframe=timeframe,
-        direction=direction,
-        contract=contract,
-        brief=brief,
-        max_finalists=int(os.environ.get("QIYU_STRUCTURED_FINALISTS") or 6),
-        development_ratio=float(
-            os.environ.get("QIYU_STRUCTURED_DEVELOPMENT_RATIO") or 0.65
-        ),
+    _emit_progress("map_elites", "结构化事件搜索 / 开发段选优", done=0, total=2, force=True)
+    pin_only = bool(
+        isinstance((contract or {}).get("pinned_rhyme_arm"), dict)
+        and (contract.get("pinned_rhyme_arm") or {}).get("pin_only")
     )
-    # Structured candidates are created after the generic population builder,
-    # so they did not pass through its research-contract attachment step.  The
-    # old handoff therefore stripped an otherwise valid candidate of its
-    # immutable contract identity, and the formal capability gate reported the
-    # misleading quartet: schema invalid / body hash mismatch / not immutable /
-    # declared invalid.  Attach the already validated outer contract here;
-    # this changes no signal, evidence or gate threshold.
-    structured_hypotheses = [
-        rcontract.apply_to_hypothesis(row, contract)
-        for row in (structured_pack.get("hypotheses") or [])
-    ]
+    if pin_only:
+        structured_pack = {
+            "ok": True,
+            "skipped": True,
+            "skip_reason": "pinned_rhyme_arm_pin_only",
+            "hypotheses": [],
+            "event_definitions_tested": 0,
+            "horizon_trials": 0,
+            "development_positive_n": 0,
+            "n_finalists": 0,
+            "selection_used_confirmation": False,
+        }
+        structured_hypotheses = []
+    else:
+        structured_pack = structured_search.search(
+            candles=candles,
+            factor_matrix=factor_matrix,
+            symbol=symbol,
+            timeframe=timeframe,
+            direction=direction,
+            contract=contract,
+            brief=brief,
+            max_finalists=int(os.environ.get("QIYU_STRUCTURED_FINALISTS") or 6),
+            development_ratio=float(
+                os.environ.get("QIYU_STRUCTURED_DEVELOPMENT_RATIO") or 0.65
+            ),
+        )
+        # Structured candidates are created after the generic population builder,
+        # so they did not pass through its research-contract attachment step.  The
+        # old handoff therefore stripped an otherwise valid candidate of its
+        # immutable contract identity, and the formal capability gate reported the
+        # misleading quartet: schema invalid / body hash mismatch / not immutable /
+        # declared invalid.  Attach the already validated outer contract here;
+        # this changes no signal, evidence or gate threshold.
+        structured_hypotheses = [
+            rcontract.apply_to_hypothesis(row, contract)
+            for row in (structured_pack.get("hypotheses") or [])
+        ]
     if structured_hypotheses:
         pop["hypotheses"] = structured_hypotheses + list(pop.get("hypotheses") or [])
     stages["structured_candidate_search"] = {
@@ -968,21 +1499,58 @@ def run_discovery(
 
     # Lean campaign: map + streaming cheap probes (summary-only) before heavy probes.
     # This separates candidate count from resident memory.
-    lean = campaign.run_lean_campaign(
-        brief=brief,
-        symbol=symbol,
-        timeframe=timeframe,
-        factor_matrix=factor_matrix,
-        candles=candles,
-        fwd_returns=fwd_returns,
-        available_data=contract.get("available_data"),
-        micro_meta=stages.get("microstructure") or {},
-        campaign_id="lean_%s" % run_id,
-        max_cells=int((constraints or {}).get("max_mechanism_cells") or 96),
-        max_cheap_probes=int((constraints or {}).get("max_cheap_probes") or 160),
-        max_diagnostic=int((constraints or {}).get("max_diagnostic") or 8),
-        max_exec_tier=int((constraints or {}).get("max_exec_tier") or 4),
-        batch_size=6,
+    def _lean_progress_cb(info):
+        info = info or {}
+        done = info.get("done")
+        total = info.get("total")
+        _emit_progress(
+            "map_elites",
+            "廉价探针流 %s/%s" % (done, total),
+            done=done,
+            total=total,
+        )
+
+    _emit_progress("map_elites", "启动 lean 机制地图 + 廉价探针流", done=0, total=1, force=True)
+    if pin_only:
+        lean = {
+            "ok": True,
+            "skipped": True,
+            "skip_reason": "pinned_rhyme_arm_pin_only",
+            "campaign_id": "lean_skip_pin_%s" % run_id,
+            "evidence_level": None,
+            "stages": {
+                "map": {"n_cells": 0},
+                "cheap_stream": {"n_streamed_this_call": 0, "promote": [], "state_counts": {}},
+                "diagnostic": {"n": 0},
+                "execution_tier_shortlist": [],
+            },
+        }
+    else:
+        lean = campaign.run_lean_campaign(
+            brief=brief,
+            symbol=symbol,
+            timeframe=timeframe,
+            factor_matrix=factor_matrix,
+            candles=candles,
+            fwd_returns=fwd_returns,
+            available_data=contract.get("available_data"),
+            micro_meta=stages.get("microstructure") or {},
+            campaign_id="lean_%s" % run_id,
+            max_cells=lean_max_cells,
+            max_cheap_probes=lean_max_cheap,
+            max_diagnostic=int((constraints or {}).get("max_diagnostic") or 8),
+            max_exec_tier=int((constraints or {}).get("max_exec_tier") or 4),
+            batch_size=6,
+            progress_cb=_lean_progress_cb,
+        )
+    _emit_progress(
+        "map_elites",
+        "lean 完成 cells=%s cheap=%s"
+        % (
+            ((lean.get("stages") or {}).get("map") or {}).get("n_cells"),
+            ((lean.get("stages") or {}).get("cheap_stream") or {}).get("n_streamed_this_call"),
+        ),
+        force=True,
     )
     stages["lean_campaign"] = {
         "campaign_id": lean.get("campaign_id"),
@@ -1271,9 +1839,24 @@ def run_discovery(
         "failures_n": 0,
         "representation_types": set(),
     }
+    _emit_progress(
+        "probe",
+        "开始裸探测 n=%s" % len(work_population),
+        done=0,
+        total=max(1, len(work_population)),
+        force=True,
+    )
     while hypothesis_index < len(work_population):
         h = work_population[hypothesis_index]
         hypothesis_index += 1
+        if hypothesis_index == 1 or hypothesis_index % 2 == 0 or hypothesis_index >= len(work_population):
+            _emit_progress(
+                "probe",
+                "裸探测 %s/%s survivors=%s"
+                % (hypothesis_index, len(work_population), len(survivors)),
+                done=hypothesis_index,
+                total=max(1, len(work_population)),
+            )
         gate = _probe_one_hypothesis(h, hypothesis_index - 1, len(work_population))
         if gate == "break":
             break
@@ -1387,6 +1970,17 @@ def run_discovery(
             ),
         }, run_id=run_id)
         if not pr.get("passed"):
+            pr = _try_param_rescue_after_probe(
+                pr,
+                factor_matrix,
+                fwd_returns,
+                candles,
+                symbol,
+                timeframe,
+                direction,
+                run_id,
+            )
+        if not pr.get("passed"):
             best_fail = pr.get("best") or {}
             fail_codes = list(
                 best_fail.get("failure_codes")
@@ -1446,10 +2040,10 @@ def run_discovery(
 
         # Early multiverse on naked probe returns (multi-generator)
         mv = multiverse.survival_test(best.get("trade_returns") or [])
-        if (not mv.get("passed")) and handoff_ready:
+        if (not mv.get("passed")) and (handoff_ready or manufacture_mode):
             mv = dict(mv)
             mv["passed"] = True
-            mv["soft_pass"] = "handoff_floor_to_review" if not manufacture_mode else "manufacture_batch_soft"
+            mv["soft_pass"] = "qi_only_diagnostic" if manufacture_mode else "handoff_floor_to_review"
         ledger.append_event({
             "event_type": "multiverse_probe",
             "hypothesis_id": h.get("hypothesis_id"),
@@ -1483,10 +2077,7 @@ def run_discovery(
             trade_direction=best.get("trade_direction") or "long",
             execution_mapping=best.get("execution_mapping") or "next_bar_open",
         )
-        if (not af.get("passed")) and (handoff_ready or manufacture_mode):
-            af = dict(af)
-            af["passed"] = True
-            af["soft_pass"] = "manufacture_batch_soft"
+        # HARD: antifalsify ∈ SOFT_PASS_FORBIDDEN_GATES — never soft-pass.
         ledger.append_event({
             "event_type": "antifalsify",
             "hypothesis_id": h.get("hypothesis_id"),
@@ -1494,11 +2085,17 @@ def run_discovery(
             "support_n": af.get("support_n"),
             "oppose_n": af.get("oppose_n"),
             "causal_claim": False,
-            "soft_pass": af.get("soft_pass"),
+            "soft_pass": None,
         }, run_id=run_id)
         if not af.get("passed"):
             _learn_close(h, pcon, "antifalsify", probe=best, multiverse=mv, antifalsify=af)
             continue
+        _emit_progress(
+            "antifalsify",
+            "抗证伪通过 survivors=%s tested=%s" % (len(survivors), tested),
+            done=tested,
+            total=max(1, len(work_population)),
+        )
 
         # Leakage / causal / execution named roles
         leak = committee.run_leakage_auditor(
@@ -1518,20 +2115,14 @@ def run_discovery(
             trade_direction=best.get("trade_direction") or "long",
             execution_mapping=best.get("execution_mapping") or "next_bar_open",
         )
-        if (not leak.get("passed")) and (handoff_ready or manufacture_mode):
-            leak = dict(leak)
-            leak["passed"] = True
-            leak["soft_pass"] = "manufacture_batch_soft"
+        # HARD: leakage ∈ SOFT_PASS_FORBIDDEN_GATES — never soft-pass.
         if not leak.get("passed"):
             _learn_close(
                 h, pcon, "leakage", probe=best, multiverse=mv, antifalsify=af, leakage=leak,
             )
             continue
         causal = committee.run_causal_auditor(af, causal_claim_flag=False, run_id=run_id)
-        if (not causal.get("passed")) and (handoff_ready or manufacture_mode):
-            causal = dict(causal)
-            causal["passed"] = True
-            causal["soft_pass"] = "manufacture_batch_soft"
+        # HARD: causal ∈ SOFT_PASS_FORBIDDEN_GATES — never soft-pass.
         if not causal.get("passed"):
             _learn_close(
                 h, pcon, "antifalsify", probe=best, multiverse=mv, antifalsify=af, leakage=leak,
@@ -1542,11 +2133,11 @@ def run_discovery(
             best, n_bars=n_bars, span_days=span_days, min_efr=gate_min_efr,
             symbol=symbol,
         )
-        # 账户胜率>50%+反彩票已达标时，EFR 诊断不单独枪毙（复核仍可严审）。
-        if (not feas.get("passed")) and handoff_ready:
+        # EFR/摩擦仍可诊断软通过；唯一硬杀已恢复为 AF/泄漏/因果。
+        if (not feas.get("passed")) and (handoff_ready or manufacture_mode):
             feas = dict(feas)
             feas["passed"] = True
-            feas["soft_pass"] = "handoff_floor_to_review"
+            feas["soft_pass"] = "diagnostic_soft" if manufacture_mode else "handoff_floor_to_review"
         ledger.append_event({
             "event_type": "efr",
             "hypothesis_id": h.get("hypothesis_id"),
@@ -1565,10 +2156,10 @@ def run_discovery(
         exe = committee.run_execution_engineer(
             best, efr_pack=feas, run_id=run_id, min_efr=gate_min_efr,
         )
-        if (not exe.get("passed")) and handoff_ready:
+        if (not exe.get("passed")) and (handoff_ready or manufacture_mode):
             exe = dict(exe)
             exe["passed"] = True
-            exe["soft_pass"] = "handoff_floor_to_review"
+            exe["soft_pass"] = "diagnostic_soft" if manufacture_mode else "handoff_floor_to_review"
         if not exe.get("passed"):
             _learn_close(
                 h, pcon, "execution", probe=best, multiverse=mv, antifalsify=af,
@@ -1608,10 +2199,10 @@ def run_discovery(
             h, factor_matrix, fwd_returns, run_id,
             main_probe_best=best,
         )
-        if (not red.get("passed")) and handoff_ready:
+        if (not red.get("passed")) and (handoff_ready or manufacture_mode):
             red = dict(red)
             red["passed"] = True
-            red["soft_pass"] = "handoff_floor_to_review"
+            red["soft_pass"] = "diagnostic_soft" if manufacture_mode else "handoff_floor_to_review"
         if not red.get("passed"):
             _learn_close(
                 h, pcon, "redteam", probe=best, multiverse=mv, antifalsify=af,
@@ -1851,6 +2442,7 @@ def run_discovery(
         and _mfg_mode
         and survivors
         and global_trials_used < global_trial_limit
+        and not pin_only
     ):
         pfr_vals = []
         mae_vals = []
@@ -1990,6 +2582,139 @@ def run_discovery(
                 "median_pfr_before": med_pfr,
                 "median_mae_before": med_mae,
             }, run_id=run_id)
+    elif pin_only:
+        stages["quality_precheck"] = {
+            "need_quality_repair": False,
+            "skipped": True,
+            "skip_reason": "pinned_rhyme_arm_pin_only",
+            "n_survivors_before": len(survivors),
+        }
+        stages["quality_repair"] = {
+            "ran": False,
+            "skipped": True,
+            "skip_reason": "pinned_rhyme_arm_pin_only",
+        }
+
+    # P6/P7.1 quality-discovery layer: lineage gate, failure paths, freeze, funnel
+    try:
+        from . import failure_path_analyzer as fpa
+        from . import family_freeze_policy as ffp
+        from . import behavior_similarity_gate as bsg
+        from . import quality_funnel as qfunnel
+        from . import candidate_lineage as clin
+        fam_rows = []
+        funnel_rows = []
+        lineage_rejected = 0
+        for s in survivors:
+            h = clin.attach_lineage(s.get("hypothesis") or {}, repair_round=0)
+            s["hypothesis"] = h
+            prb = s.get("probe") or {}
+            labels = list(prb.get("path_labels") or prb.get("labels") or [])
+            check = clin.validate_lineage(h, raise_on_fail=False)
+            if not check.get("ok"):
+                lineage_rejected += 1
+                s["lineage_gate"] = "CANDIDATE_LINEAGE_MISSING"
+                continue
+            fam_rows.append({
+                "strategy_family": h.get("strategy_family") or h.get("mechanism_id"),
+                "labels": labels,
+                "metrics": prb,
+                "hypothesis": h,
+                "lineage": h.get("lineage"),
+                "probe_returns": s.get("probe_returns") or [],
+                "entry_bars": prb.get("entry_bars") or prb.get("signal_ids"),
+            })
+            funnel_rows.append({"metrics": prb, "handoff_passed": False,
+                                "lineage": h.get("lineage")})
+        fail_report = fpa.family_failure_report(fam_rows)
+        dominant_path = None
+        if fail_report:
+            dominant_path = fail_report[0].get("dominant_failure_path")
+        freeze_pack = ffp.apply_family_freeze([
+            {
+                "strategy_family": r.get("strategy_family"),
+                "metrics": r.get("metrics"),
+            }
+            for r in fam_rows
+        ])
+        # Drop parameter-expansion clones of frozen families from survivors
+        kept_surv, dropped_surv = [], []
+        frozen_ids = set(freeze_pack.get("frozen_ids") or [])
+        for s in survivors:
+            h = s.get("hypothesis") or {}
+            fam = h.get("strategy_family") or h.get("mechanism_id") or ""
+            if fam in frozen_ids and h.get("parameter_expansion"):
+                dropped_surv.append(s)
+                continue
+            kept_surv.append(s)
+        survivors = kept_surv
+        # Behavior anti-clone among survivors
+        beh_in = []
+        for s in survivors:
+            h = s.get("hypothesis") or {}
+            prb = s.get("probe") or {}
+            beh_in.append({
+                "hypothesis": h,
+                "metrics": prb,
+                "behavior": {
+                    "entry_bars": prb.get("entry_bars") or prb.get("signal_ids"),
+                    "pnl_series": s.get("probe_returns") or [],
+                    "failure_breakdown": (
+                        (prb.get("failure_path_breakdown") or {}).get("failure_breakdown")
+                        if isinstance(prb.get("failure_path_breakdown"), dict)
+                        else None
+                    ),
+                },
+            })
+        clone_pack = bsg.reject_clones(beh_in)
+        if clone_pack.get("rejected"):
+            reject_ids = set()
+            for r in clone_pack["rejected"]:
+                hh = (r.get("hypothesis") or {})
+                reject_ids.add(id(hh))
+            survivors = [
+                s for s in survivors
+                if id(s.get("hypothesis") or {}) not in reject_ids
+            ]
+        funnel = qfunnel.funnel_report(funnel_rows)
+        diversity = bsg.pool_diversity_summary(beh_in)
+        stages["p6_quality_discovery"] = {
+            "ok": True,
+            "lineage_rejected_unknown_family": lineage_rejected,
+            "failure_family_report": fail_report[:12],
+            "dominant_failure_path": dominant_path,
+            "family_freeze": {
+                "frozen_ids": freeze_pack.get("frozen_ids"),
+                "decisions": (freeze_pack.get("decisions") or [])[:20],
+                "dropped_parameter_clones": len(dropped_surv),
+            },
+            "behavior_gate": {
+                "kept": len(clone_pack.get("kept") or []),
+                "rejected": len(clone_pack.get("rejected") or []),
+                "near_duplicate_ratio": clone_pack.get("near_duplicate_ratio"),
+            },
+            "quality_funnel": {
+                k: funnel.get(k) for k in (
+                    "total_candidates", "q0_count", "q1_count", "q2_count",
+                    "q3_count", "q4_count",
+                )
+            },
+            "diversity": diversity,
+        }
+        ledger.append_event({
+            "event_type": "p6_quality_discovery",
+            "dominant_failure_path": dominant_path,
+            "frozen_families": list(freeze_pack.get("frozen_ids") or []),
+            "clone_rejected": len(clone_pack.get("rejected") or []),
+            "q0": funnel.get("q0_count"),
+            "q1": funnel.get("q1_count"),
+            "q2": funnel.get("q2_count"),
+        }, run_id=run_id)
+    except Exception as _p6_exc:
+        stages["p6_quality_discovery"] = {
+            "ok": False,
+            "error": str(_p6_exc)[:240],
+        }
 
     probe_population = list(work_population)
     budget = ledger.effective_trial_budget(run_id=run_id)
@@ -2180,11 +2905,9 @@ def run_discovery(
                 manufacture_mode = bool(mfg.pre_review_gates_disabled())
             except Exception:
                 manufacture_mode = False
-            # Manufacture batch: OOS/WR are selection features, not admit vetoes.
+            # 制造模式：OOS 可诊断；法官不再强制录取（AF/泄漏/因果已硬杀）。
             if manufacture_mode:
                 judgment = dict(judgment)
-                judgment["admit_to_assembly"] = True
-                judgment["manufacture_batch_force_admit"] = True
                 judgment["oos_confirmation_advisory"] = {
                     "passed": oos_confirmation_passed,
                     "hard_block": oos_gate.get("hard_block"),

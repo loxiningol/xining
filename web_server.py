@@ -789,12 +789,34 @@ def api_creation_submit():
 @app.route("/api/creation/review", methods=["GET"])
 @auth.login_required
 def api_creation_review():
-    """策略创造复核模块：四阶段复核板 + 双管道对接。"""
+    """质检器板（取代四阶段复核展示）：合格/不合格双表。"""
     try:
-        from dual_engine_workflow_v2 import parallel_creation as pc
-        return jsonify(pc.review_status())
+        from dual_engine_workflow_v2 import quality_inspector as qi
+        return jsonify(qi.status())
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "error": str(e), "passed": [], "failed": []}), 500
+
+
+@app.route("/api/creation/quality_inspector", methods=["GET"])
+@auth.login_required
+def api_creation_quality_inspector():
+    """质检器：双管道汇流 · E>0 且周频>0.5。"""
+    try:
+        from dual_engine_workflow_v2 import quality_inspector as qi
+        return jsonify(qi.status())
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "passed": [], "failed": []}), 500
+
+
+@app.route("/api/strategy/pending_optimize", methods=["GET"])
+@auth.login_required
+def api_strategy_pending_optimize():
+    """策略待优化板块：人工/机器优化中的策略列表与近2年关键指标。"""
+    try:
+        from dual_engine_workflow_v2 import pending_optimize as po
+        return jsonify(po.status())
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "strategies": [], "count": 0}), 500
 
 
 @app.route("/api/dual_engine/auto_driver", methods=["GET"])

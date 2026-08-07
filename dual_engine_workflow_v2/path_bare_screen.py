@@ -169,16 +169,33 @@ def screen_from_observations(observations, horizon=None, direction=None):
         summary["horizon"] = horizon
     if direction is not None:
         summary["direction"] = direction
+    failure_path_breakdown = None
+    try:
+        from . import failure_path_analyzer as fpa
+        failure_path_breakdown = fpa.breakdown_from_labels(labels)
+        summary["failure_path_breakdown"] = failure_path_breakdown.get(
+            "failure_breakdown"
+        )
+        summary["dominant_failure_path"] = failure_path_breakdown.get(
+            "dominant_failure_path"
+        )
+        summary["classified_failure_ratio"] = failure_path_breakdown.get(
+            "classified_failure_ratio"
+        )
+    except Exception:
+        failure_path_breakdown = None
     gate = hard_gate(summary, allow_underpowered=True)
     rank = entry_score(summary, gate=gate)
     return {
         "ok": True,
         "schema": "qiyu_path_bare_screen_v1",
         "summary": summary,
+        "failure_path_breakdown": failure_path_breakdown,
         "gate": gate,
         "rank": rank,
         "passed": bool(gate.get("review_eligible")),
         "packaging_ok": bool(gate.get("feasible")),
+        "path_labels": labels,
     }
 
 

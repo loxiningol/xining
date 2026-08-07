@@ -23,7 +23,7 @@ REVIEW_1_SCOPE = "基础语法、逻辑断言、开仓密度预检"
 REVIEW_2_SCOPE = "单标的历史回测与样本收益稳定性"
 REVIEW_3_SCOPE = "多标的矩阵验证与抗风险离群测试"
 REVIEW_4_SCOPE = (
-    "三AI理论复核（胜率≥65% + 盈利单均值≥5% + 近2年周开仓折价≥0.5）"
+    "多AI理论复核（期望值E=W×R−(1−W)>0 + 近2年周开仓≥0.5）"
 )
 
 REVIEW_1_FULL = "【%s】（%s）" % (REVIEW_1, REVIEW_1_SCOPE)
@@ -31,8 +31,8 @@ REVIEW_2_FULL = "【%s】（%s）" % (REVIEW_2, REVIEW_2_SCOPE)
 REVIEW_3_FULL = "【%s】（%s）" % (REVIEW_3, REVIEW_3_SCOPE)
 REVIEW_4_FULL = "【%s】（%s）" % (REVIEW_4, REVIEW_4_SCOPE)
 
-HUMAN_CONFIRM_GATE = "人工确认签发"
-HUMAN_CONFIRM_NOTE = "四次复核通过后进入 WxPusher 人工确认；永不自动上线"
+HUMAN_CONFIRM_GATE = "进入策略待优化"
+HUMAN_CONFIRM_NOTE = "四复核通过后进入策略待优化板块（人工/机器优化）；永不自动挂载"
 
 STAGE_TO_REVIEW = {
     "pretest": 1,
@@ -221,6 +221,12 @@ def scrub(text):
         return s
     for pat, repl in _SCRUB_RULES:
         s = pat.sub(repl, s)
+    # Path-exit lexicon: 先盈→止盈 / 先亏→止损 / 到期→定时
+    try:
+        from .path_lexicon import scrub as _path_scrub
+        s = _path_scrub(s)
+    except Exception:
+        pass
     return s
 
 

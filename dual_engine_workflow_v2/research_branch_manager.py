@@ -161,7 +161,11 @@ def trees_for_brief(brief=""):
     Bare tokens like 「清算」often appear in data-gap notes and must NOT pull the
     exhaustion tree into an unrelated Donchian/breakout campaign.
     """
-    text = str(brief or "")
+    import os
+    # Parallel creation passes mechanism intent via env so contract brief stays
+    # free of unrepresentable exact-clause fragments (e.g. A+B ops notes).
+    intent_extra = str(os.environ.get("QIYU_RESEARCH_DIRECTION_INTENT") or "").strip()
+    text = "\n".join(x for x in (intent_extra, str(brief or "")) if x)
     # Strip common contract/policy sections that mention missing data feeds.
     cut_markers = ("## 研究契约", "## 约束", "研究契约约束", "proxy_policy", "缺清算", "缺订单簿")
     intent = text
@@ -182,15 +186,25 @@ def trees_for_brief(brief=""):
         out.append(EXHAUSTION_TREE)
     donchian_hit = any(k in intent for k in (
         "唐奇安", "通道突破", "趋势突破", "假突破", "有效突破", "主趋势启动", "中频突破",
-    )) or any(k in intent_l for k in ("donchian", "channel break", "trend break"))
+        "顺势", "趋势过滤", "扩张确认",
+    )) or any(k in intent_l for k in (
+        "donchian", "channel break", "trend break", "trend follow", "with-trend",
+    ))
     if donchian_hit:
         out.append(DONCHIAN_TREE)
-    squeeze_hit = any(k in intent for k in ("波动率收缩", "波动收缩", "收缩扩张", "波动压缩")) or any(
-        k in intent_l for k in ("squeeze", "vol compression", "vol expansion")
-    )
+    squeeze_hit = any(k in intent for k in (
+        "波动率收缩", "波动收缩", "收缩扩张", "波动压缩",
+        "波动扩张", "波动扩展", "波动率扩张", "扩张顺势",
+    )) or any(k in intent_l for k in (
+        "squeeze", "vol compression", "vol expansion", "vol expand", "volatility expansion",
+    ))
     # Generic「突破」alone is not enough when Donchian already owns the brief.
     if squeeze_hit or (not donchian_hit and ("突破" in intent or "breakout" in intent_l)):
         out.append(SQUEEZE_TREE)
+    # Empty map = lean/cheap vacuum and fake "compiled=0". Prefer a researchable
+    # default lattice over silent zero cells when the brief is policy-only.
+    if not out:
+        out.extend([SQUEEZE_TREE, DONCHIAN_TREE, EXHAUSTION_TREE])
     return out
 
 

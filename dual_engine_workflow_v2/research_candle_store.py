@@ -565,26 +565,67 @@ def _load_flat_local_research(symbol, timeframe, max_bars=None):
     }
 
 
+def _candle_span_days(candles):
+    try:
+        rows = list(candles or [])
+        if len(rows) < 2:
+            return 0.0
+        t0 = int(rows[0].get("ts") or 0)
+        t1 = int(rows[-1].get("ts") or 0)
+        if t1 <= t0:
+            return 0.0
+        return float(t1 - t0) / 86400000.0
+    except Exception:
+        return 0.0
+
+
 def load_for_creation(symbol, timeframe, lookback_days=400, max_bars=50000):
     """Convenience for creation blueprint: last N days from research store.
 
-    优先 R2/分片 manifest；若缺失则回退仓库内 local/*_research.json 扁平文件。
+    Prefer the longest available history. Chunk/R2 ranges that are shorter than
+    the flat local research file (or shorter than 180d) must not shadow it —
+    otherwise creation silently runs on ~40d / 12k-bar mirages.
     """
     end_ms = int(time.time() * 1000)
     start_ms = end_ms - int(lookback_days) * 86400 * 1000
     got = load_candles_range(
         symbol, timeframe, start_ms=start_ms, end_ms=end_ms, max_bars=max_bars,
     )
-    if got.get("ok") and got.get("candles"):
-        return got
     flat = _load_flat_local_research(symbol, timeframe, max_bars=max_bars)
-    if flat.get("ok"):
-        flat["fallback_from"] = {
+    got_ok = bool(got.get("ok") and got.get("candles"))
+    flat_ok = bool(flat.get("ok") and flat.get("candles"))
+    got_span = _candle_span_days(got.get("candles") if got_ok else [])
+    flat_span = _candle_span_days(flat.get("candles") if flat_ok else [])
+    min_span = 180.0
+    try:
+        from . import manufacture_batch_policy as mfg
+        min_span = float(mfg.HANDOFF_MIN_SPAN_DAYS or 180)
+    except Exception:
+        min_span = 180.0
+
+    if got_ok and flat_ok:
+        # Prefer flat when it is materially longer, or when chunk span is short.
+        if flat_span >= min_span and (got_span + 1e-9 < min_span or flat_span > got_span + 1.0):
+            out = dict(flat)
+            out["preferred_over"] = {
+                "backend": got.get("backend"),
+                "n": got.get("n"),
+                "span_days": got_span,
+                "reason": "flat_longer_or_chunk_below_min_span",
+            }
+            return out
+        out = dict(got)
+        out["flat_available"] = {"n": flat.get("n"), "span_days": flat_span}
+        return out
+    if got_ok:
+        return got
+    if flat_ok:
+        out = dict(flat)
+        out["fallback_from"] = {
             "error": got.get("error"),
             "backend": got.get("backend"),
         }
-        return flat
-    # 保留原错误，附带扁平回退失败信息
+        return out
     out = dict(got or {})
     out["flat_fallback"] = {
         "ok": flat.get("ok"),

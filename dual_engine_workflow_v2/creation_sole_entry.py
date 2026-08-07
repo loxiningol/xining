@@ -280,6 +280,13 @@ def _create_strategy_unlocked(
         "顺序：第一步研究发现 → 第二步统一门槛 → 第三步四阶段复核。"
         % (symbol, timeframe)
     )
+    # Mechanism intent for trees/lean ONLY. Never splice into brief text —
+    # contract compilers treat「A+B」fragments as required exact clauses and
+    # abort with required_clause_unrepresentable before discovery starts.
+    rd = str(research_direction or "").strip()
+    prev_intent = os.environ.get("QIYU_RESEARCH_DIRECTION_INTENT")
+    if rd:
+        os.environ["QIYU_RESEARCH_DIRECTION_INTENT"] = rd
     mission_id = str(mission_id or unique_id("creation"))
     blueprint_kwargs = dict(
         symbol=symbol,
@@ -341,6 +348,11 @@ def _create_strategy_unlocked(
         blueprint["failure_artifact"] = blueprint_module._persist_failure_blueprint(
             out_dir, symbol, timeframe, mission_id, blueprint,
         )
+    finally:
+        if prev_intent is None:
+            os.environ.pop("QIYU_RESEARCH_DIRECTION_INTENT", None)
+        else:
+            os.environ["QIYU_RESEARCH_DIRECTION_INTENT"] = prev_intent
     stages = (blueprint or {}).get("stages") or {}
     gate = verify_blueprint_stages(blueprint)
     if not stages.get("research_discovery"):

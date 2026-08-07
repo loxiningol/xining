@@ -9,10 +9,14 @@ Long:  target = entry * (1 + 0.005555), stop = entry * (1 - 0.005)
 Short: target = entry * (1 - 0.005555), stop = entry * (1 + 0.005)
 
 Same entry semantics as probe_protocol: next-bar open (signal_i + 1).
+
+对外中文路径结果：止盈 / 止损 / 定时（见 path_lexicon；禁止先盈/先亏/到期）。
 """
 from __future__ import print_function
 
 import math
+
+from .path_lexicon import first_touch_zh as _first_touch_zh
 
 TARGET_PRICE_PCT = 0.005555
 STOP_PRICE_PCT = 0.005
@@ -115,10 +119,12 @@ def label_path(candles, entry_i, direction, horizon,
         if hit_target and hit_stop:
             bars_to_stop = offset + 1
             bars_to_target = offset + 1
+            ft = "stop_same_bar_as_target"
             return {
                 "ok": True,
                 "profit_first": 0,
-                "first_touch": "stop_same_bar_as_target",
+                "first_touch": ft,
+                "first_touch_zh": _first_touch_zh(ft, 0),
                 "mfe_pct": float(mfe_pct),
                 "mae_pct": float(mae_pct),
                 "bars_to_target": bars_to_target,
@@ -134,10 +140,12 @@ def label_path(candles, entry_i, direction, horizon,
             }
         if hit_stop and bars_to_stop is None:
             bars_to_stop = offset + 1
+            ft = "stop"
             return {
                 "ok": True,
                 "profit_first": 0,
-                "first_touch": "stop",
+                "first_touch": ft,
+                "first_touch_zh": _first_touch_zh(ft, 0),
                 "mfe_pct": float(mfe_pct),
                 "mae_pct": float(mae_pct),
                 "bars_to_target": None,
@@ -153,10 +161,12 @@ def label_path(candles, entry_i, direction, horizon,
             }
         if hit_target and bars_to_target is None:
             bars_to_target = offset + 1
+            ft = "target"
             return {
                 "ok": True,
                 "profit_first": 1,
-                "first_touch": "target",
+                "first_touch": ft,
+                "first_touch_zh": _first_touch_zh(ft, 1),
                 "mfe_pct": float(mfe_pct),
                 "mae_pct": float(mae_pct),
                 "bars_to_target": bars_to_target,
@@ -171,10 +181,12 @@ def label_path(candles, entry_i, direction, horizon,
                 "levered_target_return": target_pct * LEVERAGE,
             }
 
+    ft = "unresolved"
     return {
         "ok": True,
         "profit_first": -1,
-        "first_touch": "unresolved",
+        "first_touch": ft,
+        "first_touch_zh": _first_touch_zh(ft, -1),
         "mfe_pct": float(mfe_pct),
         "mae_pct": float(mae_pct),
         "bars_to_target": None,

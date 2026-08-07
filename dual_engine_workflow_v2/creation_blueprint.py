@@ -4,7 +4,7 @@
 创造策略指令固定顺序：
   第一步：研究发现（本模块主责：委员会产物 + 探针 + 多重检验后组装）
   第二步：统一门槛（胜率>50% + 去最大盈利后不崩 + 漏斗/门槛0–7/寒霜贰筛）
-  第三步：四阶段复核（本编排器不替代复核模块）
+  第三步：复核（本编排器不替代复核模块）
 
 第一步内部：契约 → 机制图谱/种群 → 裸探针 → 反证矩阵 → EFR/DSR/PBO → 仅存活者组装。
 """
@@ -30,6 +30,7 @@ from . import easyquant_bridge as eq
 from . import quantoracle_bridge as qo
 from . import research_candle_store as rcs
 from . import research_discovery as discovery
+from .research_discovery import _creation_skip_llm
 from . import research_ledger as ledger
 
 
@@ -95,18 +96,42 @@ def _root():
 
 def _load_matrix(symbol, timeframe, horizon=3, max_bars=None):
     # Prefer long research history when R2/local store is populated.
+    # MMVQ: never hand off on <180d spans — load enough bars for that floor.
+    lookback_days = int(
+        os.environ.get("QIYU_CREATION_LOOKBACK_DAYS")
+        or os.environ.get("QIYU_RESEARCH_LOOKBACK_DAYS")
+        or 730
+    )
+    lookback_days = max(180, lookback_days)
     if max_bars is None:
         explicit = os.environ.get("QIYU_CREATION_MAX_BARS")
         if explicit:
             max_bars = int(explicit)
         else:
             tf = str(timeframe or "").strip().lower()
-            # RAM-bounded but materially longer than the former universal
-            # 20k cap: ~520 days for 15m and >2 years for 1h.
-            max_bars = 50000 if tf == "15m" else (20000 if tf == "1h" else 30000)
+            # 5m: 180d≈51840 bars; keep headroom for 730d when available.
+            if tf in ("5m", "5min"):
+                max_bars = max(52000, int(lookback_days * 288 * 1.05))
+            elif tf == "15m":
+                max_bars = max(20000, int(lookback_days * 96 * 1.05))
+            elif tf == "1h":
+                max_bars = max(5000, int(lookback_days * 24 * 1.05))
+            else:
+                max_bars = 50000
+    # Never let env truncation defeat the mid-frequency span floor.
+    tf = str(timeframe or "").strip().lower()
+    min_span = 180.0
+    try:
+        from . import manufacture_batch_policy as mfg
+        min_span = float(mfg.HANDOFF_MIN_SPAN_DAYS or 180)
+    except Exception:
+        min_span = 180.0
+    per_day = 288.0 if tf in ("5m", "5min") else (96.0 if tf == "15m" else 24.0)
+    floor_bars = int(min_span * per_day * 1.02)
+    max_bars = max(int(max_bars or 0), floor_bars)
     loaded = eq.load_candles(
         symbol, timeframe, max_bars=max_bars, prefer_research=True,
-        lookback_days=int(os.environ.get("QIYU_CREATION_LOOKBACK_DAYS") or 730),
+        lookback_days=lookback_days,
     )
     if not loaded.get("ok"):
         return {
@@ -118,6 +143,42 @@ def _load_matrix(symbol, timeframe, horizon=3, max_bars=None):
         }
     candles = loaded["candles"]
     closes = [r["close"] for r in candles]
+    # Span floor: refuse to open creation on short research windows that inflate weekly.
+    span_days = None
+    try:
+        if len(candles) >= 2:
+            t0 = int(candles[0].get("ts") or 0)
+            t1 = int(candles[-1].get("ts") or 0)
+            if t1 > t0:
+                span_days = (t1 - t0) / 86400000.0
+    except Exception:
+        span_days = None
+    if span_days is None:
+        # Fallback from bar count (5m≈288/day, 15m≈96/day).
+        tf = str(timeframe or "").strip().lower()
+        per_day = 288.0 if tf in ("5m", "5min") else (96.0 if tf == "15m" else 24.0)
+        span_days = float(len(candles)) / per_day if candles else 0.0
+    min_span = 180.0
+    try:
+        from . import manufacture_batch_policy as mfg
+        min_span = float(mfg.HANDOFF_MIN_SPAN_DAYS or 180)
+    except Exception:
+        min_span = 180.0
+    if float(span_days or 0.0) + 1e-9 < float(min_span):
+        return {
+            "ok": False,
+            "error": "research_span_days_below_%d" % int(min_span),
+            "n_bars": loaded.get("n"),
+            "span_days": span_days,
+            "path": loaded.get("path"),
+            "source": loaded.get("source"),
+            "research": loaded.get("research"),
+            "hint_zh": (
+                "研究窗口不足 %d 天（实际≈%.1f 天 / %s bars）。"
+                "短窗会把密集触发伪装成高周频；拒绝开跑。"
+                % (int(min_span), float(span_days or 0.0), loaded.get("n"))
+            ),
+        }
     matrix = eq._build_factor_matrix(candles)
     fwd = eq._forward_returns(closes, horizon=int(horizon))
     return {
@@ -126,6 +187,7 @@ def _load_matrix(symbol, timeframe, horizon=3, max_bars=None):
         "matrix": matrix,
         "fwd": fwd,
         "n_bars": loaded.get("n"),
+        "span_days": span_days,
         "path": loaded.get("path"),
         "source": loaded.get("source"),
         "research": loaded.get("research"),
@@ -364,7 +426,7 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
     risk_lines.extend([
         "",
         "## 说明",
-        "本报告止于第一步研究发现与第二步门槛衔接。第三步四阶段复核由复核模块承接，本蓝图不替代复核。",
+        "本报告止于第一步研究发现与第二步门槛衔接。第三步复核由复核模块承接，本蓝图不替代复核。",
         "",
     ])
 
@@ -373,7 +435,7 @@ def _write_deliverables(out_dir, symbol, timeframe, blueprint):
 # Mechanism: {family}
 # 第二步胜率门：已通过（严格大于50%）
 # Window: {window}
-# Next: 第二步其余门槛 → 第三步四阶段复核
+# Next: 第二步其余门槛 → 第三步复核
 
 STRATEGY = {{
     "symbol": "{symbol}",
@@ -500,9 +562,9 @@ def _candidate_from_admitted_payload(payload):
 
 def _admission_trade_quality(returns, min_wr=None, min_trades=None,
                              min_expectancy_factor=1.0):
-    """创造交接硬底：正式审核前必须挡住低胜率彩票书。
+    """创造交接硬底：复核前必须挡住低胜率彩票书。
 
-    正式审核仍负责压力/前向/矩阵/多 AI。创造侧不得把「胜率≤50% 但肥尾平均净收益好看」
+    复核仍负责压力/前向/矩阵/多模型。创造侧不得把「胜率≤50% 但肥尾平均净收益好看」
     的书交出去。门槛与第二次复核的胜率下限、门槛2 的期望因子对齐。
     """
     from .creation_quality_doctrine import (
@@ -902,6 +964,8 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
                     for key in (
                         "profit_first_rate", "median_mae_pct", "median_mfe_pct",
                         "mean_winning_levered", "path_entry_score",
+                        "execution_leverage", "protective_stop_policy",
+                        "exit_policy", "win_rate",
                     ):
                         if path_summary.get(key) is None and src.get(key) is not None:
                             path_summary[key] = src.get(key)
@@ -952,6 +1016,33 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
     ranked_all = []
     if manufacture_mode and mfg is not None:
         top_for_review, ranked_all = mfg.select_top_for_review(manufactured)
+        # 全部制造包写入质检器（合格/不合格由质检器自己分表）。
+        try:
+            from . import quality_inspector as qi
+            for row in ranked_all:
+                metrics = row.get("select_metrics") or {}
+                title = (
+                    row.get("title_zh")
+                    or row.get("recipe_id")
+                    or ((row.get("candidate") or {}).get("recipe_id"))
+                    or "unnamed"
+                )
+                qi.ingest({
+                    "id": row.get("recipe_id") or title,
+                    "title_zh": title,
+                    "symbol": row.get("symbol") or symbol,
+                    "timeframe": row.get("timeframe") or timeframe,
+                    "direction": direction,
+                    "source": "creation_pipeline",
+                    "expectancy_E": metrics.get("expectancy_E"),
+                    "weekly_open_freq": metrics.get("weekly_opens"),
+                    "mean_win_only_pct": metrics.get("mean_win_only_pct") or metrics.get(
+                        "account_mean_win_only_pct"
+                    ),
+                    "metrics": metrics,
+                })
+        except Exception:
+            pass
         stages["manufacture_batch"] = {
             "schema": "qiyu_manufacture_batch_v1",
             "n_manufactured": len(manufactured),
@@ -959,18 +1050,15 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
             "top_n": int(mfg.TOP_N_TO_REVIEW),
             "shortfall": max(0, int(mfg.MIN_MANUFACTURE) - len(manufactured)),
             "handoff_floors": {
-                "win_rate": float(mfg.HANDOFF_MIN_WIN_RATE),
-                "weekly_opens": float(mfg.HANDOFF_MIN_WEEKLY_OPENS),
-                "mean_win_only_pct": float(mfg.HANDOFF_MIN_WIN_ONLY_PCT),
-                "n_trades": int(mfg.HANDOFF_MIN_TRADES),
-                "profit_first_rate": float(mfg.HANDOFF_MIN_PROFIT_FIRST_RATE),
-                "median_mae_max": float(mfg.HANDOFF_MAX_MEDIAN_MAE),
+                "qi_only": True,
+                "expectancy_E_strict_gt": float(mfg.HANDOFF_EXPECTANCY_STRICT_GT),
+                "weekly_opens_strict_gt": float(mfg.HANDOFF_MIN_WEEKLY_OPENS),
             },
             "n_handoff_qualified": len(top_for_review),
             "thresholds": {
-                "win_rate": mfg.REVIEW_WR,
-                "weekly_opens": mfg.REVIEW_WEEKLY_OPENS,
-                "mean_win_only_pct": mfg.REVIEW_MEAN_WIN_ONLY_PCT,
+                "expectancy_E_strict_gt": mfg.HANDOFF_EXPECTANCY_STRICT_GT,
+                "weekly_opens_strict_gt": mfg.REVIEW_WEEKLY_OPENS,
+                "qi_only": True,
             },
             "ranked": [
                 {
@@ -1046,17 +1134,9 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
                     "failure_layer": "B_quality_handoff",
                     "materialization_ok": True,
                     "message_zh": (
-                        "制造批次有存活包，但账户口径未达交接门槛"
-                        "（胜率≥%.0f%% · 盈利单均值≥%.2f%% · 周频≥%.1f · n≥%d · "
-                        "profit_first≥%.2f）；"
-                        "禁止把同质垃圾交精简多AI复核。材料化已成功，属质量层失败。"
-                        % (
-                            mfg.HANDOFF_MIN_WIN_RATE * 100.0,
-                            mfg.HANDOFF_MIN_WIN_ONLY_PCT,
-                            mfg.HANDOFF_MIN_WEEKLY_OPENS,
-                            mfg.HANDOFF_MIN_TRADES,
-                            mfg.HANDOFF_MIN_PROFIT_FIRST_RATE,
-                        )
+                        "制造批次有存活包，但未达质检器门槛"
+                        "（四AI平均 E>0 且周开仓频率>0.5）；"
+                        "已写入质检不合格表。材料化已成功，属质检层失败。"
                     ),
                     "n_manufactured": len(manufactured),
                     "n_handoff_qualified": 0,
@@ -1092,8 +1172,8 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
                     ],
                     "next_step": "quality_optimization_layer_B",
                     "note_zh": (
-                        "禁止解读为「市场没有策略」。A层材料化成功；B层质量失败。"
-                        "只允许改确认/排除/时序表征，禁止改止损与杠杆、禁止降门槛。"
+                        "禁止解读为「市场没有策略」。A层材料化成功；质检器未放行。"
+                        "唯一门槛：E>0 且周开仓频率>0.5。"
                     ),
                 },
                 "symbol": symbol, "timeframe": timeframe, "direction": direction,
@@ -1104,7 +1184,7 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
                 "run_id": run_id,
                 "data": stages.get("data"),
                 "handoff_zh": (
-                    "制造批次交接门槛未过：不向复核交屎。请强化入场确认/排除/时序修复再开轮。"
+                    "质检器门槛未过（E>0 且周开仓>0.5）：已写入不合格表。"
                 ),
                 "at": _now(),
             }
@@ -1150,7 +1230,7 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
             "run_id": run_id,
             "data": stages.get("data"),
             "handoff_zh": (
-                "制造批次无可正式编译候选；禁止用未验证因子硬凑。"
+                "制造批次无可编译候选；禁止用未验证因子硬凑。"
                 if manufacture_mode else
                 "已准入候选在后置风险门全部失败；禁止切换未验证因子，须以父失败门开启新研究轮。"
             ),
@@ -1230,15 +1310,19 @@ def _assemble_admitted_population(symbol, timeframe, direction, brief, data, sta
         "run_id": run_id,
         "data": stages.get("data"),
         "handoff_zh": (
-            "制造批次完成：已按交接门槛筛出 Top-%d（胜率≥%.0f%% · 盈利单≥%.2f%% · 周频≥0.5），"
-            "交精简多AI均值复核（盈利单≥11.11%% · 周频≥0.5 · 止损0.5%%）。"
+            "制造批次完成：已按交接门槛筛出 Top-%d（胜率严格大于%.0f%% · 盈利单严格大于 stop×杠杆≈%.2f%% · 周频≥%.1f），"
+            "交接并进入复核。"
             % (
                 len(review_batch),
-                (mfg.HANDOFF_MIN_WIN_RATE * 100.0) if mfg is not None else 45.0,
-                mfg.HANDOFF_MIN_WIN_ONLY_PCT if mfg is not None else 9.0,
+                (mfg.HANDOFF_MIN_WIN_RATE * 100.0) if mfg is not None else 50.0,
+                (
+                    mfg.mean_win_floor_pct()
+                    if mfg is not None else 10.0
+                ),
+                (mfg.HANDOFF_MIN_WEEKLY_OPENS if mfg is not None else 0.1),
             )
             if manufacture_mode else
-            "候选身份已锁定；第一步研究发现可交接，进入第二步统一门槛后交第三步四阶段复核。"
+            "候选身份已锁定；第一步研究发现可交接，进入第二步统一门槛后交第三步复核。"
         ),
         "at": _now(),
     }
@@ -1277,7 +1361,7 @@ def run_creation_blueprint(
     direction="long",
     brief="",
     horizon=3,
-    skip_llm=True,
+    skip_llm=None,
     max_loops=MAX_LOOP,
     out_dir=None,
     run_id=None,
@@ -1291,6 +1375,7 @@ def run_creation_blueprint(
     fuses = {"iteration": False, "overfit_drops": 0, "var_rejects": 0, "abort_reason": None}
     stages = {}
     run_id = run_id or ledger.new_run_id("blueprint")
+    skip_llm = _creation_skip_llm(skip_llm)
 
     # Compile a provisional contract before touching data.  This makes target,
     # direction and mutation-contract errors observable even when the candle
@@ -1425,6 +1510,15 @@ def run_creation_blueprint(
         prev_deepen = os.environ.get("QIYU_STRUCTURED_DEEPEN")
         os.environ["QIYU_STRUCTURED_DEEPEN"] = "1"
         try:
+            try:
+                from . import job_progress as jp
+                jp.report_progress(
+                    "map_elites",
+                    "same-identity deepen：加密度量搜索",
+                    force=True,
+                )
+            except Exception:
+                pass
             disc_deep = _run_disc(
                 direction, brief, deepen_id, meta_pack, compiled_contract,
             )
@@ -2121,7 +2215,7 @@ def run_creation_blueprint(
         "handoff_zh": (
             (
                 "第一步研究发现已通过初评衔接；进入第二步统一门槛后，"
-                "再交第三步四阶段复核。本编排器不替代复核模块。"
+                "再交第三步复核。本编排器不替代复核模块。"
                 if presentable and ok else
                 (hardness_pack or {}).get("human_banner_zh")
                 or (prelim_pack or {}).get("human_banner_zh")
@@ -2163,7 +2257,7 @@ def run_creation_blueprint(
             "instructions_zh": (
                 "【第一步：研究发现】下列候选已经过机制图谱/现象扫描、裸探针、反证证据矩阵、"
                 "EFR 与多重检验（DSR/PBO-lite）。禁止回退到『先写完整策略再圆故事』。"
-                "下一步是第二步统一门槛，再交第三步四阶段复核；禁止声称已过复核。"
+                "下一步是第二步统一门槛，再交第三步复核；禁止声称已过复核。"
                 "禁止把 CausalImpact-lite 说成因果证明；禁止周收益≥8%硬凑。"
                 "你是总指挥。请据此写 mechanism_spec；禁止与 QuantOracle certified 数字冲突。"
             ),

@@ -100,14 +100,14 @@ def _strategy_detail_block(row, blueprint, job):
             _fmt_num(by_wk.get("kimi"), 3),
         ),
         # Literal string (no %% formatting) — single % characters only.
-        "门槛: 盈利单均值≥11.11%(加杠杆不含亏损单) · 周开仓频率≥0.5 · 止损0.5%价格",
+        "门槛: 盈利单均值须严格大于 stop×杠杆（默认20×0.5%→>10%） · 周开仓频率≥0.1 · 止损0.5%价格",
         "失败原因: %s" % ("；".join(str(x) for x in (fail or [])[:6]) or "无"),
     ]
     return "\n".join(lines), passed
 
 
 def _notify_review_outcome_wx(formal_review, blueprint, job):
-    """正式复核结束后推送 WxPusher：Top3 逐条详细报告，通过/未通过均发。"""
+    """复核结束后推送 WxPusher：Top3 逐条详细报告，通过/未通过均发。"""
     formal_review = formal_review or {}
     job = job or {}
     blueprint = blueprint or {}
@@ -137,7 +137,7 @@ def _notify_review_outcome_wx(formal_review, blueprint, job):
         "管道: %s\n"
         "研究方向: %s\n"
         "job: %s\n"
-        "复核模式: 四AI均值(DS/Qwen/GLM/Kimi) · 盈利单≥11.11%% · 周频≥0.5 · 止损0.5%%\n"
+        "复核模式: 精简多模型均值 · 盈利单>stop×杠杆 · 周频≥0.1 · 止损0.5%%\n"
         "提交数: %s\n"
         "时间: %s\n"
     ) % (
@@ -272,11 +272,18 @@ def _validate_recipe_lineage(blueprint, job):
     terms = recipe.get("terms") or []
     kind = str(recipe.get("event_kind") or "")
     logic = str(recipe.get("event_logic") or "")
-    if logic not in ("all", "ordered_joins"):
+    if logic not in ("all", "ordered_joins", "ast"):
         reasons.append("selected_recipe_event_logic_invalid")
     if kind == "human_contract_exact":
         if logic != "ordered_joins":
             reasons.append("selected_recipe_exact_event_logic_invalid")
+    elif kind == "ast_compiled":
+        if not isinstance(recipe.get("event_ast"), dict) or not recipe.get("event_ast"):
+            reasons.append("selected_recipe_event_ast_missing")
+        if recipe.get("event_ast_formal_ok") is False:
+            reasons.append("selected_recipe_ast_not_formally_reproducible")
+        if logic not in ("ast", "all"):
+            reasons.append("selected_recipe_ast_event_logic_invalid")
     elif kind in ("mechanism_intersection", "mechanism_preserving"):
         if logic != "all" or len(terms) < 2:
             reasons.append("selected_recipe_generic_event_not_formally_admissible")
@@ -284,6 +291,13 @@ def _validate_recipe_lineage(blueprint, job):
         reasons.append("selected_recipe_event_kind_not_formally_admissible")
     for index, term in enumerate(terms):
         if not isinstance(term, dict) or not term.get("factor"):
+            # AST terms may be structural nodes without factor; allow when
+            # event_ast is the formal identity.
+            if kind == "ast_compiled" and (
+                term.get("node_type") in ("ast", "quantile", "sequence", "state")
+                or term.get("event_ast")
+            ):
+                continue
             reasons.append("selected_recipe_term_%d_invalid" % index)
             continue
         literal = (
@@ -531,9 +545,9 @@ def submit_blueprint_to_formal_review(blueprint, job):
                 else "creation_candidate_not_qualified"
             ),
             "message_zh": (
-                "管道生成失败：候选材料化不足，禁止进入正式复核（非市场研究拒绝）。"
+                "管道生成失败：候选材料化不足，禁止进入复核（非市场研究拒绝）。"
                 if is_mat else
-                "创造门槛未通过，禁止进入正式复核。"
+                "创造门槛未通过，禁止进入复核。"
             ),
         }
     if not (blueprint or {}).get("glm_research_brief"):
@@ -544,7 +558,7 @@ def submit_blueprint_to_formal_review(blueprint, job):
             "submission_created": False,
             "review_submitted": False,
             "reason": "qualified_blueprint_missing_research_brief",
-            "message_zh": "合格蓝图缺少可追溯研究摘要，禁止进入正式复核。",
+            "message_zh": "合格蓝图缺少可追溯研究摘要，禁止进入复核。",
         }
     stages = (blueprint or {}).get("stages") or {}
     envelope = stages.get("admission_envelope") or {}
@@ -567,7 +581,7 @@ def submit_blueprint_to_formal_review(blueprint, job):
             "review_submitted": False,
             "reason": "creation_recipe_lineage_invalid",
             "lineage_errors": recipe_validation.get("reasons") or [],
-            "message_zh": "最终候选未能证明属于研究准入信封，禁止进入正式复核。",
+            "message_zh": "最终候选未能证明属于研究准入信封，禁止进入复核。",
         }
 
     # Hard ban: account WR≤50% / lottery books never enter four-review.
@@ -594,7 +608,7 @@ def submit_blueprint_to_formal_review(blueprint, job):
                 "submission_created": False,
                 "review_submitted": False,
                 "reason": "manufacture_review_batch_empty",
-                "message_zh": "制造批次无合格交接包，禁止进入精简多AI复核。",
+                "message_zh": "制造批次无质检合格包（E>0且周开仓>0.5），已写入质检不合格表。",
             }
         try:
             from . import review_gate as rgate
@@ -631,7 +645,7 @@ def submit_blueprint_to_formal_review(blueprint, job):
                 "reason": "manufacture_handoff_floor_fail",
                 "rejected": bad,
                 "message_zh": (
-                    "制造批次交接门槛/handoff token 未过，禁止交屎给复核。"
+                    "质检器门槛未过（E>0 且周开仓>0.5），不进入待优化。"
                 ),
             }
     if not manufacture_mode:
@@ -672,7 +686,7 @@ def submit_blueprint_to_formal_review(blueprint, job):
                 "review_submitted": False,
                 "reason": "creation_account_wr_anti_lottery_fail",
                 "admission_trade_quality": quality,
-                "message_zh": "账户口径胜率未严格大于50%或反彩票/均值未过，禁止进入正式复核。",
+                "message_zh": "账户口径胜率未严格大于50%或反彩票/均值未过，禁止进入复核。",
             }
 
     # Review is deliberately serialized; creation itself remains two-lane.
@@ -795,6 +809,29 @@ def submit_blueprint_to_formal_review(blueprint, job):
                 })
                 continue
             pack["dsl"] = impl.get("dsl")
+            # Native exit-hold search (creation Formal Bridge path).
+            try:
+                from . import formal_consistency_audit as fca
+                import auto_trade_strategy_ecosystem as eco
+                frame = eco._load_research_frame(
+                    job.get("symbol"), job.get("timeframe"),
+                )
+                if frame is not None and len(frame) >= 300 and pack.get("dsl"):
+                    hold_cal = fca.calibrate_max_hold_for_formal_floors(
+                        pack["dsl"],
+                        frame,
+                        job.get("symbol"),
+                        job.get("timeframe"),
+                    )
+                    sel = int(
+                        hold_cal.get("selected_max_hold_bars")
+                        or pack["dsl"].get("max_hold_bars")
+                        or 24
+                    )
+                    pack["dsl"]["max_hold_bars"] = sel
+                    pack["native_exit_hold_search"] = hold_cal
+            except Exception as _hold_exc:
+                pack["native_exit_hold_search_error"] = str(_hold_exc)[:240]
             pack["dsl_long"] = impl.get("dsl_long") or (
                 pack["dsl"] if str(meta.get("direction")).lower() == "long" else None
             )
@@ -842,7 +879,7 @@ def submit_blueprint_to_formal_review(blueprint, job):
         "review_submitted": bool(results),
         "task_id": primary.get("task_id"),
         "reason": "slim_multiai_batch" if manufacture_mode else primary.get("reason"),
-        "message_zh": "已提交 Top-%d 至精简多AI均值复核" % len(results),
+        "message_zh": "已提交 Top-%d 至精简多模型均值复核" % len(results),
         "review_batch_results": results,
         "n_submitted": len(results),
     }

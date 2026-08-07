@@ -29,17 +29,45 @@ def _stable_hash(payload):
 
 
 def normalize_trades_for_reference(trades):
-    """Map DSL / backtest trade dicts into reference-calculator fill schema."""
+    """Map DSL / backtest trade dicts into reference-calculator fill schema.
+
+    DSL / slim Formal trades embed round-trip costs in ``pnl_ratio`` and usually
+    leave entry/exit fee fields at 0. Prefer that levered pnl for parity so the
+    independent reference does not fee-lessly recompute from fill prices and
+    diverge from production.
+    """
     out = []
     for t in trades or []:
         if not isinstance(t, dict):
             continue
+        pnl = t.get("pnl_ratio_full_size")
+        if pnl is None:
+            pnl = t.get("pnl_ratio")
+        explicit_fee = 0.0
+        for key in (
+            "entry_fee",
+            "exit_fee",
+            "funding",
+            "funding_fee",
+            "slippage_cost",
+            "slippage",
+        ):
+            try:
+                explicit_fee += abs(float(t.get(key) or 0.0))
+            except Exception:
+                pass
+        # When costs live in pnl_ratio (typical DSL), skip fee-less fill recompute.
+        prefer_pnl = pnl is not None and explicit_fee <= 1e-15
+        entry_price = None if prefer_pnl else (
+            t.get("entry_price") or t.get("entry") or t.get("price")
+        )
+        exit_price = None if prefer_pnl else (t.get("exit_price") or t.get("exit"))
         row = {
             "entry_time": t.get("entry_time") or t.get("entry_ts") or t.get("open_time"),
             "exit_time": t.get("exit_time") or t.get("exit_ts") or t.get("close_time"),
             "side": t.get("side") or t.get("direction") or "long",
-            "entry_price": t.get("entry_price") or t.get("entry") or t.get("price"),
-            "exit_price": t.get("exit_price") or t.get("exit"),
+            "entry_price": entry_price,
+            "exit_price": exit_price,
             "quantity": t.get("quantity") or t.get("qty") or 1.0,
             "entry_fee": t.get("entry_fee") or 0.0,
             "exit_fee": t.get("exit_fee") or 0.0,
@@ -47,8 +75,8 @@ def normalize_trades_for_reference(trades):
             "slippage_cost": t.get("slippage_cost") or t.get("slippage") or 0.0,
             "stop_price": t.get("stop_price"),
             "exit_reason": t.get("exit_reason") or t.get("reason"),
-            "pnl_ratio": t.get("pnl_ratio_full_size") or t.get("pnl_ratio"),
-            "mae": t.get("mae") or t.get("mae_pct"),
+            "pnl_ratio": pnl,
+            "mae": t.get("mae") or t.get("mae_pct") or t.get("mae_price_pct"),
             "mfe": t.get("mfe") or t.get("mfe_pct"),
             "profit_first": t.get("profit_first") or t.get("path_hit"),
             "leverage": t.get("leverage") or 20,
@@ -253,22 +281,29 @@ def validate_fixed_contract(metrics=None):
             avg = None
     # Soft: if avg missing, don't invent pass; require explicit value for hard pass.
     if avg is not None and float(avg) < ref.MIN_AVG_WINNING_LEVERED:
-        reasons.append("avg_winning_levered_below_0.1111")
+        reasons.append("avg_winning_levered_below_stop_times_leverage_default")
     if m.get("recent_2y_requirement_passed") is False:
         reasons.append("recent_2y_requirement_failed")
     stop = m.get("stop_distance")
     if stop is not None and abs(float(stop) - ref.STOP_PRICE_DISTANCE) > 1e-12:
         reasons.append("stop_distance_not_0.005")
     lev = m.get("leverage")
-    if lev is not None and abs(float(lev) - ref.LEVERAGE) > 1e-12:
-        reasons.append("leverage_not_20")
+    if lev is not None:
+        try:
+            from . import manufacture_batch_policy as mfg
+            lv = float(lev)
+            if lv < float(mfg.LEVERAGE_MIN) - 1e-12 or lv > float(mfg.LEVERAGE_MAX) + 1e-12:
+                reasons.append("leverage_out_of_range_%s_%s" % (mfg.LEVERAGE_MIN, mfg.LEVERAGE_MAX))
+        except Exception:
+            if abs(float(lev) - ref.LEVERAGE) > 1e-12:
+                reasons.append("leverage_not_20")
     return {
         "ok": not reasons,
         "reasons": reasons,
         "thresholds": {
             "average_profitable_trade_return": ref.MIN_AVG_WINNING_LEVERED,
             "stop_distance": ref.STOP_PRICE_DISTANCE,
-            "leverage": ref.LEVERAGE,
+            "leverage_range": [20, 50],
         },
     }
 

@@ -1,0 +1,451 @@
+{
+  "run_id": "trend1",
+  "brief": "均线金叉做多",
+  "ledger_path": "/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720/auto_trade/dual_engine/research_ledger/trend1.jsonl",
+  "nde_probe_events": 57,
+  "nde_failure_lineage": 35,
+  "nde_learning_updates": 57,
+  "state_counts": {
+    "NO_DIRECTIONAL_EFFECT": 63,
+    "PROXY_INADEQUATE": 2,
+    "MECHANISM_CONTRADICTED": 3,
+    "SAMPLE_INADEQUATE": 4
+  },
+  "判定位置": {
+    "primary": "dual_engine_workflow_v2/probe_protocol.py evaluate_trial()",
+    "manufacture_branch_L1481-1489": "net_mean<=0 → NO_DIRECTIONAL_EFFECT; net_mean>0 but WR<=35% → NEAR_MISS",
+    "default_branch_L1511-1512": "statistical/economic/execution all fail → NO_DIRECTIONAL_EFFECT",
+    "cheap_probe_L157-158": "cheap_probe_stream: mean<=0 or t<1.0 → NO_DIRECTIONAL_EFFECT",
+    "ledger_write": "research_discovery.py L1769-1791 append_event event_type=probe"
+  },
+  "lineage_stats": {
+    "independent_events_min": 374,
+    "independent_events_max": 374,
+    "independent_events_zero": 0,
+    "mean_net_positive": 0,
+    "mean_net_negative": 30,
+    "mean_net_nan": 5,
+    "failure_codes": {
+      "adverse_selection": 34,
+      "formal_capability_blocked": 5,
+      "event_dilution": 2,
+      "signal_redundancy": 2,
+      "gross_edge_unstable": 1
+    },
+    "best_events": {
+      "mat_trend_filter_exhaust": 30
+    },
+    "families": {
+      "vol_squeeze_break": 3,
+      "liquidity_sweep": 1,
+      "trend_pullback": 1,
+      "mean_reversion": 2,
+      "liquidation_bounce": 1,
+      "delayed_confirmation": 1,
+      "direction_reversal": 1,
+      "trend_continuation": 1,
+      "relative_strength_gate": 1,
+      "failed_breakout_fade": 1,
+      "data_driven": 11,
+      "symbolic": 11
+    },
+    "learning_attribution": {
+      "signal_failure": 57
+    }
+  },
+  "lineage_samples": [
+    {
+      "hypothesis_id": "H_vol_squeeze_expansion_001",
+      "mechanism_id": "vol_squeeze_expansion_001",
+      "family": "vol_squeeze_break",
+      "mechanism_tree_id": "vol_squeeze_expansion",
+      "mechanism_branch_id": "T1_volatility_only",
+      "mechanism_branch_zh": "只预测未来实现波动",
+      "requires_micro_data": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "research_state_zh": "未发现方向性效应",
+      "failure_codes": [
+        "adverse_selection"
+      ],
+      "failure_codes_zh": [
+        "入场后短期逆向选择（MAE 主导）"
+      ],
+      "best_event": "mat_trend_filter_exhaust",
+      "best_horizon": 6,
+      "best_mapping": "next_bar_open",
+      "formal_capability_reasons": [],
+      "evidence_axes": {
+        "statistical_direction": false,
+        "economic_magnitude": false,
+        "execution_feasibility": false,
+        "volatility_effect": false
+      },
+      "mean_net": -0.04918887779248336,
+      "independent_events": 374,
+      "n_event_clusters": 374,
+      "family_closed": false
+    },
+    {
+      "hypothesis_id": "H_asia_range_break_001",
+      "mechanism_id": "asia_range_break_001",
+      "family": "vol_squeeze_break",
+      "mechanism_tree_id": "donchian_trend_break",
+      "mechanism_branch_id": "D1_valid_break_continuation",
+      "mechanism_branch_zh": "有效通道突破后的趋势延续",
+      "requires_micro_data": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "research_state_zh": "未发现方向性效应",
+      "failure_codes": [
+        "adverse_selection"
+      ],
+      "failure_codes_zh": [
+        "入场后短期逆向选择（MAE 主导）"
+      ],
+      "best_event": "mat_trend_filter_exhaust",
+      "best_horizon": 6,
+      "best_mapping": "next_bar_open",
+      "formal_capability_reasons": [],
+      "evidence_axes": {
+        "statistical_direction": false,
+        "economic_magnitude": false,
+        "execution_feasibility": false,
+        "volatility_effect": false
+      },
+      "mean_net": -0.04918887779248336,
+      "independent_events": 374,
+      "n_event_clusters": 374,
+      "family_closed": false
+    },
+    {
+      "hypothesis_id": "H_failed_breakout_trap_001",
+      "mechanism_id": "failed_breakout_trap_001",
+      "family": "liquidity_sweep",
+      "mechanism_tree_id": "donchian_trend_break",
+      "mechanism_branch_id": "D2_false_break_filter",
+      "mechanism_branch_zh": "震荡假突破过滤 / 收回",
+      "requires_micro_data": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "research_state_zh": "未发现方向性效应",
+      "failure_codes": [
+        "adverse_selection"
+      ],
+      "failure_codes_zh": [
+        "入场后短期逆向选择（MAE 主导）"
+      ],
+      "best_event": "mat_trend_filter_exhaust",
+      "best_horizon": 6,
+      "best_mapping": "next_bar_open",
+      "formal_capability_reasons": [],
+      "evidence_axes": {
+        "statistical_direction": false,
+        "economic_magnitude": false,
+        "execution_feasibility": false,
+        "volatility_effect": false
+      },
+      "mean_net": -0.04918887779248336,
+      "independent_events": 374,
+      "n_event_clusters": 374,
+      "family_closed": false
+    },
+    {
+      "hypothesis_id": "H_trend_pullback_continuation_001",
+      "mechanism_id": "trend_pullback_continuation_001",
+      "family": "trend_pullback",
+      "mechanism_tree_id": "donchian_trend_break",
+      "mechanism_branch_id": "D3_htf_trend_filter",
+      "mechanism_branch_zh": "高周期趋势过滤下的顺势突破",
+      "requires_micro_data": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "research_state_zh": "未发现方向性效应",
+      "failure_codes": [
+        "adverse_selection"
+      ],
+      "failure_codes_zh": [
+        "入场后短期逆向选择（MAE 主导）"
+      ],
+      "best_event": "mat_trend_filter_exhaust",
+      "best_horizon": 6,
+      "best_mapping": "next_bar_open",
+      "formal_capability_reasons": [],
+      "evidence_axes": {
+        "statistical_direction": false,
+        "economic_magnitude": false,
+        "execution_feasibility": false,
+        "volatility_effect": false
+      },
+      "mean_net": -0.04918887779248336,
+      "independent_events": 374,
+      "n_event_clusters": 374,
+      "family_closed": false
+    },
+    {
+      "hypothesis_id": "H_vol_squeeze_break_001",
+      "mechanism_id": "vol_squeeze_break_001",
+      "family": "vol_squeeze_break",
+      "mechanism_tree_id": "donchian_trend_break",
+      "mechanism_branch_id": "D4_vol_context",
+      "mechanism_branch_zh": "突破前波动压缩 / 扩张确认",
+      "requires_micro_data": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "research_state_zh": "未发现方向性效应",
+      "failure_codes": [
+        "adverse_selection"
+      ],
+      "failure_codes_zh": [
+        "入场后短期逆向选择（MAE 主导）"
+      ],
+      "best_event": "mat_trend_filter_exhaust",
+      "best_horizon": 6,
+      "best_mapping": "next_bar_open",
+      "formal_capability_reasons": [],
+      "evidence_axes": {
+        "statistical_direction": false,
+        "economic_magnitude": false,
+        "execution_feasibility": false,
+        "volatility_effect": false
+      },
+      "mean_net": -0.04918887779248336,
+      "independent_events": 374,
+      "n_event_clusters": 374,
+      "family_closed": false
+    },
+    {
+      "hypothesis_id": "H_panic_exhaustion_recovery_001",
+      "mechanism_id": "panic_exhaustion_recovery_001",
+      "family": "mean_reversion",
+      "mechanism_tree_id": "exhaustion_recovery",
+      "mechanism_branch_id": "A_forced_liquidation",
+      "mechanism_branch_zh": "强制平仓衰竭",
+      "requires_micro_data": true,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "research_state_zh": "未发现方向性效应",
+      "failure_codes": [
+        "adverse_selection"
+      ],
+      "failure_codes_zh": [
+        "入场后短期逆向选择（MAE 主导）"
+      ],
+      "best_event": "mat_trend_filter_exhaust",
+      "best_horizon": 6,
+      "best_mapping": "next_bar_open",
+      "formal_capability_reasons": [],
+      "evidence_axes": {
+        "statistical_direction": false,
+        "economic_magnitude": false,
+        "execution_feasibility": false,
+        "volatility_effect": false
+      },
+      "mean_net": -0.04918887779248336,
+      "independent_events": 374,
+      "n_event_clusters": 374,
+      "family_closed": false
+    },
+    {
+      "hypothesis_id": "H_exhaustion_absorption_reclaim_002",
+      "mechanism_id": "exhaustion_absorption_reclaim_002",
+      "family": "mean_reversion",
+      "mechanism_tree_id": "exhaustion_recovery",
+      "mechanism_branch_id": "C_absorption_reclaim",
+      "mechanism_branch_zh": "信息冲击后价格接受失败 / 吸收收回",
+      "requires_micro_data": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "research_state_zh": "未发现方向性效应",
+      "failure_codes": [
+        "adverse_selection"
+      ],
+      "failure_codes_zh": [
+        "入场后短期逆向选择（MAE 主导）"
+      ],
+      "best_event": "mat_trend_filter_exhaust",
+      "best_horizon": 6,
+      "best_mapping": "next_bar_open",
+      "formal_capability_reasons": [],
+      "evidence_axes": {
+        "statistical_direction": false,
+        "economic_magnitude": false,
+        "execution_feasibility": false,
+        "volatility_effect": false
+      },
+      "mean_net": -0.04918887779248336,
+      "independent_events": 374,
+      "n_event_clusters": 374,
+      "family_closed": false
+    },
+    {
+      "hypothesis_id": "H_forced_liquidation_bounce_001",
+      "mechanism_id": "forced_liquidation_bounce_001",
+      "family": "liquidation_bounce",
+      "mechanism_tree_id": "exhaustion_recovery",
+      "mechanism_branch_id": "A_forced_liquidation",
+      "mechanism_branch_zh": "强制平仓衰竭",
+      "requires_micro_data": true,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "research_state_zh": "未发现方向性效应",
+      "failure_codes": [
+        "adverse_selection"
+      ],
+      "failure_codes_zh": [
+        "入场后短期逆向选择（MAE 主导）"
+      ],
+      "best_event": "mat_trend_filter_exhaust",
+      "best_horizon": 6,
+      "best_mapping": "next_bar_open",
+      "formal_capability_reasons": [],
+      "evidence_axes": {
+        "statistical_direction": false,
+        "economic_magnitude": false,
+        "execution_feasibility": false,
+        "volatility_effect": false
+      },
+      "mean_net": -0.04918887779248336,
+      "independent_events": 374,
+      "n_event_clusters": 374,
+      "family_closed": false
+    }
+  ],
+  "probe_samples": [
+    {
+      "event_type": "probe",
+      "hypothesis_id": "H_vol_squeeze_expansion_001",
+      "passed": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "n_probes": 7,
+      "best_factor": "rsi_14",
+      "best_event": "mat_trend_filter_exhaust",
+      "independent_events": 374,
+      "mean_net": -0.04918887779248336,
+      "formal_capability_reasons": [],
+      "at": "2026-08-05 22:47:13",
+      "ts": 1785941233.0360498,
+      "run_id": "trend1",
+      "event_id": "662f22e8aec76649"
+    },
+    {
+      "event_type": "probe",
+      "hypothesis_id": "H_asia_range_break_001",
+      "passed": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "n_probes": 7,
+      "best_factor": "rsi_14",
+      "best_event": "mat_trend_filter_exhaust",
+      "independent_events": 374,
+      "mean_net": -0.04918887779248336,
+      "formal_capability_reasons": [],
+      "at": "2026-08-05 22:47:17",
+      "ts": 1785941237.479203,
+      "run_id": "trend1",
+      "event_id": "00d9e9f496d93bdd"
+    },
+    {
+      "event_type": "probe",
+      "hypothesis_id": "H_failed_breakout_trap_001",
+      "passed": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "n_probes": 7,
+      "best_factor": "rsi_14",
+      "best_event": "mat_trend_filter_exhaust",
+      "independent_events": 374,
+      "mean_net": -0.04918887779248336,
+      "formal_capability_reasons": [],
+      "at": "2026-08-05 22:47:22",
+      "ts": 1785941242.209355,
+      "run_id": "trend1",
+      "event_id": "e0a08d6ed25da75c"
+    },
+    {
+      "event_type": "probe",
+      "hypothesis_id": "H_trend_pullback_continuation_001",
+      "passed": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "n_probes": 7,
+      "best_factor": "rsi_14",
+      "best_event": "mat_trend_filter_exhaust",
+      "independent_events": 374,
+      "mean_net": -0.04918887779248336,
+      "formal_capability_reasons": [],
+      "at": "2026-08-05 22:47:26",
+      "ts": 1785941246.238414,
+      "run_id": "trend1",
+      "event_id": "aa7bcdf0a13bef87"
+    },
+    {
+      "event_type": "probe",
+      "hypothesis_id": "H_vol_squeeze_break_001",
+      "passed": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "n_probes": 7,
+      "best_factor": "rsi_14",
+      "best_event": "mat_trend_filter_exhaust",
+      "independent_events": 374,
+      "mean_net": -0.04918887779248336,
+      "formal_capability_reasons": [],
+      "at": "2026-08-05 22:47:31",
+      "ts": 1785941251.8935528,
+      "run_id": "trend1",
+      "event_id": "a80d5ddc6db7c5fd"
+    },
+    {
+      "event_type": "probe",
+      "hypothesis_id": "H_panic_exhaustion_recovery_001",
+      "passed": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "n_probes": 7,
+      "best_factor": "rsi_14",
+      "best_event": "mat_trend_filter_exhaust",
+      "independent_events": 374,
+      "mean_net": -0.04918887779248336,
+      "formal_capability_reasons": [],
+      "at": "2026-08-05 22:47:37",
+      "ts": 1785941257.939936,
+      "run_id": "trend1",
+      "event_id": "c5469e1091769de8"
+    },
+    {
+      "event_type": "probe",
+      "hypothesis_id": "H_exhaustion_absorption_reclaim_002",
+      "passed": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "n_probes": 7,
+      "best_factor": "rsi_14",
+      "best_event": "mat_trend_filter_exhaust",
+      "independent_events": 374,
+      "mean_net": -0.04918887779248336,
+      "formal_capability_reasons": [],
+      "at": "2026-08-05 22:47:42",
+      "ts": 1785941262.8172128,
+      "run_id": "trend1",
+      "event_id": "9180ac6b9591f4bb"
+    },
+    {
+      "event_type": "probe",
+      "hypothesis_id": "H_forced_liquidation_bounce_001",
+      "passed": false,
+      "research_state": "NO_DIRECTIONAL_EFFECT",
+      "n_probes": 7,
+      "best_factor": "rsi_14",
+      "best_event": "mat_trend_filter_exhaust",
+      "independent_events": 374,
+      "mean_net": -0.04918887779248336,
+      "formal_capability_reasons": [],
+      "at": "2026-08-05 22:47:48",
+      "ts": 1785941268.120481,
+      "run_id": "trend1",
+      "event_id": "f3a8bacf8155fcad"
+    }
+  ],
+  "population_n": 59,
+  "replay_n": 0,
+  "replay": [],
+  "replay_wr_stats": {
+    "n_with_wr": 0,
+    "wr_min": null,
+    "wr_max": null,
+    "wr_gt_35pct": 0,
+    "wr_eq_0": 0,
+    "n_zero_triggers": 0,
+    "n_zero_independent": 0,
+    "rets_all_nan": 0,
+    "rets_all_zero": 0
+  },
+  "conclusion_zh": "重放未命中 NDE 假设（种群随机性）；以 ledger failure_lineage 为准。"
+}

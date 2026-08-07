@@ -176,6 +176,160 @@ def _direction_candidates(hypothesis):
     return (1, -1)
 
 
+def _locked_trade_direction(hypothesis):
+    """Return 'long'|'short'|None when trade direction is contract-locked."""
+    if not bool((hypothesis or {}).get("trade_direction_locked")):
+        return None
+    declared = str((hypothesis or {}).get("predicted_direction") or "").strip().lower()
+    if declared in ("long", "buy", "positive_shift"):
+        return "long"
+    if declared in ("short", "sell", "negative_shift"):
+        return "short"
+    signs = _direction_candidates(hypothesis)
+    if signs == (1,):
+        return "long"
+    if signs == (-1,):
+        return "short"
+    return None
+
+
+def _entry_regime(hypothesis):
+    """Classify entry semantics for direction-legal factor sides."""
+    blob = " ".join([
+        str((hypothesis or {}).get("family") or ""),
+        str((hypothesis or {}).get("mechanism_id") or ""),
+        str((hypothesis or {}).get("statement_zh") or ""),
+        str((hypothesis or {}).get("path") or ""),
+    ]).lower()
+    if any(x in blob for x in (
+        "mean_reversion", "exhaust", "liquid", "衰竭", "清算", "panic",
+        "reclaim", "oversold", "超卖", "反弹", "bounce", "recovery",
+        "布林", "bollinger", "bb_lower",
+    )):
+        return "mean_reversion"
+    if any(x in blob for x in (
+        "break", "squeeze", "compression", "压缩", "扩张", "trend",
+        "donchian", "pullback", "continuation", "突破", "顺势", "扩张",
+    )):
+        return "breakout"
+    return "mixed"
+
+
+# Factor sides that are bullish (long-entry) or bearish (short-entry) by construction.
+_LONG_MEAN_REV_SIDES = {
+    "rsi_14": ("low",),
+    "close_z_20": ("low",),
+    "bb_lower_dist": ("low",),
+    "bb_mid_reclaim": ("high",),
+    "bullish_reclaim": ("high",),
+    "reclaim_strength": ("high",),
+    "ret_3": ("low",),
+    "ret_1": ("low",),
+    "downside_velocity_decay": ("high",),
+    "exhaustion_score": ("high",),
+    "absorption_proxy": ("high",),
+    "signed_volume_pressure": ("low",),
+    "impact_decay_proxy": ("high",),
+    "lower_wick_pct": ("high",),
+}
+_LONG_BREAKOUT_SIDES = {
+    "donchian20_long_break": ("high",),
+    "trend_bias_50_200": ("high",),
+    "expansion_score": ("high",),
+    "breakout_acceptance": ("high",),
+    "ret_3": ("high",),
+    "ret_1": ("high",),
+    "ret_12": ("high",),
+    "volume_z": ("high",),
+    "bb_width": ("high",),
+    "atr_pct_14": ("high",),
+    "volatility_acceleration": ("high",),
+    "squeeze_persistence": ("high",),
+    "bb_mid_reclaim": ("high",),
+    "close_z_20": ("high",),
+    "slope_close_6": ("high",),
+    "trend_efficiency_12": ("high",),
+}
+_SHORT_MEAN_REV_SIDES = {
+    "rsi_14": ("high",),
+    "close_z_20": ("high",),
+    "bb_upper_dist": ("low",),
+    "ret_3": ("high",),
+    "ret_1": ("high",),
+    "upper_wick_pct": ("high",),
+    "exhaustion_score": ("high",),
+    "signed_volume_pressure": ("high",),
+}
+_SHORT_BREAKOUT_SIDES = {
+    "donchian20_short_break": ("high",),
+    "trend_bias_50_200": ("low",),
+    "expansion_score": ("high",),
+    "breakout_acceptance": ("high",),
+    "ret_3": ("low",),
+    "ret_1": ("low",),
+    "volume_z": ("high",),
+    "bb_width": ("high",),
+    "atr_pct_14": ("high",),
+    "volatility_acceleration": ("high",),
+    "squeeze_persistence": ("high",),
+    "close_z_20": ("low",),
+    "slope_close_6": ("low",),
+}
+
+
+def _legal_entry_sides(hypothesis, factor_name):
+    """Return allowed quantile sides for a factor under locked trade direction.
+
+    When direction is locked, overbought-long / oversold-short sides are banned.
+    Unlocked hypotheses keep both sides (legacy free search).
+    """
+    factor = str(factor_name or "").strip()
+    direction = _locked_trade_direction(hypothesis)
+    if direction is None or not factor:
+        return ("high", "low")
+    regime = _entry_regime(hypothesis)
+    allowed = set()
+    if direction == "long":
+        if regime in ("mean_reversion", "mixed"):
+            allowed.update(_LONG_MEAN_REV_SIDES.get(factor) or ())
+        if regime in ("breakout", "mixed"):
+            allowed.update(_LONG_BREAKOUT_SIDES.get(factor) or ())
+        # Hard ban: long never enters on classic overbought extremes.
+        if factor in ("rsi_14",) and "high" in allowed and regime != "breakout":
+            allowed.discard("high")
+        if factor == "rsi_14" and regime == "mean_reversion":
+            allowed = {"low"}
+        if factor == "donchian20_short_break":
+            allowed.clear()
+    else:
+        if regime in ("mean_reversion", "mixed"):
+            allowed.update(_SHORT_MEAN_REV_SIDES.get(factor) or ())
+        if regime in ("breakout", "mixed"):
+            allowed.update(_SHORT_BREAKOUT_SIDES.get(factor) or ())
+        if factor in ("rsi_14",) and "low" in allowed and regime != "breakout":
+            allowed.discard("low")
+        if factor == "rsi_14" and regime == "mean_reversion":
+            allowed = {"high"}
+        if factor == "donchian20_long_break":
+            allowed.clear()
+    if not allowed:
+        # Unknown factor under lock: keep both only for pure vol state factors
+        # that are not directional entries by themselves.
+        if factor in (
+            "bb_width", "atr_pct_14", "squeeze_persistence", "squeeze_score",
+            "volatility_acceleration", "range_pct", "volume_z",
+        ):
+            return ("high", "low") if regime == "breakout" else (
+                ("high",) if direction == "long" else ("high", "low")
+            )
+        return tuple()
+    return tuple(side for side in ("high", "low") if side in allowed)
+
+
+def _side_legal_for_hypothesis(hypothesis, factor_name, side):
+    return str(side or "") in set(_legal_entry_sides(hypothesis, factor_name))
+
+
 def _candidate_events(hypothesis, factor_matrix, max_specs=18):
     hints = list((hypothesis or {}).get("factor_hints") or
                  (hypothesis or {}).get("observable_proxy") or [])
@@ -205,6 +359,36 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
 
     # P2: prefer deterministic event_ast when present.
     event_ast = (hypothesis or {}).get("event_ast")
+    pinned_mask = (hypothesis or {}).get("pinned_event_mask")
+    if pinned_mask is not None:
+        # Stage1 rhyme arm lock: exact research identity. Keep Formal AST too.
+        pin_terms = [{"node_type": "pinned_rhyme_arm", "family_id": (hypothesis or {}).get("family_id")}]
+        pin_spec = {
+            "event_id": "rhyme_pinned_%s" % ((hypothesis or {}).get("family_id") or "arm"),
+            "terms": pin_terms,
+            "mask": list(pinned_mask),
+            "kind": "human_contract_exact",
+            "logic": "pinned_stage1_arm",
+            "pinned_rhyme_arm": True,
+        }
+        if isinstance(event_ast, dict) and event_ast:
+            try:
+                from . import ast_compiler as ac
+                dsl_pack = ac.compile_ast_to_dsl(event_ast)
+                pin_spec["event_ast"] = event_ast
+                pin_spec["event_ast_hash"] = dsl_pack.get("event_ast_hash")
+                pin_spec["event_ast_formal_ok"] = bool(dsl_pack.get("formal_ok"))
+                pin_spec["event_ast_dsl"] = dsl_pack.get("entry_tree")
+                if dsl_pack.get("formal_ok"):
+                    pin_spec["kind"] = "ast_compiled"
+                    pin_spec["logic"] = "ast"
+                    pin_spec["terms"] = list(dsl_pack.get("terms") or pin_terms)
+            except Exception:
+                pass
+        specs.append(pin_spec)
+        # Exact pin wins: do not dilute with quantile remine.
+        return specs[: int(max_specs)], available
+
     if isinstance(event_ast, dict) and event_ast:
         try:
             from . import ast_compiler as ac
@@ -321,6 +505,8 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
             q = _finite(row.get("q"))
             if name not in (factor_matrix or {}) or side not in ("high", "low") or q is None:
                 return [], available
+            if not _side_legal_for_hypothesis(hypothesis, name, side):
+                return [], available
             masks.append(mask(name, side, q))
             frozen_terms.append({
                 "factor": name,
@@ -420,8 +606,11 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
         return unique[: int(max_specs)], available
 
     for name in available:
+        legal_sides = _legal_entry_sides(hypothesis, name)
+        if not legal_sides:
+            continue
         for q in DEFAULT_QUANTILES:
-            for side in ("high", "low"):
+            for side in legal_sides:
                 specs.append({
                     "event_id": "%s_%s_q%s" % (name, side, int(q * 100)),
                     "terms": [quantile_term(name, side, q)],
@@ -436,8 +625,13 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
         for j in range(i + 1, min(len(available), 5)):
             pairs.append((available[i], available[j]))
     for a, b in pairs:
+        sides_a = _legal_entry_sides(hypothesis, a)
+        sides_b = _legal_entry_sides(hypothesis, b)
+        if not sides_a or not sides_b:
+            continue
+        side_pairs = [(sa, sb) for sa in sides_a for sb in sides_b]
         for q_ix in INTERSECTION_QUANTILES:
-            for sa, sb in (("high", "high"), ("low", "low"), ("high", "low"), ("low", "high")):
+            for sa, sb in side_pairs:
                 ma, mb = mask(a, sa, q_ix), mask(b, sb, q_ix)
                 n = min(len(ma), len(mb))
                 specs.append({
@@ -474,6 +668,10 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
         specialised.extend(combos)
     for a, sa, b, sb, name in specialised:
         if a not in factor_matrix or b not in factor_matrix:
+            continue
+        if not _side_legal_for_hypothesis(hypothesis, a, sa):
+            continue
+        if not _side_legal_for_hypothesis(hypothesis, b, sb):
             continue
         ma, mb = mask(a, sa, 0.8), mask(b, sb, 0.8)
         n = min(len(ma), len(mb))
@@ -566,6 +764,11 @@ def _candidate_events(hypothesis, factor_matrix, max_specs=18):
             )
         for event_name, definitions in reversed(exhaustion_events):
             if not all(name in (factor_matrix or {}) for name, _, _ in definitions):
+                continue
+            if any(
+                not _side_legal_for_hypothesis(hypothesis, name, side)
+                for name, side, _q in definitions
+            ):
                 continue
             term_rows = [
                 quantile_term(name, side, q)
@@ -800,7 +1003,8 @@ def _regime_split_conditional(candles, obs):
     }
 
 
-def _trade_observation(candles, signal_i, horizon, direction, mapping):
+def _trade_observation(candles, signal_i, horizon, direction, mapping,
+                       stop_pct=None, target_pct=None, barrier_exit=False):
     rows = candles or []
     if mapping == "delayed_confirmation":
         entry_i = signal_i + 2
@@ -823,21 +1027,44 @@ def _trade_observation(candles, signal_i, horizon, direction, mapping):
     planned_exit_i = exit_i
     if not entry:
         return None
-    stop_pct = recipe_policy.PROTECTIVE_STOP_PCT
+    if stop_pct is None:
+        stop_pct = recipe_policy.PROTECTIVE_STOP_PCT
+    stop_pct = float(stop_pct)
     stop_price = entry * (1.0 - stop_pct if direction > 0 else 1.0 + stop_pct)
+    target_price = None
+    if target_pct is not None and float(target_pct) > 0:
+        tp = float(target_pct)
+        target_price = entry * (1.0 + tp if direction > 0 else 1.0 - tp)
     exit_reason = "fixed_horizon_close"
     exit_price = None
     for index in range(entry_i, planned_exit_i + 1):
         high = _finite(rows[index].get("high"))
         low = _finite(rows[index].get("low"))
-        stopped = bool(
+        hit_stop = bool(
             (direction > 0 and low is not None and low <= stop_price)
             or (direction < 0 and high is not None and high >= stop_price)
         )
-        if stopped:
+        hit_target = bool(
+            barrier_exit and target_price is not None and (
+                (direction > 0 and high is not None and high >= target_price)
+                or (direction < 0 and low is not None and low <= target_price)
+            )
+        )
+        if barrier_exit and hit_stop and hit_target:
+            # Same-bar ambiguity: treat as stop (conservative), matching path_outcome.
             exit_i = index
             exit_price = stop_price
             exit_reason = "protective_stop"
+            break
+        if hit_stop:
+            exit_i = index
+            exit_price = stop_price
+            exit_reason = "protective_stop"
+            break
+        if hit_target:
+            exit_i = index
+            exit_price = target_price
+            exit_reason = "barrier_target"
             break
     if exit_price is None:
         exit_price = _finite(rows[planned_exit_i].get("close"))
@@ -859,9 +1086,10 @@ def _trade_observation(candles, signal_i, horizon, direction, mapping):
     path_label = None
     try:
         from . import path_outcome as path_out
+        path_target = float(target_pct) if target_pct is not None else path_out.TARGET_PRICE_PCT
         path_label = path_out.label_path(
             rows, entry_i, direction, horizon,
-            target_pct=path_out.TARGET_PRICE_PCT,
+            target_pct=path_target,
             stop_pct=stop_pct,
         )
     except Exception:
@@ -884,6 +1112,58 @@ def _trade_observation(candles, signal_i, horizon, direction, mapping):
         out["bars_to_stop"] = path_label.get("bars_to_stop")
         out["path_label"] = path_label
     return out
+
+
+def _holding_exec_params(hypothesis=None, contract=None):
+    """Resolve stop/target/leverage/barrier from hyp or research contract."""
+    hyp = hypothesis if isinstance(hypothesis, dict) else {}
+    holding = hyp.get("holding_contract") or {}
+    if not holding and isinstance(contract, dict):
+        holding = contract.get("holding_contract") or {}
+    stop_pol = holding.get("protective_stop_policy") or {}
+    exit_pol = holding.get("exit_policy") or {}
+    try:
+        stop_pct = float(stop_pol.get("price_pct"))
+    except (TypeError, ValueError):
+        stop_pct = recipe_policy.PROTECTIVE_STOP_PCT
+    target_pct = holding.get("target_price_distance")
+    if target_pct is None:
+        target_pct = exit_pol.get("target_price_pct")
+    if target_pct is None and isinstance(hyp.get("rhyme_selected_spec"), dict):
+        target_pct = hyp["rhyme_selected_spec"].get("target_price_distance")
+    try:
+        target_pct = float(target_pct) if target_pct is not None else None
+    except (TypeError, ValueError):
+        target_pct = None
+    try:
+        leverage = float(holding.get("execution_leverage"))
+    except (TypeError, ValueError):
+        leverage = None
+    if leverage is None and isinstance(hyp.get("rhyme_selected_spec"), dict):
+        try:
+            leverage = float(hyp["rhyme_selected_spec"].get("leverage"))
+        except (TypeError, ValueError):
+            leverage = None
+    if leverage is None:
+        leverage = float(recipe_policy.EXECUTION_LEVERAGE)
+    barrier = (
+        str(exit_pol.get("mode") or "") == recipe_policy.BARRIER_PCT_EXIT_MODE
+        or bool(hyp.get("pinned_rhyme_arm"))
+        or (
+            isinstance((contract or {}).get("pinned_rhyme_arm"), dict)
+            and bool((contract or {}).get("pinned_rhyme_arm"))
+        )
+    )
+    if barrier and target_pct is None:
+        target_pct = stop_pct
+    return {
+        "stop_pct": stop_pct,
+        "target_pct": target_pct,
+        "leverage": leverage,
+        "barrier_exit": bool(barrier and target_pct is not None),
+        "exit_policy": dict(exit_pol) if exit_pol else None,
+        "protective_stop_policy": dict(stop_pol) if stop_pol else None,
+    }
 
 
 def _newey_west_t(xs):
@@ -969,16 +1249,30 @@ def _cost_scenarios(symbol, horizon):
 
 
 def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mapping,
-                    symbol=None, timeframe=None):
-    gap = _independence_gap_bars(horizon, timeframe=timeframe)
-    merge = max(3, int(horizon or 1))
+                    symbol=None, timeframe=None, exec_params=None):
+    xp = exec_params if isinstance(exec_params, dict) else {}
+    stop_pct = xp.get("stop_pct", recipe_policy.PROTECTIVE_STOP_PCT)
+    target_pct = xp.get("target_pct")
+    barrier_exit = bool(xp.get("barrier_exit"))
+    leverage = float(xp.get("leverage") or recipe_policy.EXECUTION_LEVERAGE)
+    # Stage1 pin identity: do not thin signals with independence clustering.
+    if barrier_exit or bool(xp.get("pin_dense_events")):
+        gap = 1
+        merge = 1
+    else:
+        gap = _independence_gap_bars(horizon, timeframe=timeframe)
+        merge = max(3, int(horizon or 1))
     raw, independent = _independent_events(
         event.get("mask") or [], gap, merge_bars=merge,
     )
     obs = []
     if candles:
         for i in independent:
-            row = _trade_observation(candles, i, horizon, direction, mapping)
+            row = _trade_observation(
+                candles, i, horizon, direction, mapping,
+                stop_pct=stop_pct, target_pct=target_pct,
+                barrier_exit=barrier_exit,
+            )
             if row is not None:
                 obs.append(row)
     else:
@@ -993,12 +1287,19 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
     costs = _cost_scenarios(symbol, horizon)
     primary = "maker_taker" if mapping == "pullback_limit" else "taker_taker"
     primary_cost = float((costs.get(primary) or {}).get("total_friction") or 0.0)
+    # Pin/barrier Stage1 identity uses the rhyme round-trip cost model so
+    # mean_win > stop*L stays consistent with research admission.
+    if barrier_exit:
+        try:
+            from project_prometheus import rhyme_contract as _rc
+            primary_cost = float(_rc.ROUND_TRIP_PRICE_COST)
+        except Exception:
+            pass
     # Every statistical gate must see realizable post-cost returns.  Keeping
     # gross returns here made DSR/PBO significant even when friction erased the
     # edge.
-    leverage = recipe_policy.EXECUTION_LEVERAGE
     # DSR/PBO and final formal execution now consume the same account-return
-    # basis: full-size 20x gross PnL minus the same leveraged friction estimate.
+    # basis: full-size leveraged gross PnL minus the same leveraged friction estimate.
     rets = [
         (float(value) - primary_cost) * float(leverage)
         for value in gross_rets
@@ -1056,6 +1357,25 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
     wins = [v for v in rets if v is not None and float(v) > 0]
     losses = [v for v in rets if v is not None and float(v) < 0]
     win_rate = (len(wins) / float(n)) if n else None
+    # Barrier / Stage1 pin: WR = path profit-first among resolved (exclude
+    # unresolved horizon closes), matching rhyme admission identity.
+    if barrier_exit:
+        pf_rets = []
+        lf_rets = []
+        for item, ret in zip(obs, rets):
+            v = item.get("profit_first")
+            if v is None:
+                continue
+            if int(v) == 1:
+                pf_rets.append(ret)
+            elif int(v) == 0:
+                lf_rets.append(ret)
+        resolved_n = len(pf_rets) + len(lf_rets)
+        if resolved_n > 0:
+            win_rate = len(pf_rets) / float(resolved_n)
+            wins = list(pf_rets)
+            losses = list(lf_rets)
+            n = resolved_n
     avg_win = (sum(wins) / float(len(wins))) if wins else 0.0
     avg_loss_mag = (sum(-float(v) for v in losses) / float(len(losses))) if losses else 0.0
     if avg_loss_mag > 0:
@@ -1093,9 +1413,28 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         path_screen = None
     path_packaging_ok = bool((path_screen or {}).get("packaging_ok"))
     path_review_ok = bool((path_screen or {}).get("passed"))
-    path_summary = (path_screen or {}).get("summary") or {}
+    path_summary = dict((path_screen or {}).get("summary") or {})
+    if barrier_exit:
+        # path_bare_screen still defaults to 0.5555%/20x; pin identity uses
+        # researched target/stop/leverage already computed into win_rate/wins.
+        pf_n = len(wins) if win_rate is not None else 0
+        lf_n = len(losses) if win_rate is not None else 0
+        resolved = pf_n + lf_n
+        if resolved > 0 and win_rate is not None:
+            path_summary["profit_first_rate"] = float(win_rate)
+            path_summary["loss_first_rate"] = float(lf_n) / float(resolved)
+            path_summary["n_profit_first"] = int(pf_n)
+            path_summary["n_loss_first"] = int(lf_n)
+            path_summary["n"] = int(resolved)
+            path_summary["barrier_target_pct"] = float(target_pct) if target_pct is not None else None
+            path_summary["mean_winning_levered"] = float(avg_win) if wins else None
+            path_summary["path_identity"] = "rhyme_barrier_resolved"
+            path_summary["win_rate_basis"] = "path_profit_first_resolved"
+            path_summary["mean_win_basis"] = "path_barrier_winning_levered"
+            path_summary["win_rate"] = float(win_rate)
     # 毛收益仅作诊断；交接/组装必须用账户口径（含摩擦）胜率>50% + 反彩票。
-    # 禁止「毛胜率好看、账户胜率≈35%」的屎策略混进四阶段复核。
+    # 禁止「毛胜率好看、账户胜率≈35%」的屎策略混进复核。
+    # 屏障/钉扎臂另用 path_profit_first_resolved，并在 select_metrics 标明口径。
     gross_wins = [v for v in gross_rets if v is not None and float(v) > 0]
     gross_losses = [v for v in gross_rets if v is not None and float(v) < 0]
     gross_win_rate = (len(gross_wins) / float(n)) if n else None
@@ -1139,11 +1478,15 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
     regime_conditional, regime_pack = _regime_split_conditional(candles, obs)
     if n < MIN_INDEPENDENT_EVENTS:
         state = "SAMPLE_INADEQUATE"
+    elif manufacture_mode and n >= MIN_INDEPENDENT_EVENTS and net_mean is not None and net_mean > 0:
+        # Creation hard floor restored: account/path WR must clear 35%.
+        # Positive mean alone is not READY (stops random-noise survivors).
+        if win_rate is not None and float(win_rate) > 0.35:
+            state = "READY_FOR_ASSEMBLY"
+        else:
+            state = "NEAR_MISS_DIAGNOSTIC"
     elif manufacture_mode and n >= MIN_INDEPENDENT_EVENTS:
-        # Materialize first, judge later. Path metrics are recorded and used at
-        # handoff / ranking — they must NOT veto packaging or the manufacture
-        # batch collapses to empty and the pipeline falsely claims "no market edge".
-        state = "READY_FOR_ASSEMBLY"
+        state = "NO_DIRECTIONAL_EFFECT" if (net_mean is None or net_mean <= 0) else "NEAR_MISS_DIAGNOSTIC"
     elif path_review_ok and statistical and economic and execution and high_wr and anti_lottery:
         state = "READY_FOR_ASSEMBLY"
     elif path_review_ok and handoff_floor:
@@ -1231,6 +1574,9 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         "median_mae_pct": path_summary.get("median_mae_pct"),
         "mean_winning_levered": path_summary.get("mean_winning_levered"),
         "median_winning_levered": path_summary.get("median_winning_levered"),
+        "failure_path_breakdown": (path_screen or {}).get("failure_path_breakdown"),
+        "dominant_failure_path": path_summary.get("dominant_failure_path"),
+        "path_labels": list((path_screen or {}).get("path_labels") or [])[:500],
         "path_packaging_ok": path_packaging_ok,
         "path_review_eligible": path_review_ok,
         "path_entry_score": ((path_screen or {}).get("rank") or {}).get("score"),
@@ -1250,15 +1596,25 @@ def _evaluate_trial(candles, fallback_returns, event, horizon, direction, mappin
         "primary_cost_scenario": primary,
         "primary_cost_per_trade": primary_cost,
         "statistical_returns_are_post_cost": True,
-        "exit_policy": {
-            "mode": recipe_policy.EXIT_POLICY_MODE,
-            "exit_bar": "entry_plus_horizon_minus_1",
-            "price": "bar_close",
-            "allow_early_take_profit": False,
-        },
+        "exit_policy": (
+            {
+                "mode": recipe_policy.BARRIER_PCT_EXIT_MODE,
+                "target_price_pct": float(target_pct),
+                "exit_bar": "first_touch_target_or_stop_else_horizon",
+                "price": "barrier_or_bar_close",
+                "allow_early_take_profit": False,
+            }
+            if barrier_exit and target_pct is not None
+            else {
+                "mode": recipe_policy.EXIT_POLICY_MODE,
+                "exit_bar": "entry_plus_horizon_minus_1",
+                "price": "bar_close",
+                "allow_early_take_profit": False,
+            }
+        ),
         "protective_stop_policy": {
             "mode": recipe_policy.PROTECTIVE_STOP_MODE,
-            "price_pct": recipe_policy.PROTECTIVE_STOP_PCT,
+            "price_pct": float(stop_pct),
             "applies_from": "entry_bar",
             "precedence": "protective_stop_before_time_exit",
         },
@@ -1403,6 +1759,10 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
     # Candidate-first grid: keep the full event identity fixed while comparing
     # its holding periods.  The old Latin traversal tested each event only once
     # at an arbitrary horizon, so "multi-horizon search" was merely telemetry.
+    exec_params = _holding_exec_params(
+        hypothesis,
+        (hypothesis or {}).get("research_contract"),
+    )
     for spec_i, spec in enumerate(specs):
         for horizon in preferred_horizons:
             for mapping_i, mapping in enumerate(mappings):
@@ -1417,7 +1777,7 @@ def probe_hypothesis(hypothesis, factor_matrix, fwd_returns, round_trip_cost=0.0
     for spec, horizon, direction, mapping in plan[:budget]:
         rows.append(_evaluate_trial(
             candles, fwd_returns, spec, horizon, direction, mapping,
-            symbol=symbol, timeframe=timeframe,
+            symbol=symbol, timeframe=timeframe, exec_params=exec_params,
         ))
 
     # Horizon mismatch vs hypothesis statement band (not search-order bias).

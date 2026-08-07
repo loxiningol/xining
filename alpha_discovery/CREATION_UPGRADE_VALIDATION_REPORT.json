@@ -1,0 +1,31 @@
+{
+  "brief": "均线金叉做多",
+  "elapsed_sec": 1431.9,
+  "ok": false,
+  "outcome": "generation_system_failure",
+  "present_to_assembly": null,
+  "n_survivors": null,
+  "research_state_counts": {
+    "NO_DIRECTIONAL_EFFECT": 68,
+    "PROXY_INADEQUATE": 2,
+    "MECHANISM_CONTRADICTED": 2
+  },
+  "nde_before_baseline": 63,
+  "nde_after": 68,
+  "meta": {
+    "skip_llm": false,
+    "glm_enriched": false,
+    "glm_error": null,
+    "selected_lens": "均线金叉趋势跟踪",
+    "n_design_perspectives": 3
+  },
+  "design_seed_hypotheses_n": 0,
+  "design_seed_ids": [],
+  "qualified_candidate": null,
+  "checklist": {
+    "has_design_seed_candidate": false,
+    "has_any_survivor": false,
+    "wr_gt_35_mean_gt_0": false,
+    "nde_dropped": false
+  }
+}

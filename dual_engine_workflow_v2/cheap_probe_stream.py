@@ -183,7 +183,7 @@ def build_mechanism_cells(brief="", max_cells=80):
             allowed_extra_families.add("exhaustion")
         elif tid == "donchian_trend_break":
             allowed_extra_families.add("donchian_trend_break")
-        elif tid == "vol_squeeze_break":
+        elif tid in ("vol_squeeze_break", "vol_squeeze_expansion"):
             allowed_extra_families.add("vol_squeeze")
     mechanism_features = {
         str(row.get("mechanism_id") or ""): list(
