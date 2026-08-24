@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-from flask import Flask, render_template_string, jsonify, request
+from flask import Flask, render_template_string, jsonify, request, send_from_directory
 from flask_httpauth import HTTPBasicAuth
 
 import backtest_engine_v2
@@ -78,6 +78,14 @@ RESEARCH_INSTRUMENTS = (
     "SHIB-USDT-SWAP", "ORDI-USDT-SWAP",
     # commodities
     "XAU-USDT-SWAP", "XAG-USDT-SWAP", "NG-USDT-SWAP", "CL-USDT-SWAP",
+    # OKX US equity perpetuals (TradFi / stock perps)
+    "SNDK-USDT-SWAP", "SKHYNIX-USDT-SWAP", "SKHY-USDT-SWAP",
+    "NVDA-USDT-SWAP", "MU-USDT-SWAP", "AAPL-USDT-SWAP", "TSLA-USDT-SWAP",
+    "GOOGL-USDT-SWAP", "META-USDT-SWAP", "MSFT-USDT-SWAP",
+    "QQQ-USDT-SWAP", "SPY-USDT-SWAP", "AMD-USDT-SWAP", "AMZN-USDT-SWAP",
+    "INTC-USDT-SWAP", "AVGO-USDT-SWAP", "NFLX-USDT-SWAP", "COIN-USDT-SWAP",
+    "TSM-USDT-SWAP",
+    "POPMART-USDT-SWAP", "KO-USDT-SWAP", "EWY-USDT-SWAP", "SOXL-USDT-SWAP",
 )
 
 
@@ -355,6 +363,14 @@ def _parse_backtest_risk_params(data):
 
     return leverage, matched, None
 # BACKTEST_RISK_CONTROLS_END
+
+
+HOUSEKEEPER_DIR = Path("/root/static/housekeeper")
+
+
+@app.route("/housekeeper/<path:filename>")
+def housekeeper_files(filename):
+    return send_from_directory(str(HOUSEKEEPER_DIR), filename)
 
 
 @app.route("/")
@@ -660,7 +676,41 @@ _VECTOR_STATUS_STALE_TTL = 120.0
 _VECTOR_STATUS_BUILD_TIMEOUT = 18.0
 
 
+def _vector_disk_status_fallback(error=None):
+    """Serve last good roster snapshot when live rebuild OOMs or times out."""
+    try:
+        import auto_trade_roster_display_metrics as _rdm
+        payload = _rdm.load_vector_status_cache()
+        if isinstance(payload, dict) and payload.get("asset_zones"):
+            out = dict(payload)
+            out["degraded"] = True
+            out["cache"] = "disk"
+            if error:
+                out["error"] = str(error)
+                out["message"] = (
+                    "运行策略自磁盘快照恢复（实时构建失败或超时，点刷新可重试）"
+                )
+            return out
+    except Exception:
+        pass
+    return None
+
+
+def _vector_seed_status_cache_from_disk():
+    with _VECTOR_STATUS_CACHE_LOCK:
+        if _VECTOR_STATUS_CACHE.get("payload") is not None:
+            return
+        disk = _vector_disk_status_fallback()
+        if disk is not None:
+            _VECTOR_STATUS_CACHE["payload"] = disk
+            _VECTOR_STATUS_CACHE["ts"] = time.time()
+            _VECTOR_STATUS_CACHE["error"] = None
+
+
 def _vector_minimal_status_payload(error=None):
+    disk = _vector_disk_status_fallback(error)
+    if disk is not None:
+        return disk
     return {
         "ok": False if error else True,
         "degraded": True,
@@ -689,21 +739,32 @@ def _vector_status_payload_cached():
     def _build():
         try:
             payload = _vector_status_payload()
+            try:
+                import auto_trade_roster_display_metrics as _rdm
+                _rdm.save_vector_status_cache(payload)
+            except Exception:
+                pass
             with _VECTOR_STATUS_CACHE_LOCK:
                 _VECTOR_STATUS_CACHE["ts"] = time.time()
                 _VECTOR_STATUS_CACHE["payload"] = payload
                 _VECTOR_STATUS_CACHE["error"] = None
                 _VECTOR_STATUS_CACHE["building"] = False
         except Exception as exc:
+            fallback = _vector_disk_status_fallback(exc)
             with _VECTOR_STATUS_CACHE_LOCK:
                 _VECTOR_STATUS_CACHE["error"] = str(exc)
                 _VECTOR_STATUS_CACHE["building"] = False
-                if _VECTOR_STATUS_CACHE.get("payload") is None:
+                if fallback is not None:
+                    _VECTOR_STATUS_CACHE["payload"] = fallback
+                    _VECTOR_STATUS_CACHE["ts"] = time.time()
+                elif _VECTOR_STATUS_CACHE.get("payload") is None:
                     _VECTOR_STATUS_CACHE["payload"] = _vector_minimal_status_payload(exc)
                     _VECTOR_STATUS_CACHE["ts"] = time.time()
 
     # Kick a background rebuild when cache is missing/expired.
     with _VECTOR_STATUS_CACHE_LOCK:
+        if _VECTOR_STATUS_CACHE.get("payload") is None:
+            _vector_seed_status_cache_from_disk()
         if not _VECTOR_STATUS_CACHE.get("building"):
             _VECTOR_STATUS_CACHE["building"] = True
             already_building = False
@@ -806,6 +867,17 @@ def api_creation_quality_inspector():
         return jsonify(qi.status())
     except Exception as e:
         return jsonify({"ok": False, "error": str(e), "passed": [], "failed": []}), 500
+
+
+@app.route("/api/creation/bakery", methods=["GET"])
+@auth.login_required
+def api_creation_bakery():
+    """合格策略面包房：按北京时间每一轮创造分组的过关策略，最多最近7天。"""
+    try:
+        from dual_engine_workflow_v2 import quality_inspector as qi
+        return jsonify(qi.bakery_board())
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "rounds": []}), 500
 
 
 @app.route("/api/strategy/pending_optimize", methods=["GET"])
@@ -1261,7 +1333,7 @@ def build_process_status_payload():
     add("web", "网站服务", "healthy" if web_ok else "error",
         "\n".join(web_detail_lines), detail_lines=web_detail_lines)
 
-    # --- Formal daemon farm inventory (includes XRP 15m) ---
+    # --- Formal auto-trade supervisor (portfolio daemon is the live path) ---
     daemon_status = {}
     try:
         import auto_trade_formal_daemon as daemon
@@ -1270,16 +1342,59 @@ def build_process_status_payload():
         daemon_status = {"running": False, "error": str(e)}
 
     daemon_pids = []
+    portfolio_pids = []
     try:
         for proc in Path("/proc").iterdir():
             if not proc.name.isdigit():
                 continue
             cmd = _proc_cmdline(proc.name)
+            if "auto_trade_formal_daemon.py" in cmd and "--portfolio" in cmd:
+                portfolio_pids.append(int(proc.name))
             if "python3 -c import auto_trade_formal_daemon as d; d.run_forever()" in cmd:
                 daemon_pids.append(int(proc.name))
     except Exception:
         pass
     daemon_pid_set = set(daemon_pids)
+    file_portfolio_pid = _read_pid("/root/auto_trade/formal_daemon_portfolio.pid")
+    portfolio_pid = file_portfolio_pid if file_portfolio_pid in set(portfolio_pids) else (
+        portfolio_pids[0] if portfolio_pids else file_portfolio_pid)
+    portfolio_cmd = _proc_cmdline(portfolio_pid) if portfolio_pid else ""
+    portfolio_alive = bool(
+        portfolio_pid
+        and _pid_alive(portfolio_pid)
+        and "auto_trade_formal_daemon.py" in portfolio_cmd
+        and "--portfolio" in portfolio_cmd
+    )
+    runtime = _vector_load_json(
+        Path("/root/auto_trade/formal_daemon_portfolio_runtime.json"), {})
+    if not isinstance(runtime, dict):
+        runtime = {}
+    slot_rows = list(runtime.get("slot_results") or [])
+    runtime_ts = None
+    try:
+        runtime_ts = float(runtime.get("updated_at_ts") or 0) or None
+    except Exception:
+        runtime_ts = None
+    runtime_age = (time.time() - runtime_ts) if runtime_ts else None
+    runtime_fresh = bool(runtime_age is not None and runtime_age <= 300)
+    failed_slots = [
+        s for s in slot_rows
+        if isinstance(s, dict) and s.get("ok") is False
+    ]
+    tf_counts = {}
+    for s in slot_rows:
+        if not isinstance(s, dict):
+            continue
+        tf = str(s.get("timeframe") or "")
+        if tf:
+            tf_counts[tf] = int(tf_counts.get(tf) or 0) + 1
+    portfolio_ok = bool(
+        portfolio_alive
+        and runtime.get("ok")
+        and runtime_fresh
+        and slot_rows
+        and not failed_slots
+    )
 
     expected_daemons = [
         ("BTC 1小时", "/root/auto_trade/formal_daemon.pid"),
@@ -1307,43 +1422,52 @@ def build_process_status_payload():
         daemon_rows.append({"label": label, "pid": pid, "ok": ok})
         if not ok:
             missing_daemons.append(label)
-
     expected_count = len(expected_daemons)
     running_expected = sum(1 for row in daemon_rows if row["ok"])
-    # Healthy when every expected instance is up. Extra procs are noted, not fatal.
-    daemon_group_ok = running_expected == expected_count
-    daemon_running = bool(daemon_status.get("running")) or running_expected > 0
-    daemon_state = "healthy" if daemon_group_ok else "error"
+    farm_ok = running_expected == expected_count
+    daemon_running = bool(portfolio_alive or farm_ok or daemon_status.get("running"))
+    daemon_state = "healthy" if (portfolio_ok or farm_ok) else "error"
     pid_by_label = {row["label"]: row["pid"] for row in daemon_rows}
-    btc_daemon_pid = pid_by_label.get("BTC 1小时")
     btc_15m_daemon_pid = pid_by_label.get("BTC 15分钟")
     btc_5m_daemon_pid = pid_by_label.get("BTC 5分钟")
     eth_5m_daemon_pid = pid_by_label.get("ETH 5分钟")
     sol_5m_daemon_pid = pid_by_label.get("SOL 5分钟")
     xrp_5m_daemon_pid = pid_by_label.get("XRP 5分钟")
-    cl_daemon_pid = pid_by_label.get("CL 1小时")
     cl_5m_daemon_pid = pid_by_label.get("CL 5分钟")
-    xau_daemon_pid = pid_by_label.get("XAU 1小时")
     xau_15m_daemon_pid = pid_by_label.get("XAU 15分钟")
-    ng_daemon_pid = pid_by_label.get("NG 1小时")
     ng_5m_daemon_pid = pid_by_label.get("NG 5分钟")
     xag_5m_daemon_pid = pid_by_label.get("XAG 5分钟")
     ltc_5m_daemon_pid = pid_by_label.get("LTC 5分钟")
     ada_5m_daemon_pid = pid_by_label.get("ADA 5分钟")
     xrp_15m_daemon_pid = pid_by_label.get("XRP 15分钟")
 
-    if daemon_state == "healthy":
+    if portfolio_ok:
+        tf_txt = "、".join(
+            "%s×%d" % (tf, tf_counts[tf])
+            for tf in sorted(tf_counts.keys())
+        ) or "无槽位"
         daemon_lines = [
-            "实盘守护进程 %d/%d 在线（含 XRP 15分钟）" % (running_expected, expected_count),
+            "组合守护进程在线（PID %s）" % portfolio_pid,
+            "本轮心跳覆盖 %d 个花名册槽位：%s" % (len(slot_rows), tf_txt),
+            "最近心跳 %s" % (runtime.get("updated_at") or "未知"),
         ]
-        if len(daemon_pids) > expected_count:
-            daemon_lines.append("另有 %d 个额外进程（不判异常）" % (len(daemon_pids) - expected_count))
+    elif farm_ok:
+        daemon_lines = [
+            "实盘守护进程 %d/%d 在线" % (running_expected, expected_count),
+        ]
     else:
-        daemon_lines = [
-            "守护进程异常：%d/%d 在线" % (running_expected, expected_count),
-            "缺失：" + ("、".join(missing_daemons) if missing_daemons else "未知"),
-            "当前进程数 %d" % len(daemon_pids),
-        ]
+        daemon_lines = ["守护进程异常"]
+        if portfolio_alive:
+            if not runtime_fresh:
+                daemon_lines.append("组合守护在线但心跳超时")
+            elif not slot_rows:
+                daemon_lines.append("组合守护在线但本轮无花名册槽位")
+            elif failed_slots:
+                daemon_lines.append("失败槽位 %d 个" % len(failed_slots))
+        else:
+            daemon_lines.append("组合守护进程未在线")
+            if missing_daemons:
+                daemon_lines.append("旧分进程也未在线：%s" % "、".join(missing_daemons[:8]))
     add("auto_daemon", "自动交易守护进程", daemon_state,
         "\n".join(daemon_lines), detail_lines=daemon_lines)
 
@@ -1352,15 +1476,14 @@ def build_process_status_payload():
         import auto_trade_symbol_priority as symbol_priority
         priority_status = symbol_priority.status()
         priority_order = priority_status.get("priority") or []
-        expected_priority = [
+        expected_priority_prefix = [
             "BTC-USDT-SWAP", "CL-USDT-SWAP",
             "XAU-USDT-SWAP", "NG-USDT-SWAP",
             "XAG-USDT-SWAP",
-            "LTC-USDT-SWAP", "ADA-USDT-SWAP",
         ]
         priority_ok = (
             priority_status.get("ok") is True
-            and priority_order[:7] == expected_priority
+            and priority_order[:5] == expected_priority_prefix
             and priority_status.get("unknown_symbol_policy") == "append_to_end"
         )
         import auto_trade_portfolio_risk as portfolio_risk
@@ -1412,22 +1535,9 @@ def build_process_status_payload():
     except Exception as e:
         strategy_read_error = str(e)
 
-    # Expected current live openable set.
-    expected_live_keys = {
-        "codex0725t3_ada5m_trendpb_r42_z2p3_h14",
-        "ltc5_exhaustion_fade_short_ai",
-        "ng5_exhaustion_fade_short_ai",
-        "frost_xrp_rescue_h20_t45",
-        "frost3_btc1h_xrpport_exhaustion_fade_slope",
-        "btc5_trend_rebound_ada5_clone_v1",
-        "eth5_trend_rebound_ada5_clone_v1",
-        "sol5_trend_rebound_ada5_clone_v1",
-        "xrp5_trend_rebound_ada5_clone_v1",
-    }
-    live_keys = {row["key"] for row in live_rows}
     strategy_ok = (
         strategy_read_error is None
-        and live_keys == expected_live_keys
+        and bool(live_rows)
         and daemon_state == "healthy"
     )
     if strategy_read_error:
@@ -1437,79 +1547,56 @@ def build_process_status_payload():
     else:
         strategy_lines = ["可开仓运行策略 %d 条：" % len(live_rows)]
         strategy_lines.extend(row["line"] for row in live_rows)
-        if live_keys != expected_live_keys:
-            missing = sorted(expected_live_keys - live_keys)
-            extra = sorted(live_keys - expected_live_keys)
-            if missing:
-                strategy_lines.append("缺少预期：" + "、".join(missing))
-            if extra:
-                strategy_lines.append("额外策略：" + "、".join(extra))
     add("auto_strategies", "自动交易策略监测",
         "healthy" if strategy_ok else "error",
         "\n".join(strategy_lines), detail_lines=strategy_lines)
 
-    # --- 15m modules: XRP live; BTC/CL/XAU/NG idle ---
-    def _cfg_keys(config):
-        keys = list(config.get("strategy_keys") or []) if isinstance(config, dict) else []
-        return keys
+    # --- 15m / 5m live slots are owned by the portfolio supervisor ---
+    def _slots_tf(tf):
+        out = []
+        for s in slot_rows:
+            if isinstance(s, dict) and str(s.get("timeframe") or "").lower() == tf:
+                out.append(s)
+        return out
 
-    def _idle_15m_ok(config, symbol):
-        return (
-            isinstance(config, dict)
-            and config.get("symbol") == symbol
-            and config.get("timeframe") == "15m"
-            and _cfg_keys(config) == []
-            and bool(config.get("allow_auto_open")) is False
+    def _slot_label(row):
+        return "%s %s" % (
+            str((row or {}).get("symbol") or "").replace("-USDT-SWAP", ""),
+            {"1h": "1小时", "15m": "15分钟", "5m": "5分钟"}.get(
+                str((row or {}).get("timeframe") or ""),
+                (row or {}).get("timeframe") or "",
+            ),
         )
 
-    fifteen_symbols_idle = (
-        "BTC-USDT-SWAP",
-        "CL-USDT-SWAP",
-        "XAU-USDT-SWAP",
-        "NG-USDT-SWAP",
-    )
-    fifteen_idle_ok = True
-    fifteen_notes = []
-    for symbol in fifteen_symbols_idle:
-        config = _vector_load_json(
-            Path("/root/auto_trade/formal_daemon_config_%s_15m.json" % symbol.split("-")[0].lower()),
-            {},
-        )
-        ok = _idle_15m_ok(config, symbol)
-        fifteen_idle_ok = fifteen_idle_ok and ok
-        if not ok:
-            fifteen_notes.append("%s 15分钟非空闲" % symbol.split("-")[0])
-
-    xrp_15m_cfg = _vector_load_json(Path("/root/auto_trade/formal_daemon_config_xrp_15m.json"), {})
-    xrp_15m_ok = (
-        isinstance(xrp_15m_cfg, dict)
-        and xrp_15m_cfg.get("symbol") == "XRP-USDT-SWAP"
-        and xrp_15m_cfg.get("timeframe") == "15m"
-        and _cfg_keys(xrp_15m_cfg) == ["frost_xrp_rescue_h20_t45"]
-        and bool(xrp_15m_cfg.get("allow_auto_open")) is True
-        and bool(xrp_15m_cfg.get("formal_auto_trading_authorized")) is True
-        and bool(xrp_15m_daemon_pid and xrp_15m_daemon_pid in daemon_pid_set)
-    )
-    # BTC/XAU 15m daemons may stay up for monitoring even while idle.
-    btc_15m_proc_ok = bool(btc_15m_daemon_pid and btc_15m_daemon_pid in daemon_pid_set)
-    xau_15m_proc_ok = bool(xau_15m_daemon_pid and xau_15m_daemon_pid in daemon_pid_set)
-    fifteen_minute_ok = bool(fifteen_idle_ok and xrp_15m_ok and btc_15m_proc_ok and xau_15m_proc_ok)
-    if fifteen_minute_ok:
+    fifteen_slots = _slots_tf("15m")
+    if portfolio_ok and not fifteen_slots:
+        fifteen_minute_ok = True
         fifteen_lines = [
-            "XRP 15分钟：寒霜 exhaustion_fade 可开仓",
-            "BTC / CL / XAU / NG 15分钟：保持关闭（无开仓授权）",
-            "BTC、XAU 15分钟守护进程在线（监测）",
+            "当前花名册无 15 分钟实盘槽位",
+            "由组合守护统一调度 1 小时策略",
         ]
+    elif fifteen_slots:
+        bad = [s for s in fifteen_slots if not s.get("ok")]
+        fifteen_minute_ok = not bad
+        fifteen_lines = [
+            "15分钟槽位 %d 个由组合守护调度" % len(fifteen_slots),
+        ]
+        fifteen_lines.extend("· %s" % _slot_label(s) for s in fifteen_slots)
+        if bad:
+            fifteen_lines.append("异常：" + "、".join(_slot_label(s) for s in bad))
     else:
-        fifteen_lines = ["15分钟模块配置或进程异常"]
-        if not xrp_15m_ok:
-            fifteen_lines.append("XRP 15分钟未按预期授权运行")
-        if not fifteen_idle_ok:
-            fifteen_lines.extend(fifteen_notes or ["存在非预期 15分钟开仓授权"])
-        if not btc_15m_proc_ok:
-            fifteen_lines.append("BTC 15分钟守护进程未在线")
-        if not xau_15m_proc_ok:
-            fifteen_lines.append("XAU 15分钟守护进程未在线")
+        # Legacy dedicated-process farm, only if portfolio is not the live path.
+        def _cfg_keys(config):
+            keys = list(config.get("strategy_keys") or []) if isinstance(config, dict) else []
+            return keys
+        xrp_15m_ok = bool(xrp_15m_daemon_pid and xrp_15m_daemon_pid in daemon_pid_set)
+        btc_15m_proc_ok = bool(btc_15m_daemon_pid and btc_15m_daemon_pid in daemon_pid_set)
+        xau_15m_proc_ok = bool(xau_15m_daemon_pid and xau_15m_daemon_pid in daemon_pid_set)
+        fifteen_minute_ok = bool(xrp_15m_ok and btc_15m_proc_ok and xau_15m_proc_ok)
+        fifteen_lines = (
+            ["15分钟分进程在线"] if fifteen_minute_ok
+            else ["15分钟模块未挂载（当前也无组合守护 15 分钟槽位）"]
+        )
     add(
         "dual_timeframe_modules",
         "多周期自动交易模块",
@@ -1518,64 +1605,23 @@ def build_process_status_payload():
         detail_lines=fifteen_lines,
     )
 
-    # --- 5m live layer ---
-    five_minute_expected = {
-        "BTC-USDT-SWAP": ["btc5_trend_rebound_ada5_clone_v1"],
-        "ETH-USDT-SWAP": ["eth5_trend_rebound_ada5_clone_v1"],
-        "SOL-USDT-SWAP": ["sol5_trend_rebound_ada5_clone_v1"],
-        "XRP-USDT-SWAP": ["xrp5_trend_rebound_ada5_clone_v1"],
-        "CL-USDT-SWAP": [],
-        "NG-USDT-SWAP": ["ng5_exhaustion_fade_short_ai"],
-        "XAU-USDT-SWAP": [],
-        "XAG-USDT-SWAP": [],
-        "LTC-USDT-SWAP": ["ltc5_exhaustion_fade_short_ai"],
-        "ADA-USDT-SWAP": ["codex0725t3_ada5m_trendpb_r42_z2p3_h14"],
-    }
-    five_minute_pid = {
-        "BTC-USDT-SWAP": btc_5m_daemon_pid,
-        "ETH-USDT-SWAP": eth_5m_daemon_pid,
-        "SOL-USDT-SWAP": sol_5m_daemon_pid,
-        "XRP-USDT-SWAP": xrp_5m_daemon_pid,
-        "CL-USDT-SWAP": cl_5m_daemon_pid,
-        "NG-USDT-SWAP": ng_5m_daemon_pid,
-        "XAU-USDT-SWAP": None,  # no dedicated 5m daemon required
-        "XAG-USDT-SWAP": xag_5m_daemon_pid,
-        "LTC-USDT-SWAP": ltc_5m_daemon_pid,
-        "ADA-USDT-SWAP": ada_5m_daemon_pid,
-    }
-    five_minute_ok = True
-    five_active = []
-    five_issues = []
-    for symbol, expected in five_minute_expected.items():
-        key = symbol.split("-")[0].lower()
-        config = _vector_load_json(Path("/root/auto_trade/formal_daemon_config_%s_5m.json" % key), {})
-        active_expected = bool(expected)
-        cfg_ok = isinstance(config, dict) and _cfg_keys(config) == expected
-        open_ok = bool(config.get("allow_auto_open")) == active_expected if isinstance(config, dict) else False
-        pid = five_minute_pid.get(symbol)
-        proc_ok = True
-        if pid is not None:
-            # Idle modules still keep monitoring daemons for BTC/CL/XAG.
-            proc_ok = bool(pid in daemon_pid_set)
-        if active_expected:
-            proc_ok = bool(pid and pid in daemon_pid_set)
-        row_ok = cfg_ok and open_ok and proc_ok
-        five_minute_ok = five_minute_ok and row_ok
-        label = symbol.split("-")[0]
-        if active_expected and row_ok:
-            five_active.append(label)
-        if not row_ok:
-            five_issues.append(label)
-    if five_minute_ok:
+    five_slots = _slots_tf("5m")
+    if portfolio_ok and not five_slots:
+        five_minute_ok = True
         five_lines = [
-            "可开仓：%s 5分钟" % ("、".join(five_active) if five_active else "无"),
-            "CL / XAG / XAU 5分钟：关闭或待命",
+            "当前花名册无 5 分钟实盘槽位",
+            "由组合守护统一调度 1 小时策略",
         ]
+    elif five_slots:
+        bad = [s for s in five_slots if not s.get("ok")]
+        five_minute_ok = not bad
+        five_lines = ["5分钟槽位 %d 个由组合守护调度" % len(five_slots)]
+        five_lines.extend("· %s" % _slot_label(s) for s in five_slots)
+        if bad:
+            five_lines.append("异常：" + "、".join(_slot_label(s) for s in bad))
     else:
-        five_lines = [
-            "5分钟配置或进程状态异常",
-            "异常标的：" + ("、".join(five_issues) if five_issues else "未知"),
-        ]
+        five_minute_ok = False
+        five_lines = ["5分钟模块未挂载（当前也无组合守护 5 分钟槽位）"]
     add("five_minute_live", "5分钟实盘层",
         "healthy" if five_minute_ok else "error",
         "\n".join(five_lines), detail_lines=five_lines)
@@ -1608,14 +1654,25 @@ def build_process_status_payload():
             for symbol, metadata in fifteen_minute_data.items()
         ]
         data_lines.append("全部为 OKX 确认 K 线，无非预期间隔")
+        data_state = "healthy"
+        data_critical = True
+    elif not fifteen_slots:
+        data_lines = [
+            "当前未挂载 15 分钟实盘，本地 provenance 未齐不阻断交易",
+        ]
+        data_state = "warning"
+        data_critical = False
     else:
         data_lines = ["BTC、CL、XAU 或 NG 的 15 分钟本地历史数据尚未完整就绪"]
+        data_state = "error"
+        data_critical = True
     add(
         "backtest_15m_data",
         "15分钟回测数据",
-        "healthy" if fifteen_minute_data_ok else "error",
+        data_state,
         "\n".join(data_lines),
         detail_lines=data_lines,
+        critical=data_critical,
     )
 
     executor_status = {}
@@ -1702,6 +1759,16 @@ def build_process_status_payload():
         "components": components,
         "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+
+@app.route("/api/manual_experience", methods=["GET", "POST"])
+@auth.login_required
+def api_manual_experience():
+    import auto_trade_manual_experience as _manual_exp
+    if request.method == "GET":
+        return jsonify(_manual_exp.load_board())
+    out = _manual_exp.save_note(request.get_json(silent=True) or {})
+    return jsonify(out), (200 if out.get("ok") else 400)
 
 
 @app.route("/api/process_status")
@@ -3893,7 +3960,9 @@ def _stage823_auto_auth_err():
 def _stage823_auto_read_cfg():
     import json
     from pathlib import Path
-    p = Path("/root/auto_trade/formal_daemon_config.json")
+    import auto_trade_slot_paths as slot_paths
+    p = Path("/root/auto_trade") / slot_paths.daemon_config_name(
+        "BTC-USDT-SWAP", "1h")
     try:
         if p.exists():
             s = p.read_text(encoding="utf-8", errors="ignore")
@@ -3909,7 +3978,9 @@ def _stage823_auto_read_cfg():
 def _stage823_auto_write_cfg(cfg):
     import json
     from pathlib import Path
-    p = Path("/root/auto_trade/formal_daemon_config.json")
+    import auto_trade_slot_paths as slot_paths
+    p = Path("/root/auto_trade") / slot_paths.daemon_config_name(
+        "BTC-USDT-SWAP", "1h")
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(cfg, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
 
@@ -4102,22 +4173,145 @@ def _vector_configured_symbols(timeframe, baseline=()):
         symbol = str(symbol or "").strip().upper()
         if symbol and symbol not in symbols:
             symbols.append(symbol)
-    pattern = "formal_daemon_config_*_%s.json" % timeframe
-    for path in sorted(_VECTOR_AUTO.glob(pattern)):
+    for path in sorted(_VECTOR_AUTO.glob("formal_daemon_config*.json")):
+        name = path.name
+        if name == "formal_daemon_config.json":
+            continue
         config = _vector_load_json(path, {})
         if not isinstance(config, dict):
             continue
         config_timeframe = str(
-            config.get("timeframe") or config.get("bar") or ""
+            config.get("timeframe") or config.get("bar") or "1h"
         ).strip().lower()
         symbol = str(config.get("symbol") or "").strip().upper()
-        if (
-            config_timeframe == timeframe
-            and symbol.endswith("-USDT-SWAP")
-            and symbol not in symbols
-        ):
+        if not symbol.endswith("-USDT-SWAP"):
+            continue
+        if config_timeframe != timeframe:
+            continue
+        if timeframe == "1h":
+            # 1h configs use formal_daemon_config_<asset>.json (no _1h suffix).
+            stem = name[len("formal_daemon_config_"):-len(".json")]
+            if "_" in stem and not stem.endswith("_1h"):
+                continue
+        elif ("_%s.json" % timeframe) not in name:
+            continue
+        if symbol not in symbols:
             symbols.append(symbol)
     return tuple(symbols)
+
+
+def _vector_portfolio_running():
+    try:
+        pid_file = _VECTOR_AUTO / "formal_daemon_portfolio.pid"
+        pid = int(pid_file.read_text().strip())
+        return bool(pid > 0 and is_pid_alive(str(pid_file)))
+    except Exception:
+        return False
+
+
+def _vector_timeframe_label(timeframe):
+    tf = str(timeframe or "").lower()
+    return {"1h": "1小时", "15m": "15分钟", "5m": "5分钟"}.get(tf, tf)
+
+
+def _vector_build_timeframe_slots(timeframe, baseline=(), portfolio_running=False):
+    """Build assets + asset_zones for one timeframe from mounted daemon configs."""
+    assets = []
+    zones = []
+    tf = str(timeframe or "").lower()
+    tf_label = _vector_timeframe_label(tf)
+    portfolio = bool(portfolio_running) if tf == "1h" else False
+    for symbol in _vector_configured_symbols(tf, baseline):
+        asset_key = symbol.split("-")[0].lower()
+        if tf == "1h":
+            config = _vector_load_json(
+                _VECTOR_AUTO / ("formal_daemon_config_%s.json" % asset_key), {})
+        else:
+            config = _vector_load_json(
+                _VECTOR_AUTO / ("formal_daemon_config_%s_%s.json" % (asset_key, tf)), {})
+        if not isinstance(config, dict):
+            config = {}
+        shared_state_suffix = "_" + asset_key
+        shared_state = _vector_load_json(
+            _VECTOR_AUTO / ("formal_v6_state%s.json" % shared_state_suffix), {})
+        configured_keys = {
+            _vector_canonical_strategy_key(k)
+            for k in (config.get("strategy_keys") or [])
+            if k
+        }
+        raw_current = shared_state.get("current") if isinstance(shared_state, dict) else None
+        current_key = _vector_canonical_strategy_key(
+            (raw_current or {}).get("strategy_key")
+            if isinstance(raw_current, dict)
+            else None
+        )
+        zone_current = raw_current if current_key in configured_keys else None
+        if portfolio:
+            zone_running = portfolio
+            zone_pid = None
+        else:
+            pid_file = _VECTOR_AUTO / (
+                "formal_daemon_%s_%s.pid" % (asset_key, tf)
+                if tf != "1h"
+                else "formal_daemon_%s.pid" % asset_key
+            )
+            try:
+                zone_pid = int(pid_file.read_text().strip())
+                zone_running = bool(zone_pid > 0 and is_pid_alive(str(pid_file)))
+            except Exception:
+                zone_pid, zone_running = None, False
+        dashboard = _vector_trade_dashboard(
+            zone_current, None, None, config, state_suffix=shared_state_suffix)
+        auto_open = bool(config.get("allow_auto_open"))
+        auto_close = bool(config.get("allow_auto_close"))
+        chain_ready = bool(
+            zone_running
+            and config.get("enabled")
+            and auto_open
+            and config.get("formal_auto_trading_authorized")
+            and config.get("gate_authorized_auto_trading")
+        )
+        if _vector_active(zone_current):
+            runtime_state = "持仓中"
+        elif chain_ready:
+            runtime_state = "监测中"
+        elif not configured_keys:
+            runtime_state = "等待配置%s策略" % tf_label
+        elif zone_running:
+            runtime_state = "未运行"
+        else:
+            runtime_state = "未运行"
+        assets.append({
+            "symbol": symbol,
+            "timeframe": tf,
+            "timeframe_label": tf_label,
+            "running": zone_running,
+            "pid": zone_pid,
+            "status": runtime_state,
+            "current": zone_current,
+        })
+        zones.append({
+            "symbol": symbol,
+            "name": "%s 自动交易（%s）" % (symbol.split("-")[0], tf_label),
+            "timeframe": tf,
+            "timeframe_label": tf_label,
+            "running": zone_running,
+            "pid": zone_pid,
+            "auto_open": auto_open,
+            "auto_close": auto_close,
+            "runtime_state": runtime_state,
+            "position": zone_current,
+            "config": config,
+            "records": dashboard,
+            "strategy_count": len(dashboard.get("strategy_stats") or []),
+            "assignment_status": config.get("assignment_status") or ("active" if configured_keys else "waiting_for_%s_strategy" % tf),
+            "validity_days_total": config.get("validity_days_total"),
+            "valid_until": config.get("valid_until"),
+            "days_remaining": config.get("days_remaining"),
+            "validity_countdown_zh": config.get("validity_countdown_zh"),
+            "strategy_validity": config.get("strategy_validity") or {},
+        })
+    return assets, zones
 
 def _vector_write_json(path, obj):
     try:
@@ -4157,12 +4351,16 @@ def _vector_import_status_only():
         if not isinstance(daemon, dict):
             daemon = {}
         if not daemon:
-            cfg = _vector_load_json(_VECTOR_AUTO / "formal_daemon_config.json", {}) or {}
+            cfg = _vector_load_json(_VECTOR_AUTO / "formal_daemon_config_btc.json", {}) or {}
             try:
-                pid = int((_VECTOR_AUTO / "formal_daemon.pid").read_text().strip())
-                running = bool(pid > 0 and is_pid_alive(str(_VECTOR_AUTO / "formal_daemon.pid")))
+                pid = int((_VECTOR_AUTO / "formal_daemon_portfolio.pid").read_text().strip())
+                running = bool(pid > 0 and is_pid_alive(str(_VECTOR_AUTO / "formal_daemon_portfolio.pid")))
             except Exception:
-                pid, running = None, False
+                try:
+                    pid = int((_VECTOR_AUTO / "formal_daemon_btc.pid").read_text().strip())
+                    running = bool(pid > 0 and is_pid_alive(str(_VECTOR_AUTO / "formal_daemon_btc.pid")))
+                except Exception:
+                    pid, running = None, False
             daemon = {
                 "running": running,
                 "daemon_running": running,
@@ -4192,6 +4390,7 @@ def _vector_import_status_only():
 
 def _vector_current(executor=None):
     files = [
+        _VECTOR_AUTO / "formal_v6_state_btc.json",
         _VECTOR_AUTO / "formal_v6_state.json",
         _VECTOR_AUTO / "formal_executor_state.json",
         _VECTOR_AUTO / "formal_v6_executor_state.json",
@@ -4296,6 +4495,7 @@ def _vector_event(e):
 
 def _vector_events():
     files = [
+        _VECTOR_AUTO / "formal_daemon_events_btc.jsonl",
         _VECTOR_AUTO / "formal_daemon_events.jsonl",
         _VECTOR_AUTO / "formal_executor_events.jsonl",
         _VECTOR_AUTO / "formal_events.jsonl",
@@ -4395,6 +4595,70 @@ def _vector_lookup_assignment_row(assignments, ratings_by_id, symbol, timeframe,
             symbol, timeframe, _vector_canonical_strategy_key(strategy_key)
         )
     return assignment_id, row, rating
+
+
+def _vector_tier_hitch_fields(strategy_key, assignment_row=None, assignment_rating=None,
+                              roster_row=None):
+    assignment_row = assignment_row if isinstance(assignment_row, dict) else {}
+    assignment_rating = assignment_rating if isinstance(assignment_rating, dict) else {}
+    roster_row = roster_row if isinstance(roster_row, dict) else {}
+    stop_pct = (
+        assignment_row.get("stop_loss_pct")
+        or assignment_rating.get("stop_loss_pct")
+        or roster_row.get("stop_loss_pct")
+    )
+    hitch_class = None
+    try:
+        from auto_trade_formal_notify import strategy_hitch_class
+        hitch_class = strategy_hitch_class(strategy_key, stop_pct=stop_pct)
+    except Exception:
+        hitch_class = None
+    tier_code = None
+    try:
+        import auto_trade_strategy_tiers as _tiers
+        tier_code = _tiers.normalize(
+            assignment_rating.get("strategy_tier")
+            or assignment_row.get("strategy_tier")
+            or roster_row.get("strategy_tier")
+            or assignment_rating.get("strategy_tier_label")
+            or assignment_row.get("strategy_tier_label")
+            or roster_row.get("strategy_tier_label"),
+            assignment_row.get("explicit_position_ratio")
+            or assignment_rating.get("explicit_position_ratio")
+            or roster_row.get("explicit_position_ratio")
+            or assignment_row.get("max_position_ratio")
+            or assignment_rating.get("max_position_ratio"),
+        )
+        if not tier_code:
+            tier_code = "MACARON"
+        tier_label = _tiers.label(tier_code) or "马卡龙策略"
+        tier_rank = _tiers.rank(tier_code)
+    except Exception:
+        tier_code = str(
+            assignment_rating.get("strategy_tier")
+            or assignment_row.get("strategy_tier")
+            or roster_row.get("strategy_tier")
+            or "MACARON"
+        )
+        tier_label = str(
+            assignment_rating.get("strategy_tier_label")
+            or assignment_row.get("strategy_tier_label")
+            or "马卡龙策略"
+        )
+        tier_rank = 1 if str(tier_code).upper() == "DAIFUKU" else 2
+    try:
+        from auto_trade_formal_notify import format_tier_hitch_zh
+        display = format_tier_hitch_zh(tier_label, hitch_class)
+    except Exception:
+        display = tier_label
+    return {
+        "strategy_tier": tier_code,
+        "strategy_tier_label": tier_label,
+        "strategy_tier_rank": tier_rank,
+        "hitch_class": hitch_class,
+        "strategy_tier_display_zh": display,
+    }
+
 
 def _vector_trade_row(raw):
     if not isinstance(raw, dict):
@@ -4605,6 +4869,16 @@ def _vector_trade_dashboard(cur, strategy_key, strategy_name, cfg=None, state_su
     all_rows.sort(key=_vector_trade_sort_ts, reverse=True)
     rows = all_rows[:15]
 
+    roster_by_key = {}
+    try:
+        import auto_trade_live_roster as _live_roster
+        for row in _live_roster.load_roster() or []:
+            k = str((row or {}).get("strategy_key") or "")
+            if k and k not in roster_by_key:
+                roster_by_key[k] = row
+    except Exception:
+        roster_by_key = {}
+
     running = []
     seen = set()
     candidates = []
@@ -4808,6 +5082,9 @@ def _vector_trade_dashboard(cur, strategy_key, strategy_name, cfg=None, state_su
         }
         funnel = exp_row.get("funnel_7d") or {}
         freq = exp_row.get("frequency") or {}
+        tier_hitch = _vector_tier_hitch_fields(
+            strategy["key"], assignment_row, assignment_rating,
+            roster_by_key.get(strategy["key"]))
         stats.append({
             "strategy_key": strategy["key"],
             "strategy_name": shown_name,
@@ -4815,6 +5092,11 @@ def _vector_trade_dashboard(cur, strategy_key, strategy_name, cfg=None, state_su
             "direction": direction, "completed_count": len(trades), "windows": windows,
             "grade": lifecycle_grade,
             "lifecycle_grade": lifecycle_grade,
+            "strategy_tier": tier_hitch.get("strategy_tier"),
+            "strategy_tier_label": tier_hitch.get("strategy_tier_label"),
+            "strategy_tier_rank": tier_hitch.get("strategy_tier_rank"),
+            "hitch_class": tier_hitch.get("hitch_class"),
+            "strategy_tier_display_zh": tier_hitch.get("strategy_tier_display_zh"),
             "max_position_ratio": max_position_ratio,
             "grade_rank": grade_rank_map.get(lifecycle_grade)
             or assignment_rating.get("grade_rank") or 0,
@@ -4917,7 +5199,7 @@ def _vector_trade_dashboard(cur, strategy_key, strategy_name, cfg=None, state_su
     }
 
 def _vector_status_payload():
-    cfg = _vector_load_json(_VECTOR_AUTO / "formal_daemon_config.json", {})
+    cfg = _vector_load_json(_VECTOR_AUTO / "formal_daemon_config_btc.json", {})
     if not isinstance(cfg, dict):
         cfg = {}
 
@@ -5027,7 +5309,7 @@ def _vector_status_payload():
         )
         if not isinstance(config, dict):
             config = {}
-        shared_state_suffix = "" if asset_key == "btc" else "_" + asset_key
+        shared_state_suffix = "_" + asset_key
         shared_state = _vector_load_json(
             _VECTOR_AUTO / ("formal_v6_state%s.json" % shared_state_suffix),
             {},
@@ -5132,7 +5414,7 @@ def _vector_status_payload():
         config = _vector_load_json(_VECTOR_AUTO/("formal_daemon_config_%s_5m.json"%asset_key),{})
         if not isinstance(config,dict):
             config = {}
-        shared_state_suffix = "" if asset_key == "btc" else "_"+asset_key
+        shared_state_suffix = "_"+asset_key
         shared_state = _vector_load_json(_VECTOR_AUTO/("formal_v6_state%s.json"%shared_state_suffix),{})
         configured_keys = {_vector_canonical_strategy_key(k) for k in (config.get("strategy_keys") or []) if k}
         raw_current = shared_state.get("current") if isinstance(shared_state,dict) else None
@@ -5228,81 +5510,16 @@ def _vector_status_payload():
         daily_trade_records = []
         strategy_rating.setdefault("daily_record_error", str(daily_error))
 
+    portfolio_running = _vector_portfolio_running()
+    one_hour_assets, one_hour_zones = _vector_build_timeframe_slots(
+        "1h", ("BTC-USDT-SWAP",), portfolio_running=portfolio_running)
+
     return {
         "ok": True,
         "stage": "vector_safe_real_verify_v3_status",
         "time": _vector_time.strftime("%Y-%m-%d %H:%M:%S"),
-        "assets": [
-            {"symbol": "BTC-USDT-SWAP", "running": daemon_running,
-             "timeframe": "1h", "timeframe_label": "1小时",
-             "status": "持仓中" if active else "监测中", "current": cur},
-            {"symbol": "CL-USDT-SWAP", "running": cl_running,
-             "timeframe": "1h", "timeframe_label": "1小时",
-             "status": "持仓中" if _vector_active(cl_cur) else ("监测中" if cl_running else "未运行"),
-             "current": cl_cur, "pid": cl_pid},
-            {"symbol": "XAU-USDT-SWAP", "running": xau_running,
-             "timeframe": "1h", "timeframe_label": "1小时",
-             "status": "持仓中" if _vector_active(xau_cur) else ("监测中" if xau_running else "未运行"),
-             "current": xau_cur, "pid": xau_pid},
-            {"symbol": "NG-USDT-SWAP", "running": ng_running,
-             "timeframe": "1h", "timeframe_label": "1小时",
-             "status": "持仓中" if _vector_active(ng_cur) else ("监测中" if ng_running else "未运行"),
-             "current": ng_cur, "pid": ng_pid},
-        ] + fifteen_minute_assets + five_minute_assets,
-        "asset_zones": [
-            {
-                "symbol": "BTC-USDT-SWAP", "name": "BTC 自动交易（1小时）",
-                "timeframe": "1h", "timeframe_label": "1小时",
-                "running": daemon_running, "auto_open": allow_open, "auto_close": allow_close,
-                "runtime_state": "持仓中" if active else ("监测中" if daemon_running else "未运行"),
-                "position": cur, "config": cfg, "records": trade_dashboard,
-                "strategy_count": len(trade_dashboard.get("strategy_stats") or []),
-                "assignment_status": "active",
-            },
-            {
-                "symbol": "CL-USDT-SWAP", "name": "CL 自动交易（1小时）",
-                "timeframe": "1h", "timeframe_label": "1小时",
-                "running": cl_running,
-                "auto_open": bool((cl_cfg or {}).get("allow_auto_open")),
-                "auto_close": bool((cl_cfg or {}).get("allow_auto_close")),
-                "runtime_state": "持仓中" if _vector_active(cl_cur) else (
-                    "监测中" if cl_running and bool((cl_cfg or {}).get("allow_auto_open"))
-                    else ("已停用" if cl_running else "未运行")
-                ),
-                "position": cl_cur, "config": cl_cfg, "records": cl_trade_dashboard,
-                "strategy_count": len(cl_trade_dashboard.get("strategy_stats") or []),
-                "assignment_status": (cl_cfg or {}).get("cl_strategy_assignment_status") or "pending_cl_specific_strategies",
-            },
-            {
-                "symbol": "XAU-USDT-SWAP", "name": "XAU 自动交易（1小时）",
-                "timeframe": "1h", "timeframe_label": "1小时",
-                "running": xau_running,
-                "auto_open": bool((xau_cfg or {}).get("allow_auto_open")),
-                "auto_close": bool((xau_cfg or {}).get("allow_auto_close")),
-                "runtime_state": "持仓中" if _vector_active(xau_cur) else (
-                    "监测中" if xau_running and bool((xau_cfg or {}).get("allow_auto_open")) else (
-                        "仅监测（等待XAU专用策略）" if xau_running else "未运行"
-                    )
-                ),
-                "position": xau_cur, "config": xau_cfg, "records": xau_trade_dashboard,
-                "strategy_count": len(xau_trade_dashboard.get("strategy_stats") or []),
-                "assignment_status": (xau_cfg or {}).get("xau_strategy_assignment_status") or "pending_xau_specific_strategies",
-            },
-            {
-                "symbol": "NG-USDT-SWAP", "name": "NG 自动交易（1小时）",
-                "timeframe": "1h", "timeframe_label": "1小时",
-                "running": ng_running,
-                "auto_open": bool((ng_cfg or {}).get("allow_auto_open")),
-                "auto_close": bool((ng_cfg or {}).get("allow_auto_close")),
-                "runtime_state": "持仓中" if _vector_active(ng_cur) else (
-                    "监测中" if ng_running and bool((ng_cfg or {}).get("allow_auto_open"))
-                    else ("已停用" if ng_running else "未运行")
-                ),
-                "position": ng_cur, "config": ng_cfg, "records": ng_trade_dashboard,
-                "strategy_count": len(ng_trade_dashboard.get("strategy_stats") or []),
-                "assignment_status": (ng_cfg or {}).get("ng_strategy_assignment_status") or "pending_ng_specific_strategies",
-            },
-        ] + fifteen_minute_zones + five_minute_zones,
+        "assets": one_hour_assets + fifteen_minute_assets + five_minute_assets,
+        "asset_zones": one_hour_zones + fifteen_minute_zones + five_minute_zones,
         "priority_policy": priority_policy,
         "strategy_rating": strategy_rating,
         "daily_trade_records": daily_trade_records,
@@ -5371,6 +5588,45 @@ def _vector_status_payload():
 
 @app.before_request
 def vector_safe_real_verify_v3_api():
+    if _vector_req.path == "/api/hold_assist/triggers":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        if _vector_req.method != "GET":
+            return _vector_jsonify({"ok": False, "error": "GET_REQUIRED"}), 405
+        try:
+            import auto_trade_hold_tribunal as _hold_assist
+            return _vector_jsonify(_hold_assist.trigger_board())
+        except Exception as e:
+            return _vector_jsonify({
+                "ok": False,
+                "schema": "qiyu_hold_assist_triggers_v1",
+                "count": 0,
+                "triggers": [],
+                "error": str(e),
+            }), 500
+
+    if _vector_req.path == "/api/manual_experience":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        try:
+            import auto_trade_manual_experience as _manual_exp
+            if _vector_req.method == "GET":
+                return _vector_jsonify(_manual_exp.load_board())
+            if _vector_req.method == "POST":
+                payload = _vector_req.get_json(silent=True) or {}
+                out = _manual_exp.save_note(payload)
+                code = 200 if out.get("ok") else 400
+                return _vector_jsonify(out), code
+            return _vector_jsonify({"ok": False, "error": "GET_OR_POST_REQUIRED"}), 405
+        except Exception as e:
+            return _vector_jsonify({
+                "ok": False,
+                "schema": "qiyu_manual_experience_v1",
+                "count": 0,
+                "records": [],
+                "error": str(e),
+            }), 500
+
     if _vector_req.path == "/api/vector/auto_trade/latest_records":
         if not _vector_auth_ok():
             return _vector_unauth()
@@ -5413,33 +5669,23 @@ def vector_safe_real_verify_v3_api():
                 return _vector_jsonify({"ok": False, "error": "杠杆只能选择20x、30x或50x"}), 400
             if stop_loss_pct not in (0.003, 0.006, 0.009):
                 return _vector_jsonify({"ok": False, "error": "止损只能选择0.3%、0.6%或0.9%"}), 400
-            if symbol == "BTC-USDT-SWAP" and timeframe == "1h":
-                import auto_trade_formal_daemon as _risk_daemon
-                updated = _risk_daemon.update_config(leverage=leverage, stop_loss_pct=stop_loss_pct)
-                cfg = (updated or {}).get("config") or {}
-            else:
-                if timeframe in ("15m","5m"):
-                    cfg_name = "formal_daemon_config_%s_%s.json" % (
-                        symbol.split("-")[0].lower(), timeframe
-                    )
-                else:
-                    cfg_name = {
-                        "CL-USDT-SWAP": "formal_daemon_config_cl.json",
-                        "XAU-USDT-SWAP": "formal_daemon_config_xau.json",
-                        "NG-USDT-SWAP": "formal_daemon_config_ng.json",
-                    }[symbol]
-                cfg_path = _VECTOR_AUTO / cfg_name
-                cfg = _vector_load_json(cfg_path, {})
-                if not isinstance(cfg, dict):
-                    return _vector_jsonify({"ok": False, "error": "%s配置读取失败" % symbol}), 500
-                cfg["leverage"] = leverage
-                cfg["stop_loss_pct"] = stop_loss_pct
-                _vector_write_json(cfg_path, cfg)
+            import auto_trade_slot_paths as slot_paths
+            cfg_name = slot_paths.daemon_config_name(symbol, timeframe)
+            if not cfg_name:
+                return _vector_jsonify({"ok": False, "error": "不支持的自动交易标的"}), 400
+            cfg_path = _VECTOR_AUTO / cfg_name
+            cfg = _vector_load_json(cfg_path, {})
+            if not isinstance(cfg, dict) or not cfg_path.exists():
+                return _vector_jsonify({"ok": False, "error": "%s配置读取失败" % symbol}), 500
+            cfg["leverage"] = leverage
+            cfg["stop_loss_pct"] = stop_loss_pct
+            _vector_write_json(cfg_path, cfg)
             if int(cfg.get("leverage", 0)) != leverage or abs(float(cfg.get("stop_loss_pct", 0)) - stop_loss_pct) > 0.0000001:
                 return _vector_jsonify({"ok": False, "error": "配置持久化校验失败"}), 500
             message = (
-                "=== 栖语自动交易参数调整 ===\n"
-                "自动交易系统的杠杆止损组合已调整\n"
+                "🔧 庄园小工具箱动了动：\n"
+                "“小管家把这张标的的杠杆和止损垫子轻轻调了一下。已经开着的仓不会追改，只对下一次新开仓生效。”\n"
+                "\n"
                 "标的：%s\n"
                 "周期：%s\n"
                 "杠杆：%sx\n"
@@ -5463,6 +5709,31 @@ def vector_safe_real_verify_v3_api():
             except Exception:
                 pass
             return _vector_jsonify({"ok": True, "symbol": symbol, "timeframe": timeframe, "leverage": leverage, "stop_loss_pct": stop_loss_pct, "applies_to": "next_new_positions_selected_symbol_and_timeframe", "existing_position_unchanged": True, "notification_sent": bool((notify_result or {}).get("sent")), "notification": notify_result})
+        except Exception as e:
+            return _vector_jsonify({"ok": False, "error": str(e)}), 500
+
+    if _vector_req.path == "/api/vector/auto_trade/status/refresh":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        if _vector_req.method != "POST":
+            return _vector_jsonify({"ok": False, "error": "POST_REQUIRED"}), 405
+        with _VECTOR_STATUS_CACHE_LOCK:
+            _VECTOR_STATUS_CACHE["ts"] = 0.0
+            _VECTOR_STATUS_CACHE["payload"] = None
+            _VECTOR_STATUS_CACHE["error"] = None
+            _VECTOR_STATUS_CACHE["building"] = False
+        try:
+            payload = _vector_status_payload_cached()
+            return _vector_jsonify({
+                "ok": True,
+                "refreshed": True,
+                "strategy_count": sum(
+                    len((z.get("records") or {}).get("strategy_stats") or [])
+                    for z in (payload.get("asset_zones") or [])
+                ),
+                "degraded": bool(payload.get("degraded")),
+                "cache": payload.get("cache"),
+            })
         except Exception as e:
             return _vector_jsonify({"ok": False, "error": str(e)}), 500
 
@@ -5498,6 +5769,18 @@ def vector_safe_real_verify_v3_api():
 @app.after_request
 def purge_818c_v7_no_cache(response):
     try:
+        path = request.path or ""
+        if path.startswith("/housekeeper/") and int(getattr(response, "status_code", 0) or 0) == 200:
+            lowered = path.lower()
+            if lowered.endswith(".js") or lowered.endswith(".css"):
+                response.headers["Cache-Control"] = "no-cache, must-revalidate, max-age=0"
+                response.headers["Pragma"] = "no-cache"
+                response.headers["Expires"] = "0"
+                return response
+            response.headers["Cache-Control"] = "public, max-age=2592000, immutable"
+            response.headers.pop("Pragma", None)
+            response.headers.pop("Expires", None)
+            return response
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
