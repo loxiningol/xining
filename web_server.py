@@ -764,7 +764,12 @@ def _vector_status_payload_cached():
     # Kick a background rebuild when cache is missing/expired.
     with _VECTOR_STATUS_CACHE_LOCK:
         if _VECTOR_STATUS_CACHE.get("payload") is None:
-            _vector_seed_status_cache_from_disk()
+            disk = _vector_disk_status_fallback()
+            if disk is not None:
+                _VECTOR_STATUS_CACHE["payload"] = disk
+                _VECTOR_STATUS_CACHE["ts"] = time.time()
+                _VECTOR_STATUS_CACHE["error"] = None
+                stale = disk
         if not _VECTOR_STATUS_CACHE.get("building"):
             _VECTOR_STATUS_CACHE["building"] = True
             already_building = False
@@ -5605,6 +5610,80 @@ def vector_safe_real_verify_v3_api():
                 "error": str(e),
             }), 500
 
+    if _vector_req.path == "/api/safety_net":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        if _vector_req.method != "GET":
+            return _vector_jsonify({"ok": False, "error": "GET_REQUIRED"}), 405
+        try:
+            import safety_net as _safety_net
+            return _vector_jsonify(_safety_net.status_snapshot())
+        except Exception as e:
+            return _vector_jsonify({"ok": False, "error": str(e)}), 500
+
+    if _vector_req.path == "/api/vector/auto_trade/live_positions":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        if _vector_req.method != "GET":
+            return _vector_jsonify({"ok": False, "error": "GET_REQUIRED"}), 405
+        try:
+            import auto_trade_live_positions as _live_pos
+            return _vector_jsonify(_live_pos.list_live_positions())
+        except Exception as e:
+            return _vector_jsonify({
+                "ok": False,
+                "schema": "qiyu_live_positions_v1",
+                "position_count": 0,
+                "positions": [],
+                "error": str(e),
+            }), 500
+
+    if _vector_req.path == "/api/vector/auto_trade/live_positions/close":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        if _vector_req.method != "POST":
+            return _vector_jsonify({"ok": False, "error": "POST_REQUIRED"}), 405
+        try:
+            payload = _vector_req.get_json(silent=True) or {}
+            import auto_trade_live_positions as _live_pos
+            return _vector_jsonify(_live_pos.close_live_position(
+                payload.get("inst_id") or payload.get("instId"),
+                payload.get("pos_side") or payload.get("posSide"),
+                mgn_mode=payload.get("mgn_mode") or payload.get("mgnMode"),
+            ))
+        except Exception as e:
+            return _vector_jsonify({"ok": False, "error": str(e)}), 500
+
+    if _vector_req.path == "/api/vector/auto_trade/daily_summary":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        if _vector_req.method != "GET":
+            return _vector_jsonify({"ok": False, "error": "GET_REQUIRED"}), 405
+        try:
+            import auto_trade_weekly_summary as _week_sum
+            return _vector_jsonify(_week_sum.daily_summary_cached())
+        except Exception as e:
+            return _vector_jsonify({
+                "ok": False,
+                "schema": "qiyu_daily_summary_v1",
+                "error": str(e),
+            }), 500
+
+    if _vector_req.path == "/api/vector/auto_trade/weekly_summary":
+        if not _vector_auth_ok():
+            return _vector_unauth()
+        if _vector_req.method != "GET":
+            return _vector_jsonify({"ok": False, "error": "GET_REQUIRED"}), 405
+        try:
+            import auto_trade_weekly_summary as _week_sum
+            return _vector_jsonify(_week_sum.weekly_summary_cached())
+        except Exception as e:
+            return _vector_jsonify({
+                "ok": False,
+                "schema": "qiyu_weekly_summary_v1",
+                "error": str(e),
+            }), 500
+
     if _vector_req.path == "/api/manual_experience":
         if not _vector_auth_ok():
             return _vector_unauth()
@@ -5813,6 +5892,7 @@ if __name__ == "__main__":
     try:
         def _warm_vector_status():
             try:
+                _vector_seed_status_cache_from_disk()
                 _vector_status_payload_cached()
             except Exception:
                 pass
