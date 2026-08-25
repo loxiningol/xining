@@ -15,6 +15,7 @@ class DashboardRouteWiringTest(unittest.TestCase):
             '/api/vector/auto_trade/weekly_summary',
             '/api/safety_net',
             '/api/forecast/latest',
+            '/api/forecast/refresh_statistical',
             '/api/vector/auto_trade/status',
         ):
             self.assertIn(path, WEB, "missing handler for %s" % path)
@@ -29,6 +30,13 @@ class DashboardRouteWiringTest(unittest.TestCase):
             "calling seed-from-disk while holding the cache lock deadlocks qiyu-web",
         )
         self.assertIn("_vector_disk_status_fallback()", chunk)
+
+    def test_forecast_refresh_is_scheduled_not_inline(self):
+        start = WEB.find("def api_forecast_refresh_statistical")
+        self.assertGreater(start, 0)
+        chunk = WEB[start:start + 900]
+        self.assertIn("schedule_lightweight_refresh", chunk)
+        self.assertNotIn("run_lightweight_statistical_refresh", chunk)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,8 @@ MIN_SAMPLE_POSITIVE_E = 10  # ban 1-live-trade / thin samples as positive-E
 MIN_LIVE_OR_BT_POSITIVE_E = 5  # need live or BT evidence; AI-only ≠ positive-E
 
 _refresh_lock = threading.Lock()
+_SCHEDULE_REFRESH_LOCK = threading.Lock()
+_SCHEDULE_REFRESH_PENDING = False
 
 
 def _now():
@@ -45,6 +47,23 @@ def _read(path, default=None):
         return json.loads(Path(path).read_text(encoding="utf-8"))
     except Exception:
         return default if default is not None else {}
+
+
+def _patch_state(**kwargs):
+    st = _read(STATE_PATH, {}) or {}
+    st.update(kwargs)
+    st["updated_at"] = _now()
+    _atomic(STATE_PATH, st)
+    return st
+
+
+def lightweight_refresh_in_flight():
+    st = _read(STATE_PATH, {}) or {}
+    return bool(
+        _refresh_lock.locked()
+        or _SCHEDULE_REFRESH_PENDING
+        or st.get("lightweight_refresh_running")
+    )
 
 
 def _atomic(path, value):
@@ -685,7 +704,13 @@ def clear_stale_on_report(report):
 
 
 def load_latest_for_ui():
-    """UI-safe latest: never present stale snapshot as current without banner."""
+    """UI-safe latest: never present stale snapshot as current without banner.
+
+    Do not recompute occupancy combo on this path. Combo is written into the
+    snapshot by run_lightweight_statistical_refresh / apply_closeout_layers.
+    Recomputing here blocks GET /api/forecast/latest and the 控制台 panel
+    times out or sits on 暂无.
+    """
     report = _read(LATEST_PATH, {})
     flag = _read(STALE_FLAG_PATH, {})
     try:
@@ -695,30 +720,90 @@ def load_latest_for_ui():
         pool = {}
     pool_ver = pool.get("strategy_pool_version")
     report_ver = report.get("strategy_pool_version")
+    mounted_now = pool.get("mounted_count")
+    report_mounted = report.get("strategy_pool_mounted_count")
+    if report_mounted is None:
+        report_mounted = report.get("active_strategy_count")
     stale = bool(flag.get("stale") or report.get("stale"))
     if report_ver and pool_ver and report_ver != pool_ver:
         stale = True
         report["stale"] = True
         report["stale_reason"] = report.get("stale_reason") or "strategy_pool_version_mismatch"
-    if (report.get("active_strategy_count") is not None
-            and pool.get("mounted_count") is not None
-            and int(report.get("active_strategy_count") or 0) != int(pool.get("mounted_count") or 0)):
+    if (report_mounted is not None
+            and mounted_now is not None
+            and int(report_mounted or 0) != int(mounted_now or 0)):
         stale = True
         report["stale"] = True
         report["stale_reason"] = "mounted_count_mismatch"
     report["is_current"] = not stale
     report["strategy_pool_version_now"] = pool_ver
+    report["strategy_pool_mounted_count_now"] = mounted_now
     report["ui_stale_banner_zh"] = (
-        "预测已过期（策略池已变更），数值不可作为当前预测；正在/请触发统计刷新。"
+        "组合数据已过期（挂载池已变更），下列频率数字不可用；请点「重算并刷新」。"
         if stale else None
     )
+    combo = report.get("portfolio_combo")
+    if not isinstance(combo, dict):
+        report["portfolio_combo"] = {"missing": True, "reason": "combo_not_in_snapshot"}
+    if stale:
+        # Do not keep selling old pool's frequency as current.
+        overall = dict(report.get("overall") or {})
+        overall["daily_opens_expected"] = None
+        overall["weekly_opens_expected"] = None
+        overall["stale_suppressed"] = True
+        report["overall"] = overall
+        try:
+            schedule_lightweight_refresh(
+                reason=report.get("stale_reason") or "pool_change",
+                detail={"mounted_now": mounted_now, "report_mounted": report_mounted},
+            )
+        except Exception:
+            pass
+    report["lightweight_refresh_running"] = lightweight_refresh_in_flight()
     return report
+
+
+def schedule_lightweight_refresh(reason="pool_change", detail=None):
+    """Background statistical refresh (frequency + combo); never blocks caller."""
+    global _SCHEDULE_REFRESH_PENDING
+    with _SCHEDULE_REFRESH_LOCK:
+        if _SCHEDULE_REFRESH_PENDING or _refresh_lock.locked():
+            return {
+                "ok": True,
+                "skipped": True,
+                "reason": "refresh_already_scheduled",
+                "detail": detail or {},
+            }
+        _SCHEDULE_REFRESH_PENDING = True
+
+    def _worker():
+        global _SCHEDULE_REFRESH_PENDING
+        try:
+            run_lightweight_statistical_refresh(push_wx=False)
+        except Exception:
+            pass
+        finally:
+            with _SCHEDULE_REFRESH_LOCK:
+                _SCHEDULE_REFRESH_PENDING = False
+
+    threading.Thread(
+        target=_worker,
+        name="forecast-lightweight-refresh",
+        daemon=True,
+    ).start()
+    return {"ok": True, "scheduled": True, "reason": reason, "detail": detail or {}}
 
 
 def run_lightweight_statistical_refresh(push_wx=False):
     """Refresh statistical forecast numbers without waiting on 3AI explain."""
     if not _refresh_lock.acquire(False):
         return {"ok": False, "error": "refresh_already_running"}
+    _patch_state(
+        lightweight_refresh_running=True,
+        lightweight_refresh_started_at=_now(),
+        lightweight_refresh_error=None,
+        last_mode="lightweight_statistical",
+    )
     try:
         import auto_trade_system_forecast as forecast
         import auto_trade_expectancy_metrics as exp
@@ -790,9 +875,29 @@ def run_lightweight_statistical_refresh(push_wx=False):
             "last_weekly_opens_expected": (report.get("overall") or {}).get(
                 "weekly_opens_expected"),
             "strategy_pool_version": report.get("strategy_pool_version"),
+            "lightweight_refresh_running": False,
+            "lightweight_refresh_finished_at": _now(),
         })
         return {"ok": True, "report": report, "wx": None}
+    except Exception as exc:
+        try:
+            _patch_state(
+                lightweight_refresh_running=False,
+                lightweight_refresh_error=str(exc),
+                lightweight_refresh_finished_at=_now(),
+            )
+        except Exception:
+            pass
+        raise
     finally:
+        try:
+            st = _read(STATE_PATH, {}) or {}
+            if st.get("lightweight_refresh_running"):
+                st["lightweight_refresh_running"] = False
+                st["lightweight_refresh_finished_at"] = _now()
+                _atomic(STATE_PATH, st)
+        except Exception:
+            pass
         _refresh_lock.release()
 
 
@@ -802,7 +907,7 @@ def notify_pool_change(reason, detail=None, auto_refresh=True):
     out = {"stale": flag, "refresh": None}
     if auto_refresh:
         try:
-            out["refresh"] = run_lightweight_statistical_refresh(push_wx=False)
+            out["refresh"] = schedule_lightweight_refresh(reason=reason, detail=detail)
         except Exception as exc:
             out["refresh_error"] = str(exc)
     return out
@@ -917,6 +1022,12 @@ def apply_closeout_layers(report):
     report["calibration_period_metrics"] = calib.get("period_metrics")
     if report.get("calibration_stage", {}).get("ui_must_show_calibration_banner"):
         report["calibration_banner_zh"] = report["calibration_stage"]["banner_zh"]
+
+    try:
+        import auto_trade_portfolio_combo_metrics as pcm
+        report = pcm.attach_to_report(report)
+    except Exception as exc:
+        report["portfolio_combo_error"] = str(exc)
 
     # Creation brief prioritizes positive-E gap
     brief = dict(report.get("creation_brief") or {})

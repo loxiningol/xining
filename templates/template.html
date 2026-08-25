@@ -2,51 +2,63 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>VECTOR 量化工作台</title>
+<title>Macaron &amp; Daifuku Quant 🍡</title>
+<link rel="icon" type="image/png" href="/static/macaron-title.png">
+<link rel="preload" as="image" href="/housekeeper/manor-world-v7.webp" fetchpriority="high">
+<link rel="preload" as="style" href="/housekeeper/manor-layout-20260823.css?v=holdorb6">
+<link rel="preload" as="script" href="/housekeeper/manor-layout-20260823exp.js?v=holdorb6">
 <style>
 :root{
-  --bg:#11100e;--panel:#191816;--panel2:#201f1c;--line:rgba(255,255,255,.10);
-  --text:#e8e4dc;--muted:#9d978c;--soft:#6f695f;--gain:#9bbf9a;--loss:#c58f84;--focus:#d8d0c3;
+  --bg:#fdf6f2;--bg-grad-top:#fff9f6;--bg-grad-mid:#f8efe8;--bg-grad-bot:#f3e4d8;
+  --panel:#fffcfa;--panel2:#fff7f2;--line:rgba(212,184,168,.42);
+  --text:#6b5b54;--muted:#a8948a;--soft:#c4b0a6;--gain:#7fa37a;--loss:#c9a092;--focus:#8b7368;
+  --accent:#d4a574;--accent-soft:#e8c9a8;
+  --card-shadow:0 16px 40px rgba(196,168,154,.14);
+  --card-shadow-sm:0 8px 22px rgba(196,168,154,.10);
+  --surface:rgba(255,252,250,.98);--surface-2:rgba(255,248,244,.95);--surface-3:rgba(255,242,236,.92);
+  --surface-hover:rgba(255,236,226,.96);
+  --radius-xl:26px;--radius-lg:20px;--radius-md:16px;--radius-sm:14px;
 }
 *{box-sizing:border-box}
-body{margin:0;padding:32px;background:radial-gradient(circle at top,#1d1b18 0,#11100e 42%,#0d0c0b 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.02em}
-h1{margin:0 0 8px;font-size:28px;font-weight:300;letter-spacing:.18em}
+body{margin:0;padding:32px;background:radial-gradient(ellipse 120% 80% at 50% -20%,var(--bg-grad-top) 0%,var(--bg-grad-mid) 48%,var(--bg-grad-bot) 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.02em}
+h1{margin:0 0 8px;font-size:28px;font-weight:300;letter-spacing:.18em;color:var(--focus)}
 .subtitle{color:var(--muted);margin-bottom:32px}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}
 .full{grid-column:1/-1}
-.panel{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.018));border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.22)}
+.panel{background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px solid var(--line);border-radius:var(--radius-xl);padding:24px;box-shadow:var(--card-shadow)}
 .title{font-size:16px;font-weight:400;color:var(--focus);margin-bottom:18px;letter-spacing:.12em}
-button{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text);border-radius:12px;padding:9px 14px;cursor:pointer;transition:background .25s,border .25s}
-button:hover{background:rgba(255,255,255,.08)}
-input,select,textarea{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+button{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:var(--radius-md);padding:9px 14px;cursor:pointer;transition:background .25s,border .25s,box-shadow .25s;box-shadow:var(--card-shadow-sm)}
+button:hover{background:var(--surface-hover)}
+input,select,textarea{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:var(--radius-md);padding:9px 11px}
 textarea{width:100%;min-height:90px}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .number{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .gain{color:var(--gain)}.loss{color:var(--loss)}.muted{color:var(--muted)}
-details{border:1px solid var(--line);border-radius:16px;padding:12px 14px;background:rgba(255,255,255,.025);margin-bottom:12px}
+details{border:1px solid var(--line);border-radius:var(--radius-lg);padding:12px 14px;background:var(--surface-2);margin-bottom:12px;box-shadow:var(--card-shadow-sm)}
 summary{cursor:pointer;color:var(--focus)}
 .strategy-summary-title{display:block}
 .strategy-summary-meta{display:block;margin-top:6px;color:var(--muted);font-size:12px;letter-spacing:.02em}
 .strategy-body{margin-top:12px;color:var(--muted);line-height:1.7}
+.strategy-template-note{color:var(--muted);margin:-8px 0 16px;font-size:13px;letter-spacing:.04em}
 .badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:8px}
-.badge-off{color:var(--loss);border-color:rgba(197,143,132,.35)}
-.badge-blocked{color:#d6aa82;border-color:rgba(214,170,130,.38);background:rgba(214,170,130,.08)}
+.badge-off{color:var(--loss);border-color:rgba(201,160,146,.35)}
+.badge-blocked{color:var(--accent);border-color:rgba(214,170,130,.38);background:rgba(232,201,168,.12)}
 .disabled{opacity:.55}
 table{width:100%;border-collapse:collapse;margin-top:14px}
 th,td{border:1px solid var(--line);padding:9px;text-align:center;font-size:13px}
-th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
-.progress{height:7px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-top:8px}
-.progress div{height:100%;background:var(--focus);width:0%}
+th{color:var(--focus);font-weight:400;background:var(--surface-2)}
+.progress{height:7px;background:rgba(212,184,168,.22);border-radius:999px;overflow:hidden;margin-top:8px}
+.progress div{height:100%;background:linear-gradient(90deg,var(--accent-soft),var(--accent));width:0%}
 .param-row{display:grid;grid-template-columns:1fr 120px 70px 70px;gap:8px;margin-bottom:8px}
 .status-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px}.on{background:var(--gain)}.off{background:var(--loss)}
-.bt-strategy-picker{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+.bt-strategy-picker{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-3)}
 .bt-strategy-option{display:flex;align-items:flex-start;gap:8px;padding:9px 10px;border:1px solid transparent;border-radius:10px;color:var(--muted);cursor:pointer}
-.bt-strategy-option:hover{background:rgba(255,255,255,.035);border-color:var(--line)}
+.bt-strategy-option:hover{background:var(--surface-hover);border-color:var(--line)}
 .bt-strategy-option input{margin-top:3px}.bt-strategy-option span{line-height:1.45}.bt-selection-note{width:100%;font-size:12px;color:var(--muted)}
-.bt-strategy-option.scope-dedicated{grid-column:1/-1;border-color:rgba(58,166,255,.45);background:rgba(58,166,255,.09);color:var(--text)}
-.bt-strategy-option.scope-dedicated:hover{border-color:var(--focus);background:rgba(58,166,255,.14)}
-.bt-scope-badge{display:inline-block;margin-left:8px;padding:2px 7px;border:1px solid rgba(58,166,255,.45);border-radius:999px;color:var(--focus);font-size:11px;white-space:nowrap}
-.bt-combo-summary{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
+.bt-strategy-option.scope-dedicated{grid-column:1/-1;border-color:rgba(212,165,116,.45);background:rgba(232,201,168,.22);color:var(--text)}
+.bt-strategy-option.scope-dedicated:hover{border-color:var(--accent);background:rgba(232,201,168,.32)}
+.bt-scope-badge{display:inline-block;margin-left:8px;padding:2px 7px;border:1px solid rgba(212,165,116,.45);border-radius:999px;color:var(--focus);font-size:11px;white-space:nowrap}
+.bt-combo-summary{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface-2);box-shadow:var(--card-shadow-sm)}
 .bt-result-block{margin-top:14px;padding-top:2px}.bt-result-title{margin:14px 0 8px;color:var(--focus);font-size:15px;letter-spacing:.06em}
 .bt-data-coverage{width:100%;font-size:12px;color:var(--muted);line-height:1.65}
 .market-monitor-compact{padding:16px 18px}
@@ -64,7 +76,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 .system-timeline:before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:1px;background:var(--line)}
 .system-timeline-item{position:relative;display:grid;grid-template-columns:120px 1fr;gap:18px;padding:0 0 22px}
 .system-timeline-item:last-child{padding-bottom:0}
-.system-timeline-item:before{content:"";position:absolute;left:-19px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--gain);box-shadow:0 0 0 4px rgba(155,191,154,.09)}
+.system-timeline-item:before{content:"";position:absolute;left:-19px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--gain);box-shadow:0 0 0 4px rgba(127,163,122,.09)}
 .system-timeline-date{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--focus);font-size:13px}
 .system-timeline-event{color:var(--text);font-size:13px;line-height:1.6}
 @media(max-width:900px){.grid{grid-template-columns:1fr}.param-row{grid-template-columns:1fr}}
@@ -72,82 +84,189 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 .site-health-head-v7{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
 .site-health-summary-v7{font-size:15px;color:var(--focus);letter-spacing:.06em}
 .site-health-meta-v7{margin-top:6px;color:var(--muted);font-size:12px}
-.site-health-pill-v7{flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(155,191,154,.30);color:var(--gain);background:rgba(155,191,154,.08);font-size:12px;white-space:nowrap}
-.site-health-pill-v7.error{color:var(--loss);border-color:rgba(197,143,132,.34);background:rgba(197,143,132,.08)}
+.site-health-pill-v7{flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(127,163,122,.30);color:var(--gain);background:rgba(127,163,122,.10);font-size:12px;white-space:nowrap}
+.site-health-pill-v7.error{color:var(--loss);border-color:rgba(201,160,146,.34);background:rgba(201,160,146,.10)}
 .site-health-grid-v7{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.site-health-card-v7{padding:14px 15px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
-.site-health-card-v7.error{border-color:rgba(197,143,132,.35);background:rgba(197,143,132,.05)}
-.site-health-card-v7.warning{border-color:rgba(214,170,130,.35);background:rgba(214,170,130,.05)}
+.site-health-card-v7{padding:14px 15px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-2);box-shadow:var(--card-shadow-sm)}
+.site-health-card-v7.error{border-color:rgba(201,160,146,.35);background:rgba(201,160,146,.08)}
+.site-health-card-v7.warning{border-color:rgba(214,170,130,.35);background:rgba(232,201,168,.12)}
 .site-health-name-v7{display:flex;align-items:center;gap:8px;margin-bottom:8px;color:var(--focus);font-size:13px;letter-spacing:.04em}
 .site-health-dot-v7{width:8px;height:8px;border-radius:50%;background:var(--gain);flex:0 0 auto}
 .site-health-card-v7.error .site-health-dot-v7{background:var(--loss)}
-.site-health-card-v7.warning .site-health-dot-v7{background:#d6aa82}
+.site-health-card-v7.warning .site-health-dot-v7{background:var(--accent)}
 .site-health-detail-v7{color:var(--muted);font-size:12px;line-height:1.65;white-space:pre-line;word-break:break-word}
 .site-health-detail-v7 ul{margin:0;padding-left:1.1em}
 .site-health-detail-v7 li{margin:2px 0}
 @media(max-width:620px){.site-health-head-v7{flex-direction:column}}
+.mdq-ops-sign-group{display:grid;gap:28px;grid-column:1/-1;min-width:0}
+.safety-net-meta{margin:-6px 0 16px;color:var(--muted);font-size:12px}
+.safety-net-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.safety-net-card{padding:14px 15px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-2);box-shadow:var(--card-shadow-sm)}
+.safety-net-card.is-exhausted{border-color:rgba(201,160,146,.35);background:rgba(201,160,146,.08)}
+.safety-net-card.is-usable{border-color:rgba(127,163,122,.30);background:rgba(127,163,122,.08)}
+.safety-net-card-label{color:var(--focus);font-size:13px;letter-spacing:.04em;margin-bottom:8px}
+.safety-net-card-count{font-size:18px;letter-spacing:.04em;color:var(--text);margin-bottom:8px}
+.safety-net-card-note{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.65}
+.safety-net-lock{margin-top:12px;color:var(--muted);font-size:12px}
+.safety-net-lock.is-locked{color:var(--loss)}
 </style>
 </head>
 <body>
-<h1>VECTOR</h1>
-<div class="subtitle">量化工作台</div>
+<header class="site-hero">
+  <div class="site-hero-brand">
+    <div class="site-hero-icon"><img class="site-title-macaron" src="/static/macaron-title.png" alt="马卡龙"></div>
+      <div>
+      <div class="site-hero-kicker">MACARON · DAIFUKU</div>
+      <h1>Macaron &amp; Daifuku Quant <span class="site-hero-daifuku" aria-hidden="true">🍡</span></h1>
+      <div class="site-hero-subtitle">策略研究 · 盘面监控 · 自动交易</div>
+      </div>
+      </div>
+  <div class="site-hero-ornament" aria-hidden="true"><i></i><i></i><i></i></div>
+</header>
+
+<nav id="mdqViewSwitch" class="mdq-manor-switch" role="group" aria-label="页面显示方式">
+  <span class="mdq-manor-switch-caption">显示方式</span>
+  <button type="button" data-mode="manor" aria-pressed="false">庄园世界</button>
+  <button type="button" data-mode="classic" aria-pressed="true">经典控制台</button>
+</nav>
 
 <div class="grid">
   <div class="panel full">
 <!-- VECTOR_AUTO_TRADE_STATE_V5_NOGUESS_START -->
 <style>
-  .atm-module{margin:0;padding:28px 30px 32px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.014));color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  .atm-module{margin:0;padding:28px 30px 32px;border:1px solid var(--line);border-radius:var(--radius-xl);background:linear-gradient(180deg,var(--surface),var(--surface-2));color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;box-shadow:var(--card-shadow)}
   .atm-module *{box-sizing:border-box}
   .atm-module-title{font-size:20px;font-weight:600;color:var(--focus);letter-spacing:.1em;margin:0 0 22px}
-  .atm-section{margin:0 0 26px;padding:22px 22px 18px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.018)}
+  .atm-section{margin:0 0 26px;padding:22px 22px 18px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface-2);box-shadow:var(--card-shadow-sm)}
   .atm-section:last-child{margin-bottom:0}
   .atm-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
   .atm-section-title{font-size:15px;font-weight:600;color:var(--focus);letter-spacing:.08em;margin:0}
   .atm-section-sub{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.55}
   .atm-section-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .atm-count{padding:5px 10px;border-radius:999px;font-size:11px;color:var(--gain);border:1px solid rgba(155,191,154,.28);background:rgba(155,191,154,.08)}
-  .atm-btn{padding:7px 12px;border-radius:10px;font-size:12px;color:var(--text);border:1px solid var(--line);background:rgba(255,255,255,.04);cursor:pointer}
-  .atm-btn:hover{background:rgba(255,255,255,.07)}
+  .atm-count{padding:5px 10px;border-radius:999px;font-size:11px;color:var(--gain);border:1px solid rgba(127,163,122,.28);background:rgba(127,163,122,.10)}
+  .atm-btn{padding:7px 12px;border-radius:var(--radius-sm);font-size:12px;color:var(--text);border:1px solid var(--line);background:var(--surface);cursor:pointer;box-shadow:var(--card-shadow-sm)}
+  .atm-btn:hover{background:var(--surface-hover)}
   .atm-btn:disabled{opacity:.55;cursor:wait}
-  .atm-btn-primary{border-color:rgba(61,139,253,.45);background:rgba(61,139,253,.16);color:#dceaff}
-  .atm-empty{padding:14px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);font-size:12px;line-height:1.6}
+  .atm-btn-primary{border-color:rgba(212,165,116,.55);background:rgba(232,201,168,.35);color:#7a5f4a}
+  .atm-empty{padding:14px;border:1px dashed var(--line);border-radius:var(--radius-md);color:var(--muted);font-size:12px;line-height:1.6;background:var(--surface-2)}
   .atm-roster{display:grid;gap:8px}
-  .atm-row{border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.014);overflow:hidden}
-  .atm-row-main{display:grid;grid-template-columns:minmax(180px,2.2fr) 72px minmax(110px,1fr) minmax(110px,1fr) auto;gap:10px;align-items:center;padding:12px 14px}
+  .atm-row{border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface);overflow:hidden;box-shadow:var(--card-shadow-sm)}
+  .atm-row-main{display:grid;grid-template-columns:minmax(180px,2.2fr) minmax(132px,auto);gap:10px;align-items:center;padding:12px 14px}
   .atm-row-title{font-size:13px;color:var(--text);font-weight:500;line-height:1.45}
   .atm-row-scope{font-size:11px;color:var(--muted);margin-top:3px}
   .atm-field-label{display:block;font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:.04em}
   .atm-field-value{font-size:13px;color:var(--text);font-weight:500}
-  .atm-grade{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--line);background:rgba(255,255,255,.04)}
-  .atm-grade.grade-s{color:#f0d78c;border-color:rgba(240,215,140,.65);background:linear-gradient(180deg,rgba(240,215,140,.22),rgba(180,140,40,.12))}
-  .atm-grade.grade-a{color:#c4a0ff;border-color:rgba(180,120,255,.55);background:rgba(150,100,255,.14)}
-  .atm-grade.grade-b{color:#7eb6ff;border-color:rgba(100,160,255,.5);background:rgba(80,140,255,.12)}
-  .atm-grade.grade-c{color:#a8a8a8;border-color:rgba(160,160,160,.45);background:rgba(140,140,140,.1)}
-  .atm-row details{border-top:1px solid rgba(255,255,255,.06)}
+  .atm-grade{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--surface-2)}
+  .atm-grade.grade-s{color:#c9a45c;border-color:rgba(212,175,120,.55);background:linear-gradient(180deg,rgba(245,220,170,.35),rgba(232,201,168,.18))}
+  .atm-grade.grade-a{color:#b8956e;border-color:rgba(196,160,116,.50);background:rgba(232,201,168,.22)}
+  .atm-grade.grade-b{color:#c4a07a;border-color:rgba(212,165,116,.48);background:rgba(232,201,168,.18)}
+  .atm-grade.grade-c{color:#b8a9a0;border-color:rgba(196,184,176,.45);background:rgba(245,236,230,.65)}
+  .atm-grade.grade-macaron{color:#c47a8a;border-color:rgba(212,150,168,.50);background:rgba(255,228,234,.55);font-size:11px;min-width:72px;white-space:nowrap}
+  .atm-grade.grade-daifuku{color:#8a6b4a;border-color:rgba(212,184,140,.55);background:linear-gradient(180deg,rgba(255,244,220,.7),rgba(232,210,168,.28));font-size:11px;min-width:72px;white-space:nowrap}
+  .atm-grade.grade-manual{color:#8a7a72;border-color:rgba(180,168,160,.45);background:rgba(245,240,236,.8);font-size:11px;min-width:72px;white-space:nowrap}
+  .atm-pos-row{display:grid;grid-template-columns:minmax(220px,2.4fr) minmax(132px,auto) minmax(150px,1fr) auto;gap:12px;align-items:center;padding:14px}
+  .atm-pos-pnl{text-align:right}
+  .atm-pos-pnl strong{display:block;font-size:16px;font-weight:600;letter-spacing:.02em}
+  .atm-pos-pnl span{display:block;font-size:12px;margin-top:3px}
+  .atm-btn-danger{border-color:rgba(201,160,146,.45);color:#a07870;background:rgba(255,244,240,.9);white-space:nowrap}
+  .atm-btn-danger:hover{background:rgba(255,232,224,.96)}
+  .atm-assist-card{padding:14px}
+  .atm-assist-card.is-watch{box-shadow:inset 3px 0 0 rgba(127,163,122,.65)}
+  .atm-assist-card.is-warn{box-shadow:inset 3px 0 0 rgba(212,175,96,.85)}
+  .atm-assist-card.is-urgent{box-shadow:inset 3px 0 0 rgba(201,120,110,.85)}
+  .atm-assist-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .atm-assist-tier{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+  .atm-assist-tier.watch{color:#6a7a68;border:1px solid rgba(127,163,122,.40);background:rgba(127,163,122,.10)}
+  .atm-assist-tier.warn{color:#a07838;border:1px solid rgba(212,175,96,.50);background:rgba(255,236,196,.55)}
+  .atm-assist-tier.urgent{color:#a05a52;border:1px solid rgba(201,120,110,.50);background:rgba(255,228,220,.65)}
+  .atm-assist-tier.pending,.atm-assist-tier.failed,.atm-assist-tier.hard_close{color:#8a7a72;border:1px solid rgba(180,168,160,.45);background:rgba(245,240,236,.8)}
+  .atm-assist-odds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+  .atm-assist-odds div{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.35)}
+  .atm-assist-odds span{display:block;font-size:11px;color:var(--muted)}
+  .atm-assist-odds strong{display:block;margin-top:2px;font-size:18px;font-weight:650;letter-spacing:.02em}
+  .atm-assist-meta{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;font-size:12px;color:var(--text)}
+  .atm-assist-meta span{color:var(--muted)}
+  .atm-assist-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .atm-assist-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:11px;color:var(--muted);border:1px solid var(--line);background:rgba(255,255,255,.28)}
+  .atm-assist-reason{margin-top:8px;font-size:12px;line-height:1.55;color:var(--text)}
+  .atm-assist-foot{margin-top:8px;font-size:11px;color:var(--muted)}
+  @media(max-width:620px){.atm-assist-odds{grid-template-columns:1fr}}
+  .mdq-exp-sides{display:flex;gap:8px;flex-wrap:wrap}
+  .mdq-exp-side{min-width:72px}
+  .mdq-exp-side.is-on[data-side="long"]{border-color:rgba(127,163,122,.55);background:rgba(127,163,122,.16);color:#5f7a5c}
+  .mdq-exp-side.is-on[data-side="short"]{border-color:rgba(201,160,146,.55);background:rgba(255,236,228,.9);color:#a07870}
+  .mdq-exp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mdq-exp-input{width:100%;min-height:132px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface);color:var(--text);font-size:13px;line-height:1.55;resize:vertical;font-family:inherit}
+  .mdq-exp-input:focus{outline:none;border-color:rgba(212,165,116,.7)}
+  .mdq-exp-actions{display:flex;align-items:center;gap:10px;margin-top:12px}
+  .mdq-exp-msg{font-size:12px;color:var(--muted)}
+  .mdq-exp-card{padding:14px}
+  .mdq-exp-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .mdq-exp-time{font-size:12px;color:var(--muted);white-space:nowrap}
+  .mdq-exp-body{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+  .mdq-exp-body p{margin:0;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+  .mdq-exp-tag{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+  .mdq-exp-tag.long{color:#5f7a5c;border:1px solid rgba(127,163,122,.45);background:rgba(127,163,122,.12)}
+  .mdq-exp-tag.short{color:#a07870;border:1px solid rgba(201,160,146,.45);background:rgba(255,236,228,.9)}
+  @media(max-width:820px){
+    .mdq-exp-grid,.mdq-exp-body{grid-template-columns:1fr}
+  }
+  .atm-pos-pnl .atm-field-label{text-align:right}
+  @media(max-width:820px){
+    .atm-pos-row{grid-template-columns:1fr 1fr;}
+    .atm-pos-row > :first-child{grid-column:1/-1}
+  }
+  .atm-row details{border-top:1px solid rgba(212,184,168,.18)}
   .atm-row summary{list-style:none;cursor:pointer;padding:8px 14px;font-size:11px;color:var(--muted)}
   .atm-row summary::-webkit-details-marker{display:none}
   .atm-row summary::after{content:'▾';float:right;opacity:.7}
   .atm-row details[open] summary::after{content:'▴'}
   .atm-trade-wrap{padding:0 12px 12px;overflow-x:auto}
   .atm-trade-table{width:100%;border-collapse:collapse;min-width:560px;font-size:11px}
-  .atm-trade-table th,.atm-trade-table td{padding:6px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.05)}
+  .atm-trade-table th,.atm-trade-table td{padding:6px 8px;text-align:left;border-bottom:1px solid rgba(212,184,168,.14)}
   .atm-trade-table th{color:var(--muted);font-weight:500}
   .atm-trade-table .gain{color:var(--gain)}
   .atm-trade-table .loss{color:var(--loss)}
+  .atm-row-split{display:block;padding:0 14px 4px}
+  .atm-roster-fold{margin:0 0 8px;border:1px solid var(--surface-hover);border-radius:10px;background:var(--surface-3);overflow:hidden}
+  .atm-roster-fold>summary{cursor:pointer;list-style:none;padding:10px 12px;font-size:12px;color:var(--text);font-weight:500}
+  .atm-roster-fold>summary::-webkit-details-marker{display:none}
+  .atm-roster-fold>summary::before{content:'▸ ';color:var(--muted)}
+  .atm-roster-fold[open]>summary::before{content:'▾ '}
+  .atm-roster-fold-body{padding:0 12px 12px}
+  .atm-metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .atm-metric-item{padding:8px 10px;border:1px solid rgba(212,184,168,.18);border-radius:8px;background:var(--surface-3);min-width:0}
+  .atm-metric-item span{display:block;font-size:10px;color:var(--muted);margin-bottom:4px;line-height:1.35}
+  .atm-metric-item strong{display:block;font-size:14px;font-weight:600;color:var(--text);line-height:1.35;word-break:break-word}
+  .atm-metric-item strong.atm-muted{color:var(--muted);font-size:12px;font-weight:500}
+  .atm-metric-item.atm-gate-fail{border-color:rgba(220,80,80,.55);background:rgba(220,80,80,.08)}
+  .atm-metric-item.atm-gate-warn{border-color:rgba(220,170,60,.55);background:rgba(220,170,60,.08)}
+  .atm-metric-threshold{display:block;font-size:9px;color:var(--muted);margin-top:3px;line-height:1.3}
+  .atm-metric-status{display:block;font-size:10px;margin-top:3px;line-height:1.3}
+  .atm-metric-status.pass{color:#6fbf8a}
+  .atm-metric-status.fail{color:#e07a7a}
+  .atm-metric-status.warn{color:#d9b35c}
+  .atm-metric-status.missing{color:var(--muted)}
+  .atm-qa-meta{font-size:11px;color:var(--muted);line-height:1.55;margin:0 0 10px}
+  .atm-qa-meta strong{color:var(--text);font-weight:500}
+  .atm-qa-section-title{font-size:11px;color:var(--text);font-weight:600;margin:10px 0 6px}
+  .atm-roster-status-hint{margin:0 0 10px;padding:8px 12px;border-radius:8px;font-size:12px;color:var(--muted);background:var(--surface-2);border:1px solid var(--surface-hover)}
+  .atm-trade-wrap{overflow:auto}
   .vector-daily-ledger-v10{margin:0;padding:0;border:0;border-radius:0;background:transparent}
   .vector-daily-ledger-head-v10{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
   .vector-daily-ledger-title-v10{font-size:15px;color:var(--focus);letter-spacing:.08em;font-weight:600}
   .vector-daily-ledger-sub-v10{font-size:11px;color:var(--muted);margin-top:6px}
-  .vector-latest-table-wrap-v11{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.014)}
+  .vector-latest-table-wrap-v11{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface-3)}
   .vector-latest-table-v11{width:100%;min-width:960px;border-collapse:collapse;font-size:11px}
-  .vector-latest-table-v11 th,.vector-latest-table-v11 td{padding:10px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap}
-  .vector-latest-table-v11 th{color:var(--muted);font-weight:500;background:rgba(255,255,255,.018)}
+  .vector-latest-table-v11 th,.vector-latest-table-v11 td{padding:10px 12px;text-align:left;border-bottom:1px solid rgba(212,184,168,.14);white-space:nowrap}
+  .vector-latest-table-v11 th{color:var(--muted);font-weight:500;background:var(--surface-3)}
   .vector-latest-table-v11 tr:last-child td{border-bottom:0}
   .vector-latest-table-v11 td{color:var(--text)}
+  .vector-latest-table-v11 .atm-qi-act{width:44px;text-align:center;padding:6px 8px}
   .vector-latest-table-v11 .gain{color:var(--gain)}
   .vector-latest-table-v11 .loss{color:var(--loss)}
   .vector-latest-meta-v11{margin-top:8px;font-size:10px;color:var(--muted);text-align:right}
-  .vector-daily-day-v10{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:rgba(255,255,255,.014);overflow:hidden}
+  .vector-daily-day-v10{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:var(--surface-3);overflow:hidden}
   .vector-daily-day-v10 summary{display:grid;grid-template-columns:1.2fr repeat(4,minmax(90px,1fr));gap:10px;align-items:center;padding:14px 16px;cursor:pointer;list-style:none;font-size:12px;color:var(--text)}
   .vector-daily-day-v10 summary::-webkit-details-marker{display:none}
   .vector-daily-day-v10 summary span{color:var(--muted)}
@@ -160,30 +279,36 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .vector-daily-event-v10 b{color:var(--text);font-weight:500}
   .vector-auto-empty-v5{font-size:12px;color:var(--soft);margin-top:8px}
   .atm-forecast-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
-  .atm-metric{padding:12px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.02)}
+  .atm-forecast-metrics.atm-summary-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .atm-metric{padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--surface-3)}
   .atm-metric span{display:block;font-size:10px;color:var(--muted);margin-bottom:6px}
-  .atm-metric strong{font-size:20px;font-weight:600;color:var(--text)}
+  .atm-metric strong.atm-pending{font-size:13px;font-weight:500;color:var(--muted)}
   .atm-forecast-summary{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 10px}
   .atm-forecast-status{font-size:12px;color:var(--muted);min-height:18px;margin-bottom:10px}
   .atm-forecast-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
   .atm-forecast-table{width:100%;border-collapse:collapse;min-width:640px;font-size:12px}
   .atm-forecast-table th,.atm-forecast-table td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line)}
-  .atm-forecast-table th{color:var(--muted);font-weight:500;background:rgba(255,255,255,.02)}
+  .atm-forecast-table th{color:var(--muted);font-weight:500;background:var(--surface-3)}
+  .atm-forecast-table .gain{color:var(--gain)}
+  .atm-forecast-table .loss{color:var(--loss)}
   .atm-ok{color:var(--gain)}
   .atm-warn{color:var(--focus)}
   .atm-pipe-link{font-size:12px;color:var(--muted);margin:0 0 12px;letter-spacing:.02em}
   .atm-pipe-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .atm-pipe-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
-  .atm-pipe-card.is-working{border-color:rgba(214,170,130,.4);background:rgba(214,170,130,.06)}
+  .atm-pipe-card{padding:14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-2);box-shadow:var(--card-shadow-sm)}
+  .atm-pipe-card.is-working{border-color:rgba(214,170,130,.4);background:rgba(232,201,168,.14)}
   .atm-pipe-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
   .atm-pipe-head strong{font-size:14px;letter-spacing:.04em}
   .atm-pipe-state{font-size:11px;color:var(--muted)}
-  .atm-pipe-card.is-working .atm-pipe-state{color:#d6aa82}
+  .atm-pipe-card.is-working .atm-pipe-state{color:var(--accent)}
   .atm-pipe-dir{font-size:13px;margin-bottom:10px;min-height:1.4em}
-  .atm-pipe-progress{height:8px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:6px}
-  .atm-pipe-bar{height:100%;background:linear-gradient(90deg,#8f7a5f,#d6aa82);width:0%;transition:width .4s ease}
+  .atm-pipe-progress{height:8px;border-radius:999px;background:rgba(212,184,168,.18);overflow:hidden;margin-bottom:6px}
+  .atm-pipe-bar{height:100%;background:linear-gradient(90deg,var(--accent-soft),var(--accent));width:0%;transition:width .4s ease}
   .atm-pipe-pct{font-size:11px;color:var(--muted);margin-bottom:6px}
   .atm-pipe-detail{font-size:12px;color:var(--text);line-height:1.55;min-height:2.8em}
+  .atm-workshop-policy{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+  .atm-workshop-policy span{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 8px;background:var(--surface-3)}
+  .atm-workshop-batch{font-size:12px;color:var(--text);margin:0 0 12px}
   .atm-qi-flow{display:flex;flex-direction:column;align-items:center;margin:6px 0 14px;gap:0}
   .atm-qi-join{
     width:min(420px,92%);height:28px;position:relative;margin-top:2px;
@@ -203,9 +328,9 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   }
   .atm-qi-cube{
     width:132px;height:132px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    border:1px solid rgba(214,170,130,.45);border-radius:10px;
-    background:linear-gradient(145deg,rgba(214,170,130,.14),rgba(255,255,255,.03));
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 10px 28px rgba(0,0,0,.18);
+    border:1px solid rgba(214,170,130,.45);border-radius:var(--radius-md);
+    background:linear-gradient(145deg,rgba(232,201,168,.18),var(--surface));
+    box-shadow:inset 0 0 0 1px rgba(255,252,250,.65),var(--card-shadow-sm);
     text-align:center;padding:10px;
   }
   .atm-qi-cube strong{font-size:16px;letter-spacing:.12em;color:var(--focus);font-weight:650}
@@ -228,18 +353,55 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .atm-qi-split-leg-l{left:18%}
   .atm-qi-split-leg-r{right:18%}
   .atm-qi-tables{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
-  .atm-qi-table-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
-  .atm-qi-table-card.is-pass{border-color:rgba(155,191,154,.32)}
-  .atm-qi-table-card.is-fail{border-color:rgba(197,143,132,.28)}
+  .atm-qi-table-card{padding:14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-2);box-shadow:var(--card-shadow-sm)}
+  .atm-qi-table-card.is-pass{border-color:rgba(127,163,122,.32)}
+  .atm-qi-table-card.is-fail{border-color:rgba(201,160,146,.28)}
   .atm-qi-table-card h3{margin:0 0 10px;font-size:13px;letter-spacing:.04em;font-weight:600}
   .atm-qi-table-card.is-pass h3{color:var(--gain)}
   .atm-qi-table-card.is-fail h3{color:var(--loss)}
+  .atm-qi-table-card .atm-de-table{table-layout:fixed;width:100%}
+  .atm-qi-table-card .atm-de-table th,.atm-qi-table-card .atm-de-table td{vertical-align:middle}
+  .atm-qi-table-card .atm-de-table .atm-qi-name{width:46%}
+  .atm-qi-table-card .atm-de-table .atm-row-title{
+    font-size:12px;font-weight:500;line-height:1.45;color:var(--text);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .atm-qi-table-card .atm-de-table .atm-row-scope{
+    font-size:11px;color:var(--muted);margin-top:3px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .atm-qi-table-card .atm-de-table .atm-qi-act{width:44px;text-align:center}
+  .atm-qi-author-hint{font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.45}
+  .atm-qi-author{
+    font-size:12px;line-height:1.45;color:var(--text);
+  }
+  .atm-qi-author .atm-qi-verdict{font-weight:600}
+  .atm-qi-author.is-sign .atm-qi-verdict{color:var(--gain)}
+  .atm-qi-author.is-watch .atm-qi-verdict{color:var(--focus)}
+  .atm-qi-author.is-not-mount .atm-qi-verdict{color:var(--accent)}
+  .atm-qi-author.is-tech .atm-qi-verdict{color:var(--loss)}
+  .atm-qi-author .atm-qi-why{
+    font-size:11px;color:var(--muted);margin-top:3px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .atm-qi-del{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:28px;height:28px;padding:0;border:1px solid var(--line);
+    border-radius:8px;background:var(--surface-2);color:var(--muted);cursor:pointer;
+  }
+  .atm-qi-del:hover{color:var(--loss);border-color:rgba(201,160,146,.45);background:rgba(201,160,146,.08)}
+  .atm-qi-del svg{width:14px;height:14px;pointer-events:none}
   .atm-qi-gate{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 10px;text-align:center}
+  .atm-bakery-rounds{display:grid;gap:12px;margin-top:8px}
+  .atm-bakery-round{padding:14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-2);box-shadow:var(--card-shadow-sm)}
+  .atm-bakery-round h3{margin:0 0 10px;font-size:13px;letter-spacing:.04em;font-weight:600;color:var(--gain)}
+  .atm-bakery-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+  .atm-bakery-list li{font-size:13px;color:var(--text);line-height:1.45;padding:8px 10px;border:1px solid rgba(127,163,122,.18);border-radius:var(--radius-sm);background:var(--surface)}
   @media (max-width:900px){
     .atm-pipe-grid,.atm-qi-tables,.atm-de-grid{grid-template-columns:1fr}
   }
   .atm-de-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px}
-  .atm-de-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
+  .atm-de-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-3)}
   .atm-de-card h3{margin:0 0 8px;font-size:12px;color:var(--focus);letter-spacing:.06em;font-weight:600}
   .atm-de-insight{font-size:12px;color:var(--text);line-height:1.65;min-height:48px}
   .atm-de-meta{font-size:11px;color:var(--muted);margin-top:8px}
@@ -249,7 +411,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .atm-de-table th{color:var(--muted);font-weight:500}
   .atm-tw-console{
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    background:rgba(255,255,255,.014);
+    background:var(--surface-3);
     border:1px solid var(--line);
     border-radius:14px;
     padding:14px 16px 12px;
@@ -268,42 +430,42 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .atm-tw-slot{
     margin:0 0 10px;padding:12px 12px 10px;
     border:1px solid var(--line);border-radius:12px;
-    background:rgba(255,255,255,.018);
+    background:var(--surface-3);
   }
   .atm-tw-slot:last-child{margin-bottom:0}
   .atm-tw-slot.is-running{border-color:rgba(214,170,130,.35);background:rgba(214,170,130,.05)}
-  .atm-tw-slot.is-success,.atm-tw-slot.is-breakthrough{border-color:rgba(155,191,154,.32);background:rgba(155,191,154,.05)}
-  .atm-tw-slot.is-archived{border-color:rgba(197,143,132,.28);background:rgba(197,143,132,.04)}
+  .atm-tw-slot.is-success,.atm-tw-slot.is-breakthrough{border-color:rgba(127,163,122,.32);background:rgba(127,163,122,.05)}
+  .atm-tw-slot.is-archived{border-color:rgba(201,160,146,.28);background:rgba(201,160,146,.04)}
   .atm-tw-slot.is-idle{opacity:.78}
   .atm-tw-slot-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px}
   .atm-tw-slot-id{font-size:11px;color:var(--muted);letter-spacing:.04em}
   .atm-tw-slot-badge{
     display:inline-flex;align-items:center;gap:6px;
     padding:3px 9px;border-radius:999px;font-size:11px;
-    border:1px solid var(--line);color:var(--muted);background:rgba(255,255,255,.03);
+    border:1px solid var(--line);color:var(--muted);background:var(--surface-2);
   }
-  .atm-tw-slot.is-running .atm-tw-slot-badge{color:#d6aa82;border-color:rgba(214,170,130,.38);background:rgba(214,170,130,.08)}
+  .atm-tw-slot.is-running .atm-tw-slot-badge{color:var(--accent);border-color:rgba(214,170,130,.38);background:rgba(214,170,130,.08)}
   .atm-tw-slot.is-success .atm-tw-slot-badge,
-  .atm-tw-slot.is-breakthrough .atm-tw-slot-badge{color:var(--gain);border-color:rgba(155,191,154,.32);background:rgba(155,191,154,.08)}
-  .atm-tw-slot.is-archived .atm-tw-slot-badge{color:var(--loss);border-color:rgba(197,143,132,.32);background:rgba(197,143,132,.08)}
+  .atm-tw-slot.is-breakthrough .atm-tw-slot-badge{color:var(--gain);border-color:rgba(127,163,122,.32);background:rgba(127,163,122,.08)}
+  .atm-tw-slot.is-archived .atm-tw-slot-badge{color:var(--loss);border-color:rgba(201,160,146,.32);background:rgba(201,160,146,.08)}
   .atm-tw-slot-title{font-size:13px;color:var(--text);font-weight:600;margin:2px 0 4px}
   .atm-tw-slot-fam{font-size:11px;color:var(--muted)}
   .atm-tw-slot-status{font-size:12px;color:var(--focus);margin:6px 0 4px;line-height:1.5}
   .atm-tw-slot-meta{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted);margin-bottom:8px}
-  .atm-tw-bar-track{height:7px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+  .atm-tw-bar-track{height:7px;border-radius:999px;background:rgba(212,184,168,.18);overflow:hidden}
   .atm-tw-bar-fill{height:100%;border-radius:999px;background:var(--focus);width:0%;transition:width .35s ease}
-  .atm-tw-slot.is-running .atm-tw-bar-fill{background:#d6aa82}
+  .atm-tw-slot.is-running .atm-tw-bar-fill{background:var(--accent)}
   .atm-tw-slot.is-success .atm-tw-bar-fill,
   .atm-tw-slot.is-breakthrough .atm-tw-bar-fill{background:var(--gain)}
   .atm-tw-slot.is-archived .atm-tw-bar-fill{background:var(--loss)}
   .atm-tw-pipe-inline{margin-top:8px;font-size:11px;color:var(--muted);letter-spacing:.02em}
   .atm-tw-pipe-inline b{color:var(--text);font-weight:500}
   .atm-tw-pipe-inline .ok{color:var(--gain)}
-  .atm-tw-pipe-inline .run{color:#d6aa82}
+  .atm-tw-pipe-inline .run{color:var(--accent)}
   .atm-tw-pipe-inline .fail{color:var(--loss)}
   .atm-tw-diag{
     margin-top:10px;padding:10px 11px;border:1px solid var(--line);border-radius:10px;
-    background:rgba(255,255,255,.02);
+    background:var(--surface-3);
   }
   .atm-tw-diag-title{font-size:11px;color:var(--focus);letter-spacing:.04em;margin:0 0 8px;font-weight:600}
   .atm-tw-diag-row{font-size:11px;color:var(--muted);line-height:1.55;margin:0 0 5px}
@@ -311,24 +473,26 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
   .atm-tw-diag-list{margin:4px 0 8px;padding-left:1.1em;color:var(--muted);font-size:11px;line-height:1.55}
   .atm-tw-diag-list li{margin:2px 0}
   .atm-tw-prompt{
-    margin-top:6px;padding:9px 10px;border:1px dashed rgba(155,191,154,.35);
-    border-radius:9px;background:rgba(155,191,154,.05);color:var(--text);
+    margin-top:6px;padding:9px 10px;border:1px dashed rgba(127,163,122,.35);
+    border-radius:9px;background:rgba(127,163,122,.05);color:var(--text);
     font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-word;
   }
   .atm-tw-diag-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .atm-tw-copy{
     padding:5px 10px;border-radius:8px;font-size:11px;cursor:pointer;
-    border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);
+    border:1px solid var(--line);background:var(--surface-2);color:var(--text);
   }
-  .atm-tw-copy:hover{background:rgba(255,255,255,.08)}
-  .atm-tw-copy.ok{color:var(--gain);border-color:rgba(155,191,154,.35)}
+  .atm-tw-copy:hover{background:var(--surface-hover)}
+  .atm-tw-copy.ok{color:var(--gain);border-color:rgba(127,163,122,.35)}
   .atm-tw-note{margin-top:10px;font-size:11px;color:var(--muted);line-height:1.55}
-  .atm-tw-charter{font-size:11px;color:var(--muted);line-height:1.65;margin:0 0 12px;padding:10px 12px;border-left:3px solid rgba(155,191,154,.45);background:rgba(155,191,154,.05);border-radius:0 10px 10px 0}
+  .atm-tw-charter{font-size:11px;color:var(--muted);line-height:1.65;margin:0 0 12px;padding:10px 12px;border-left:3px solid rgba(127,163,122,.45);background:rgba(127,163,122,.05);border-radius:0 10px 10px 0}
   #strategyCreatorModule{display:none!important}
   @media(max-width:980px){
     .atm-module{padding:18px}
-    .atm-row-main{grid-template-columns:1fr 1fr}
+    .atm-row-main{grid-template-columns:1fr 72px}
+    .atm-metric-grid{grid-template-columns:1fr}
     .atm-forecast-metrics{grid-template-columns:1fr 1fr}
+    .atm-forecast-metrics.atm-summary-metrics{grid-template-columns:1fr 1fr}
     .atm-de-grid{grid-template-columns:1fr}
     .vector-daily-day-v10 summary{grid-template-columns:1fr 1fr}
     .vector-daily-events-v10{grid-template-columns:1fr}
@@ -343,13 +507,14 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     <div class="atm-section-head">
       <div>
         <h2 class="atm-section-title">策略创造演进模块</h2>
+        <div class="atm-section-sub">管道1 / 管道2：AI 自由创造。已有策略模版的再创造改走下方工坊，不再占用这两条管道。</div>
       </div>
       <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="creationPipelinesRefresh()">刷新</button>
+        <button type="button" class="atm-btn" onclick="creationPipelinesRefresh(true)">刷新</button>
         <div class="atm-count" id="atmCreationWorking">0 管在研</div>
       </div>
     </div>
-    <div class="atm-pipe-link" id="atmCreationReviewLink">汇流 → 质检器（四AI平均：E&gt;0 且周开仓频率&gt;0.5）</div>
+    <div class="atm-pipe-link" id="atmCreationReviewLink">汇流 → 质检器（样本内10项 + 盲样本外夏普）</div>
     <div class="atm-pipe-grid" id="atmCreationPipelines">
       <div class="atm-pipe-card" data-pipeline="1">
         <div class="atm-pipe-head"><strong>管道1</strong><span class="atm-pipe-state" id="atmPipe1State">读取中…</span></div>
@@ -377,57 +542,55 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     <div class="atm-section-head">
       <div>
         <h2 class="atm-section-title">质检器</h2>
-        <div class="atm-section-sub">双管道汇流后的唯一简化复核：四AI平均数 E&gt;0 且周开仓频率&gt;0.5。</div>
+        <div class="atm-section-sub">机器门：样本内数值 + 盲样本外夏普。绿栏只表示数字过关，不等于建议签发。Qwen 质检作者写咨询档，不能放行、不能否决挂载。过关成品在面包房按轮次陈列。</div>
       </div>
       <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="creationReviewRefresh()">刷新</button>
-        <div class="atm-count" id="atmQiCount">0 / 0</div>
+        <button type="button" class="atm-btn" onclick="creationReviewRefresh(true)">刷新</button>
+        <div class="atm-count" id="atmQiCount">0 条</div>
       </div>
     </div>
-    <div class="atm-qi-gate" id="atmQiGate">门槛：四AI平均 E&gt;0 · 周开仓频率&gt;0.5 · 禁止自动挂载</div>
+    <div class="atm-qi-gate" id="atmQiGate">门槛：样本内机器门 + 盲样本外夏普 · Qwen咨询 · 禁止自动挂载</div>
     <div class="atm-qi-flow">
       <div class="atm-qi-cube" id="atmQiCube">
         <strong>质检器</strong>
         <span id="atmQiCubeMeta">等待管道产出</span>
+        </div>
       </div>
-      <div class="atm-qi-split">
-        <span class="atm-qi-split-leg-l"></span>
-        <span class="atm-qi-split-leg-r"></span>
-      </div>
-    </div>
     <div class="atm-qi-tables">
       <div class="atm-qi-table-card is-pass">
-        <h3>质检合格策略</h3>
+        <h3>机器门过关</h3>
+        <div class="atm-qi-author-hint">绿栏 ≠ 快挂。右侧是 Qwen 质检作者咨询。</div>
         <div style="overflow-x:auto">
           <table class="atm-de-table">
             <thead>
               <tr>
-                <th>策略名称</th>
-                <th>E值</th>
-                <th>周开仓频率</th>
-                <th>盈利单平均盈利率</th>
+                <th>策略</th>
+                <th id="atmQiPassThE">E值</th>
+                <th id="atmQiPassThW">周开仓</th>
+                <th>质检作者</th>
               </tr>
             </thead>
-            <tbody id="atmQiPassRows">
-              <tr><td colspan="4" style="color:var(--muted)">读取中…</td></tr>
+            <tbody id="atmQiPassBody">
+              <tr><td colspan="4" style="color:var(--muted)">等待过关策略…</td></tr>
             </tbody>
           </table>
         </div>
       </div>
       <div class="atm-qi-table-card is-fail">
-        <h3>质检不合格策略</h3>
+        <h3>机器门未过</h3>
         <div style="overflow-x:auto">
           <table class="atm-de-table">
             <thead>
               <tr>
-                <th>策略名称</th>
-                <th>E值</th>
-                <th>周开仓频率</th>
-                <th>盈利单平均盈利率</th>
+                <th>策略</th>
+                <th id="atmQiFailThE">E值</th>
+                <th id="atmQiFailThW">周开仓</th>
+                <th>诊断</th>
+                <th></th>
               </tr>
             </thead>
-            <tbody id="atmQiFailRows">
-              <tr><td colspan="4" style="color:var(--muted)">读取中…</td></tr>
+            <tbody id="atmQiFailBody">
+              <tr><td colspan="5" style="color:var(--muted)">暂无不合格条目</td></tr>
             </tbody>
           </table>
         </div>
@@ -436,41 +599,202 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     <div class="atm-forecast-status" id="atmReviewStatus"></div>
   </section>
 
-  <!-- 第三栏：策略待优化（人工/机器优化） -->
+  <section class="atm-section" id="atmSectionBakery" data-atm-section="2b">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">合格策略面包房</h2>
+        <div class="atm-section-sub">只陈列每一轮创造的过关策略。轮次按北京时间命名，例如 8月18日第二轮创造。最多保留最近7天，超出后自动删除最旧一天。已加入运行策略的条目自动撤下。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn" onclick="creationBakeryRefresh(true)">刷新</button>
+        <div class="atm-count" id="atmBakeryCount">0 份过关</div>
+      </div>
+    </div>
+    <div class="atm-bakery-rounds" id="atmBakeryRounds">
+      <div class="atm-empty">等待一轮创造过关…</div>
+    </div>
+    <div class="atm-forecast-status" id="atmBakeryStatus"></div>
+  </section>
+
+  <!-- 第三栏：已有策略模版工坊（与管道1/2同能力，专跑系统已有模版再创造） -->
   <section class="atm-section" id="atmSectionPendingOptimize" data-atm-section="3">
     <div class="atm-section-head">
       <div>
-        <h2 class="atm-section-title">策略待优化</h2>
-        <div class="atm-section-sub">质检合格后的优化池。展示标题、近2年账户胜率、盈利单平均盈利率、周开仓频率、期望值（E）。</div>
+        <h2 class="atm-section-title">已有策略模版工坊</h2>
+        <div class="atm-section-sub">工坊管道1 / 工坊管道2：与管道1/2同一套 sole 入口（cognitive_designer → 11项质检 → 人工确认）。专跑系统已有策略模版的优化与再创造，把管道1/2腾给 AI 自由创造。不自动挂载。</div>
       </div>
       <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="pendingOptimizeRefresh()">刷新</button>
-        <div class="atm-count" id="atmPendingOptimizeCount">0 条</div>
+        <button type="button" class="atm-btn" onclick="pendingOptimizeRefresh(true)">刷新</button>
+        <div class="atm-count" id="atmPendingOptimizeCount">工坊空闲</div>
       </div>
     </div>
-    <div class="atm-pipe-link" id="atmPendingOptimizeNote">承接质检合格策略的参数打磨；未挂载实盘。</div>
-    <div class="atm-de-card">
-      <div style="overflow-x:auto">
-        <table class="atm-de-table">
+    <div class="atm-pipe-link" id="atmPendingOptimizeNote">汇流 → 质检器（样本内10项 + 盲样本外夏普） · 禁止自动挂载</div>
+    <div class="atm-workshop-policy" id="atmWorkshopPolicy">
+      <span>周期一律 1h</span><span>with-llm</span><span>BTC 现网 5 条本批不叠</span><span>SOL 现网 3 条本批不叠</span><span>ADA 禁止研究</span><span>标的按占用缺口轮转</span><span>不重复上一轮「原策略 × 标的」</span><span>不自动挂载</span>
+    </div>
+    <div class="atm-workshop-batch" id="atmWorkshopBatch">批次读取中…</div>
+    <div class="atm-pipe-grid" id="atmWorkshopPipelines">
+      <div class="atm-pipe-card" data-pipeline="3">
+        <div class="atm-pipe-head"><strong>工坊管道1</strong><span class="atm-pipe-state" id="atmPipe3State">读取中…</span></div>
+        <div class="atm-pipe-dir" id="atmPipe3Dir">—</div>
+        <div class="atm-pipe-progress"><div class="atm-pipe-bar" id="atmPipe3Bar" style="width:0%"></div></div>
+        <div class="atm-pipe-pct" id="atmPipe3Pct">0%</div>
+        <div class="atm-pipe-detail" id="atmPipe3Detail">正在连接已有策略模版工坊…</div>
+      </div>
+      <div class="atm-pipe-card" data-pipeline="4">
+        <div class="atm-pipe-head"><strong>工坊管道2</strong><span class="atm-pipe-state" id="atmPipe4State">读取中…</span></div>
+        <div class="atm-pipe-dir" id="atmPipe4Dir">—</div>
+        <div class="atm-pipe-progress"><div class="atm-pipe-bar" id="atmPipe4Bar" style="width:0%"></div></div>
+        <div class="atm-pipe-pct" id="atmPipe4Pct">0%</div>
+        <div class="atm-pipe-detail" id="atmPipe4Detail">正在连接已有策略模版工坊…</div>
+      </div>
+    </div>
+    <div class="atm-de-card" style="margin-top:14px">
+        <div style="overflow-x:auto">
+          <table class="atm-de-table">
           <thead>
             <tr>
-              <th>策略标题</th>
-              <th>近2年账户胜率</th>
-              <th>盈利单平均盈利率</th>
-              <th>周开仓频率</th>
-              <th>期望值（E）</th>
+              <th>原策略模版</th>
+              <th>标的 / 周期 / 方向</th>
+              <th>工坊管道</th>
+              <th>队列</th>
+              <th>进度</th>
             </tr>
           </thead>
           <tbody id="atmPendingOptimizeRows">
             <tr><td colspan="5" style="color:var(--muted)">读取中…</td></tr>
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
-    </div>
     <div class="atm-forecast-status" id="atmPendingOptimizeStatus"></div>
   </section>
 
-  <!-- 第四栏：运行策略 -->
+  <!-- 系统组合数据（紧挨运行策略上方 · 只读） -->
+  <section class="atm-section" id="atmSectionForecast" data-atm-section="0">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">系统组合数据</h2>
+        <div class="atm-section-sub">预计成交/皮尔逊来自等权未加杠杆周收益；周几何按账户占用回放（最多3仓、同品种1仓、风险帽15.2%）。方向型/赔率型为同类策略单独占用回放，百分数不与合计相加。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn" onclick="window.refreshForecastStatistics()">重算并刷新</button>
+      </div>
+    </div>
+    <div class="atm-forecast-status" id="systemForecastPanel">加载组合数据…</div>
+    <div class="atm-forecast-metrics">
+      <div class="atm-metric"><span>预计日均成交</span><strong id="atmFcDaily">暂无</strong></div>
+      <div class="atm-metric"><span>预计周总成交</span><strong id="atmFcWeekly">暂无</strong></div>
+      <div class="atm-metric"><span>策略间皮尔逊相关系数</span><strong id="atmFcPearson">暂无</strong></div>
+      <div class="atm-metric"><span>未加杠杆组合周期望收益率</span><strong id="atmFcMuWeekly">暂无</strong></div>
+      <div class="atm-metric"><span>未加杠杆组合周收益波动率</span><strong id="atmFcSigmaWeekly">暂无</strong></div>
+      <div class="atm-metric"><span>占用回放成交率</span><strong id="atmFcOccTake">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（占用路径）</span><strong id="atmFcGeoWeekly">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（占用路径·样本外）</span><strong id="atmFcGeoWeeklyOos">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（方向型·占用路径）</span><strong id="atmFcGeoWeeklyDir">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（方向型·样本外）</span><strong id="atmFcGeoWeeklyOosDir">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（赔率型·占用路径）</span><strong id="atmFcGeoWeeklyOdds">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（赔率型·样本外）</span><strong id="atmFcGeoWeeklyOosOdds">暂无</strong></div>
+    </div>
+    <p class="atm-forecast-summary" id="atmFcGenerated"></p>
+  </section>
+
+  <!-- 每日 / 每周情况汇总：仓位管理之上 -->
+  <div id="atmSectionPeriodSummary">
+  <section class="atm-section" id="atmSectionDailySummary" data-atm-section="4a0">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">每日情况汇总</h2>
+        <div class="atm-section-sub" id="atmDailySub">统计周期：每天 00:00 至 23:59（北京时间），次日自动刷新。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn" onclick="loadDailySummary()">刷新</button>
+        <div class="atm-count" id="atmDailyCount">今日</div>
+      </div>
+    </div>
+    <div class="atm-forecast-metrics atm-summary-metrics">
+      <div class="atm-metric"><span>每日开仓次数（自动）</span><strong id="atmDayOpenAuto">读取中…</strong></div>
+      <div class="atm-metric"><span>每日开仓次数（手动）</span><strong id="atmDayOpenManual">读取中…</strong></div>
+      <div class="atm-metric"><span>日增长率（自动）</span><strong id="atmDayGrowthAuto">读取中…</strong></div>
+      <div class="atm-metric"><span>日增长率</span><strong id="atmDayGrowth">读取中…</strong></div>
+      <div class="atm-metric"><span>日盈利额</span><strong id="atmDayProfit">读取中…</strong></div>
+    </div>
+    <div class="atm-forecast-table-wrap" id="atmDailyTradesWrap">
+      <table class="atm-forecast-table" id="atmDailyTrades">
+        <thead>
+          <tr>
+            <th>开仓标的</th>
+            <th>开仓性质</th>
+            <th>杠杆</th>
+            <th>仓位</th>
+            <th>方向</th>
+            <th>增长率</th>
+            <th>盈利额</th>
+          </tr>
+        </thead>
+        <tbody id="atmDailyTradeBody">
+          <tr><td colspan="7">正在读取今日成交…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="atm-section" id="atmSectionWeekly" data-atm-section="4a">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">每周情况汇总</h2>
+        <div class="atm-section-sub" id="atmWeeklySub">统计周期：每周一 00:00 至周日 24:00（北京时间）。下表明细仅自动开仓，不含手动。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn" onclick="loadWeeklySummary()">刷新</button>
+        <div class="atm-count" id="atmWeeklyCount">本周</div>
+      </div>
+    </div>
+    <div class="atm-forecast-metrics atm-summary-metrics">
+      <div class="atm-metric"><span>每周开仓次数（自动）</span><strong id="atmWkOpenAuto">读取中…</strong></div>
+      <div class="atm-metric"><span>每周开仓次数（手动）</span><strong id="atmWkOpenManual">读取中…</strong></div>
+      <div class="atm-metric"><span>周增长率（自动）</span><strong id="atmWkGrowthAuto">读取中…</strong></div>
+      <div class="atm-metric"><span>周增长率</span><strong id="atmWkGrowth">读取中…</strong></div>
+      <div class="atm-metric"><span>周盈利额</span><strong id="atmWkProfit">读取中…</strong></div>
+    </div>
+    <div class="atm-forecast-table-wrap" id="atmWeeklyTradesWrap">
+      <table class="atm-forecast-table" id="atmWeeklyTrades">
+        <thead>
+          <tr>
+            <th>开仓时间</th>
+            <th>开仓标的</th>
+            <th>开仓性质</th>
+            <th>杠杆</th>
+            <th>仓位</th>
+            <th>方向</th>
+            <th>增长率</th>
+            <th>盈利额</th>
+          </tr>
+        </thead>
+        <tbody id="atmWeeklyTradeBody">
+          <tr><td colspan="8">正在读取本周自动开仓…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  </div>
+
+  <!-- 仓位暖房：从自动交易庄园独立 -->
+  <section class="atm-section" id="atmSectionPositions" data-atm-section="4b">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">仓位暖房</h2>
+        <div class="atm-section-sub">实时显示当前持仓（含手动开仓）。自动仓标注马卡龙/大福等级、策略标题与标的方向，并给出当前盈利率与盈利额。</div>
+      </div>
+      <div class="atm-section-meta">
+        <button type="button" class="atm-btn" onclick="loadLivePositions()">刷新</button>
+        <div class="atm-count" id="atmPositionCount">0 个仓位</div>
+      </div>
+    </div>
+    <div class="atm-roster" id="atmPositionRoster"><div class="atm-empty">正在读取实时仓位…</div></div>
+  </section>
+
+  <!-- 运行策略 -->
   <section class="atm-section" id="atmSectionStrategies" data-atm-section="4">
     <div class="atm-section-head">
       <div>
@@ -478,45 +802,26 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
         <div class="atm-section-sub">全部已挂载/运行中的自动交易策略合集（全标的 · 全周期），每条一行；展开可查看近10组开平仓记录。</div>
       </div>
       <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="vectorAutoFetch()">刷新</button>
-        <div class="atm-count" id="atmStrategyCount">0 条策略</div>
+        <button type="button" class="atm-btn" onclick="vectorAutoFetch(true)">刷新</button>
+        <div class="atm-count" id="atmStrategyCount">读取中…</div>
       </div>
     </div>
     <div class="atm-roster" id="atmStrategyRoster"><div class="atm-empty">正在读取运行策略…</div></div>
   </section>
 
-  <!-- 第五栏：最新自动交易记录 -->
-  <section class="atm-section" id="atmSectionDaily" data-atm-section="5">
-    <div class="vector-daily-ledger-v10" id="vectorDailyLedger">
-      <div class="vector-daily-ledger-head-v10">
-        <div>
-          <div class="vector-daily-ledger-title-v10">最新自动交易记录</div>
-          <div class="vector-daily-ledger-sub-v10">按平仓时间倒序展示最近20笔正式自动交易；超过20笔后自动移除最旧记录，不修改原始成交历史。</div>
-        </div>
-      </div>
-      <div id="vectorDailyLedgerRows"><div class="vector-auto-empty-v5">正在读取最新自动交易记录…</div></div>
-    </div>
-  </section>
-
-  <!-- 第六栏：系统频率预测（置底 · 只读） -->
-  <section class="atm-section" id="atmSectionForecast" data-atm-section="6">
+  <!-- 观风金球：自动交易辅助监测（庄园顶楼金色小球） -->
+  <section class="atm-section" id="atmSectionHoldAssist" data-atm-section="5">
     <div class="atm-section-head">
       <div>
-        <h2 class="atm-section-title">系统频率预测</h2>
-        <div class="atm-section-sub">定时任务生成的开仓频率摘要（只读展示）。</div>
+        <h2 class="atm-section-title">观风金球</h2>
+        <div class="atm-section-sub">DeepSeek-v4 对仍持仓自动单的剩余路径研判（止盈 / 止损 / 定时）。观察中的仓也会列出；警告与加急仍会留在这里。对应仓位平仓后自动删除。不改交易所止损。</div>
       </div>
       <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="window.refreshForecastStatistics()">重算并刷新</button>
+        <button type="button" class="atm-btn" onclick="loadHoldAssistTriggers(true)">刷新</button>
+        <div class="atm-count" id="atmHoldAssistCount">读取中…</div>
       </div>
     </div>
-    <div class="atm-forecast-status" id="systemForecastPanel">加载频率预测…</div>
-    <div class="atm-forecast-metrics">
-      <div class="atm-metric"><span>预计日均成交</span><strong id="atmFcDaily">暂无</strong></div>
-      <div class="atm-metric"><span>预计周总成交</span><strong id="atmFcWeekly">暂无</strong></div>
-      <div class="atm-metric"><span>挂载策略</span><strong id="atmFcActive">暂无</strong></div>
-      <div class="atm-metric"><span>可开仓 / 暂停</span><strong id="atmFcOpenPause">暂无</strong></div>
-    </div>
-    <p class="atm-forecast-summary" id="atmFcGenerated"></p>
+    <div class="atm-roster" id="atmHoldAssistRoster"><div class="atm-empty">正在读取剩余路径…</div></div>
   </section>
 </div>
 
@@ -528,6 +833,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
     });
   }
+  const QI_TRASH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M7 7l1 12a1 1 0 0 0 1 .9h6a1 1 0 0 0 1-.9l1-12"/></svg>';
   function fmtPct(pct, digits){
     if(pct===null||pct===undefined||pct===''||Number.isNaN(Number(pct))) return {text:'-',cls:''};
     const n=Number(pct);
@@ -538,32 +844,45 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     if(pct===null||pct===undefined||pct===''||Number.isNaN(Number(pct))) return '-';
     return Number(pct).toFixed(1)+'%';
   }
-  function normalizeGrade(stat){
-    let grade=String(stat.lifecycle_grade||stat.grade||'B').trim();
-    const gradeUp=grade.toUpperCase();
-    if(!grade||grade==='未评级'||grade==='待评级'||['UNRATED','NONE','NULL','PENDING','DELETED'].indexOf(gradeUp)>=0){
-      grade='B';
-    }else if(gradeUp==='SHADOW'){
-      grade='SHADOW';
-    }else if(/^[SABCDE]$/.test(gradeUp)){
-      grade=gradeUp;
-    }
-    return grade;
+  function rosterTierLabel(stat){
+    const zh=String((stat&&(stat.strategy_tier_label||stat.strategy_grade_zh||stat.strategy_tier_display_zh))||'').trim();
+    if(zh.indexOf('大福')>=0) return '大福策略';
+    if(zh.indexOf('马卡龙')>=0) return '马卡龙策略';
+    const t=String((stat&&stat.strategy_tier)||'').toUpperCase();
+    if(t==='DAIFUKU') return '大福策略';
+    return '马卡龙策略';
   }
-  function gradeClass(grade){
-    if(/^[SABC]$/.test(grade)) return 'grade-'+grade.toLowerCase();
-    if(grade==='SHADOW') return 'grade-c';
+  function rosterHitchClass(stat){
+    const c=String((stat&&(stat.hitch_class||stat.strategy_hitch_class))||'').trim();
+    if(c.indexOf('方向')>=0) return '方向型';
+    if(c.indexOf('赔率')>=0) return '赔率型';
     return '';
+  }
+  function rosterTierBadge(stat){
+    const ready=String((stat&&stat.strategy_tier_display_zh)||'').trim();
+    if(ready.indexOf('手动')>=0) return ready;
+    if(ready.indexOf('·赔率型')>=0 || ready.indexOf('·方向型')>=0) return ready;
+    const base=rosterTierLabel(stat);
+    const hitch=rosterHitchClass(stat);
+    return hitch?(base+'·'+hitch):base;
+  }
+  function rosterTierClass(stat){
+    return rosterTierLabel(stat)==='大福策略'?'grade-daifuku':'grade-macaron';
+  }
+  function rosterTierRank(stat){
+    const n=Number(stat&&stat.strategy_tier_rank);
+    if(isFinite(n)&&n>0) return n;
+    return rosterTierLabel(stat)==='大福策略'?1:2;
   }
   function keepNewestTradeGroups(trades){
     const list=Array.isArray(trades)?trades.slice():[];
     // API returns newest-first; keep newest 10 only.
     return list.slice(0,10);
   }
-  function renderTradeDropdown(recent){
+  function renderTradeTable(recent){
     const rows=keepNewestTradeGroups(recent);
     if(!rows.length){
-      return '<div class="atm-empty" style="margin:0 14px 12px">近10组：暂无开平仓记录</div>';
+      return '<div class="atm-empty" style="margin:0">近10组：暂无开平仓记录</div>';
     }
     return '<div class="atm-trade-wrap"><table class="atm-trade-table"><thead><tr><th>开仓时间</th><th>平仓时间</th><th>总仓位盈/亏率</th><th>单笔盈利率</th></tr></thead><tbody>'+
       rows.map(function(t){
@@ -574,104 +893,257 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       }).join('')+
       '</tbody></table></div>';
   }
-  function fmtMetric(stat, kind){
-    // kind: wr | equity | margin
-    const status=(stat.metric_status||{});
-    if(kind==='wr'){
-      const v=(stat.calibrated_expected_win_rate_pct!=null)?stat.calibrated_expected_win_rate_pct:stat.expected_win_rate_pct;
-      if(v===null||v===undefined||v===''||Number.isNaN(Number(v))||status.win_rate==='missing'){
-        return {text: status.display_win_rate || '暂无样本/未校准', cls:'muted', missing:true};
-      }
-      const cred=(stat.credibility!=null)?Number(stat.credibility):null;
-      const n=(stat.sample_n!=null)?stat.sample_n:(stat.backtest_trades||0);
-      const hi=!!stat.wr_high_confidence;
-      let text=Number(v).toFixed(1)+'%';
-      if(!hi){
-        text += '（低可信 n='+n+(cred!=null?(' cred='+cred.toFixed(2)):'')+'）';
-      }else{
-        text += '（n='+n+'）';
-      }
-      return {text: text, cls: hi?'':'muted', missing:false};
-    }
-    const v=(kind==='equity')?stat.net_expectancy_equity_pct:stat.net_expectancy_margin_pct;
-    if(v===null||v===undefined||v===''||Number.isNaN(Number(v))||status.expectancy==='missing'){
-      return {text: status.display_expectancy || '暂无样本/未校准', cls:'muted', missing:true};
-    }
-    const n=Number(v);
-    // ≥4 decimals when near zero so "约0.00%" never hides sign/magnitude
-    const abs=Math.abs(n);
-    const digits=(abs>0 && abs<0.05)?4:2;
-    return {text:(n>=0?'+':'')+n.toFixed(digits)+'%', cls:n>=0?'gain':'loss', missing:false};
-  }
-  function fmtWrSplit(stat){
-    function one(v, label){
-      if(v===null||v===undefined||v===''||Number.isNaN(Number(v))) return label+':暂无';
-      return label+':'+Number(v).toFixed(1)+'%';
-    }
+  function rosterMetricOptions(stat){
+    const block=stat.roster_metrics||{};
+    const opts=Array.isArray(block.options)?block.options:[];
+    if(opts.length) return opts;
     return [
-      one(stat.ai_logic_wr_pct!=null?stat.ai_logic_wr_pct:stat.ai_theoretical_wr_avg,'AI逻辑'),
-      one(stat.walk_forward_wr_pct,'WF'),
-      one(stat.backtest_wr_pct,'回测'),
-      one(stat.live_wr_pct,'实盘'),
-      one(stat.calibrated_expected_win_rate_pct,'校准预期'),
-      'n='+(stat.sample_n!=null?stat.sample_n:(stat.backtest_trades||0)),
-      '可信度='+(stat.credibility!=null?Number(stat.credibility).toFixed(2):'暂无'),
-      (stat.wr_high_confidence?'高可信':'非高可信')
-    ].join(' · ');
+      {id:'raw_expectancy_price',label:'单笔未经加杠杆裸期望收益',display:'暂无',missing:true},
+      {id:'weekly_trade_freq',label:'周交易频率（回测信号触发）',display:'暂无',missing:true},
+      {id:'backtest_sample_n',label:'历史回测总样本交易笔数',display:'暂无',missing:true},
+      {id:'payoff_ratio',label:'策略盈亏比',display:'暂无',missing:true},
+      {id:'win_rate',label:'策略胜率',display:'暂无',missing:true},
+      {id:'avg_holding_bars',label:'平均持仓k线根数',display:'暂无',missing:true},
+      {id:'tp_trigger_rate',label:'主动止盈触发率',display:'暂无',missing:true},
+      {id:'max_drawdown_unleveraged',label:'单策略未加杠杆最大回撤',display:'暂无',missing:true},
+      {id:'in_sample_sharpe',label:'样本内单策略年化夏普',display:'暂无',missing:true},
+      {id:'out_of_sample_sharpe',label:'样本外年化夏普',display:'暂无',missing:true},
+      {id:'stressed_expectancy',label:'高滑点压测后期望收益',display:'暂无',missing:true}
+    ];
+  }
+  function qaStatusText(item){
+    if(!item) return '暂无';
+    if(item.status==='missing'||item.display==='暂无') return '暂无';
+    if(item.severity==='diagnostic'){
+      return item.warn?'（仅风险诊断，未达参考线）':'（仅风险诊断，不参与通过或否决）';
+    }
+    if(item.passed===true) return '（通过）';
+    if(item.passed===false) return '（未达门槛）';
+    return '';
+  }
+  function qaItemClass(item){
+    if(!item||item.status==='missing') return '';
+    if(item.severity==='diagnostic'&&item.warn) return ' atm-gate-warn';
+    if(item.severity==='gate'&&item.warn) return ' atm-gate-fail';
+    return '';
+  }
+  function renderQualityAuditItem(item, prefix){
+    if(!item) return '';
+    const label=prefix?(prefix+'. '):((item.index?item.index+'. ':''));
+    const actual=item.display||'暂无';
+    const thr=item.threshold_display?(' / '+item.threshold_display):'';
+    const status=qaStatusText(item);
+    const statusCls=item.status==='missing'?'missing':(item.warn?(item.severity==='diagnostic'?'warn':'fail'):'pass');
+    return '<div class="atm-metric-item'+qaItemClass(item)+'"><span>'+zoneEsc(label+(item.label_zh||''))+'</span><strong'+(item.status==='missing'?' class="atm-muted"':'')+'>'+zoneEsc(actual)+zoneEsc(thr)+'</strong><span class="atm-metric-status '+statusCls+'">'+zoneEsc(status)+'</span></div>';
+  }
+  function renderQualityAuditMeta(meta, stat, zoneMeta){
+    meta=meta||{};
+    const title=meta.strategy_title||stat.strategy_title||stat.strategy_name||'未命名策略';
+    const sym=meta.symbol||zoneMeta.symbol||'';
+    const tf=meta.timeframe||zoneMeta.timeframe||'';
+    const dir=meta.direction||stat.direction||'';
+    const stop=meta.protective_stop_display||(meta.protective_stop_pct!=null?(Number(meta.protective_stop_pct)*100).toFixed(4)+'%':'暂无');
+    const hist=meta.quality_history_zh||'暂无';
+    const cmd=meta.creation_command_id||'暂无';
+    return '<div class="atm-qa-meta">'+
+      '<div><strong>策略：</strong>'+zoneEsc(title)+'</div>'+
+      '<div><strong>标的/周期：</strong>'+zoneEsc(sym+' / '+tf)+'</div>'+
+      '<div><strong>方向：</strong>'+zoneEsc(dir||'—')+'</div>'+
+      '<div><strong>保护止损：</strong>'+zoneEsc(stop)+'</div>'+
+      '<div><strong>质检历程：</strong>'+zoneEsc(hist)+'</div>'+
+      '<div><strong>指令编号：</strong>'+zoneEsc(cmd)+'</div>'+
+    '</div>';
+  }
+  function renderQualityAuditFold(stat, zoneMeta, foldKey, open){
+    const block=stat.roster_metrics||{};
+    const qa=block.quality_audit||{};
+    const pending=!!block.metrics_pending;
+    const metaHtml=renderQualityAuditMeta(qa.meta||{}, stat, zoneMeta);
+    const isItems=Array.isArray(qa.is_items)?qa.is_items:[];
+    const diagItems=Array.isArray(qa.diagnostic_items)?qa.diagnostic_items:[];
+    const oosItems=Array.isArray(qa.oos_items)?qa.oos_items:[];
+    const structure=qa.structure_check||{};
+    let body='';
+    if(isItems.length){
+      body+='<div class="atm-qa-section-title">10项质检（实际值 / 门槛）</div><div class="atm-metric-grid">';
+      body+=isItems.map(function(it){ return renderQualityAuditItem(it); }).join('');
+      body+='</div>';
+      }else{
+      body+='<div class="atm-metric-grid">';
+      body+=rosterMetricOptions(stat).map(function(o){
+        return '<div class="atm-metric-item"><span>'+zoneEsc(o.label)+'</span><strong'+(o.missing?' class="atm-muted"':'')+'>'+zoneEsc(o.display||'暂无')+'</strong></div>';
+      }).join('');
+      body+='</div>';
+    }
+    if(structure&&structure.label_zh){
+      body+='<div class="atm-qa-section-title">结构校验</div>';
+      body+='<div class="atm-metric-grid">'+renderQualityAuditItem(structure)+'</div>';
+    }
+    if(diagItems.length){
+      body+='<div class="atm-qa-section-title">风险诊断</div><div class="atm-metric-grid">';
+      body+=diagItems.map(function(it){ return renderQualityAuditItem(it); }).join('');
+      body+='</div>';
+    }
+    if(oosItems.length){
+      body+='<div class="atm-qa-section-title">一次性盲 OOS（实际值 / 门槛）</div><div class="atm-metric-grid">';
+      body+=oosItems.map(function(it){ return renderQualityAuditItem(it); }).join('');
+      body+='</div>';
+    }
+    const hint=pending?'<div class="atm-roster-status-hint" style="margin-bottom:8px">部分回测指标后台计算中，刷新后自动补齐</div>':'';
+    const count=isItems.length||rosterMetricOptions(stat).length;
+    return '<details class="atm-roster-fold" data-fold-key="'+zoneEsc(foldKey)+'"'+(open?' open':'')+'><summary>策略质检（'+count+'项+OOS）</summary><div class="atm-roster-fold-body">'+hint+metaHtml+body+'</div></details>';
+  }
+  function renderMetricFold(stat, foldKey, open){
+    return renderQualityAuditFold(stat, {}, foldKey, open);
   }
   function renderStrategyRow(stat, zoneMeta){
-    const grade=normalizeGrade(stat);
+    const grade=rosterTierBadge(stat);
     const title=stat.strategy_title||stat.strategy_name||'未命名策略';
     const assetShort=(zoneMeta.symbol||'').replace('-USDT-SWAP','');
     const tfLabel=zoneMeta.timeframeLabel||zoneMeta.timeframe||'';
-    const wr=fmtMetric(stat,'wr');
-    const equity=fmtMetric(stat,'equity');
-    const margin=fmtMetric(stat,'margin');
     const recent=Array.isArray(stat.recent_trades)?stat.recent_trades:[];
     const nGroups=Math.min(recent.length,10);
-    const funnel=stat.funnel_7d||{};
-    const freq=stat.frequency_forecast||{};
     const family=stat.mechanism_family||'';
-    const expandStatus = nGroups===0
-      ? '近10组成交：暂无已平仓记录（不是评分）'
-      : ('近'+nGroups+'组已平仓记录（最多展示10组）');
-    const aiRef=fmtWrSplit(stat);
-    return '<div class="atm-row" data-strategy-key="'+zoneEsc(stat.strategy_key||'')+'" data-asset-symbol="'+zoneEsc(zoneMeta.symbol||'')+'" data-asset-timeframe="'+zoneEsc(zoneMeta.timeframe||'')+'">'+
+    const sk=stat.strategy_key||'';
+    const sym=zoneMeta.symbol||'';
+    const tf=zoneMeta.timeframe||'';
+    const foldMetrics=rosterFoldKey(sym, tf, sk, 'metrics');
+    const foldTrades=rosterFoldKey(sym, tf, sk, 'trades');
+    const tradeTitle=nGroups===0
+      ? '交易历史：暂无已平仓记录'
+      : ('交易历史（近'+nGroups+'组，最多10组）');
+    return '<div class="atm-row" data-strategy-key="'+zoneEsc(sk)+'" data-asset-symbol="'+zoneEsc(sym)+'" data-asset-timeframe="'+zoneEsc(tf)+'">'+
       '<div class="atm-row-main">'+
         '<div><div class="atm-row-title">'+zoneEsc(title)+'</div><div class="atm-row-scope">'+zoneEsc(assetShort+(tfLabel?(' · '+tfLabel):'')+(family?(' · '+family):''))+'</div></div>'+
-        '<div><span class="atm-field-label">策略评级</span><span class="atm-grade '+gradeClass(grade)+'">'+zoneEsc(grade)+'</span></div>'+
-        '<div><span class="atm-field-label">校准预期胜率</span><span class="atm-field-value '+(wr.missing?'atm-muted':'')+'">'+zoneEsc(wr.text)+'</span></div>'+
-        '<div><span class="atm-field-label">净期望(权益)</span><span class="atm-field-value '+(equity.cls||'')+'">'+zoneEsc(equity.text)+'</span></div>'+
-        '<div><span class="atm-field-label">净期望(保证金)</span><span class="atm-field-value '+(margin.cls||'')+'">'+zoneEsc(margin.text)+'</span></div>'+
+        '<div><span class="atm-field-label">策略等级</span><span class="atm-grade '+rosterTierClass(stat)+'">'+zoneEsc(grade)+'</span></div>'+
       '</div>'+
-      '<div class="atm-wr-split" style="margin:4px 14px 0;font-size:11px;color:var(--muted)">'+zoneEsc(aiRef)+'</div>'+
-      '<details>'+
-        '<summary>'+zoneEsc(expandStatus)+'</summary>'+
-        '<div class="atm-funnel" style="margin:8px 14px;font-size:12px;color:var(--muted)">'+
-          '近7日漏斗：信号 '+zoneEsc(funnel.signals==null?'?':funnel.signals)+
-          ' · 尝试 '+zoneEsc(funnel.attempts==null?'?':funnel.attempts)+
-          ' · 成交 '+zoneEsc(funnel.fills==null?'?':funnel.fills)+
-          ' · 平仓 '+zoneEsc(funnel.exits==null?'?':funnel.exits)+
-          ' · 阻断 '+zoneEsc(funnel.blocked==null?'?':funnel.blocked)+
-          (freq.expected_weekly_fills!=null?(' · 统计周期望成交 '+Number(freq.expected_weekly_fills).toFixed(2)):'')+
-          (freq.class?(' · 频率分类 '+freq.class):'')+
-          '<div style="margin-top:4px">'+zoneEsc(aiRef)+'</div>'+
-          (stat.cost_price_pct!=null?('<div>单笔成本(价格) '+Number(stat.cost_price_pct).toFixed(3)+'% · PF '+(stat.profit_factor==null?'暂无':stat.profit_factor)+' · 可信度 '+(stat.credibility==null?'暂无':stat.credibility)+'</div>'):'')+
+      '<div class="atm-row-split">'+
+        renderQualityAuditFold(stat, zoneMeta, foldMetrics, isRosterFoldOpen(foldMetrics))+
+        '<details class="atm-roster-fold" data-fold-key="'+zoneEsc(foldTrades)+'"'+(isRosterFoldOpen(foldTrades)?' open':'')+'><summary>'+zoneEsc(tradeTitle)+'</summary><div class="atm-roster-fold-body">'+renderTradeTable(recent)+'</div></details>'+
         '</div>'+
-        renderTradeDropdown(recent)+
-      '</details>'+
     '</div>';
   }
-  function renderAssetZones(zones){
+  let _atmRosterHasData = false;
+  let _atmRosterLastFingerprint = '';
+  let _atmRosterFoldOpen = {};
+  let _atmRosterPendingZones = null;
+  function rosterFoldKey(symbol, timeframe, strategyKey, fold){
+    return [symbol||'', timeframe||'', strategyKey||'', fold||''].join('|');
+  }
+  function isRosterFoldOpen(key){
+    return !!_atmRosterFoldOpen[key];
+  }
+  function rosterHasOpenFolds(){
+    return Object.keys(_atmRosterFoldOpen).some(function(k){ return _atmRosterFoldOpen[k]; });
+  }
+  function syncRosterFoldOpenFromDom(){
+    const box=$('atmStrategyRoster');
+    if(!box) return;
+    box.querySelectorAll('details[data-fold-key]').forEach(function(el){
+      const key=el.getAttribute('data-fold-key');
+      if(!key) return;
+      if(el.open) _atmRosterFoldOpen[key]=true;
+      else delete _atmRosterFoldOpen[key];
+    });
+  }
+  function bindRosterFoldListeners(){
+    const box=$('atmStrategyRoster');
+    if(!box || box.dataset.foldBound==='1') return;
+    box.dataset.foldBound='1';
+    box.addEventListener('toggle', function(ev){
+      const el=ev.target;
+      if(!el || el.tagName!=='DETAILS') return;
+      const key=el.getAttribute('data-fold-key');
+      if(!key) return;
+      if(el.open) _atmRosterFoldOpen[key]=true;
+      else delete _atmRosterFoldOpen[key];
+      if(!rosterHasOpenFolds() && _atmRosterPendingZones){
+        const pending=_atmRosterPendingZones;
+        _atmRosterPendingZones=null;
+        renderAssetZones(pending, {force:true});
+      }
+    }, true);
+  }
+  function rosterZonesFingerprint(zones){
+    const parts=[];
+    (zones||[]).forEach(function(zone){
+      const stats=Array.isArray((zone.records||{}).strategy_stats)?(zone.records||{}).strategy_stats:[];
+      stats.forEach(function(stat){
+        const opts=rosterMetricOptions(stat);
+        const metricSig=opts.map(function(o){ return o.id+':'+(o.display||''); }).join(';');
+        const trades=(stat.recent_trades||[]).slice(0,3).map(function(t){
+          return (t.closed_at||'')+':'+(t.equity_return_pct==null?'':t.equity_return_pct);
+        }).join(';');
+        parts.push([
+          zone.symbol||'',
+          zone.timeframe||'',
+          stat.strategy_key||'',
+          stat.strategy_tier||stat.strategy_tier_label||'',
+          stat.hitch_class||stat.strategy_tier_display_zh||'',
+          metricSig,
+          trades
+        ].join('||'));
+      });
+    });
+    return parts.sort().join('##');
+  }
+  function countRosterStrategies(zones){
+    let n=0;
+    (zones||[]).forEach(function(zone){
+      const stats=Array.isArray((zone.records||{}).strategy_stats)?(zone.records||{}).strategy_stats:[];
+      n+=stats.length;
+    });
+    return n;
+  }
+  function renderRosterStatusHint(message){
+    const box=$('atmStrategyRoster');
+    if(!box) return;
+    let hint=box.querySelector('.atm-roster-status-hint');
+    if(!message){
+      if(hint) hint.remove();
+      return;
+    }
+    if(!hint){
+      hint=document.createElement('div');
+      hint.className='atm-roster-status-hint';
+      box.insertBefore(hint, box.firstChild);
+    }
+    hint.textContent=message;
+  }
+  function rosterIsLoading(){
+    const box=$('atmStrategyRoster');
+    if(!box) return false;
+    const t=String(box.textContent||'');
+    return t.indexOf('正在读取运行策略')>=0;
+  }
+  function renderAssetZones(zones, opts){
+    opts=opts||{};
+    const force=!!opts.force;
     const box=$('atmStrategyRoster');
     const countEl=$('atmStrategyCount');
     if(!box)return;
     if(!Array.isArray(zones)||!zones.length){
       box.innerHTML='<div class="atm-empty">未读取到自动交易状态。</div>';
       if(countEl) countEl.textContent='0 条策略';
+      _atmRosterHasData=false;
+      _atmRosterLastFingerprint='';
+      _atmRosterPendingZones=null;
       return;
     }
-    const assetOrder={'BTC-USDT-SWAP':0,'ETH-USDT-SWAP':1,'SOL-USDT-SWAP':2,'XRP-USDT-SWAP':3,'CL-USDT-SWAP':4,'XAU-USDT-SWAP':5,'NG-USDT-SWAP':6,'XAG-USDT-SWAP':7,'LTC-USDT-SWAP':8,'ADA-USDT-SWAP':9};
+    const fingerprint=rosterZonesFingerprint(zones);
+    const loading=rosterIsLoading();
+    if(!force && !loading && fingerprint===_atmRosterLastFingerprint && box.querySelector('.atm-row')){
+      if(countEl) countEl.textContent=countRosterStrategies(zones)+' 条策略';
+      return;
+    }
+    if(!force && !loading && rosterHasOpenFolds()){
+      _atmRosterPendingZones=zones;
+      renderRosterStatusHint('你有展开中的面板，已暂停自动重绘；收起后自动更新，或点「刷新」强制更新');
+      if(countEl) countEl.textContent=countRosterStrategies(zones)+' 条策略';
+      return;
+    }
+    syncRosterFoldOpenFromDom();
+    const assetOrder={'BTC-USDT-SWAP':0,'ETH-USDT-SWAP':1,'SOL-USDT-SWAP':2,'XRP-USDT-SWAP':3,'DOGE-USDT-SWAP':4,'CL-USDT-SWAP':5,'XAU-USDT-SWAP':6,'NG-USDT-SWAP':7,'XAG-USDT-SWAP':8,'ADA-USDT-SWAP':9};
     const tfOrder={'1h':0,'15m':1,'5m':2};
     const combined=[];
     zones.forEach(function(zone){
@@ -688,10 +1160,7 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       return t.indexOf('顺势回升')>=0;
     }
     combined.sort(function(a,b){
-      const ga=normalizeGrade(a.stat);
-      const gb=normalizeGrade(b.stat);
-      const rank={'S':4,'A':3,'B':2,'C':1,'SHADOW':0};
-      const rd=(rank[gb]||0)-(rank[ga]||0);
+      const rd=rosterTierRank(b.stat)-rosterTierRank(a.stat);
       if(rd!==0) return rd;
       const reboundDiff=(isTrendReboundStat(a.stat)?0:1)-(isTrendReboundStat(b.stat)?0:1);
       if(reboundDiff!==0) return reboundDiff;
@@ -713,111 +1182,747 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
           });
         }).join('')
       : '<div class="atm-empty">当前没有已挂载的运行策略。</div>';
+    _atmRosterHasData=combined.length>0;
+    _atmRosterLastFingerprint=fingerprint;
+    _atmRosterPendingZones=null;
+    bindRosterFoldListeners();
+    renderRosterStatusHint('');
   }
-  function renderLatestTradeRecords(payload){
-    const box=$('vectorDailyLedgerRows');
-    if(!box)return;
-    const rows=Array.isArray(payload&&payload.records)?payload.records:[];
-    if(!rows.length){box.innerHTML='<div class="vector-auto-empty-v5">暂无已平仓的自动交易记录。</div>';return}
-    function numText(value,digits,suffix){
-      if(value===null||value===undefined||value==='')return '待核算';
-      const n=Number(value); if(!Number.isFinite(n))return '待核算';
-      return (n>0?'+':'')+n.toFixed(digits)+(suffix||'');
+  function pctText(value){
+    const n=Number(value);
+    if(!Number.isFinite(n)) return '—';
+    const p=n>1.5?n:n*100;
+    return p.toFixed(1)+'%';
+  }
+  function fmtPx(value){
+    const n=Number(value);
+    if(!Number.isFinite(n)) return '';
+    if(Math.abs(n)>=100) return n.toFixed(2);
+    if(Math.abs(n)>=10) return n.toFixed(3);
+    return n.toFixed(4);
+  }
+  function holdChip(label, value){
+    if(value===null||value===undefined||value==='') return '';
+    return '<span class="atm-assist-chip">'+zoneEsc(label)+' '+zoneEsc(value)+'</span>';
+  }
+  function swingZh(state){
+    const map={
+      HH_HL:'抬高', LH_LL:'走弱', LH_HL:'低高点', HH_LL:'撕裂',
+      LH:'低高点', HL:'更高低点', LL_LH:'空头延续', mixed:'混杂'
+    };
+    const s=String(state||'').trim();
+    if(!s || s==='unknown') return '';
+    return map[s]||s;
+  }
+  function consumedText(value){
+    const n=Number(value);
+    if(!Number.isFinite(n) || n<=0) return '';
+    return pctText(n);
+  }
+  function renderHoldAssistTriggers(payload){
+    const box=$('atmHoldAssistRoster');
+    const countEl=$('atmHoldAssistCount');
+    if(!box) return;
+    const rows=Array.isArray(payload&&payload.positions)
+      ? payload.positions
+      : (Array.isArray(payload&&payload.triggers)?payload.triggers:[]);
+    const n=rows.length;
+    const alerts=Number(payload&&payload.alert_count);
+    const alertN=Number.isFinite(alerts)?alerts:rows.filter(function(r){
+      return r.status==='warn'||r.status==='urgent'||r.tier==='warn'||r.tier==='urgent';
+    }).length;
+    if(countEl){
+      countEl.textContent=n?(n+' 笔持仓'+(alertN?(' · '+alertN+' 条警告'):'')):'0 笔持仓';
     }
-    const body=rows.map(function(row){
-      const pnl=Number(row.profit_amount_usdt); const rate=Number(row.pnl_rate_leveraged_pct);
-      const valueClass=Number.isFinite(pnl)?(pnl>0?'gain':(pnl<0?'loss':'')):(Number.isFinite(rate)?(rate>0?'gain':(rate<0?'loss':'')):'');
-      return `<tr><td>${zoneEsc(row.symbol_label||String(row.symbol||'-').replace('-USDT-SWAP',''))}</td><td>${zoneEsc(row.timeframe_label||row.timeframe||'-')}</td><td>${zoneEsc(row.opened_at||'-')}</td><td>${zoneEsc(row.closed_at||'-')}</td><td class="${valueClass}">${zoneEsc(row.result||'待核算')}</td><td class="${valueClass}">${zoneEsc(numText(row.pnl_rate_leveraged_pct,2,'%'))}</td><td class="${valueClass}">${zoneEsc(numText(row.profit_amount_usdt,6,' USDT'))}</td></tr>`;
+    if(!n){
+      box.innerHTML='<div class="atm-empty">当前没有自动持仓。观风金球只看自动单，手动仓不进入。</div>';
+      return;
+    }
+    box.innerHTML=rows.map(function(row){
+      const status=row.status||(row.tier==='urgent'?'urgent':(row.tier==='warn'?'warn':(row.authored===false?'pending':'watch')));
+      const cardCls=status==='urgent'?' is-urgent':(status==='warn'?' is-warn':(status==='watch'?' is-watch':''));
+      const tierZh=row.status_zh||row.tier_zh||(status==='urgent'?'加急':(status==='warn'?'警告':(status==='watch'?'观察':'研判中')));
+      const title=row.strategy_title||'未标注策略';
+      const scope=[row.symbol_label||row.inst_id||'-', row.direction_zh||''].filter(Boolean).join(' · ');
+      const authored=row.authored!==false && row.p_take_profit!=null && row.p_stop!=null;
+      const fm=row.formulas||{};
+      const cciN=Number(fm.cci);
+      const chips=[
+        holdChip('回吐', (fm.giveback_frac!=null && fm.giveback_frac!=='')?pctText(fm.giveback_frac):''),
+        holdChip('转弱', (fm.weakening_intensity!=null && Number(fm.weakening_intensity)>0.005)?Number(fm.weakening_intensity).toFixed(2):''),
+        holdChip('结构', swingZh(fm.swing_state)),
+        holdChip('量比', (fm.vol_ratio_down!=null && fm.vol_ratio_down!=='')?Number(fm.vol_ratio_down).toFixed(2):''),
+        holdChip('CCI', Number.isFinite(cciN)?cciN.toFixed(0):''),
+        holdChip('止损已走', consumedText(row.stop_consumed)),
+        row.floor_applied?'<span class="atm-assist-chip">结构下限已校正</span>':''
+      ].filter(Boolean).join('');
+      const pxBits=[];
+      if(fmtPx(row.entry_price)) pxBits.push('<div><span>开仓</span> '+zoneEsc(fmtPx(row.entry_price))+'</div>');
+      if(fmtPx(row.mark_price)) pxBits.push('<div><span>现价</span> '+zoneEsc(fmtPx(row.mark_price))+'</div>');
+      if(fmtPx(row.stop_loss_price)) pxBits.push('<div><span>保护止损</span> '+zoneEsc(fmtPx(row.stop_loss_price))+'</div>');
+      const odds=authored
+        ? ('<div class="atm-assist-odds">'+
+            '<div><span>止盈</span><strong>'+zoneEsc(pctText(row.p_take_profit))+'</strong></div>'+
+            '<div><span>止损</span><strong>'+zoneEsc(pctText(row.p_stop))+'</strong></div>'+
+            '<div><span>定时</span><strong>'+zoneEsc(pctText(row.p_timed))+'</strong></div>'+
+          '</div>')
+        : '<div class="atm-assist-reason">DeepSeek-v4 尚未写出剩余路径，稍后再看。</div>';
+      const reason=row.reason_zh?'<div class="atm-assist-reason">'+zoneEsc(row.reason_zh)+'</div>':'';
+      const footBits=[row.voter_zh||'DeepSeek-v4'];
+      if(row.estimated_at) footBits.push('研判 '+row.estimated_at);
+      if(row.notified_at) footBits.push('微信已发 '+row.notified_at);
+      const foot='<div class="atm-assist-foot">'+zoneEsc(footBits.join(' · '))+'</div>';
+      return '<div class="atm-row atm-assist-card'+cardCls+'">'+
+        '<div class="atm-assist-top">'+
+          '<div><div class="atm-row-title">'+zoneEsc(title)+'</div><div class="atm-row-scope">'+zoneEsc(scope)+'</div></div>'+
+          '<span class="atm-assist-tier '+zoneEsc(status)+'">'+zoneEsc(tierZh)+'</span>'+
+        '</div>'+
+        odds+
+        (pxBits.length?'<div class="atm-assist-meta">'+pxBits.join('')+'</div>':'')+
+        (chips?'<div class="atm-assist-chips">'+chips+'</div>':'')+
+        reason+foot+
+      '</div>';
     }).join('');
-    box.innerHTML=`<div class="vector-latest-table-wrap-v11"><table class="vector-latest-table-v11"><thead><tr><th>开仓标的</th><th>周期</th><th>开仓时间</th><th>平仓时间</th><th>结果</th><th>盈利率（加杠杆）</th><th>盈利额</th></tr></thead><tbody>${body}</tbody></table></div><div class="vector-latest-meta-v11">${rows.length} / ${Number(payload.max_records||20)} 笔 · 更新时间 ${zoneEsc(payload.updated_at||'-')}</div>`;
   }
-  async function loadLatestTradeRecords(){
-    const pack=await fetchJson('/api/vector/auto_trade/latest_records', null, 10000);
-    const j=pack.j||{};
-    if(!pack.res.ok||j.ok!==true)throw new Error(j.error||('HTTP '+pack.res.status));
-    renderLatestTradeRecords(j);
-  }
+  window.loadHoldAssistTriggers=async function(force){
+    if(force){
+      delete _atmPollInflight.hold_assist;
+      _atmPollBackoffMs.hold_assist=0;
+    }
+    return atmPollOnce('hold_assist', async function(){
+      const box=$('atmHoldAssistRoster');
+      const countEl=$('atmHoldAssistCount');
+      try{
+        const pack=await fetchJson('/api/hold_assist/triggers', null, 15000);
+        const j=pack.j||{};
+        if(!pack.res.ok||j.ok!==true) throw new Error(j.error||('HTTP '+pack.res.status));
+        renderHoldAssistTriggers(j);
+      }catch(e){
+        if(box && box.querySelector('.atm-assist-card')){
+          if(countEl) countEl.textContent='刷新失败，保留上次研判';
+        }else if(box){
+          box.innerHTML='<div class="atm-empty">观风金球读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</div>';
+          if(countEl) countEl.textContent='读取失败';
+        }
+        throw e;
+      }
+    });
+  };
   function fetchJson(url, opts, timeoutMs){
     const ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
     const timer = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(e){} }, timeoutMs||20000) : null;
     const o = Object.assign({credentials:'same-origin', cache:'no-store'}, opts||{});
     if(ctrl) o.signal = ctrl.signal;
     return fetch(url, o).then(function(res){
-      return res.json().then(function(j){ return {res:res, j:j}; });
+      return res.text().then(function(text){
+        let j = {};
+        if(text){
+          try{
+            j = JSON.parse(text);
+          }catch(parseErr){
+            const snippet = String(text).replace(/\s+/g, ' ').trim().slice(0, 120);
+            const hint = (res.status === 401 || res.status === 403)
+              ? '登录已失效，请刷新页面重新登录'
+              : (res.status >= 500 ? '服务暂时不可用（可能正在重启）' : '接口返回非 JSON');
+            throw new Error(hint + (snippet ? ('：' + snippet) : ''));
+          }
+        }
+        return {res:res, j:j};
+      });
+    }).catch(function(err){
+      const name=err && err.name;
+      const msg=String((err && err.message) || err || '');
+      if(name==='AbortError' || /abort/i.test(msg) || /aborted/i.test(msg)){
+        throw new Error('读取超时，请再点刷新');
+      }
+      throw err;
     }).finally(function(){ if(timer) clearTimeout(timer); });
   }
-  function renderForecastReport(rep, stale){
-    const panel=$('systemForecastPanel');
-    if(!rep||!rep.generated_at){
-      if(panel) panel.textContent='尚无频率预测报告（由定时任务生成）';
-      if($('atmFcDaily')) $('atmFcDaily').textContent='暂无';
-      if($('atmFcWeekly')) $('atmFcWeekly').textContent='暂无';
-      if($('atmFcActive')) $('atmFcActive').textContent='暂无';
-      if($('atmFcOpenPause')) $('atmFcOpenPause').textContent='暂无';
-      if($('atmFcGenerated')) $('atmFcGenerated').textContent='';
+  const _atmPollInflight = {};
+  const _atmPollBackoffMs = {};
+  const _atmPollBlockedUntil = {};
+  function atmPollBackoff(key, failed){
+    if(!failed){
+      _atmPollBackoffMs[key] = 0;
+      _atmPollBlockedUntil[key] = 0;
+      return 0;
+    }
+    const prev = Number(_atmPollBackoffMs[key] || 0);
+    const next = prev ? Math.min(prev * 2, 32000) : 8000;
+    _atmPollBackoffMs[key] = next;
+    _atmPollBlockedUntil[key] = Date.now() + next;
+    return next;
+  }
+  function atmPollBlocked(key){
+    return Number(_atmPollBlockedUntil[key] || 0) > Date.now();
+  }
+  async function atmPollOnce(key, runner, force){
+    if(force){
+      atmPollBackoff(key, false);
+      delete _atmPollInflight[key];
+    }
+    if(_atmPollInflight[key]) return _atmPollInflight[key];
+    if(atmPollBlocked(key)) return null;
+    const job = (async function(){
+      try{
+        const out = await runner();
+        atmPollBackoff(key, false);
+        return out;
+      }catch(e){
+        atmPollBackoff(key, true);
+        throw e;
+      }finally{
+        delete _atmPollInflight[key];
+      }
+    })();
+    _atmPollInflight[key] = job;
+    return job;
+  }
+  const _atmSerial = { q: [], running: false, current: '' };
+  function atmSerialEnqueue(key, runner){
+    key = String(key || '');
+    if(!key || typeof runner !== 'function') return;
+    if(_atmSerial.current === key) return;
+    for(let i=0; i<_atmSerial.q.length; i++){
+      if(_atmSerial.q[i].key === key) return;
+    }
+    _atmSerial.q.push({key:key, runner:runner});
+    atmSerialKick();
+  }
+  function atmSerialKick(){
+    if(_atmSerial.running) return;
+    const job = _atmSerial.q.shift();
+    if(!job){
+      _atmSerial.current = '';
       return;
     }
-    const o=rep.overall||{};
-    if(panel) panel.textContent=stale
-      ? '预测已过期：策略池已变更，以下数字为旧快照，请点击“重算并刷新”'
-      : '系统频率预测 · 当前策略池统计';
-    if($('atmFcDaily')) $('atmFcDaily').textContent=o.daily_opens_expected==null?'暂无':o.daily_opens_expected;
-    if($('atmFcWeekly')) $('atmFcWeekly').textContent=o.weekly_opens_expected==null?'暂无':o.weekly_opens_expected;
-    if($('atmFcActive')) $('atmFcActive').textContent=rep.active_strategy_count==null?'暂无':rep.active_strategy_count;
-    if($('atmFcOpenPause')) $('atmFcOpenPause').textContent=
-      (rep.can_open_strategy_count==null?'?':rep.can_open_strategy_count)+' / '+
-      (rep.paused_strategy_count==null?'?':rep.paused_strategy_count);
-    if($('atmFcGenerated')) $('atmFcGenerated').textContent=
-      (stale?'过期快照 · ':'')+'生成时间：'+(rep.generated_at||'');
+    _atmSerial.running = true;
+    _atmSerial.current = job.key;
+    Promise.resolve()
+      .then(function(){ return job.runner(); })
+      .catch(function(){})
+      .then(function(){
+        _atmSerial.running = false;
+        _atmSerial.current = '';
+        atmSerialKick();
+      });
   }
+  window.atmSerialEnqueue = atmSerialEnqueue;
+  function atmCallIfFn(name){
+    return function(){
+      const fn = window[name];
+      if(typeof fn !== 'function') return null;
+      return fn();
+    };
+  }
+  function fcFmtRate(v, digits){
+    if(v===null||v===undefined||v===''||Number.isNaN(Number(v))) return '暂无';
+    return Number(v).toFixed(digits===undefined?4:digits);
+  }
+  function fcFmtPctFromDecimal(v, digits){
+    if(v===null||v===undefined||v===''||Number.isNaN(Number(v))) return '暂无';
+    const n=Number(v)*100;
+    const d=digits===undefined?3:digits;
+    return (n>=0?'+':'')+n.toFixed(d)+'%';
+  }
+  function fcFmtLev(v, opts){
+    if(v===null||v===undefined||v===''||Number.isNaN(Number(v))) return '暂无';
+    const n=Number(v);
+    const base=n.toFixed(2)+'×';
+    if(opts&&opts.kellyNegHint&&n<0) return base+'（期望为负·不宜加杠杆）';
+    return base;
+  }
+  function renderForecastReport(rep, stale, opts){
+    opts=opts||{};
+    const panel=$('systemForecastPanel');
+    const combo=(rep&&rep.portfolio_combo)||{};
+    const o=(rep&&rep.overall)||{};
+    if(!rep||!rep.generated_at){
+      if(!opts.keepStatus){
+        if(panel) panel.textContent='尚无组合数据报告（请点「重算并刷新」）';
+        ['atmFcDaily','atmFcWeekly','atmFcPearson','atmFcMuWeekly','atmFcSigmaWeekly','atmFcOccTake','atmFcGeoWeekly','atmFcGeoWeeklyOos','atmFcGeoWeeklyDir','atmFcGeoWeeklyOosDir','atmFcGeoWeeklyOdds','atmFcGeoWeeklyOosOdds'].forEach(function(id){
+          if($(id)) $(id).textContent='暂无';
+        });
+        if($('atmFcGenerated')) $('atmFcGenerated').textContent='';
+      }
+      return;
+    }
+    if(panel && !opts.keepStatus) panel.textContent=stale
+      ? '组合数据已过期：挂载池已变更，频率数字已清空；组合指标仅按当前运行策略重算，请点「重算并刷新」'
+      : '系统组合数据 · 当前挂载策略池统计';
+    if($('atmFcDaily')) $('atmFcDaily').textContent=stale?'暂无':fcFmtRate(o.daily_opens_expected, 4);
+    if($('atmFcWeekly')) $('atmFcWeekly').textContent=stale?'暂无':fcFmtRate(o.weekly_opens_expected, 4);
+    const pearson=combo.pairwise_pearson_avg!=null?combo.pairwise_pearson_avg:o.pairwise_pearson_avg;
+    if($('atmFcPearson')) $('atmFcPearson').textContent=
+      pearson==null?(combo.strategy_count<2?'单策略':'暂无'):fcFmtRate(pearson, 4);
+    const mu=combo.unleveraged_weekly_expected_return!=null?combo.unleveraged_weekly_expected_return:o.unleveraged_weekly_expected_return;
+    const sigma=combo.unleveraged_weekly_volatility!=null?combo.unleveraged_weekly_volatility:o.unleveraged_weekly_volatility;
+    const geo=(combo.weekly_geometric_growth!=null)?combo.weekly_geometric_growth
+      :(combo.weekly_geometric_compound_growth!=null?combo.weekly_geometric_compound_growth:o.weekly_geometric_compound_growth);
+    const geoOos=(combo.weekly_geometric_growth_oos!=null)?combo.weekly_geometric_growth_oos:o.weekly_geometric_growth_oos;
+    if($('atmFcMuWeekly')) $('atmFcMuWeekly').textContent=fcFmtPctFromDecimal(mu, 3);
+    if($('atmFcSigmaWeekly')) $('atmFcSigmaWeekly').textContent=fcFmtPctFromDecimal(sigma, 3);
+    var occ=(combo.occupancy_replay)||{};
+    if($('atmFcOccTake')) $('atmFcOccTake').textContent=
+      (occ.take_rate==null)?'暂无':fcFmtRate(occ.take_rate, 4);
+    if($('atmFcGeoWeekly')) $('atmFcGeoWeekly').textContent=fcFmtPctFromDecimal(geo, 3);
+    if($('atmFcGeoWeeklyOos')) $('atmFcGeoWeeklyOos').textContent=fcFmtPctFromDecimal(geoOos, 3);
+    var hitchGeo=(combo.weekly_geometric_growth_by_hitch_class)||o.weekly_geometric_growth_by_hitch_class||{};
+    var hitchGeoOos=(combo.weekly_geometric_growth_oos_by_hitch_class)||o.weekly_geometric_growth_oos_by_hitch_class||{};
+    if($('atmFcGeoWeeklyDir')) $('atmFcGeoWeeklyDir').textContent=fcFmtPctFromDecimal(hitchGeo['方向型'], 3);
+    if($('atmFcGeoWeeklyOosDir')) $('atmFcGeoWeeklyOosDir').textContent=fcFmtPctFromDecimal(hitchGeoOos['方向型'], 3);
+    if($('atmFcGeoWeeklyOdds')) $('atmFcGeoWeeklyOdds').textContent=fcFmtPctFromDecimal(hitchGeo['赔率型'], 3);
+    if($('atmFcGeoWeeklyOosOdds')) $('atmFcGeoWeeklyOosOdds').textContent=fcFmtPctFromDecimal(hitchGeoOos['赔率型'], 3);
+    var missHint='';
+    if(combo&&combo.missing){
+      missHint=' · 组合未就绪'+(combo.missing_reason?('：'+combo.missing_reason):'');
+    }
+    var skip=occ.skip_reasons||{};
+    var skipBits=[];
+    ['risk_cap','symbol_mutex','max_open','daily_cap','consecutive_losses'].forEach(function(k){
+      if(skip[k]) skipBits.push(k+' '+skip[k]);
+    });
+    var occHint=skipBits.length?(' · 占用跳过：'+skipBits.join('、')):'';
+    if($('atmFcGenerated')) $('atmFcGenerated').textContent=
+      (stale?'过期快照 · ':'')+'生成时间：'+(rep.generated_at||'')+missHint+occHint;
+  }
+  let _forecastRefreshInflight=false;
   async function loadForecastLatest(){
+    if(_forecastRefreshInflight) return;
     try{
       const pack=await fetchJson('/api/forecast/latest', null, 15000);
       renderForecastReport(pack.j.report||pack.j, !!pack.j.stale);
     }catch(e){
       const panel=$('systemForecastPanel');
-      if(panel) panel.textContent='频率预测加载失败：'+(e&&e.message?e.message:e);
+      if(panel) panel.textContent='组合数据加载失败：'+(e&&e.message?e.message:e);
     }
   }
   window.refreshForecastStatistics=async function(){
+    if(_forecastRefreshInflight) return;
+    _forecastRefreshInflight=true;
     const panel=$('systemForecastPanel');
-    if(panel) panel.textContent='正在按当前挂载策略重算频率（不调用AI、不发WxPusher）…';
+    const btn=document.querySelector('#atmSectionForecast .atm-btn');
+    if(btn) btn.disabled=true;
+    if(panel) panel.textContent='正在按当前挂载策略重算组合数据（不调用AI、不发WxPusher）…';
     try{
+      try{
+        const cached=await fetchJson('/api/forecast/latest', null, 15000);
+        renderForecastReport(cached.j.report||cached.j, !!cached.j.stale, {keepStatus:true});
+        if(panel) panel.textContent='正在按当前挂载策略重算组合数据（不调用AI、不发WxPusher）…';
+      }catch(e){}
       const pack=await fetchJson('/api/forecast/refresh_statistical', {
         method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
-      }, 120000);
+      }, 20000);
       if(!pack.res.ok||pack.j.ok!==true){
         throw new Error(pack.j.error||('HTTP '+pack.res.status));
       }
-      renderForecastReport(pack.j.report||pack.j, false);
+      if(pack.j.report){
+        renderForecastReport(pack.j.report, !!pack.j.stale, {keepStatus:true});
+        if(panel) panel.textContent='正在按当前挂载策略重算组合数据（不调用AI、不发WxPusher）…';
+      }
+      const prev=(pack.j.report&&pack.j.report.generated_at)||'';
+      const t0=Date.now();
+      while(Date.now()-t0<180000){
+        await new Promise(function(resolve){ setTimeout(resolve, 2000); });
+        const g=await fetchJson('/api/forecast/latest', null, 15000);
+        const rep=g.j.report||g.j;
+        const running=!!(g.j.refresh_running||(rep&&rep.lightweight_refresh_running));
+        if(rep&&rep.generated_at){
+          renderForecastReport(rep, !!g.j.stale, {keepStatus:true});
+          if(panel) panel.textContent='正在按当前挂载策略重算组合数据（不调用AI、不发WxPusher）…';
+        }
+        if(rep&&rep.generated_at&&rep.generated_at!==prev){
+          renderForecastReport(rep, !!g.j.stale);
+          return;
+        }
+        if(!running && Date.now()-t0>2500){
+          renderForecastReport(rep, !!g.j.stale);
+          return;
+        }
+      }
+      if(panel) panel.textContent='组合数据重算超时，已显示当前快照；可再点「重算并刷新」';
     }catch(e){
-      if(panel) panel.textContent='频率重算失败：'+(e&&e.message?e.message:e);
+      if(panel) panel.textContent='组合数据重算失败：'+(e&&e.message?e.message:e);
+    }finally{
+      _forecastRefreshInflight=false;
+      if(btn) btn.disabled=false;
     }
   };
-  window.vectorAutoFetch=async function(){
-    const latestPromise=loadLatestTradeRecords().catch(function(e){
-      const daily=$('vectorDailyLedgerRows');
-      if(daily) daily.innerHTML='<div class="vector-auto-empty-v5">最新自动交易记录读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</div>';
+  function posGradeClass(row){
+    if(row && row.manual) return 'grade-manual';
+    const t=String((row&&row.strategy_tier)||'').toUpperCase();
+    if(t==='DAIFUKU') return 'grade-daifuku';
+    return 'grade-macaron';
+  }
+  function formatPosNum(v, digits, suffix){
+    if(v===null||v===undefined||v==='') return '—';
+    const n=Number(v);
+    if(!Number.isFinite(n)) return '—';
+    return (n>0?'+':'')+n.toFixed(digits)+(suffix||'');
+  }
+  function posGradeBadge(row){
+    if(row && row.manual) return row.strategy_grade_zh||'手动开仓';
+    const ready=String((row&&(row.strategy_grade_zh||row.strategy_tier_display_zh))||'').trim();
+    if(ready.indexOf('手动')>=0) return ready;
+    if(ready.indexOf('·赔率型')>=0 || ready.indexOf('·方向型')>=0) return ready;
+    const hitch=rosterHitchClass(row);
+    const base=rosterTierLabel(row);
+    return hitch?(base+'·'+hitch):base;
+  }
+  function renderLivePositionRow(row){
+    const title=row.strategy_title||'未命名仓位';
+    const grade=posGradeBadge(row);
+    const parts=[row.symbol_label||'-'];
+    if(row.timeframe_label && row.timeframe_label!=='—') parts.push(row.timeframe_label);
+    parts.push(row.direction_zh||'-');
+    if(row.mgn_mode_zh) parts.push(row.mgn_mode_zh);
+    const n=Number(row.profit_amount_usdt);
+    const r=Number(row.pnl_rate_pct);
+    const cls=Number.isFinite(n)?(n>0?'gain':(n<0?'loss':'')):(Number.isFinite(r)?(r>0?'gain':(r<0?'loss':'')):'');
+    return '<div class="atm-row atm-pos-card">'+
+      '<div class="atm-pos-row">'+
+        '<div><div class="atm-row-title">'+zoneEsc(title)+'</div><div class="atm-row-scope">'+zoneEsc(parts.join(' · '))+'</div></div>'+
+        '<div><span class="atm-field-label">策略等级</span><span class="atm-grade '+posGradeClass(row)+'">'+zoneEsc(grade)+'</span></div>'+
+        '<div class="atm-pos-pnl '+cls+'"><span class="atm-field-label">盈利率 / 盈利额</span><strong>'+zoneEsc(formatPosNum(row.pnl_rate_pct,2,'%'))+'</strong><span>'+zoneEsc(formatPosNum(row.profit_amount_usdt,2,' USDT'))+'</span></div>'+
+        '<button type="button" class="atm-btn atm-btn-danger atm-pos-close" data-inst-id="'+zoneEsc(row.inst_id||'')+'" data-pos-side="'+zoneEsc(row.side||'')+'" data-mgn-mode="'+zoneEsc(row.mgn_mode||'')+'">平仓</button>'+
+      '</div></div>';
+  }
+  function bindPositionCloseButtons(){
+    const box=$('atmPositionRoster');
+    if(!box || box.dataset.closeBound==='1') return;
+    box.dataset.closeBound='1';
+    box.addEventListener('click', function(ev){
+      const btn=ev.target && ev.target.closest ? ev.target.closest('.atm-pos-close') : null;
+      if(!btn) return;
+      window.closeLivePosition(btn.getAttribute('data-inst-id'), btn.getAttribute('data-pos-side'), btn, btn.getAttribute('data-mgn-mode'));
     });
+  }
+  function renderLivePositions(payload){
+    const box=$('atmPositionRoster');
+    const countEl=$('atmPositionCount');
+    if(!box) return;
+    if(payload && payload.building && !(payload.positions||[]).length){
+      if(!box.querySelector('.atm-pos-card')){
+        box.innerHTML='<div class="atm-empty">正在读取实时仓位…</div>';
+      }
+      if(countEl) countEl.textContent='读取中…';
+      return;
+    }
+    const rows=Array.isArray(payload&&payload.positions)?payload.positions:[];
+    if(countEl) countEl.textContent=rows.length+' 个仓位';
+    if(!rows.length){
+      box.innerHTML='<div class="atm-empty">当前没有实时持仓。</div>';
+      return;
+    }
+    box.innerHTML=rows.map(renderLivePositionRow).join('');
+    bindPositionCloseButtons();
+  }
+  window.loadDailySummary=async function(){
+    return atmPollOnce('daily_summary', async function(){
+      const pending='未到起始计数时间';
+      function setMetric(id, text, isPending){
+        const el=$(id);
+        if(!el) return;
+        el.textContent=text;
+        if(isPending) el.classList.add('atm-pending');
+        else el.classList.remove('atm-pending');
+      }
+      function paintSigned(el, value){
+        if(!el) return;
+        el.classList.remove('gain','loss');
+        const n=Number(value);
+        if(Number.isFinite(n)&&n>0) el.classList.add('gain');
+        if(Number.isFinite(n)&&n<0) el.classList.add('loss');
+      }
+      try{
+        const pack=await fetchJson('/api/vector/auto_trade/daily_summary', null, 15000);
+        const j=pack.j||{};
+        if(!pack.res.ok||j.ok!==true) throw new Error(j.error||('HTTP '+pack.res.status));
+        const started=!!j.counting_started;
+        const disp=j.display||{};
+        const label=j.pending_label||pending;
+        setMetric('atmDayOpenAuto', started?(disp.open_count_auto||'0 次'):label, !started);
+        setMetric('atmDayOpenManual', started?(disp.open_count_manual||'0 次'):label, !started);
+        setMetric('atmDayGrowthAuto', started?(disp.daily_growth_auto_pct||'—'):label, !started);
+        setMetric('atmDayGrowth', started?(disp.daily_growth_pct||'—'):label, !started);
+        setMetric('atmDayProfit', started?(disp.daily_profit_usdt||'—'):label, !started);
+        if(started){
+          paintSigned($('atmDayGrowthAuto'), j.daily_growth_auto_pct);
+          paintSigned($('atmDayGrowth'), j.daily_growth_pct);
+          paintSigned($('atmDayProfit'), j.daily_profit_usdt);
+        }
+        const sub=$('atmDailySub');
+        if(sub){
+          if(started){
+            sub.textContent='今日 '+(j.day_start||'')+' ～ '+(j.day_end_display||'')+'（北京时间）。次日 00:00 自动刷新。';
+          }else{
+            sub.textContent='统计周期：每天 00:00 至 23:59（北京时间）。下一起始 '+(j.counting_start||'2026-08-17 00:00:00')+'，当前未到起始计数时间。';
+          }
+        }
+        const countEl=$('atmDailyCount');
+        if(countEl) countEl.textContent=started?(j.day||'今日'):'未到起始计数时间';
+        const body=$('atmDailyTradeBody');
+        if(body){
+          if(!started){
+            body.innerHTML='<tr><td colspan="7">'+zoneEsc(label)+'</td></tr>';
+          }else{
+            const rows=Array.isArray(j.trades)?j.trades:[];
+            if(!rows.length){
+              body.innerHTML='<tr><td colspan="7">今日暂无开仓。</td></tr>';
+            }else{
+              body.innerHTML=rows.map(function(row){
+                const d=row.display||{};
+                const g=Number(row.growth_pct);
+                const p=Number(row.profit_usdt);
+                const gCls=Number.isFinite(g)?(g>0?'gain':(g<0?'loss':'')):'';
+                const pCls=Number.isFinite(p)?(p>0?'gain':(p<0?'loss':'')):'';
+                const nature=d.open_nature||(row.manual?'手动':'自动');
+                return '<tr>'+
+                  '<td>'+zoneEsc(d.symbol||row.symbol_label||'—')+'</td>'+
+                  '<td>'+zoneEsc(nature)+'</td>'+
+                  '<td>'+zoneEsc(d.leverage||'—')+'</td>'+
+                  '<td>'+zoneEsc(d.position||'—')+'</td>'+
+                  '<td>'+zoneEsc(d.direction||'—')+'</td>'+
+                  '<td class="'+gCls+'">'+zoneEsc(d.growth||'—')+'</td>'+
+                  '<td class="'+pCls+'">'+zoneEsc(d.profit||'—')+'</td>'+
+                '</tr>';
+              }).join('');
+            }
+          }
+        }
+      }catch(e){
+        setMetric('atmDayOpenAuto','读取失败',true);
+        setMetric('atmDayOpenManual','读取失败',true);
+        setMetric('atmDayGrowthAuto','读取失败',true);
+        setMetric('atmDayGrowth','读取失败',true);
+        setMetric('atmDayProfit','读取失败',true);
+        const body=$('atmDailyTradeBody');
+        if(body) body.innerHTML='<tr><td colspan="7">读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</td></tr>';
+        throw e;
+      }
+    });
+  };
+  window.loadWeeklySummary=async function(){
+    return atmPollOnce('weekly_summary', async function(){
+      const pending='未到起始计数时间';
+      function setMetric(id, text, isPending){
+        const el=$(id);
+        if(!el) return;
+        el.textContent=text;
+        if(isPending) el.classList.add('atm-pending');
+        else el.classList.remove('atm-pending');
+      }
+      try{
+        const pack=await fetchJson('/api/vector/auto_trade/weekly_summary', null, 15000);
+        const j=pack.j||{};
+        if(!pack.res.ok||j.ok!==true) throw new Error(j.error||('HTTP '+pack.res.status));
+        const started=!!j.counting_started;
+        const disp=j.display||{};
+        const label=j.pending_label||pending;
+        setMetric('atmWkOpenAuto', started?(disp.open_count_auto||'0 次'):label, !started);
+        setMetric('atmWkOpenManual', started?(disp.open_count_manual||'0 次'):label, !started);
+        setMetric('atmWkGrowthAuto', started?(disp.weekly_growth_auto_pct||'—'):label, !started);
+        setMetric('atmWkGrowth', started?(disp.weekly_growth_pct||'—'):label, !started);
+        setMetric('atmWkProfit', started?(disp.weekly_profit_usdt||'—'):label, !started);
+        const growthAutoEl=$('atmWkGrowthAuto');
+        const growthEl=$('atmWkGrowth');
+        const profitEl=$('atmWkProfit');
+        if(started){
+          const ga=Number(j.weekly_growth_auto_pct);
+          const g=Number(j.weekly_growth_pct);
+          const p=Number(j.weekly_profit_usdt);
+          if(growthAutoEl){
+            growthAutoEl.classList.remove('gain','loss');
+            if(Number.isFinite(ga)&&ga>0) growthAutoEl.classList.add('gain');
+            if(Number.isFinite(ga)&&ga<0) growthAutoEl.classList.add('loss');
+          }
+          if(growthEl){
+            growthEl.classList.remove('gain','loss');
+            if(Number.isFinite(g)&&g>0) growthEl.classList.add('gain');
+            if(Number.isFinite(g)&&g<0) growthEl.classList.add('loss');
+          }
+          if(profitEl){
+            profitEl.classList.remove('gain','loss');
+            if(Number.isFinite(p)&&p>0) profitEl.classList.add('gain');
+            if(Number.isFinite(p)&&p<0) profitEl.classList.add('loss');
+          }
+        }
+        const sub=$('atmWeeklySub');
+        if(sub){
+          if(started){
+            sub.textContent='本周 '+(j.week_start||'')+' ～ '+(j.week_end_display||'')+'（北京时间）。下表明细仅自动开仓，不含手动。';
+          }else{
+            sub.textContent='统计周期：每周一 00:00 至周日 24:00（北京时间）。下一起始 '+(j.counting_start||'2026-08-17 00:00:00')+'，当前未到起始计数时间。';
+          }
+        }
+        const countEl=$('atmWeeklyCount');
+        if(countEl) countEl.textContent=started?'计数中':'未到起始计数时间';
+        const body=$('atmWeeklyTradeBody');
+        if(body){
+            if(!started){
+            body.innerHTML='<tr><td colspan="8">'+zoneEsc(label)+'</td></tr>';
+          }else{
+            const rows=Array.isArray(j.trades)?j.trades:[];
+            if(!rows.length){
+              body.innerHTML='<tr><td colspan="8">本周暂无自动开仓。</td></tr>';
+            }else{
+              body.innerHTML=rows.map(function(row){
+                const d=row.display||{};
+                const g=Number(row.growth_pct);
+                const p=Number(row.profit_usdt);
+                const gCls=Number.isFinite(g)?(g>0?'gain':(g<0?'loss':'')):'';
+                const pCls=Number.isFinite(p)?(p>0?'gain':(p<0?'loss':'')):'';
+                const nature=d.open_nature||'自动';
+                const opened=d.opened_at||row.opened_at||'—';
+                return '<tr>'+
+                  '<td>'+zoneEsc(opened)+'</td>'+
+                  '<td>'+zoneEsc(d.symbol||row.symbol_label||'—')+'</td>'+
+                  '<td>'+zoneEsc(nature)+'</td>'+
+                  '<td>'+zoneEsc(d.leverage||'—')+'</td>'+
+                  '<td>'+zoneEsc(d.position||'—')+'</td>'+
+                  '<td>'+zoneEsc(d.direction||'—')+'</td>'+
+                  '<td class="'+gCls+'">'+zoneEsc(d.growth||'—')+'</td>'+
+                  '<td class="'+pCls+'">'+zoneEsc(d.profit||'—')+'</td>'+
+                '</tr>';
+              }).join('');
+            }
+          }
+        }
+      }catch(e){
+        setMetric('atmWkOpenAuto','读取失败',true);
+        setMetric('atmWkOpenManual','读取失败',true);
+        setMetric('atmWkGrowthAuto','读取失败',true);
+        setMetric('atmWkGrowth','读取失败',true);
+        setMetric('atmWkProfit','读取失败',true);
+        const body=$('atmWeeklyTradeBody');
+        if(body) body.innerHTML='<tr><td colspan="8">读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</td></tr>';
+        throw e;
+      }
+    });
+  };
+  window.loadLivePositions=async function(force){
+    if(force){
+      delete _atmPollInflight.live_positions;
+      _atmPollBackoffMs.live_positions=0;
+    }
+    return atmPollOnce('live_positions', async function(){
+      const box=$('atmPositionRoster');
+      const countEl=$('atmPositionCount');
+      try{
+        const pack=await fetchJson('/api/vector/auto_trade/live_positions', null, 15000);
+        const j=pack.j||{};
+        if(!pack.res.ok||j.ok!==true) throw new Error(j.error||('HTTP '+pack.res.status));
+        renderLivePositions(j);
+        if(j.building && !(j.positions||[]).length){
+          window._atmPosBuildTries=(window._atmPosBuildTries||0)+1;
+          if(window._atmPosBuildTries<=8){
+            setTimeout(function(){ window.loadLivePositions(true); }, 800);
+          }
+        }else{
+          window._atmPosBuildTries=0;
+        }
+      }catch(e){
+        if(box && box.querySelector('.atm-pos-card')){
+          if(countEl) countEl.textContent='刷新失败，保留上次仓位';
+        }else if(box){
+          box.innerHTML='<div class="atm-empty">实时仓位读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</div>';
+          if(countEl) countEl.textContent='读取失败';
+        }
+        throw e;
+      }
+    });
+  };
+  window.closeLivePosition=async function(instId, posSide, btn, mgnMode){
+    const inst=String(instId||'');
+    const side=String(posSide||'').toLowerCase();
+    const mgn=String(mgnMode||'').toLowerCase();
+    if(!inst || (side!=='long' && side!=='short')) return;
+    const dir=side==='long'?'做多':'做空';
+    const mgnZh=mgn==='isolated'?'逐仓':(mgn==='cross'?'全仓':'');
+    const label=inst.replace('-USDT-SWAP','');
+    if(!window.confirm('确认市价平掉 '+label+' '+dir+(mgnZh?(' '+mgnZh):'')+'仓位？此操作不可撤销。')) return;
+    if(btn) btn.disabled=true;
     try{
-      const pack=await fetchJson('/api/vector/auto_trade/status', null, 25000);
+      const pack=await fetchJson('/api/vector/auto_trade/live_positions/close', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({inst_id:inst, pos_side:side, mgn_mode:mgn||undefined})
+      }, 20000);
+      const j=pack.j||{};
+      if(!pack.res.ok || j.ok!==true) throw new Error(j.error||('HTTP '+pack.res.status));
+      await window.loadLivePositions(true);
+      loadHoldAssistTriggers(true).catch(function(){});
+    }catch(e){
+      window.alert('平仓失败：'+(e&&e.message?e.message:e));
+      if(btn) btn.disabled=false;
+    }
+  };
+  let _atmStatusBuildRetries=0;
+  window.vectorAutoFetch=async function(force){
+    const forceRefresh=!!force;
+    const box=$('atmStrategyRoster');
+    const btn=box?box.parentElement.querySelector('.atm-btn'):null;
+    if(btn) btn.disabled=true;
+    try{
+      if(forceRefresh){
+        await fetchJson('/api/vector/auto_trade/status/refresh', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
+        }, 120000);
+      }
+      let pack=null;
+      let lastErr=null;
+      for(let attempt=0; attempt<3; attempt++){
+        try{
+          pack=await fetchJson('/api/vector/auto_trade/status', null, 90000);
+          lastErr=null;
+          break;
+        }catch(err){
+          lastErr=err;
+          const m=String((err&&err.message)||err||'');
+          if(attempt<2 && /超时|abort|网络/i.test(m)){
+            await new Promise(function(resolve){ setTimeout(resolve, 800*(attempt+1)); });
+            continue;
+          }
+          throw err;
+        }
+      }
+      if(!pack) throw lastErr || new Error('读取超时，请再点刷新');
       const j=pack.j||{};
       if(!pack.res.ok){
         throw new Error(j.error||j.message||('HTTP '+pack.res.status));
       }
       const zones=j.asset_zones||[];
-      if(j.degraded && !zones.length){
-        const box=$('atmStrategyRoster');
-        if(box) box.innerHTML='<div class="atm-empty">运行策略读取降级：'+zoneEsc(j.message||j.error||'主机繁忙，稍后自动重试')+'</div>';
-        if($('atmStrategyCount')) $('atmStrategyCount').textContent='降级';
+      if(zones.length){
+        _atmStatusBuildRetries=0;
+        renderAssetZones(zones, {force: forceRefresh || rosterIsLoading()});
+        if(!rosterHasOpenFolds()){
+          renderRosterStatusHint('');
+        }
+      }else if(j.degraded || j.building){
+        const hint=j.message||j.error||'运行策略静态快照尚未生成，请点「刷新」';
+        if(_atmRosterHasData && !rosterIsLoading()){
+          renderRosterStatusHint(hint);
+        }else if(box){
+          box.innerHTML='<div class="atm-empty">'+zoneEsc(hint)+'</div>';
+        }
+        if($('atmStrategyCount')) $('atmStrategyCount').textContent=j.building?'构建中…':'待初始化';
+        if(_atmStatusBuildRetries<8){
+          _atmStatusBuildRetries+=1;
+          setTimeout(function(){ window.vectorAutoFetch(); }, 1500);
+        }
       }else{
-        renderAssetZones(zones);
+        renderAssetZones(zones, {force:true});
       }
     }catch(e){
-      const box=$('atmStrategyRoster');
-      if(box) box.innerHTML='<div class="atm-empty">状态读取失败：'+zoneEsc(e&&e.message?e.message:e)+'</div>';
+      const msg=(e&&e.message?e.message:String(e));
+      if(_atmRosterHasData && box && box.querySelector('.atm-row')){
+        renderRosterStatusHint('状态刷新较慢：'+msg+'（仍显示上次名单，可再点刷新）');
+      }else if($('atmStrategyCount') && !$('atmStrategyRoster .atm-row')){
+        $('atmStrategyCount').textContent='读取失败';
+        if(box) box.innerHTML='<div class="atm-empty">状态读取失败：'+zoneEsc(msg)+'</div>';
+      }
+    }finally{
+      if(btn) btn.disabled=false;
     }
-    await latestPromise;
   };
   function renderPipelineCard(pipe){
     const id=pipe.pipeline;
@@ -844,22 +1949,68 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       };
       renderPipelineCard(pipe);
     });
-    const n=pipes.filter(function(p){return p.working;}).length;
+    const n=pipes.filter(function(p){return p.working && (Number(p.pipeline)===1 || Number(p.pipeline)===2);}).length;
     if($('atmCreationWorking')) $('atmCreationWorking').textContent=n+' 管在研';
     if($('atmCreationReviewLink')){
-      $('atmCreationReviewLink').textContent='汇流 → 质检器（四AI平均：E>0 且周开仓频率>0.5） · 更新 '+(data.updated_at||'');
+      $('atmCreationReviewLink').textContent='汇流 → 质检器（样本内10项 + 盲样本外夏普） · 更新 '+(data.updated_at||'');
     }
+    try{ document.dispatchEvent(new CustomEvent('hk:pipelines', {detail: data||{}})); }catch(e){}
   }
-  window.creationPipelinesRefresh=async function(){
+  window.creationPipelinesRefresh=async function(force){
+    return atmPollOnce('pipelines', async function(){
     try{
-      const pack=await fetchJson('/api/creation/pipelines', null, 12000);
+        const pack=await fetchJson('/api/creation/pipelines', null, 25000);
       if(!pack.res.ok || pack.j.ok===false) throw new Error(pack.j.error||('HTTP '+pack.res.status));
       renderCreationPipelines(pack.j);
     }catch(e){
-      if($('atmPipe1Detail')) $('atmPipe1Detail').textContent='管道状态读取失败：'+(e&&e.message?e.message:e);
-      if($('atmPipe2Detail')) $('atmPipe2Detail').textContent='管道状态读取失败：'+(e&&e.message?e.message:e);
-    }
+        const msg='错误：'+(e&&e.message?e.message:e);
+        const blank=function(id){
+          const st=$('atmPipe'+id+'State');
+          return !st || st.textContent==='读取中…' || st.textContent==='状态获取失败';
+        };
+        [1,2].forEach(function(id){
+          if(blank(id)){
+            if($('atmPipe'+id+'State')) $('atmPipe'+id+'State').textContent='状态获取失败';
+            if($('atmPipe'+id+'Detail')) $('atmPipe'+id+'Detail').textContent=msg;
+          }
+        });
+        if($('atmCreationReviewLink')){
+          $('atmCreationReviewLink').textContent=msg+' · 请再点刷新';
+        }
+        throw e;
+      }
+    }, !!force);
   };
+  var _qiTh={eMin:0.003,wMin:0.5,eOp:'>=',wOp:'>='};
+  function qiFmtTh(v){
+    var n=Number(v);
+    if(!isFinite(n)) return String(v);
+    if(Math.abs(n-Math.round(n))<1e-12) return String(Math.round(n));
+    return String(n).replace(/(\.\d*?[1-9])0+$/,'$1').replace(/\.0+$/,'');
+  }
+  function qiMeets(val, min, op){
+    var n=Number(val), t=Number(min);
+    if(!isFinite(n) || !isFinite(t)) return false;
+    if(op==='>') return n>t;
+    if(op==='<=') return n<=t;
+    if(op==='<') return n<t;
+    return n>=t;
+  }
+  function qiReadThresholds(data){
+    var pack=(data && data.thresholds) || (data && data.gate && data.gate.thresholds) || {};
+    var isTh=pack.is || pack || {};
+    var eSpec=isTh.E_raw || {};
+    var wSpec=isTh.weekly_opens || {};
+    if(eSpec.threshold!=null && isFinite(Number(eSpec.threshold))) _qiTh.eMin=Number(eSpec.threshold);
+    if(wSpec.threshold!=null && isFinite(Number(wSpec.threshold))) _qiTh.wMin=Number(wSpec.threshold);
+    if(eSpec.operator) _qiTh.eOp=String(eSpec.operator);
+    if(wSpec.operator) _qiTh.wOp=String(wSpec.operator);
+    var eLab='E值（'+_qiTh.eOp+qiFmtTh(_qiTh.eMin)+'）';
+    var wLab='周开仓频率（'+_qiTh.wOp+qiFmtTh(_qiTh.wMin)+'）';
+    ['atmQiPassThE','atmQiFailThE'].forEach(function(id){ if($(id)) $(id).textContent=eLab; });
+    ['atmQiPassThW','atmQiFailThW'].forEach(function(id){ if($(id)) $(id).textContent=wLab; });
+    return _qiTh;
+  }
   function qiFmtPct(v, digits){
     if(v===null||v===undefined||v==='') return '—';
     const n=Number(v);
@@ -874,107 +2025,270 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     const d=(digits===undefined||digits===null)?3:digits;
     return n.toFixed(d);
   }
-  function qiRowHtml(r){
-    const name=zoneEsc(r.title_zh||r.strategy_name||r.id||'-');
+  function qiNameCell(r){
+    const full=zoneEsc(r.title_full||r.title_zh||r.strategy_name||r.id||'-');
+    const short=zoneEsc(r.title_zh||r.title_full||r.strategy_name||r.id||'-');
     const scope=zoneEsc(((r.symbol||'')+'').replace('-USDT-SWAP','')+(r.timeframe?(' · '+r.timeframe):''));
-    const eCls=(Number(r.expectancy_E)>0)?'gain':'loss';
-    const wCls=(Number(r.weekly_open_freq)>0.5)?'gain':'loss';
-    const mCls=(Number(r.mean_win_only_pct)>=0)?'gain':'loss';
-    return '<tr><td><div class="atm-row-title">'+name+'</div><div class="atm-row-scope">'+scope+
-      '</div></td><td class="'+eCls+'">'+qiFmtNum(r.expectancy_E,3)+
-      '</td><td class="'+wCls+'">'+qiFmtNum(r.weekly_open_freq,3)+
-      '</td><td class="'+mCls+'">'+qiFmtPct(r.mean_win_only_pct,2)+'</td></tr>';
+    const reasons=Array.isArray(r.gate_reasons_zh)?r.gate_reasons_zh.filter(Boolean):[];
+    const reasonLine=reasons.length
+      ? '<div class="atm-row-scope">'+zoneEsc(reasons.join(' · '))+'</div>'
+      : '';
+    return '<td class="atm-qi-name"><div class="atm-row-title" title="'+full+'">'+short+
+      '</div><div class="atm-row-scope">'+scope+'</div>'+reasonLine+'</td>';
   }
+  function qiAuthorCell(r, failed){
+    const a=r.quality_author||{};
+    const verdict=a.verdict_zh|| (failed ? '' : '质检作者待写');
+    const why=a.reason_zh||'';
+    const occ=a.occupancy||{};
+    let extra='';
+    if(occ.geo_delta!=null && isFinite(Number(occ.geo_delta))){
+      extra='占用Δ '+(Number(occ.geo_delta)*100).toFixed(2)+'pp';
+    }else if(occ.same_symbol_live_n){
+      extra='同标的已挂 '+occ.same_symbol_live_n;
+    }
+    if(a.technical_failed) extra=(extra?extra+' · ':'')+'技术失败';
+    if(a.stale) extra=(extra?extra+' · ':'')+'账本已变';
+    let cls='atm-qi-author';
+    if(a.technical_failed) cls+=' is-tech';
+    else if(a.verdict==='suggest_sign') cls+=' is-sign';
+    else if(a.verdict==='suggest_watch') cls+=' is-watch';
+    else if(a.verdict==='numbers_ok_not_mount') cls+=' is-not-mount';
+    const whyLine=why?('<div class="atm-qi-why" title="'+zoneEsc(why)+'">'+zoneEsc(why)+'</div>'):'';
+    const extraLine=extra?('<div class="atm-row-scope">'+zoneEsc(extra)+'</div>'):'';
+    return '<td class="'+cls+'"><div class="atm-qi-verdict">'+zoneEsc(verdict||'—')+'</div>'+whyLine+extraLine+'</td>';
+  }
+  function qiRowHtml(r){
+    const eCls=qiMeets(r.expectancy_E,_qiTh.eMin,_qiTh.eOp)?'gain':'loss';
+    const wCls=qiMeets(r.weekly_open_freq,_qiTh.wMin,_qiTh.wOp)?'gain':'loss';
+    return '<tr>'+qiNameCell(r)+
+      '<td class="'+eCls+'">'+qiFmtNum(r.expectancy_E,3)+
+      '</td><td class="'+wCls+'">'+qiFmtNum(r.weekly_open_freq,3)+
+      '</td>'+qiAuthorCell(r,false)+'</tr>';
+  }
+  function qiFailRowHtml(r){
+    const eCls=qiMeets(r.expectancy_E,_qiTh.eMin,_qiTh.eOp)?'gain':'loss';
+    const wCls=qiMeets(r.weekly_open_freq,_qiTh.wMin,_qiTh.wOp)?'gain':'loss';
+    const rid=zoneEsc(String(r.id||''));
+    const reasons=Array.isArray(r.gate_reasons_zh)?r.gate_reasons_zh.filter(Boolean):[];
+    const diag=reasons.length?reasons.join(' · '):(r.quality_author&&r.quality_author.reason_zh)||'—';
+    return '<tr>'+qiNameCell(r)+
+      '<td class="'+eCls+'">'+qiFmtNum(r.expectancy_E,3)+
+      '</td><td class="'+wCls+'">'+qiFmtNum(r.weekly_open_freq,3)+
+      '</td><td class="atm-row-scope">'+zoneEsc(diag)+
+      '</td><td class="atm-qi-act"><button type="button" class="atm-qi-del" title="删除" aria-label="删除" onclick="qiDeleteItem(\''+rid+'\')">'+QI_TRASH_SVG+'</button></td></tr>';
+  }
+  window.qiDeleteItem=async function(id){
+    if(!id) return;
+    if(!window.confirm('删除这条质检不合格策略？')) return;
+    try{
+      const pack=await fetchJson('/api/creation/quality_inspector/'+encodeURIComponent(id), {method:'DELETE'}, 15000);
+      if(!pack.res.ok || pack.j.ok===false) throw new Error(pack.j.error||('HTTP '+pack.res.status));
+      await creationReviewRefresh(true);
+    }catch(e){
+      if($('atmReviewStatus')) $('atmReviewStatus').textContent='删除失败：'+(e&&e.message?e.message:e);
+    }
+  };
   function renderCreationReview(data){
+    qiReadThresholds(data);
     const passed=Array.isArray(data.passed)?data.passed:[];
     const failed=Array.isArray(data.failed)?data.failed:[];
-    if($('atmQiCount')) $('atmQiCount').textContent=passed.length+' 合格 / '+failed.length+' 不合格';
-    if($('atmQiGate')) $('atmQiGate').textContent=(data.gate_zh||'四AI平均数：E>0 且周开仓频率>0.5')+' · 禁止自动挂载';
+    if($('atmQiCount')) $('atmQiCount').textContent='已检 '+(passed.length+failed.length)+' 条';
+    if($('atmQiGate')) $('atmQiGate').textContent=(data.gate_zh||'样本内机器门 + 盲样本外夏普')+' · 绿栏≠签发 · 禁止自动挂载';
     if($('atmQiCubeMeta')){
       $('atmQiCubeMeta').textContent=passed.length+failed.length
-        ? ('已检 '+(passed.length+failed.length)+' · 合格 '+passed.length)
+        ? ('已检 '+(passed.length+failed.length)+' · 机器过关 '+passed.length)
         : '等待管道产出';
     }
-    if($('atmQiPassRows')){
-      $('atmQiPassRows').innerHTML=passed.length
+    if($('atmQiPassBody')){
+      $('atmQiPassBody').innerHTML=passed.length
         ? passed.map(qiRowHtml).join('')
-        : '<tr><td colspan="4" style="color:var(--muted)">暂无质检合格策略</td></tr>';
+        : '<tr><td colspan="4" style="color:var(--muted)">暂无机器门过关条目</td></tr>';
     }
-    if($('atmQiFailRows')){
-      $('atmQiFailRows').innerHTML=failed.length
-        ? failed.map(qiRowHtml).join('')
-        : '<tr><td colspan="4" style="color:var(--muted)">暂无质检不合格策略</td></tr>';
+    if($('atmQiFailBody')){
+      $('atmQiFailBody').innerHTML=failed.length
+        ? failed.map(qiFailRowHtml).join('')
+        : '<tr><td colspan="5" style="color:var(--muted)">暂无不合格条目</td></tr>';
     }
     if($('atmReviewStatus')){
-      $('atmReviewStatus').textContent='质检器 · 更新 '+(data.updated_at||'')+' · '+(data.note_zh||'');
+      $('atmReviewStatus').textContent='质检器 · 更新 '+(data.updated_at||'')+' · 过关策略按轮次陈列在面包房 · Qwen咨询不放行';
     }
+    try{ document.dispatchEvent(new CustomEvent('hk:qi', {detail: data||{}})); }catch(e){}
   }
-  window.creationReviewRefresh=async function(){
+  window.creationReviewRefresh=async function(force){
+    return atmPollOnce('quality_inspector', async function(){
     try{
-      const pack=await fetchJson('/api/creation/quality_inspector', null, 12000);
+        const pack=await fetchJson('/api/creation/quality_inspector', null, 25000);
       if(!pack.res.ok || pack.j.ok===false) throw new Error(pack.j.error||('HTTP '+pack.res.status));
       renderCreationReview(pack.j);
     }catch(e){
-      if($('atmReviewStatus')) $('atmReviewStatus').textContent='质检器读取失败：'+(e&&e.message?e.message:e);
-      if($('atmQiPassRows')) $('atmQiPassRows').innerHTML='<tr><td colspan="4" style="color:var(--muted)">读取失败</td></tr>';
-      if($('atmQiFailRows')) $('atmQiFailRows').innerHTML='<tr><td colspan="4" style="color:var(--muted)">读取失败</td></tr>';
+        if($('atmReviewStatus')) $('atmReviewStatus').textContent='质检器读取失败：'+(e&&e.message?e.message:e);
+        throw e;
+      }
+    }, !!force);
+  };
+  function renderCreationBakery(data){
+    const rounds=Array.isArray(data.rounds)?data.rounds:[];
+    const passed=Number(data.passed_count||0);
+    if($('atmBakeryCount')) $('atmBakeryCount').textContent=passed+' 份过关';
+    if($('atmBakeryRounds')){
+      $('atmBakeryRounds').innerHTML=rounds.length
+        ? rounds.map(function(round){
+            const rows=Array.isArray(round.strategies)?round.strategies:[];
+            const list=rows.length
+              ? '<ul class="atm-bakery-list">'+rows.map(function(s){
+                  return '<li>'+zoneEsc(s.strategy_name||s.title_zh||s.id||'未命名策略')+'</li>';
+                }).join('')+'</ul>'
+              : '<div class="atm-empty">本轮暂无过关策略</div>';
+            return '<div class="atm-bakery-round"><h3>'+zoneEsc(round.round_zh||'创造轮次')+'</h3>'+list+'</div>';
+          }).join('')
+        : '<div class="atm-empty">等待一轮创造过关…</div>';
     }
+    if($('atmBakeryStatus')){
+      $('atmBakeryStatus').textContent='面包房 · 最近'+(data.max_days||7)+'天 · '+(data.round_count||0)+' 轮 · 更新 '+(data.updated_at||'');
+    }
+    try{ document.dispatchEvent(new CustomEvent('hk:bakery', {detail: data||{}})); }catch(e){}
+  }
+  window.creationBakeryRefresh=async function(force){
+    return atmPollOnce('creation_bakery', async function(){
+      try{
+        const pack=await fetchJson('/api/creation/bakery', null, 25000);
+        if(!pack.res.ok || pack.j.ok===false) throw new Error(pack.j.error||('HTTP '+pack.res.status));
+        renderCreationBakery(pack.j);
+      }catch(e){
+        if($('atmBakeryStatus')) $('atmBakeryStatus').textContent='面包房读取失败：'+(e&&e.message?e.message:e);
+        if($('atmBakeryRounds') && !$('atmBakeryRounds').querySelector('.atm-bakery-round')){
+          $('atmBakeryRounds').innerHTML='<div class="atm-empty">读取失败</div>';
+        }
+        throw e;
+      }
+    }, !!force);
   };
   function renderPendingOptimize(data){
-    const rows=Array.isArray(data.strategies)?data.strategies:[];
-    if($('atmPendingOptimizeCount')) $('atmPendingOptimizeCount').textContent=rows.length+' 条';
+    const pipes=Array.isArray(data.pipelines)?data.pipelines:[];
+    [3,4].forEach(function(id){
+      const pipe=pipes.filter(function(p){return Number(p.pipeline)===id;})[0] || {
+        pipeline:id, working:false, state:'空闲', progress:{percent:0, stage_zh:'空闲', detail:'等待已有模版再创造'}
+      };
+      renderPipelineCard(pipe);
+    });
+    const jobs=Array.isArray(data.jobs)?data.jobs:(Array.isArray(data.strategies)?data.strategies:[]);
+    const working=Number(data.working||0)||pipes.filter(function(p){return p.working;}).length;
+    const batch=data.batch||{};
+    const chips=Array.isArray(data.policy_chips)?data.policy_chips:[];
+    if($('atmPendingOptimizeCount')) $('atmPendingOptimizeCount').textContent=working? (working+' 管工作中') : '工坊空闲';
     if($('atmPendingOptimizeNote')){
-      $('atmPendingOptimizeNote').textContent=(data.note_zh||'策略待优化展示区')+' · 更新 '+(data.updated_at||'');
+      $('atmPendingOptimizeNote').textContent=(data.gate_zh||'汇流 → 质检器（样本内10项 + 盲样本外夏普） · 禁止自动挂载')+' · 更新 '+(data.updated_at||'');
+    }
+    if($('atmWorkshopPolicy') && chips.length){
+      $('atmWorkshopPolicy').innerHTML=chips.map(function(c){return '<span>'+zoneEsc(c)+'</span>';}).join('');
+    }
+    if($('atmWorkshopBatch')){
+      const batchLine=(batch.enqueued_zh||'')+(batch.id?(' · 批次 '+batch.id):'');
+      $('atmWorkshopBatch').textContent=batchLine||('工坊队列 '+jobs.length+' 条');
     }
     if($('atmPendingOptimizeRows')){
-      $('atmPendingOptimizeRows').innerHTML=rows.length?rows.map(function(r){
-        const wr=Number(r.account_win_rate_pct);
-        const mw=Number(r.mean_win_only_pct);
-        const ee=Number(r.expectancy_E);
-        const wrCls=isFinite(wr)?(wr>=50?'gain':'loss'):'';
-        const mwCls=isFinite(mw)?(mw>=0?'gain':'loss'):'';
-        const eCls=isFinite(ee)?(ee>0?'gain':'loss'):'';
+      $('atmPendingOptimizeRows').innerHTML=jobs.length?jobs.map(function(r){
+        const pct=Number(r.percent);
+        const pctText=isFinite(pct)?(pct+'%'):'—';
+        const sym=zoneEsc((r.symbol||'').replace('-USDT-SWAP',''));
         return '<tr><td><div class="atm-row-title">'+zoneEsc(r.title_zh||'-')+
-          '</div><div class="atm-row-scope">'+zoneEsc((r.symbol||'').replace('-USDT-SWAP',''))+
-          ' / '+zoneEsc(r.timeframe||'')+' · '+zoneEsc(r.direction_zh||r.direction||'')+
-          '</div></td><td class="'+wrCls+'">'+zoneEsc(qiFmtPct(r.account_win_rate_pct,2))+
-          '</td><td class="'+mwCls+'">'+zoneEsc(qiFmtPct(r.mean_win_only_pct,2))+
-          '</td><td>'+zoneEsc(qiFmtNum(r.weekly_open_freq,3))+
-          '</td><td class="'+eCls+'">'+zoneEsc(qiFmtNum(r.expectancy_E,4))+
+          '</div></td><td>'+sym+
+          ' / '+zoneEsc(r.timeframe||'1h')+' · '+zoneEsc(r.direction_zh||r.direction||'')+
+          '</td><td>'+zoneEsc(r.pipeline_label||(r.pipeline?('工坊管道'+(Number(r.pipeline)-2)):''))+
+          '</td><td>'+zoneEsc(r.queue||r.status||'')+
+          '</td><td>'+zoneEsc(pctText+(r.stage_zh?(' · '+r.stage_zh):''))+
           '</td></tr>';
-      }).join(''):'<tr><td colspan="5" style="color:var(--muted)">暂无待优化策略</td></tr>';
+      }).join(''):'<tr><td colspan="5" style="color:var(--muted)">工坊空闲 · 等待已有策略模版再创造</td></tr>';
     }
     if($('atmPendingOptimizeStatus')){
-      $('atmPendingOptimizeStatus').textContent='待优化板 · '+rows.length+' 条 · 未自动挂载';
+      $('atmPendingOptimizeStatus').textContent=working
+        ? ('已有策略模版工坊 · '+working+' 管工作中 · '+(batch.enqueued_zh||(jobs.length+' 条'))+' · 未自动挂载')
+        : ('已有策略模版工坊 · 工坊空闲 · '+(batch.enqueued_zh||(jobs.length+' 条'))+' · 未自动挂载');
     }
+    try{ document.dispatchEvent(new CustomEvent('hk:workshop', {detail: data||{}})); }catch(e){}
   }
-  window.pendingOptimizeRefresh=async function(){
-    try{
-      const pack=await fetchJson('/api/strategy/pending_optimize', null, 12000);
-      if(!pack.res.ok || pack.j.ok===false) throw new Error(pack.j.error||('HTTP '+pack.res.status));
-      renderPendingOptimize(pack.j);
-    }catch(e){
-      if($('atmPendingOptimizeStatus')) $('atmPendingOptimizeStatus').textContent='待优化板读取失败：'+(e&&e.message?e.message:e);
-      if($('atmPendingOptimizeRows')) $('atmPendingOptimizeRows').innerHTML='<tr><td colspan="5" style="color:var(--muted)">读取失败</td></tr>';
-    }
+  window.pendingOptimizeRefresh=async function(force){
+    return atmPollOnce('pending_optimize', async function(){
+      try{
+        const pack=await fetchJson('/api/strategy/pending_optimize', null, 25000);
+        if(!pack.res.ok || pack.j.ok===false) throw new Error(pack.j.error||('HTTP '+pack.res.status));
+        renderPendingOptimize(pack.j);
+      }catch(e){
+        if($('atmPendingOptimizeStatus')) $('atmPendingOptimizeStatus').textContent='模版工坊读取失败：'+(e&&e.message?e.message:e);
+        const empty=!$('atmPendingOptimizeRows') || !$('atmPendingOptimizeRows').querySelector('.atm-row-title');
+        if(empty && $('atmPendingOptimizeRows')){
+          $('atmPendingOptimizeRows').innerHTML='<tr><td colspan="5" style="color:var(--muted)">读取失败</td></tr>';
+        }
+        throw e;
+      }
+    }, !!force);
   };
+  // 开页只拉名单；名单成功或明确失败后再串行排队其余模块，同时最多 1 条。
+  // 点「刷新」名单只拉 status，不重放整队。
+  function atmEnqueueRest(){
+    atmSerialEnqueue('live_positions', atmCallIfFn('loadLivePositions'));
+    atmSerialEnqueue('hold_assist', atmCallIfFn('loadHoldAssistTriggers'));
+    atmSerialEnqueue('daily_summary', atmCallIfFn('loadDailySummary'));
+    atmSerialEnqueue('weekly_summary', atmCallIfFn('loadWeeklySummary'));
+    atmSerialEnqueue('dialysis', atmCallIfFn('loadDialysis'));
+    atmSerialEnqueue('process_status', atmCallIfFn('loadProcessStatus'));
+    atmSerialEnqueue('safety_net', atmCallIfFn('loadSafetyNet'));
+    atmSerialEnqueue('forecast', function(){ return loadForecastLatest(); });
+    atmSerialEnqueue('pipelines', function(){ return creationPipelinesRefresh(); });
+    atmSerialEnqueue('quality_inspector', function(){ return creationReviewRefresh(); });
+    atmSerialEnqueue('bakery', function(){ return creationBakeryRefresh(); });
+    atmSerialEnqueue('pending_optimize', function(){ return pendingOptimizeRefresh(); });
+    atmSerialEnqueue('manual_experience', atmCallIfFn('loadManualExperience'));
+  }
   function bootAtmModules(){
-    window.vectorAutoFetch();
     loadForecastLatest();
-    creationPipelinesRefresh();
-    creationReviewRefresh();
-    pendingOptimizeRefresh();
+    atmSerialEnqueue('strategy_config', atmCallIfFn('loadStrategyConfig'));
+    atmSerialEnqueue('live_positions', atmCallIfFn('loadLivePositions'));
+    atmSerialEnqueue('hold_assist', atmCallIfFn('loadHoldAssistTriggers'));
+    Promise.resolve(window.vectorAutoFetch()).catch(function(){}).then(function(){
+      atmEnqueueRest();
+    });
   }
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded', bootAtmModules);
   }else{
     bootAtmModules();
   }
-  setInterval(window.vectorAutoFetch,15000);
-  setInterval(creationPipelinesRefresh,4000);
-  setInterval(creationReviewRefresh,8000);
-  setInterval(pendingOptimizeRefresh,15000);
-  setInterval(loadForecastLatest,60000);
+  setInterval(function(){
+    if(document.hidden || _forecastRefreshInflight) return;
+    loadForecastLatest();
+  },60000);
+  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('pipelines', function(){ return creationPipelinesRefresh(); }); },20000);
+  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('quality_inspector', function(){ return creationReviewRefresh(); }); },20000);
+  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('bakery', function(){ return creationBakeryRefresh(); }); },20000);
+  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('pending_optimize', function(){ return pendingOptimizeRefresh(); }); },20000);
+  setInterval(function(){
+    if(document.hidden)return;
+    var box=document.getElementById('experimentalStrategies');
+    if(box && box.getAttribute('data-ready')==='1') return;
+    atmSerialEnqueue('strategy_config', atmCallIfFn('loadStrategyConfig'));
+  },20000);
+  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('live_positions', atmCallIfFn('loadLivePositions')); },15000);
+  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('hold_assist', atmCallIfFn('loadHoldAssistTriggers')); },15000);
+  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('daily_summary', atmCallIfFn('loadDailySummary')); },30000);
+  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('weekly_summary', atmCallIfFn('loadWeeklySummary')); },30000);
+  (function scheduleCstMidnightRefresh(){
+    function msUntilNextCstMidnight(){
+      const now=new Date();
+      const utc=now.getTime()+now.getTimezoneOffset()*60000;
+      const cst=new Date(utc+8*3600000);
+      const next=new Date(cst.getFullYear(), cst.getMonth(), cst.getDate()+1, 0, 0, 1, 0);
+      return Math.max(1000, next.getTime()-cst.getTime());
+    }
+    function arm(){
+      setTimeout(function(){
+        atmSerialEnqueue('daily_summary', atmCallIfFn('loadDailySummary'));
+        arm();
+      }, msUntilNextCstMidnight());
+    }
+    arm();
+  })();
 })();
 </script>
 <!-- VECTOR_AUTO_TRADE_STATE_V5_NOGUESS_END -->
@@ -982,18 +2296,18 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
 </div>
   <section class="strategy-creator-module" id="strategyCreatorModule">
     <style>
-      .strategy-creator-module{grid-column:1/-1;padding:26px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.012));box-shadow:0 18px 45px rgba(0,0,0,.16)}
+      .strategy-creator-module{grid-column:1/-1;padding:26px;border:1px solid var(--line);border-radius:var(--radius-xl);background:linear-gradient(145deg,var(--surface),var(--surface-2));box-shadow:var(--card-shadow)}
       .strategy-creator-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
       .strategy-creator-title{font-size:20px;color:var(--text);font-weight:650;letter-spacing:.03em}
       .strategy-creator-sub{font-size:12px;color:var(--muted);line-height:1.7;margin-top:6px;max-width:820px}
-      .strategy-creator-pill{border:1px solid rgba(155,191,154,.32);background:rgba(155,191,154,.08);color:var(--gain);padding:7px 12px;border-radius:999px;font-size:11px;white-space:nowrap}
+      .strategy-creator-pill{border:1px solid rgba(127,163,122,.32);background:rgba(127,163,122,.08);color:var(--gain);padding:7px 12px;border-radius:999px;font-size:11px;white-space:nowrap}
       .strategy-creator-pill.ready{color:var(--focus);border-color:rgba(218,184,105,.38);background:rgba(218,184,105,.09)}
       .strategy-creator-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:18px}
-      .strategy-creator-step{border:1px solid var(--line);border-radius:11px;padding:10px 9px;background:rgba(255,255,255,.018);font-size:11px;color:var(--muted);text-align:center;line-height:1.5}
+      .strategy-creator-step{border:1px solid var(--line);border-radius:11px;padding:10px 9px;background:var(--surface-3);font-size:11px;color:var(--muted);text-align:center;line-height:1.5}
       .strategy-creator-step b{display:block;color:var(--text);font-size:12px;margin-bottom:2px}
       .strategy-creator-status{padding:14px 16px;border:1px solid var(--line);border-radius:12px;color:var(--muted);font-size:12px;line-height:1.7;margin-bottom:14px}
       .strategy-matrix{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:14px}
-      .strategy-matrix-cell{border:1px solid var(--line);border-radius:10px;padding:10px;background:rgba(255,255,255,.016);color:var(--muted);font-size:10px;line-height:1.45}
+      .strategy-matrix-cell{border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px;background:var(--surface-2);color:var(--muted);font-size:10px;line-height:1.45}
       .strategy-matrix-cell strong{display:block;color:var(--text);font-size:14px;margin-top:3px}
       .strategy-creator-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
       .strategy-candidate-card{border:1px solid rgba(218,184,105,.30);border-radius:15px;background:rgba(218,184,105,.045);padding:18px}
@@ -1112,40 +2426,39 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       })();
     </script>
   </section>
-  <div class="panel full">
-    <div class="title">策略回测控制台</div>
-    <div class="row">
-      <div id="active_strat" class="bt-strategy-picker"></div>
-      <div id="btSelectionNote" class="bt-selection-note">请选择至少一条策略；可同时选择任意数量进行等权组合回测。</div>
-      <select id="bt_instrument" aria-label="回测标的" onchange="onBacktestScopeChange()">
-        <option value="BTC-USDT-SWAP">BTC 永续合约</option>
-        <option value="CL-USDT-SWAP">CL 永续合约</option>
-        <option value="XAU-USDT-SWAP">XAU 永续合约</option>
-        <option value="NG-USDT-SWAP">NG 永续合约</option>
-        <option value="XAG-USDT-SWAP">XAG 永续合约</option>
-        <option value="LTC-USDT-SWAP">LTC 永续合约</option>
-        <option value="ADA-USDT-SWAP">ADA 永续合约</option>
-        <option value="ETH-USDT-SWAP">ETH 永续合约</option>
-        <option value="SOL-USDT-SWAP">SOL 永续合约</option>
-        <option value="XRP-USDT-SWAP">XRP 永续合约</option>
-        <option value="DOGE-USDT-SWAP">DOGE 永续合约</option>
-        <option value="BNB-USDT-SWAP">BNB 永续合约</option>
-      </select>
-      <select id="bt_timeframe" aria-label="回测周期" onchange="onBacktestScopeChange()">
-        <option value="1h" selected>1小时周期</option>
-        <option value="15m">15分钟周期</option>
-        <option value="5m">5分钟周期</option>
-      </select>
-      <div class="bt-selection-note">切换至“BTC 永续合约＋15分钟周期”后，BTC 15分钟专用策略会置顶并自动选中。专用策略可读取上一根已闭合1小时K线作为背景；回测资格与自动交易资格相互独立。</div>
-      <input id="bt_start" type="datetime-local" value="2026-01-01T00:00">
-      <input id="bt_end" type="datetime-local" value="2026-06-28T00:00">
-      <button id="btRunButton" onclick="executeBacktest()">开始回测</button>
+  <section class="panel full atm-section" id="mdqModuleBacktest">
+    <div class="atm-section-head">
+      <div>
+        <h2 class="atm-section-title">记录手动经验记录馆</h2>
+        <div class="atm-section-sub">只记录你亲手写下的条件和结果。选择做多或做空后保存，条目会留在这座馆里。</div>
+      </div>
+      <div class="atm-section-meta">
+        <div class="atm-count" id="mdqExpCount">0 条经验</div>
+      </div>
     </div>
-    <div id="btDataCoverage" class="bt-data-coverage">正在读取所选标的与周期的历史覆盖…</div>
-    <div id="btProgress"></div>
-    <div id="btResult"></div>
+    <div class="mdq-exp-sides" role="group" aria-label="方向">
+      <button type="button" class="atm-btn mdq-exp-side is-on" data-side="long">做多</button>
+      <button type="button" class="atm-btn mdq-exp-side" data-side="short">做空</button>
+    </div>
+    <div class="mdq-exp-grid" style="margin-top:12px">
+      <label>
+        <span class="atm-field-label">条件</span>
+        <textarea class="mdq-exp-input" id="mdqExpCondition" placeholder="写下当时看到的条件"></textarea>
+      </label>
+      <label>
+        <span class="atm-field-label">结果</span>
+        <textarea class="mdq-exp-input" id="mdqExpResult" placeholder="写下后来发生的结果"></textarea>
+      </label>
+    </div>
+    <div class="mdq-exp-actions">
+      <button type="button" class="atm-btn atm-btn-primary" id="mdqExpSave">保存</button>
+      <div class="mdq-exp-msg" id="mdqExpMsg"></div>
+    </div>
+    <div class="atm-roster" id="mdqExpRoster" style="margin-top:14px"><div class="atm-empty">正在读取经验记录…</div></div>
+  </section>
+  <div class="panel full" id="mdqModuleExperimental" hidden>
+    <div id="experimentalStrategies"><div class="atm-empty">正在读取策略模版…</div></div>
   </div>
-  <div class="panel full"><div class="title">实验策略模块</div><div id="experimentalStrategies">加载中...</div></div>
   <div class="panel full market-monitor-compact">
     <div class="market-monitor-head-compact">
       <div class="title">盘面状态监控</div>
@@ -1161,14 +2474,23 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
     <div id="dialysisBox">加载中...</div>
   </div>
   <div class="panel full">
-    <div class="title">网站运行状态</div>
+    <div class="title">核心服务状态</div>
+    <div class="site-health-meta-v7" style="margin:-6px 0 10px">网站 · 自动交易功能 · 持仓 · 通知</div>
     <div id="processBox">加载中...</div>
   </div>
-  <div class="panel">
+  <div id="mdqModuleOpsSign" class="mdq-ops-sign-group full">
+    <div class="panel" id="mdqModuleActions">
     <div class="title">系统操作</div>
     <div class="row">
       <button onclick="postSimple('/api/calibrate','指标校准已发送')">核心指标校准</button>
       <button onclick="postSimple('/api/clear_signals','活跃信号已清空')">清空活跃信号</button>
+      </div>
+    </div>
+    <div class="panel" id="mdqModuleSafetyNet">
+      <div class="title">安全网</div>
+      <div class="safety-net-meta" id="safetyNetMeta">读取中…</div>
+      <div id="safetyNetBox">加载中...</div>
+      <div id="safetyNetManorStatus" hidden>系统操作 · 安全网</div>
     </div>
   </div>
   <div class="panel full">
@@ -1177,6 +2499,10 @@ th{color:var(--focus);font-weight:400;background:rgba(255,255,255,.035)}
       <div class="system-timeline-item"><div class="system-timeline-date">2026/07/17</div><div class="system-timeline-event">第一次自动化成功开仓</div></div>
       <div class="system-timeline-item"><div class="system-timeline-date">2026/07/18</div><div class="system-timeline-event">第一次自动化平仓并盈利</div></div>
       <div class="system-timeline-item"><div class="system-timeline-date">2026/07/19</div><div class="system-timeline-event">第一个纯AI策略上线系统</div></div>
+      <div class="system-timeline-item"><div class="system-timeline-date">2026/08/13</div><div class="system-timeline-event">风语者·真挚之语计划取得成功</div></div>
+      <div class="system-timeline-item"><div class="system-timeline-date">2026/08/13</div><div class="system-timeline-event">庄园世界上线</div></div>
+      <div class="system-timeline-item"><div class="system-timeline-date">2026/08/20</div><div class="system-timeline-event">安全网上线</div></div>
+      <div class="system-timeline-item"><div class="system-timeline-date">2026/08/24</div><div class="system-timeline-event">交易时段总闸上线</div></div>
     </div>
   </div>
 </div>
@@ -1205,6 +2531,26 @@ function apiGet(url){
   });
 }
 
+function apiGetTimeout(url, timeoutMs){
+  timeoutMs = timeoutMs || 5000;
+  const ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(e){} }, timeoutMs) : null;
+  const opts = ctrl ? {signal: ctrl.signal} : {};
+  return fetch(url, opts).then(function(r){
+    return r.json().catch(function(){return {};}).then(function(d){
+      if(!r.ok){throw new Error(d.error || d.message || ('请求失败 '+r.status));}
+      return d;
+    });
+  }).catch(function(err){
+    const name=err && err.name;
+    const msg=String((err && err.message) || err || '');
+    if(name==='AbortError' || /abort/i.test(msg) || /aborted/i.test(msg)){
+      throw new Error('读取超时，请再点刷新');
+    }
+    throw err;
+  }).finally(function(){ if(timer) clearTimeout(timer); });
+}
+
 function apiPost(url, body){
   return fetch(url,{
     method:'POST',
@@ -1218,29 +2564,35 @@ function apiPost(url, body){
   });
 }
 
+function strategyDisplayName(s){
+  return String((s&&s.name)||(s&&s.key)||'').replace(/（AI创造）/g,'').replace(/\(AI创造\)/g,'').replace(/^实验策略[｜|]/,'').trim();
+}
+
 function strategyTitle(s){
-  return safe((s.group||'')+'｜'+(s.direction||'')+'｜'+(s.name||s.key||''));
+  var name=strategyDisplayName(s);
+  var dir=s&&s.direction?String(s.direction):'';
+  if(dir&&name)return safe(dir+'｜'+name);
+  return safe(name||dir);
+}
+
+function isStrategyTemplate(s){
+  var group=String((s&&s.group)||'');
+  return group==='策略模版'||group==='实验策略';
 }
 
 function strategyCard(s){
-  let off = s.enabled === false;
-  let autoBlocked = s.auto_trade_eligible === false;
-  let qualification = s.auto_trade_qualification_status || (s.auto_trade_eligible===true?'已授予自动交易资格':'可回测，尚未启用自动交易');
   let timeframeText=Array.isArray(s.supported_timeframes)&&s.supported_timeframes.length?s.supported_timeframes.map(function(v){return v==='15m'?'15分钟':(v==='1h'?'1小时':v);}).join(' / '):'1小时 / 15分钟研究';
   let instrumentText=Array.isArray(s.supported_instruments)&&s.supported_instruments.length?s.supported_instruments.map(function(v){return String(v).replace('-USDT-SWAP','');}).join(' / '):'全部回测标的';
-  let recommendedRisk=s.recommended_leverage?`<div>建议回测组合：${safe(s.recommended_leverage)}x｜止损${(Number(s.recommended_stop_loss_pct||0.009)*100).toFixed(1)}%</div>`:'';
   return `
-  <details class="${off?'disabled':''}">
+  <details>
     <summary>
-      <span class="strategy-summary-title">${strategyTitle(s)} ${off?'<span class="badge badge-off">已停用</span>':''}${autoBlocked?'<span class="badge badge-blocked">可回测｜未启用自动交易</span>':''}</span>
+      <span class="strategy-summary-title">${strategyTitle(s)}</span>
       <span class="strategy-summary-meta">版本：${safe(s.version)} ｜ 最新修改：${safe(s.modified_at_beijing)}（北京时间）</span>
     </summary>
     <div class="strategy-body">
-      <div>策略名称：${safe(s.name)}</div>
+      <div>策略名称：${safe(strategyDisplayName(s))}</div>
       <div>方向：${safe(s.direction)}</div>
       <div>适用范围：${safe(instrumentText)}｜${safe(timeframeText)}</div>
-      ${recommendedRisk}
-      <div>自动交易资格：${safe(qualification)}</div>
       <div>触发条件：${safe(s.trigger)}</div>
       <div>止盈/止损：${safe(s.exit)}</div>
     </div>
@@ -1248,22 +2600,36 @@ function strategyCard(s){
 }
 
 function loadStrategyConfig(){
-  return apiGet('/api/strategy_config').then(function(data){
-    STRATEGY_CONFIG_RAW = data.config;
+  var box=document.getElementById('experimentalStrategies');
+  if(box && box.getAttribute('data-ready')!=='1'){
+    box.innerHTML='<div class="atm-empty">正在读取策略模版…</div>';
+  }
+  return apiGetTimeout('/api/strategy_config', 20000).then(function(data){
+    STRATEGY_CONFIG_RAW = data.config || {};
     STRATEGIES = STRATEGY_CONFIG_RAW.strategies || [];
     renderStrategies();
     renderBacktestSelector();
     renderEditorSelector();
+  }).catch(function(err){
+    if(box){
+      box.removeAttribute('data-ready');
+      box.innerHTML='<div class="atm-empty">策略模版读取失败：'+safe(String((err&&err.message)||err))+'</div>';
+    }
+    throw err;
   });
 }
 
 function renderStrategies(){
-  document.getElementById('experimentalStrategies').innerHTML =
-    STRATEGIES.filter(function(s){return s.group==='实验策略';}).map(strategyCard).join('') || '暂无实验策略';
+  var box=document.getElementById('experimentalStrategies');
+  if(!box) return;
+  var cards=STRATEGIES.filter(isStrategyTemplate).map(strategyCard).join('');
+  box.innerHTML = cards || '<div class="atm-empty">暂无策略模版</div>';
+  box.setAttribute('data-ready','1');
 }
 
 function renderBacktestSelector(resetSelection){
   let sel=document.getElementById('active_strat');
+  if(!sel) return;
   let old=resetSelection?[]:Array.from(sel.querySelectorAll('input:checked')).map(function(x){return x.value;});
   let instrument=(document.getElementById('bt_instrument')||{}).value||'BTC-USDT-SWAP';
   let timeframe=(document.getElementById('bt_timeframe')||{}).value||'1h';
@@ -1548,10 +2914,14 @@ function renderBacktestResult(r){
 
 function loadDialysis(){
   const timeframe=(document.getElementById('market_timeframe')||{}).value||'1h';
-  apiGet('/api/dialysis?timeframe='+encodeURIComponent(timeframe)).then(function(d){
+  return apiGetTimeout('/api/dialysis?timeframe='+encodeURIComponent(timeframe), 8000).then(function(d){
     const timeframeLabel=d.timeframe_label||(timeframe==='15m'?'15分钟':(timeframe==='5m'?'5分钟':'1小时'));
     const timeEl=document.getElementById('marketMonitorTime');
     if(timeEl) timeEl.textContent=timeframeLabel+' · '+(d.updated_at||'-');
+    if(d.building && !(Array.isArray(d.markets)&&d.markets.length)){
+      document.getElementById('dialysisBox').innerHTML='<span class="muted">盘面数据加载中…</span>';
+      return;
+    }
     const markets=Array.isArray(d.markets)&&d.markets.length?d.markets:[d];
     const rows=markets.map(function(m){
       const sym=String(m.symbol||'').replace('-USDT-SWAP','');
@@ -1569,8 +2939,56 @@ function loadDialysis(){
   });
 }
 
+function loadSafetyNet(){
+  const box=document.getElementById('safetyNetBox');
+  const meta=document.getElementById('safetyNetMeta');
+  const manor=document.getElementById('safetyNetManorStatus');
+  if(!box) return Promise.resolve();
+  return apiGetTimeout('/api/safety_net', 8000).then(function(d){
+    if(!d || d.ok===false){
+      throw new Error((d&& (d.error||d.message)) || '安全网读取失败');
+    }
+    const manual=d.manual_open||{};
+    const hitch=d.hitch_extra||{};
+    const danger=d.danger||{};
+    if(meta){
+      meta.textContent='北京日期 '+(d.beijing_date||'-')+(d.updated_at?('｜更新 '+d.updated_at):'');
+    }
+    if(manor) manor.textContent=d.summary||'系统操作 · 安全网';
+    function quotaCard(row, extraClass, extraNote){
+      const used=Number(row.used||0);
+      const limit=Number(row.limit||0);
+      const remaining=Number(row.remaining||0);
+      const pct=limit>0?Math.min(100, Math.round(used*100/limit)):0;
+      const cls=['safety-net-card'];
+      if(extraClass) cls.push(extraClass);
+      if(row.exhausted) cls.push('is-exhausted');
+      return '<div class="'+cls.join(' ')+'">'+
+        '<div class="safety-net-card-label">'+safe(row.label||'')+'</div>'+
+        '<div class="safety-net-card-count number">限额 '+limit+'｜已开 '+used+'｜剩余 '+remaining+'</div>'+
+        '<div class="progress"><div style="width:'+pct+'%"></div></div>'+
+        (extraNote?'<div class="safety-net-card-note">'+safe(extraNote)+'</div>':'')+
+      '</div>';
+    }
+    const hitchNote=hitch.note||'常规次数用尽后，与仍持仓的自动仓同标的同方向可再开';
+    const hitchClass=hitch.usable?'is-usable':'';
+    const lockClass=d.locked?'safety-net-lock is-locked':'safety-net-lock';
+    const lockText=d.locked
+      ? '账户已日锁定，次日0点自动解除'
+      : ('危险介入 '+(danger.text||((danger.used||0)+'/'+(danger.limit||3)))+'，满额将日锁定');
+    box.innerHTML='<div class="safety-net-grid">'+
+      quotaCard(manual,'', '每个北京自然日最多 '+Number(manual.limit||1)+' 次')+
+      quotaCard(hitch, hitchClass, hitchNote)+
+      '</div><div class="'+lockClass+'">'+safe(lockText)+'</div>';
+  }).catch(function(err){
+    if(meta) meta.textContent='读取失败';
+    if(manor) manor.textContent='安全网读取失败';
+    box.innerHTML='<span class="loss">安全网读取失败：'+safe(err.message||'未知错误')+'</span>';
+  });
+}
+
 function loadProcessStatus(){
-  apiGet('/api/process_status').then(function(d){
+  return apiGetTimeout('/api/process_status', 8000).then(function(d){
     const box=document.getElementById('processBox');
     box.textContent='';
     const head=document.createElement('div');
@@ -1625,7 +3043,7 @@ function loadProcessStatus(){
     });
     box.appendChild(grid);
   }).catch(function(err){
-    document.getElementById('processBox').textContent='网站运行状态读取失败：'+String(err.message||'未知错误');
+    document.getElementById('processBox').textContent='核心服务状态读取失败：'+String(err.message||'未知错误');
   });
 }
 
@@ -1642,10 +3060,11 @@ function localDatetimeValue(value){
 let BACKTEST_COVERAGE_KEY='';
 const DEFAULT_BACKTEST_START='2026-01-01T00:00';
 function loadBacktestCoverage(){
+  if(!document.getElementById('btDataCoverage')) return Promise.resolve();
   const instrument=(document.getElementById('bt_instrument')||{}).value||'BTC-USDT-SWAP';
   const timeframe=(document.getElementById('bt_timeframe')||{}).value||'1h';
   const coverageKey=instrument+'|'+timeframe;
-  apiGet('/api/backtest/data_coverage?instrument='+encodeURIComponent(instrument)+'&timeframe='+encodeURIComponent(timeframe)).then(function(data){
+  return apiGet('/api/backtest/data_coverage?instrument='+encodeURIComponent(instrument)+'&timeframe='+encodeURIComponent(timeframe)).then(function(data){
     let selected=data.selected||{};
     let gapCount=selected.non_expected_gap_count;
     if(gapCount===undefined||gapCount===null)gapCount=selected.non_hourly_gap_count;
@@ -1672,249 +3091,119 @@ function postSimple(url,msg){
   apiPost(url,{}).then(function(){alert(msg);}).catch(function(e){alert(e.message);});
 }
 
+window.loadDialysis=loadDialysis;
+window.loadProcessStatus=loadProcessStatus;
+window.loadSafetyNet=loadSafetyNet;
+window.loadStrategyConfig=loadStrategyConfig;
+window.loadBacktestCoverage=loadBacktestCoverage;
+
+(function(){
+  var side='long';
+  function expEl(id){return document.getElementById(id);}
+  function expEsc(s){
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function setSide(next){
+    side=next==='short'?'short':'long';
+    Array.prototype.forEach.call(document.querySelectorAll('.mdq-exp-side'), function(btn){
+      btn.classList.toggle('is-on', btn.getAttribute('data-side')===side);
+    });
+  }
+  function renderBoard(data){
+    var count=Number((data&&data.count)||0);
+    var countEl=expEl('mdqExpCount');
+    if(countEl) countEl.textContent=count+' 条经验';
+    var roster=expEl('mdqExpRoster');
+    if(!roster) return;
+    var rows=(data&&data.records)||[];
+    if(!rows.length){
+      roster.innerHTML='<div class="atm-empty">还没有经验记录。写下条件与结果后点保存。</div>';
+      return;
+    }
+    roster.innerHTML=rows.map(function(row){
+      var tag=row.side==='short'?'做空':'做多';
+      var cls=row.side==='short'?'short':'long';
+      return '<article class="atm-row mdq-exp-card">'+
+        '<div class="mdq-exp-card-top">'+
+          '<span class="mdq-exp-tag '+cls+'">'+expEsc(tag)+'</span>'+
+          '<span class="mdq-exp-time">'+expEsc(row.saved_at||'')+'</span>'+
+        '</div>'+
+        '<div class="mdq-exp-body">'+
+          '<div><div class="atm-field-label">条件</div><p>'+expEsc(row.condition)+'</p></div>'+
+          '<div><div class="atm-field-label">结果</div><p>'+expEsc(row.result)+'</p></div>'+
+        '</div>'+
+      '</article>';
+    }).join('');
+  }
+  function loadManualExperience(attempt){
+    attempt=Number(attempt)||0;
+    if(!expEl('mdqExpRoster')) return Promise.resolve();
+    return apiGet('/api/manual_experience').then(function(data){
+      renderBoard(data);
+    }).catch(function(err){
+      var msg=String((err&&err.message)||err||'');
+      if(attempt<4 && /502|503|Failed to fetch|NetworkError|不可用|重启/.test(msg)){
+        return new Promise(function(resolve){ setTimeout(resolve, 700+attempt*800); })
+          .then(function(){ return loadManualExperience(attempt+1); });
+      }
+      var roster=expEl('mdqExpRoster');
+      if(roster) roster.innerHTML='<div class="atm-empty">读取失败：'+expEsc(msg)+'</div>';
+    });
+  }
+  function saveManualExperience(){
+    var msg=expEl('mdqExpMsg');
+    var btn=expEl('mdqExpSave');
+    if(msg) msg.textContent='正在保存…';
+    if(btn) btn.disabled=true;
+    return apiPost('/api/manual_experience',{
+      side: side,
+      condition: (expEl('mdqExpCondition')||{}).value||'',
+      result: (expEl('mdqExpResult')||{}).value||''
+    }).then(function(data){
+      renderBoard(data);
+      if(expEl('mdqExpCondition')) expEl('mdqExpCondition').value='';
+      if(expEl('mdqExpResult')) expEl('mdqExpResult').value='';
+      if(msg) msg.textContent='已保存';
+    }).catch(function(err){
+      if(msg) msg.textContent=String(err.message||err);
+    }).then(function(){
+      if(btn) btn.disabled=false;
+    });
+  }
+  function bind(){
+    Array.prototype.forEach.call(document.querySelectorAll('.mdq-exp-side'), function(btn){
+      btn.addEventListener('click', function(){ setSide(btn.getAttribute('data-side')); });
+    });
+    var save=expEl('mdqExpSave');
+    if(save) save.addEventListener('click', saveManualExperience);
+    loadManualExperience();
+  }
+  window.loadManualExperience=loadManualExperience;
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+})();
+
 function init(){
-  loadStrategyConfig();
-  loadBacktestCoverage();
-  loadDialysis();
-  loadProcessStatus();
-  setInterval(loadDialysis,15000);
-  setInterval(loadProcessStatus,10000);
+  // 首次加载由名单完成后的串行队列负责；这里只挂定时刷新。
+  setInterval(function(){
+    if(document.hidden) return;
+    if(window.atmSerialEnqueue) window.atmSerialEnqueue('dialysis', loadDialysis);
+    else loadDialysis();
+  }, 15000);
+  setInterval(function(){
+    if(document.hidden) return;
+    if(window.atmSerialEnqueue) window.atmSerialEnqueue('process_status', loadProcessStatus);
+    else loadProcessStatus();
+  }, 30000);
+  setInterval(function(){
+    if(document.hidden) return;
+    if(window.atmSerialEnqueue) window.atmSerialEnqueue('safety_net', loadSafetyNet);
+    else loadSafetyNet();
+  }, 15000);
 }
 
 window.addEventListener('DOMContentLoaded', init);
 </script>
-
-<script id="bt-risk-controls-strict-v3">
-(function () {
-  var LEVERAGES = [20, 30, 50];
-  var STOP_LOSSES = [0.003, 0.006, 0.009];
-
-  function pctLabel(v) {
-    return (v * 100).toFixed(1) + "%";
-  }
-
-  function makeSelect(id, values, formatter, defaultValue) {
-    var sel = document.createElement("select");
-    sel.id = id;
-    sel.style.margin = "0 8px 0 4px";
-    sel.style.padding = "6px 8px";
-    sel.style.borderRadius = "6px";
-    sel.style.border = "1px solid rgba(255,255,255,0.25)";
-    sel.style.background = "rgba(0,0,0,0.18)";
-    sel.style.color = "inherit";
-
-    values.forEach(function (v) {
-      var opt = document.createElement("option");
-      opt.value = String(v);
-      opt.textContent = formatter(v);
-      if (String(v) === String(defaultValue)) opt.selected = true;
-      sel.appendChild(opt);
-    });
-
-    return sel;
-  }
-
-  function findBacktestAnchor() {
-    var nodes = Array.prototype.slice.call(document.querySelectorAll("button,input[type='button'],a"));
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
-      var text = (n.textContent || n.value || "").toLowerCase();
-      var onclick = String(n.getAttribute("onclick") || "").toLowerCase();
-      if (
-        onclick.indexOf("executebacktest") >= 0 ||
-        text.indexOf("回测") >= 0 ||
-        text.indexOf("backtest") >= 0
-      ) {
-        return n;
-      }
-    }
-    return null;
-  }
-
-  function ensureRiskControls() {
-    if (document.getElementById("btRiskControls")) return;
-
-    var wrap = document.createElement("div");
-    wrap.id = "btRiskControls";
-    wrap.style.display = "flex";
-    wrap.style.alignItems = "center";
-    wrap.style.flexWrap = "wrap";
-    wrap.style.gap = "8px";
-    wrap.style.margin = "10px 0";
-    wrap.style.padding = "10px";
-    wrap.style.border = "1px solid rgba(255,255,255,0.18)";
-    wrap.style.borderRadius = "10px";
-    wrap.style.background = "rgba(255,255,255,0.04)";
-
-    var title = document.createElement("span");
-    title.textContent = "回测风险参数";
-    title.style.fontWeight = "600";
-    title.style.marginRight = "8px";
-
-    var levLabel = document.createElement("label");
-    levLabel.textContent = "杠杆";
-    levLabel.setAttribute("for", "btLeverageSelect");
-
-    var lev = makeSelect("btLeverageSelect", LEVERAGES, function (v) { return v + "x"; }, 20);
-
-    var slLabel = document.createElement("label");
-    slLabel.textContent = "加杠杆前止损";
-    slLabel.setAttribute("for", "btStopLossSelect");
-
-    var sl = makeSelect("btStopLossSelect", STOP_LOSSES, pctLabel, 0.009);
-
-    wrap.appendChild(title);
-    wrap.appendChild(levLabel);
-    wrap.appendChild(lev);
-    wrap.appendChild(slLabel);
-    wrap.appendChild(sl);
-
-    var anchor = findBacktestAnchor();
-    if (anchor && anchor.parentNode) {
-      anchor.parentNode.insertBefore(wrap, anchor);
-    } else {
-      document.body.insertBefore(wrap, document.body.firstChild);
-    }
-  }
-
-  function getRiskParams() {
-    ensureRiskControls();
-
-    var levNode = document.getElementById("btLeverageSelect");
-    var slNode = document.getElementById("btStopLossSelect");
-
-    var leverage = levNode ? parseInt(levNode.value, 10) : 20;
-    var stopLossRatio = slNode ? parseFloat(slNode.value) : 0.009;
-
-    if (LEVERAGES.indexOf(leverage) < 0) leverage = 20;
-    if (STOP_LOSSES.indexOf(stopLossRatio) < 0) stopLossRatio = 0.009;
-
-    return {
-      leverage: leverage,
-      stop_loss_ratio: stopLossRatio,
-      stop_loss_pct: stopLossRatio
-    };
-  }
-
-  window.getBacktestRiskParams = getRiskParams;
-
-  function isBacktestUrl(url) {
-    return /\/api\/backtest(?:\?|$)/.test(String(url || "")) && String(url || "").indexOf("progress") < 0;
-  }
-
-  function injectBody(body) {
-    var obj = {};
-
-    if (typeof body === "string" && body.trim()) {
-      try {
-        obj = JSON.parse(body);
-      } catch (e) {
-        obj = {};
-      }
-    } else if (!body) {
-      obj = {};
-    } else {
-      return body;
-    }
-
-    var risk = getRiskParams();
-    obj.leverage = risk.leverage;
-    obj.stop_loss_ratio = risk.stop_loss_ratio;
-    obj.stop_loss_pct = risk.stop_loss_pct;
-
-    return JSON.stringify(obj);
-  }
-
-  function patchFetch() {
-    if (window.__btRiskFetchPatchedV3) return;
-    if (!window.fetch) return;
-
-    var oldFetch = window.fetch;
-
-    window.fetch = function (input, init) {
-      try {
-        var url = "";
-        if (typeof input === "string") {
-          url = input;
-        } else if (input && input.url) {
-          url = input.url;
-        }
-
-        if (isBacktestUrl(url)) {
-          init = init || {};
-          var method = String(init.method || "POST").toUpperCase();
-
-          if (method === "POST" || init.body) {
-            init.body = injectBody(init.body || "{}");
-            init.headers = init.headers || {};
-            if (!init.headers["Content-Type"] && !init.headers["content-type"]) {
-              init.headers["Content-Type"] = "application/json";
-            }
-          }
-        }
-      } catch (e) {}
-
-      return oldFetch.call(this, input, init);
-    };
-
-    window.__btRiskFetchPatchedV3 = true;
-  }
-
-  function patchXHR() {
-    if (window.__btRiskXHRPatchedV3) return;
-    if (!window.XMLHttpRequest) return;
-
-    var oldOpen = window.XMLHttpRequest.prototype.open;
-    var oldSend = window.XMLHttpRequest.prototype.send;
-    var oldSetHeader = window.XMLHttpRequest.prototype.setRequestHeader;
-
-    window.XMLHttpRequest.prototype.open = function (method, url) {
-      this.__btRiskMethod = method;
-      this.__btRiskUrl = url;
-      this.__btRiskHasContentType = false;
-      return oldOpen.apply(this, arguments);
-    };
-
-    window.XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
-      if (String(name || "").toLowerCase() === "content-type") {
-        this.__btRiskHasContentType = true;
-      }
-      return oldSetHeader.apply(this, arguments);
-    };
-
-    window.XMLHttpRequest.prototype.send = function (body) {
-      try {
-        if (isBacktestUrl(this.__btRiskUrl)) {
-          body = injectBody(body || "{}");
-          if (!this.__btRiskHasContentType) {
-            this.setRequestHeader("Content-Type", "application/json");
-          }
-        }
-      } catch (e) {}
-
-      return oldSend.call(this, body);
-    };
-
-    window.__btRiskXHRPatchedV3 = true;
-  }
-
-  function initRiskControls() {
-    ensureRiskControls();
-    patchFetch();
-    patchXHR();
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initRiskControls);
-  } else {
-    initRiskControls();
-  }
-
-  setTimeout(initRiskControls, 300);
-  setTimeout(initRiskControls, 1000);
-})();
-</script>
-
 
 <!-- AUTO_TRADE_CONSOLE_STAGE8_START -->
 <style>
@@ -1922,9 +3211,10 @@ window.addEventListener('DOMContentLoaded', init);
     display: none !important;
     margin: 22px 0;
     padding: 18px;
-    border: 1px solid rgba(120, 140, 170, 0.35);
-    border-radius: 14px;
-    background: rgba(20, 28, 42, 0.72);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+    box-shadow: var(--card-shadow-sm);
   }
 
   #autoTradeConsole .auto-trade-head {
@@ -1956,9 +3246,9 @@ window.addEventListener('DOMContentLoaded', init);
   #autoTradeConsole button,
   #autoTradeConsole select,
   #autoTradeConsole input {
-    border-radius: 8px;
-    border: 1px solid rgba(150, 165, 190, 0.38);
-    background: rgba(12, 18, 28, 0.92);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface);
     color: inherit;
     padding: 7px 10px;
     font-size: 13px;
@@ -1988,9 +3278,9 @@ window.addEventListener('DOMContentLoaded', init);
 
   #autoTradeConsole .auto-trade-kv {
     padding: 10px 12px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.045);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    border: 1px solid var(--line);
   }
 
   #autoTradeConsole .auto-trade-kv .k {
@@ -2169,5 +3459,207 @@ window.addEventListener('DOMContentLoaded', init);
 
 <!-- REAL_TEMP_TEST_SAFE_V52_MODULE_STAGE8_18_UI_PATCH_END -->
 
+<style id="macaron-visual-polish-v1">
+  :root{
+    --bg:#fffdf9;
+    --bg-grad-top:#fffdfa;
+    --bg-grad-mid:#fff8f5;
+    --bg-grad-bot:#fdf4ed;
+    --panel:rgba(255,255,255,.88);
+    --panel2:rgba(255,250,247,.84);
+    --line:rgba(236,170,187,.30);
+    --text:#62534f;
+    --muted:#9c8580;
+    --soft:#bca6a0;
+    --focus:#765e59;
+    --gain:#347454;
+    --loss:#b84b4d;
+    --accent:#d998a9;
+    --accent-soft:#f4ced8;
+    --surface:rgba(255,255,255,.88);
+    --surface-2:rgba(255,250,247,.80);
+    --surface-3:rgba(255,247,243,.72);
+    --surface-hover:rgba(255,235,240,.62);
+    --card-shadow:0 20px 55px rgba(142,95,91,.09),inset 0 1px 0 rgba(255,255,255,.95);
+    --card-shadow-sm:0 9px 25px rgba(142,95,91,.065),inset 0 1px 0 rgba(255,255,255,.86);
+  }
+  html{background:#fffdf9;scroll-behavior:smooth}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 8% 3%,rgba(255,214,225,.45),transparent 27%),
+      radial-gradient(circle at 92% 10%,rgba(246,222,196,.42),transparent 25%),
+      linear-gradient(155deg,#fffdf9 0%,#fff8f6 48%,#fdf3ec 100%);
+    background-attachment:fixed;
+    color:var(--text);
+  }
+  body:before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;opacity:.28;
+    background-image:radial-gradient(rgba(208,150,163,.18) .7px,transparent .7px);
+    background-size:18px 18px;
+    mask-image:linear-gradient(to bottom,black,transparent 46%);
+  }
+  .site-hero,.grid{max-width:1600px;margin-left:auto;margin-right:auto}
+  .site-hero{
+    position:relative;isolation:isolate;overflow:hidden;
+    display:flex;align-items:center;justify-content:space-between;gap:24px;
+    margin-bottom:28px;padding:23px 30px;
+    border:1px solid rgba(236,170,187,.34);border-radius:30px;
+    background:
+      linear-gradient(115deg,rgba(255,255,255,.94),rgba(255,245,247,.86) 56%,rgba(255,248,235,.88));
+    box-shadow:0 22px 60px rgba(139,92,88,.10),inset 0 1px 0 #fff;
+  }
+  .site-hero:after{
+    content:"";position:absolute;z-index:-1;width:260px;height:260px;right:-75px;top:-125px;
+    border-radius:50%;background:radial-gradient(circle,rgba(244,190,205,.34),transparent 67%);
+  }
+  .site-hero-brand{display:flex;align-items:center;gap:17px;min-width:0}
+  .site-hero-icon{
+    display:grid;place-items:center;width:58px;height:58px;flex:0 0 auto;border-radius:19px;
+    background:linear-gradient(145deg,#fff,#fff1f4);border:1px solid rgba(236,170,187,.38);
+    box-shadow:0 10px 24px rgba(180,113,132,.12),inset 0 1px 0 #fff;
+  }
+  .site-title-macaron{width:46px;height:46px;filter:drop-shadow(0 4px 5px rgba(166,91,110,.12))}
+  .site-hero-kicker{margin:0 0 4px;color:#c58d9b;font-size:10px;font-weight:700;letter-spacing:.22em}
+  .site-hero h1{margin:0;font-size:clamp(22px,2.1vw,31px);font-weight:520;letter-spacing:.08em;color:#705953;line-height:1.25}
+  .site-hero-daifuku{font-size:.82em;letter-spacing:0}
+  .site-hero-subtitle{margin-top:7px;color:var(--muted);font-size:12px;letter-spacing:.17em}
+  .site-hero-ornament{display:flex;align-items:center;gap:9px;padding-right:10px}
+  .site-hero-ornament i{display:block;width:10px;height:10px;border-radius:50%;background:#f0b7c5;box-shadow:0 0 0 6px rgba(240,183,197,.13)}
+  .site-hero-ornament i:nth-child(2){background:#edc99e;box-shadow:0 0 0 6px rgba(237,201,158,.14)}
+  .site-hero-ornament i:nth-child(3){background:#a9c7ab;box-shadow:0 0 0 6px rgba(169,199,171,.14)}
+
+  .grid{gap:25px}
+  .panel,.atm-module,.strategy-creator-module,#autoTradeConsole{
+    border-color:rgba(236,170,187,.29)!important;
+    background:linear-gradient(145deg,rgba(255,255,255,.91),rgba(255,249,247,.82))!important;
+    box-shadow:var(--card-shadow)!important;
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  }
+  .panel,.atm-module,#autoTradeConsole{border-radius:26px!important}
+  .title,.atm-module-title,.atm-section-title,.vector-daily-ledger-title-v10,.strategy-creator-title{
+    position:relative;color:#755c57!important;
+  }
+  .title:after,.atm-module-title:after{
+    content:"";display:block;width:34px;height:3px;margin-top:9px;border-radius:99px;
+    background:linear-gradient(90deg,#e7a8b8,#efd3ad);
+  }
+  .atm-section,.atm-row,.atm-pipe-card,.atm-qi-table-card,.atm-de-card,
+  .strategy-candidate-card,.strategy-creator-status,.strategy-creator-step,
+  .site-health-card-v7,#autoTradeConsole .auto-trade-card,#autoTradeConsole .auto-trade-kv{
+    border-color:rgba(236,170,187,.25)!important;
+    background:rgba(255,255,255,.68)!important;
+    box-shadow:var(--card-shadow-sm)!important;
+  }
+  details{border-color:rgba(236,170,187,.24);background:rgba(255,252,250,.74)}
+  details[open]{background:rgba(255,255,255,.84)}
+  summary{transition:color .2s ease,background .2s ease}
+  summary:hover{color:#a76476}
+
+  button,.atm-btn,.atm-tw-copy,.atm-qi-del,#autoTradeConsole button{
+    border-color:rgba(226,160,176,.36)!important;background:rgba(255,255,255,.88)!important;
+    color:#765e59!important;box-shadow:0 7px 18px rgba(157,102,102,.07)!important;
+    transition:transform .18s ease,box-shadow .18s ease,background .18s ease!important;
+  }
+  button:hover,.atm-btn:hover,.atm-tw-copy:hover,.atm-qi-del:hover,#autoTradeConsole button:hover{
+    transform:translateY(-1px);background:#fff1f4!important;box-shadow:0 10px 22px rgba(157,102,102,.11)!important;
+  }
+  .atm-btn-primary{
+    background:linear-gradient(135deg,#f7d6df,#f4ddc3)!important;border-color:rgba(213,143,160,.36)!important;
+  }
+  input,select,textarea,#autoTradeConsole select,#autoTradeConsole input{
+    border-color:rgba(226,160,176,.30)!important;background:rgba(255,255,255,.84)!important;
+    color:var(--text)!important;outline:none;transition:border .2s,box-shadow .2s,background .2s;
+  }
+  input:focus,select:focus,textarea:focus{
+    border-color:rgba(213,126,148,.58)!important;background:#fff!important;
+    box-shadow:0 0 0 4px rgba(241,184,199,.15)!important;
+  }
+
+  table,.atm-trade-table,.atm-forecast-table,.atm-de-table,.market-monitor-table,
+  .vector-latest-table-v11,#autoTradeConsole .auto-trade-events{border-collapse:separate!important;border-spacing:0!important}
+  th,td,.atm-trade-table th,.atm-trade-table td,.atm-forecast-table th,.atm-forecast-table td,
+  .atm-de-table th,.atm-de-table td,.market-monitor-table th,.market-monitor-table td,
+  .vector-latest-table-v11 th,.vector-latest-table-v11 td,
+  #autoTradeConsole .auto-trade-events th,#autoTradeConsole .auto-trade-events td{
+    border-left:0!important;border-right:0!important;border-top:0!important;
+    border-bottom:1px solid rgba(224,184,181,.22)!important;
+  }
+  th,.atm-trade-table th,.atm-forecast-table th,.atm-de-table th,.market-monitor-table th,
+  .vector-latest-table-v11 th,#autoTradeConsole .auto-trade-events th{
+    color:#8f736e!important;background:rgba(255,245,246,.72)!important;font-weight:600!important;
+    letter-spacing:.04em;
+  }
+  tbody tr td{transition:background-color .18s ease}
+  tbody tr:hover td{background:rgba(255,232,238,.48)!important}
+  tbody tr:last-child td{border-bottom:0!important}
+  .number,td[class*="number"],.atm-metric strong,.atm-metric-item strong,
+  .strategy-candidate-metric strong,#autoTradeConsole .auto-trade-kv .v{
+    font-family:ui-monospace,SFMono-Regular,Monaco,Menlo,Consolas,"Liberation Mono",monospace!important;
+    font-variant-numeric:tabular-nums lining-nums;
+  }
+
+  .badge,.bt-scope-badge,.atm-grade,.atm-count,.strategy-creator-pill,.atm-tw-slot-badge,
+  .site-health-pill-v7,#autoTradeConsole .auto-trade-status{
+    border-radius:999px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.72);
+  }
+  .atm-metric-status{
+    display:inline-flex!important;align-items:center;width:max-content;margin-top:7px!important;
+    padding:3px 8px;border-radius:999px;font-weight:650;line-height:1.2!important;
+  }
+  .atm-metric-status.pass,.site-health-pill-v7{
+    color:#277045!important;background:#e6f4ea!important;border:1px solid rgba(39,112,69,.13)!important;
+  }
+  .atm-metric-status.fail,.site-health-pill-v7.error,.badge-off{
+    color:#b33f43!important;background:#fce8e6!important;border:1px solid rgba(179,63,67,.13)!important;
+  }
+  .atm-metric-status.warn,.badge-blocked{
+    color:#96671f!important;background:#fff3d8!important;border:1px solid rgba(150,103,31,.14)!important;
+  }
+  .atm-metric-status.missing{color:#8d7d78!important;background:#f5efec!important;border:1px solid rgba(141,125,120,.12)!important}
+  .atm-metric-item.atm-gate-fail{border-color:rgba(218,104,109,.34)!important;background:rgba(252,232,230,.64)!important}
+  .atm-metric-item.atm-gate-warn{border-color:rgba(211,166,77,.34)!important;background:rgba(255,243,216,.62)!important}
+  .site-health-card-v7.error{border-color:rgba(218,104,109,.34)!important;background:rgba(252,232,230,.64)!important}
+  .site-health-card-v7.warning{border-color:rgba(211,166,77,.34)!important;background:rgba(255,243,216,.62)!important}
+  .safety-net-card{border-color:rgba(236,170,187,.25)!important;background:rgba(255,255,255,.68)!important}
+  .safety-net-card.is-exhausted{border-color:rgba(218,104,109,.34)!important;background:rgba(252,232,230,.64)!important}
+  .safety-net-card.is-usable{border-color:rgba(127,163,122,.30)!important;background:rgba(232,245,233,.55)!important}
+  .site-health-dot-v7{box-shadow:0 0 0 5px rgba(52,116,84,.09)}
+  .site-health-card-v7.error .site-health-dot-v7{box-shadow:0 0 0 5px rgba(184,75,77,.09)}
+
+  .atm-metric,.atm-metric-item,.strategy-candidate-metric{
+    border-color:rgba(233,181,191,.22)!important;background:rgba(255,250,248,.72)!important;
+  }
+  .atm-forecast-table-wrap,.vector-latest-table-wrap-v11{
+    border-color:rgba(236,170,187,.25)!important;background:rgba(255,255,255,.62)!important;
+    overflow:hidden!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+  }
+  #autoTradeConsole .s-monitoring{color:#3e6c91;background:#e9f2fa!important;border-color:#cfe1ee!important}
+  #autoTradeConsole .s-holding{color:#277045;background:#e6f4ea!important;border-color:#cce7d4!important}
+  #autoTradeConsole .s-cooldown{color:#96671f;background:#fff3d8!important;border-color:#f1dfb7!important}
+  #autoTradeConsole .s-error,#autoTradeConsole .s-stale_data{color:#b33f43;background:#fce8e6!important;border-color:#f2cecb!important}
+  #autoTradeConsole .s-paused,#autoTradeConsole .s-disabled{color:#82736f;background:#f4efed!important;border-color:#e5dad6!important}
+  #autoTradeConsole .s-blocked{color:#a35f32;background:#fff0e3!important;border-color:#efd7c2!important}
+  #autoTradeConsole .auto-trade-risk{border-top-color:rgba(224,184,181,.22)!important}
+  #autoTradeConsole .auto-trade-empty{border-color:rgba(226,160,176,.30)!important;background:rgba(255,248,246,.55)}
+
+  @media(max-width:720px){
+    body{padding:16px}
+    .site-hero{padding:18px;border-radius:23px;margin-bottom:18px}
+    .site-hero-icon{width:50px;height:50px;border-radius:16px}
+    .site-title-macaron{width:40px;height:40px}
+    .site-hero h1{font-size:20px;letter-spacing:.04em}
+    .site-hero-subtitle{font-size:10px;letter-spacing:.11em}
+    .site-hero-ornament{display:none}
+    .panel,.atm-module,#autoTradeConsole{border-radius:20px!important;padding:18px!important}
+  }
+</style>
+
+<link rel="stylesheet" href="/housekeeper/housekeeper.css?v=5">
+<link rel="stylesheet" href="/housekeeper/estate.css?v=5">
+<link rel="stylesheet" href="/housekeeper/manor-layout-20260823.css?v=holdorb6">
+<script src="/housekeeper/housekeeper-20260823.js?v=perf3"></script>
+<script src="/housekeeper/pets.js?v=6"></script>
+<script src="/housekeeper/manor-layout-20260823exp.js?v=holdorb6"></script>
 </body>
 </html>

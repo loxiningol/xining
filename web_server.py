@@ -396,12 +396,17 @@ def forecast_page():
 def api_forecast_latest():
     try:
         import auto_trade_system_forecast as forecast
+        import auto_trade_forecast_closeout as closeout
         report = forecast.load_latest() or {}
         return jsonify({
             "ok": True,
             "report": report,
             "stale": bool(report.get("stale")),
             "is_current": bool(report.get("is_current", not report.get("stale"))),
+            "refresh_running": bool(
+                report.get("lightweight_refresh_running")
+                or closeout.lightweight_refresh_in_flight()
+            ),
         })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -412,8 +417,20 @@ def api_forecast_latest():
 def api_forecast_refresh_statistical():
     try:
         import auto_trade_forecast_closeout as closeout
-        out = closeout.run_lightweight_statistical_refresh(push_wx=False)
-        return jsonify(out)
+        import auto_trade_system_forecast as forecast
+        scheduled = closeout.schedule_lightweight_refresh(
+            reason="manual_ui", detail={"source": "dashboard"})
+        report = forecast.load_latest() or {}
+        return jsonify({
+            "ok": True,
+            "started": True,
+            "scheduled": bool(scheduled.get("scheduled")),
+            "already": bool(scheduled.get("skipped")),
+            "report": report,
+            "stale": bool(report.get("stale")),
+            "is_current": bool(report.get("is_current", not report.get("stale"))),
+            "refresh_running": True,
+        })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -818,7 +835,7 @@ def api_creation_pipelines():
     """策略创造演进模块：管道1 / 管道2 实时状态。"""
     try:
         from dual_engine_workflow_v2 import parallel_creation as pc
-        return jsonify(pc.status())
+        return jsonify(pc.status(slim=True))
     except Exception as e:
         return jsonify({"ok": False, "error": str(e), "pipelines": []}), 500
 
@@ -5604,8 +5621,10 @@ def vector_safe_real_verify_v3_api():
         except Exception as e:
             return _vector_jsonify({
                 "ok": False,
-                "schema": "qiyu_hold_assist_triggers_v1",
+                "schema": "qiyu_hold_assist_board_v2",
                 "count": 0,
+                "alert_count": 0,
+                "positions": [],
                 "triggers": [],
                 "error": str(e),
             }), 500
