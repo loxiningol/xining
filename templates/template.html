@@ -746,7 +746,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
         <div class="atm-section-sub" id="atmWeeklySub">统计周期：每周一 00:00 至周日 24:00（北京时间）。下表明细仅自动开仓，不含手动。</div>
       </div>
       <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="loadWeeklySummary()">刷新</button>
+        <button type="button" class="atm-btn" onclick="loadWeeklySummary(true)">刷新</button>
         <div class="atm-count" id="atmWeeklyCount">本周</div>
       </div>
     </div>
@@ -1227,15 +1227,16 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
       ? payload.positions
       : (Array.isArray(payload&&payload.triggers)?payload.triggers:[]);
     const n=rows.length;
+    window._holdAssistHasPositions = n > 0;
     const alerts=Number(payload&&payload.alert_count);
     const alertN=Number.isFinite(alerts)?alerts:rows.filter(function(r){
       return r.status==='warn'||r.status==='urgent'||r.tier==='warn'||r.tier==='urgent';
     }).length;
     if(countEl){
-      countEl.textContent=n?(n+' 笔持仓'+(alertN?(' · '+alertN+' 条警告'):'')):'0 笔持仓';
+      countEl.textContent=n?(n+' 笔持仓'+(alertN?(' · '+alertN+' 条警告'):'')):'0 笔持仓 · 已关闭';
     }
     if(!n){
-      box.innerHTML='<div class="atm-empty">当前没有自动持仓。观风金球只看自动单，手动仓不进入。</div>';
+      box.innerHTML='<div class="atm-empty">当前没有持仓，观风金球已关闭。有仓后按半小时监测与汇报。</div>';
       return;
     }
     box.innerHTML=rows.map(function(row){
@@ -1626,7 +1627,13 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     }
     const rows=Array.isArray(payload&&payload.positions)?payload.positions:[];
     if(countEl) countEl.textContent=rows.length+' 个仓位';
+    // 持仓从无到有：重新打开观风金球轮询。
+    if(rows.length && window._holdAssistHasPositions === false){
+      window._holdAssistHasPositions = true;
+      atmSerialEnqueue('hold_assist', atmCallIfFn('loadHoldAssistTriggers'));
+    }
     if(!rows.length){
+      window._holdAssistHasPositions = false;
       box.innerHTML='<div class="atm-empty">当前没有实时持仓。</div>';
       return;
     }
@@ -2298,7 +2305,12 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     atmSerialEnqueue('strategy_config', atmCallIfFn('loadStrategyConfig'));
   },20000);
   setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('live_positions', atmCallIfFn('loadLivePositions')); },15000);
-  setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('hold_assist', atmCallIfFn('loadHoldAssistTriggers')); },15000);
+  // 观风金球：无持仓不轮询（关闭）；有持仓时 30s 刷看板，研判/微信仍按半小时槽。
+  setInterval(function(){
+    if(document.hidden) return;
+    if(window._holdAssistHasPositions === false) return;
+    atmSerialEnqueue('hold_assist', atmCallIfFn('loadHoldAssistTriggers'));
+  },15000);
   setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('daily_summary', atmCallIfFn('loadDailySummary')); },30000);
   setInterval(function(){ if(document.hidden)return; atmSerialEnqueue('weekly_summary', atmCallIfFn('loadWeeklySummary')); },30000);
   (function scheduleCstMidnightRefresh(){
