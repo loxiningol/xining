@@ -5,15 +5,16 @@ import os, json, time, uuid, tempfile, shutil
 
 ROOT = Path("/root")
 AUTO_DIR = ROOT / "auto_trade"
+import auto_trade_slot_paths as slot_paths
 SYMBOL = os.environ.get("VECTOR_TRADE_SYMBOL", "BTC-USDT-SWAP").strip().upper()
 INSTANCE_KEY = SYMBOL.split("-")[0].lower()
-INSTANCE_SUFFIX = "" if SYMBOL == "BTC-USDT-SWAP" else "_" + INSTANCE_KEY
+INSTANCE_SUFFIX = slot_paths.state_suffix(SYMBOL)
 STATE_FILE = AUTO_DIR / ("formal_v6_state%s.json" % INSTANCE_SUFFIX)
 EVENT_FILE = AUTO_DIR / ("formal_v6_events%s.jsonl" % INSTANCE_SUFFIX)
 LOCK_FILE = AUTO_DIR / ("formal_v6%s.lock" % INSTANCE_SUFFIX)
 GATE_FILE = AUTO_DIR / ("formal_live_gate%s.json" % INSTANCE_SUFFIX)
 
-TD_MODE = "cross"
+TD_MODE = "isolated"
 LEVERAGE = 20
 HARD_SZ = "0.01"
 STOP_LOSS_PCT = 0.009
@@ -370,7 +371,67 @@ def _calc_sl(side, px):
         return round(px * (1 + STOP_LOSS_PCT), 1)
     return None
 
-def _get_positions():
+def _close_td_mode(position_row=None):
+    got = str((position_row or {}).get("mgnMode") or (position_row or {}).get("tdMode") or "").strip().lower()
+    if got in ("cross", "isolated"):
+        return got
+    extra = _legacy_current_td_mode()
+    if extra:
+        return extra
+    return _td_mode()
+
+
+def _td_mode():
+    try:
+        import auto_trade_okx as okx
+        return okx.resolve_td_mode()
+    except Exception:
+        return str(globals().get("TD_MODE") or "isolated")
+
+
+def _legacy_current_td_mode(current=None):
+    """Leftover auto positions opened as cross before the isolated switch."""
+    if current is None:
+        try:
+            current = (_load_state().get("current") or {})
+        except Exception:
+            current = {}
+    if not _active(current):
+        return None
+    mode = str(current.get("td_mode") or current.get("mgnMode") or "").strip().lower()
+    if mode in ("cross", "isolated"):
+        return mode
+    return "cross"
+
+
+def _managed_td_modes(current=None):
+    modes = [_td_mode()]
+    extra = _legacy_current_td_mode(current)
+    if extra and extra not in modes:
+        modes.append(extra)
+    return modes
+
+
+def _filter_auto_rows(rows, extra_modes=None):
+    try:
+        import auto_trade_okx as okx
+        return okx.filter_auto_margin_rows(
+            rows, td_mode=_td_mode(), extra_modes=extra_modes)
+    except Exception:
+        want = set(_managed_td_modes() if extra_modes else [_td_mode()])
+        if extra_modes:
+            want.update(extra_modes)
+        out = []
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            got = str(row.get("mgnMode") or row.get("tdMode") or "").strip().lower()
+            if (not got) or got in want:
+                out.append(row)
+        return out
+
+
+def _get_positions(for_manage=False):
     raw = _okx_request("GET", "/api/v5/account/positions", params={"instType": "SWAP", "instId": SYMBOL}, auth=True)
     if not _strict_code_ok(raw):
         return {"ok": False, "positions": [], "raw": raw}
@@ -378,10 +439,12 @@ def _get_positions():
     for p in raw.get("data") or []:
         if isinstance(p, dict) and p.get("instId") == SYMBOL and abs(_safe_float(p.get("pos"), 0.0) or 0.0) > 0:
             out.append(p)
+    extra = _managed_td_modes() if for_manage else None
+    out = _filter_auto_rows(out, extra_modes=extra)
     return {"ok": True, "positions": out, "raw": raw}
 
 def _find_position(posSide):
-    res = _get_positions()
+    res = _get_positions(for_manage=True)
     if not res.get("ok"):
         return {"ok": False, "position": None, "raw": res}
     for p in res.get("positions") or []:
@@ -394,6 +457,7 @@ def _pending_orders():
     if not _strict_code_ok(raw):
         return {"ok": False, "orders": [], "raw": raw}
     out = [r for r in (raw.get("data") or []) if isinstance(r, dict) and r.get("instId") == SYMBOL]
+    out = _filter_auto_rows(out)
     return {"ok": True, "orders": out, "raw": raw}
 
 def _pending_algos_fail_closed():
@@ -411,6 +475,7 @@ def _pending_algos_fail_closed():
         except Exception as e:
             failed.append({"ordType": typ, "error": str(e)})
             raw_all.append({"ordType": typ, "error": str(e)})
+    merged = _filter_auto_rows(merged, extra_modes=_managed_td_modes())
     if failed:
         return {"ok": False, "algo_orders": merged, "failed_queries": failed, "raw": raw_all, "error": "pending algo query failed closed"}
     return {"ok": True, "algo_orders": merged, "raw": raw_all}
@@ -427,6 +492,7 @@ def _pending_algos_loose():
                         merged.append(r)
         except Exception as e:
             raw_all.append({"ordType": typ, "error": str(e)})
+    merged = _filter_auto_rows(merged, extra_modes=_managed_td_modes())
     return {"ok": True, "algo_orders": merged, "raw": raw_all}
 
 def preflight():
@@ -437,7 +503,9 @@ def preflight():
     if not pos.get("ok"):
         return {"ok": False, "error": "cannot read positions", "positions": pos}
     if pos.get("positions"):
-        return {"ok": False, "blocked": True, "error": "OKX already has BTC position", "positions": pos.get("positions")}
+        return {"ok": False, "blocked": True,
+                "error": "OKX already has %s isolated position" % SYMBOL,
+                "positions": pos.get("positions")}
     po = _pending_orders()
     if not po.get("ok"):
         return {"ok": False, "error": "cannot read pending orders", "pending": po}
@@ -451,7 +519,9 @@ def preflight():
     return {"ok": True, "positions": pos, "pending_orders": po, "pending_algos": pa}
 
 def _set_leverage(posSide, leverage=None):
-    body = {"instId": SYMBOL, "lever": str(int(leverage if leverage is not None else _active_leverage())), "mgnMode": TD_MODE, "posSide": posSide}
+    applied = _normalize_leverage(
+        leverage if leverage is not None else _active_leverage())
+    body = {"instId": SYMBOL, "lever": _leverage_text(applied), "mgnMode": _td_mode(), "posSide": posSide}
     raw = _okx_request("POST", "/api/v5/account/set-leverage", body=body, auth=True)
     ok = _strict_code_ok(raw)
     row_ok = True
@@ -858,7 +928,7 @@ def _build_entry_payload(side):
         "stop_loss_price": sl,
         "payload": {"attachAlgoClOrdId": attach_id, "slTriggerPx": str(sl), "slTriggerPxType": "last", "slOrdPx": "-1"}
     }
-    payload = {"instId": SYMBOL, "tdMode": TD_MODE, "side": mp["order_side"], "posSide": mp["posSide"], "ordType": "market", "sz": HARD_SZ, "clOrdId": clid, "attachAlgoOrds": [attached["payload"]]}
+    payload = {"instId": SYMBOL, "tdMode": _td_mode(), "side": mp["order_side"], "posSide": mp["posSide"], "ordType": "market", "sz": HARD_SZ, "clOrdId": clid, "attachAlgoOrds": [attached["payload"]]}
     return {"ok": True, "side_map": mp, "payload": payload, "attached_stop_loss": attached, "clOrdId": clid}
 
 def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm=None, sz="0.01", source="formal_auto_trade", arm_token=None, internal_auto=False):
@@ -911,6 +981,8 @@ def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm
             "order_side": mp["order_side"],
             "close_side": mp["close_side"],
             "posSide": mp["posSide"],
+            "td_mode": _td_mode(),
+            "mgnMode": _td_mode(),
             "sz": HARD_SZ,
             "leverage": LEVERAGE,
             "opened_at": _now(),
@@ -997,6 +1069,15 @@ def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm
             return {"ok": False, "opened": True, "error": "entry payload had attachAlgoOrds but attached SL not verified; recovery close attempted", "current": cur, "close": close_res}
 
         _append_event("strategy_opened", {"side": mp["side"], "price": cur.get("entry_price"), "sz": cur.get("real_position_sz"), "entry_order_payload": payload, "attached_stop_loss": attached, "stop_algo_id": attached.get("algoId")}, strategy_key)
+        try:
+            import auto_trade_roster_display_metrics as _roster_metrics
+            _roster_metrics.on_live_trade_opened(
+                SYMBOL,
+                os.environ.get("VECTOR_TRADE_TIMEFRAME", TRADE_TIMEFRAME or "1h"),
+                strategy_key,
+            )
+        except Exception:
+            pass
         return {"ok": True, "opened": True, "formal_executor": True, "temp_test": False, "entry_order_payload_has_attachAlgoOrds": True, "attached_to_entry_order": True, "exchange_side_stop_verified": True, "current": cur, "open_order": open_order}
     finally:
         _lock_release(lock)
@@ -1023,7 +1104,7 @@ def close_current(reason="formal_manual_close"):
             return {"ok": False, "closed": False, "current_preserved": True, "error": "cannot read position before close", "position": pos}
         if pos.get("position"):
             real_sz = str(abs(_safe_float(pos["position"].get("pos"), 0.0) or 0.0))
-            close_payload = {"instId": SYMBOL, "tdMode": TD_MODE, "side": mp["close_side"], "posSide": mp["posSide"], "ordType": "market", "sz": real_sz, "reduceOnly": "true", "clOrdId": "fcl" + uuid.uuid4().hex[:25]}
+            close_payload = {"instId": SYMBOL, "tdMode": _close_td_mode(pos.get("position")), "side": mp["close_side"], "posSide": mp["posSide"], "ordType": "market", "sz": real_sz, "reduceOnly": "true", "clOrdId": "fcl" + uuid.uuid4().hex[:25]}
             raw = _okx_request("POST", "/api/v5/trade/order", body=close_payload, auth=True)
             ack = _strict_order_ack(raw)
             close_order = {"ok": ack.get("ok"), "payload": close_payload, "ack": ack, "raw": raw}
@@ -1081,6 +1162,7 @@ def close_current(reason="formal_manual_close"):
         closed["close_order"] = close_order
         closed["position_absent_verified"] = absent
         closed["cancel_attached_sl"] = cancel
+        closed = _attach_close_growth(closed)
         st.setdefault("history", []).append(closed)
         st["current"] = None
         _save_state(st)
@@ -1213,9 +1295,9 @@ def _stage822_fake_okx_factory():
             if body.get("reduceOnly") == "true":
                 state["positions"] = []
             else:
-                state["positions"] = [{"instId": SYMBOL, "posSide": body.get("posSide"), "pos": body.get("sz"), "avgPx": "100.0"}]
+                state["positions"] = [{"instId": SYMBOL, "posSide": body.get("posSide"), "pos": body.get("sz"), "avgPx": "100.0", "mgnMode": body.get("tdMode") or "isolated"}]
                 attach = (body.get("attachAlgoOrds") or [{}])[0]
-                state["pending_algos"].append({"instId": SYMBOL, "algoId": "algo_attached_1", "algoClOrdId": attach.get("attachAlgoClOrdId"), "attachAlgoClOrdId": attach.get("attachAlgoClOrdId"), "side": "sell" if body.get("side") == "buy" else "buy", "posSide": body.get("posSide"), "ordType": "conditional", "slTriggerPx": attach.get("slTriggerPx"), "slOrdPx": attach.get("slOrdPx")})
+                state["pending_algos"].append({"instId": SYMBOL, "algoId": "algo_attached_1", "algoClOrdId": attach.get("attachAlgoClOrdId"), "attachAlgoClOrdId": attach.get("attachAlgoClOrdId"), "side": "sell" if body.get("side") == "buy" else "buy", "posSide": body.get("posSide"), "ordType": "conditional", "slTriggerPx": attach.get("slTriggerPx"), "slOrdPx": attach.get("slOrdPx"), "tdMode": body.get("tdMode") or "isolated"})
             return {"code": "0", "data": [{"ordId": oid, "clOrdId": body.get("clOrdId"), "sCode": "0", "sMsg": ""}]}
         if path == "/api/v5/trade/order" and method == "GET":
             oid = params.get("ordId")
@@ -1299,16 +1381,9 @@ import tempfile as _stage823_tempfile
 
 POSITION_MODE = "full_balance"
 TAKE_PROFIT_PCT = Decimal("0.009")
-TRADE_TIMEFRAME = os.environ.get("VECTOR_TRADE_TIMEFRAME", "1h").strip().lower()
-TRADE_TIMEFRAME = (
-    "5m" if TRADE_TIMEFRAME in ("5m", "5min", "5minute")
-    else ("15m" if TRADE_TIMEFRAME in ("15m", "15min", "15minute") else "1h")
-)
-CONFIG_INSTANCE_SUFFIX = (
-    "_" + INSTANCE_KEY + "_" + TRADE_TIMEFRAME
-    if TRADE_TIMEFRAME in ("15m", "5m")
-    else INSTANCE_SUFFIX
-)
+TRADE_TIMEFRAME = slot_paths.normalize_timeframe(
+    os.environ.get("VECTOR_TRADE_TIMEFRAME", "1h"))
+CONFIG_INSTANCE_SUFFIX = slot_paths.instance_suffix(SYMBOL, TRADE_TIMEFRAME)
 DAEMON_CONFIG_FILE = AUTO_DIR / (
     "formal_daemon_config%s.json" % CONFIG_INSTANCE_SUFFIX
 )
@@ -1325,6 +1400,23 @@ def _decimal_to_plain(x):
     s = format(Decimal(x), "f")
     return s.rstrip("0").rstrip(".") if "." in s else s
 
+
+def _attach_close_growth(closed):
+    """Persist growth_pct so weekly geo can see exchange stops without exit_price."""
+    closed = closed if isinstance(closed, dict) else {}
+    if closed.get("growth_pct") not in (None, ""):
+        return closed
+    try:
+        import auto_trade_geo_reality as geo
+        growth = geo.infer_close_growth_pct(closed)
+    except Exception:
+        growth = None
+    if growth is None:
+        return closed
+    closed["growth_pct"] = round(float(growth), 6)
+    closed["growth_pct_source"] = "pnl_over_margin"
+    return closed
+
 def _floor_to_step(value, step):
     value, step = _d(value), _d(step)
     return value if step <= 0 else (value / step).to_integral_value(rounding=ROUND_DOWN) * step
@@ -1333,20 +1425,70 @@ def _ceil_to_step(value, step):
     value, step = _d(value), _d(step)
     return value if step <= 0 else (value / step).to_integral_value(rounding=ROUND_CEILING) * step
 
+def _normalize_stop_loss_pct(value, default=0.009):
+    """Accept any explicit, finite price-risk fraction in (0, 1).
+
+    Creator-authored strategies are no longer restricted to a preset menu.
+    Invalid or absent platform configuration still falls back to the legacy
+    safe default, but a valid value such as 0.0078 must never be rewritten.
+    """
+    try:
+        value = float(value)
+    except Exception:
+        return float(default)
+    if value != value or value <= 0.0 or value >= 1.0:
+        return float(default)
+    return value
+
+def _normalize_leverage(value, default=20.0):
+    """Preserve an explicit finite leverage, including decimal values."""
+    try:
+        value = float(value)
+    except Exception:
+        value = float(default)
+    if value != value or value <= 0.0 or value > 125.0:
+        value = float(default)
+    if 0.0 < value < 1.0:
+        value = 1.0
+    return round(value, 4)
+
+
+def _leverage_text(value):
+    return ("%.4f" % _normalize_leverage(value)).rstrip("0").rstrip(".")
+
+
 def _load_stage823_trade_config():
     cfg = _read_json(DAEMON_CONFIG_FILE, {})
     if not isinstance(cfg, dict):
         cfg = {}
-    leverage = int(cfg.get("leverage", 20))
-    stop_loss_pct = float(cfg.get("stop_loss_pct", 0.009))
-    if leverage not in (20, 30, 50):
-        leverage = 20
-    if stop_loss_pct not in (0.003, 0.006, 0.009):
-        stop_loss_pct = 0.009
-    return {"position_mode": "full_balance", "full_position_ratio": cfg.get("full_position_ratio", 1.0), "reserve_usdt": cfg.get("reserve_usdt", 0), "fee_buffer_usdt": cfg.get("fee_buffer_usdt", 0), "leverage": leverage, "stop_loss_pct": stop_loss_pct, "take_profit_pct": cfg.get("take_profit_pct", 0.009), "notification_enabled": bool(cfg.get("notification_enabled", True)), "formal_auto_trading_authorized": bool(cfg.get("formal_auto_trading_authorized", False))}
+    leverage = _normalize_leverage(cfg.get("leverage", 20))
+    stop_loss_pct = _normalize_stop_loss_pct(cfg.get("stop_loss_pct", 0.009))
+    out = {"position_mode": "full_balance", "full_position_ratio": cfg.get("full_position_ratio", 1.0), "reserve_usdt": cfg.get("reserve_usdt", 0), "fee_buffer_usdt": cfg.get("fee_buffer_usdt", 0), "leverage": leverage, "stop_loss_pct": stop_loss_pct, "take_profit_pct": cfg.get("take_profit_pct", 0.009), "notification_enabled": bool(cfg.get("notification_enabled", True)), "formal_auto_trading_authorized": bool(cfg.get("formal_auto_trading_authorized", False))}
+    mapping = cfg.get("strategy_leverages")
+    if isinstance(mapping, dict):
+        out["strategy_leverages"] = dict(mapping)
+    return out
+
+
+def _resolve_entry_leverage(strategy_key, leverage_override=None, cfg=None):
+    """Per-strategy leverage for preflight, notify, and set-leverage."""
+    if cfg is None:
+        cfg = _load_stage823_trade_config()
+    try:
+        import auto_trade_dynamic_leverage as dynamic_leverage
+        picked = dynamic_leverage.pick_from_config(
+            cfg, strategy_key, override=leverage_override)
+    except Exception as exc:
+        return {"ok": False, "error": "strategy leverage lookup failed: %s" % exc,
+                "leverage": None, "source": None}
+    if not picked.get("ok"):
+        return picked
+    out = dict(picked)
+    out["leverage"] = _normalize_leverage(out.get("leverage"))
+    return out
 
 def _active_leverage():
-    return int(_load_stage823_trade_config().get("leverage", 20))
+    return _normalize_leverage(_load_stage823_trade_config().get("leverage", 20))
 
 def _active_stop_loss_pct():
     return float(_load_stage823_trade_config().get("stop_loss_pct", 0.009))
@@ -1363,6 +1505,8 @@ def _maybe_notify(kind, payload):
             return notify.notify_open_success(payload.get("current") or {}, payload.get("open_order") or {})
         if kind == "open_failed":
             return notify.notify_open_failed(payload)
+        if kind == "open_skipped":
+            return notify.notify_open_skipped(payload)
         if kind == "risk":
             return notify.notify_risk(payload)
         if kind == "close":
@@ -1371,6 +1515,67 @@ def _maybe_notify(kind, payload):
         return {"ok": False, "sent": False, "audit_logged": False, "error": str(e)}
     return {"ok": False, "sent": False, "audit_logged": False, "error": "unknown notification kind"}
 
+
+def _entry_notify_payload(side, strategy_key, leverage, error=None, extra=None):
+    payload = {
+        "side": side,
+        "strategy_key": strategy_key,
+        "strategy_name": _formal_strategy_name(strategy_key),
+        "symbol": SYMBOL,
+        "timeframe": TRADE_TIMEFRAME,
+        "leverage": leverage,
+        "td_mode": _td_mode(),
+        "error": error,
+        "time": _now(),
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def _is_capital_skip(result):
+    if not isinstance(result, dict):
+        return False
+    if result.get("occupancy_skip") or result.get("entry_skip") or result.get("odds_drawdown_skip"):
+        return True
+    blob = "%s %s" % (result.get("error") or "", result.get("reason") or "")
+    sizing = result.get("sizing")
+    if isinstance(sizing, dict):
+        blob += " %s" % (sizing.get("error") or "")
+    try:
+        import auto_trade_portfolio_risk as portfolio_risk
+        reason = getattr(portfolio_risk, "ODDS_ENTRY_BLOCK_REASON", "风险情况下限制入场")
+    except Exception:
+        reason = "风险情况下限制入场"
+    return (
+        "insufficient available margin" in blob
+        or "full balance sizing failed" in blob
+        or "OKX max-size <= 0" in blob
+        or reason in blob
+    )
+
+
+def _notify_open_blocked(result, side, strategy_key, leverage, extra=None):
+    payload = _entry_notify_payload(side, strategy_key, leverage,
+                                   error=(result or {}).get("error"), extra=extra)
+    if isinstance(result, dict):
+        if result.get("occupancy"):
+            payload["occupancy"] = result.get("occupancy")
+        if result.get("occupancy_fingerprint"):
+            payload["occupancy_fingerprint"] = result.get("occupancy_fingerprint")
+        if result.get("needed_ratio") is not None:
+            payload["needed_ratio"] = result.get("needed_ratio")
+        if result.get("sizing"):
+            payload["sizing"] = result.get("sizing")
+        if result.get("reason") is not None and "sizing" not in payload:
+            payload["reason"] = result.get("reason")
+        if result.get("strategy_tier"):
+            payload["strategy_tier"] = result.get("strategy_tier")
+        if result.get("full_position_ratio") is not None:
+            payload["full_position_ratio"] = result.get("full_position_ratio")
+    kind = "open_skipped" if _is_capital_skip(result) or _is_capital_skip(payload) else "open_failed"
+    return _notification_result_fields(_maybe_notify(kind, payload))
+
 def _notification_result_fields(notify_res):
     return {"notification_sent": bool((notify_res or {}).get("sent")), "notification_logged": bool((notify_res or {}).get("audit_logged")), "notification_audit_logged": bool((notify_res or {}).get("audit_logged")), "notification_real_channel_ready": bool((notify_res or {}).get("notification_real_channel_ready")), "notification_error": (notify_res or {}).get("notification_error") or (notify_res or {}).get("error"), "notification": notify_res}
 
@@ -1378,10 +1583,10 @@ def get_trade_config():
     return _load_stage823_trade_config()
 
 def confirm_text(side):
-    return "FORMAL_AUTO_TRADE:%s:%s:FULL_BALANCE:%sx:ATTACHED_SL" % (side, SYMBOL, _active_leverage())
+    return "FORMAL_AUTO_TRADE:%s:%s:FULL_BALANCE:%sx:ATTACHED_SL" % (side, SYMBOL, _leverage_text(_active_leverage()))
 
 def gate_confirm_text():
-    return "ENABLE_FORMAL_AUTO_TRADE:%s:FULL_BALANCE:%sx" % (SYMBOL, _active_leverage())
+    return "ENABLE_FORMAL_AUTO_TRADE:%s:FULL_BALANCE:%sx" % (SYMBOL, _leverage_text(_active_leverage()))
 
 def _enforce_size(sz):
     return {"ok": True, "sz": "FULL_BALANCE", "position_mode": "full_balance", "ignored_requested_sz": None if sz in [None, "", "auto", "AUTO", "full_balance", "FULL_BALANCE"] else str(sz)}
@@ -1455,7 +1660,10 @@ def _get_instrument_info():
     return {"ok": True, "instrument": row, "ctVal": row.get("ctVal"), "lotSz": row.get("lotSz"), "minSz": row.get("minSz"), "tickSz": row.get("tickSz"), "raw": raw}
 
 def _get_okx_max_size(side):
-    raw = _okx_request("GET", "/api/v5/account/max-size", params={"instId": SYMBOL, "tdMode": TD_MODE}, auth=True)
+    params = {"instId": SYMBOL, "tdMode": _td_mode()}
+    if _td_mode() == "isolated":
+        params["posSide"] = "short" if side == "short" else "long"
+    raw = _okx_request("GET", "/api/v5/account/max-size", params=params, auth=True)
     if not _strict_code_ok(raw):
         return {"ok": False, "error": "max-size query failed", "raw": raw}
     rows = raw.get("data") or []
@@ -1498,7 +1706,7 @@ def compute_full_balance_order_size(side=None, full_position_ratio=None, reserve
     lot_sz = _d(inst.get("lotSz"), "1")
     min_sz = _d(inst.get("minSz"), "1")
     tick_sz = _d(inst.get("tickSz"), "0.1")
-    trade_leverage = int(leverage if leverage is not None else cfg.get("leverage", 20))
+    trade_leverage = _normalize_leverage(leverage if leverage is not None else cfg.get("leverage", 20))
     raw_contracts = sizing_base * ratio * Decimal(str(trade_leverage)) / (price * ct_val)
     theoretical_sz = _floor_to_step(raw_contracts, lot_sz)
     max_sz = _floor_to_step(_d(max_size.get("max_size"), "0"), lot_sz)
@@ -1597,7 +1805,7 @@ def _build_entry_payload(side, leverage=None, stop_loss_pct=None,
     clid = "fae" + uuid.uuid4().hex[:25]
     attach_id = ("fasl" + uuid.uuid4().hex)[:32]
     attached = {"style": "formal_entry_attachAlgoOrds_sl", "attachAlgoClOrdId": attach_id, "logical_side": mp["side"], "reference_price": sizing.get("price"), "reference_price_info": sizing.get("ticker"), "stop_loss_price": sl, "stop_loss_pct": trade_stop_loss_pct, "stop_loss_risk": float(risk), "stop_loss_risk_not_exceed_configured_pct": True, "payload": {"attachAlgoClOrdId": attach_id, "slTriggerPx": str(sl), "slTriggerPxType": "last", "slOrdPx": "-1"}}
-    payload = {"instId": SYMBOL, "tdMode": TD_MODE, "side": mp["order_side"], "posSide": mp["posSide"], "ordType": "market", "sz": str(sizing.get("sz")), "clOrdId": clid, "attachAlgoOrds": [attached["payload"]]}
+    payload = {"instId": SYMBOL, "tdMode": _td_mode(), "side": mp["order_side"], "posSide": mp["posSide"], "ordType": "market", "sz": str(sizing.get("sz")), "clOrdId": clid, "attachAlgoOrds": [attached["payload"]]}
     return {"ok": True, "side_map": mp, "payload": payload, "attached_stop_loss": attached, "clOrdId": clid, "sizing": sizing}
 
 def _consume_arm_locked(st, side, sz, arm_token, internal_auto=False):
@@ -1622,7 +1830,8 @@ def _consume_arm_locked(st, side, sz, arm_token, internal_auto=False):
     return {"ok": True, "arm_consumed": True, "armed": armed}
 
 def _formal_strategy_name(strategy_key):
-    return {
+    key = str(strategy_key or "")
+    known = {
         "ema6_center_down_then_fall": "EMA6居中后再下行",
         "ema7_center_down_short": "EMA6居中后再下行",
         "conventional_up_break_long": "常规上升排列突破",
@@ -1630,7 +1839,7 @@ def _formal_strategy_name(strategy_key):
         "conventional_down_arrangement_bottom_up_long": "常规下跌排列筑底上行",
         "cci_75_100": "EMA7上升趋势回踩续涨",
         "ema53_liquidity_sweep_reclaim_long": "EMA53缓升｜36小时低点扫荡收回（AI创造）",
-        "cci_neg60_neg110_short": "CCI负60-负110下行中再下行",
+        "ema8_mainwave_long": "EMA8主升浪",
         "btc15_dual_cycle_downtrend_reentry_short_ai": "双周期下跌加速再死叉（AI创造）",
         "conventional_up_arrangement_valid_death_cross_short": "常规上升排列有效死叉",
         "btc5_exhaustion_reclaim_long_ai": "BTC 5分钟超跌收回（AI创造）",
@@ -1638,12 +1847,70 @@ def _formal_strategy_name(strategy_key):
         "ng5_exhaustion_fade_short_ai": "NG 5分钟冲高衰竭回落（AI创造）",
         "ng5_session_exhaustion_reclaim_long_ai": "NG 5分钟时段超跌收回（AI创造）",
         "xag5_session_breakdown_short_ai": "XAG 5分钟时段顺势破位（AI创造）",
-        "ltc5_exhaustion_fade_short_ai": "LTC 5分钟冲高衰竭回落（AI创造）",
         "ada5_session_trend_pullback_short_ai": "ADA 5分钟时段趋势反抽（AI创造）",
         "xau15_h1_breakout_long_ai": "XAU 15分钟顺势放量突破（AI创造）",
-    }.get(str(strategy_key or ""), str(strategy_key or "未命名策略"))
+        "frost_xrp_rescue_h20_t45": "XRP15冲高衰竭回落",
+        "codex0725t3_ada5m_trendpb_r42_z2p3_h14": "ADA5顺势回升",
+        "ada5m_bopb_asia_o20_r42_z2p3": "ADA5亚盘突破回踩",
+        "frost3_btc1h_xrpport_exhaustion_fade_slope": "BTC1h冲高衰竭回落",
+    }.get(key)
+    if known:
+        return known
+    for path in (
+        ROOT / "strategy_configs" / "semantic_live_strategies.json",
+        ROOT / "strategy_configs" / "ai_dsl_strategies.json",
+    ):
+        payload = _read_json(path, {"strategies": []})
+        for row in payload.get("strategies") or []:
+            if row.get("key") == key:
+                return row.get("name") or key
+    return key or "未命名策略"
 
-def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm=None, sz="FULL_BALANCE", source="formal_auto_trade", arm_token=None, internal_auto=False, entry_data=None, full_position_ratio_override=None):
+
+def _day_lock_cash_release_for_open():
+    """If day-lock parked USDT as USDC, sell it back so sizing can see cash."""
+    try:
+        import auto_trade_force_protect as _fp
+        if not _fp.day_lock_active():
+            return False
+        helped = _fp.release_usdc_for_auto_open()
+        return bool((helped or {}).get("window"))
+    except Exception:
+        return False
+
+
+def _day_lock_cash_repark_after_open(cash_helped):
+    if not cash_helped:
+        return
+    try:
+        import auto_trade_force_protect as _fp
+        _fp.repark_usdt_after_auto_open()
+    except Exception:
+        pass
+
+
+def _day_lock_mark_auto_close(closed=None):
+    """If day-locked, next USDT from this auto close should repark without a danger warning."""
+    try:
+        import auto_trade_force_protect as _fp
+        if not _fp.day_lock_active():
+            return
+        snap = {}
+        if isinstance(closed, dict):
+            snap = {
+                "inst_id": closed.get("inst_id") or closed.get("symbol"),
+                "symbol": closed.get("symbol") or closed.get("inst_id"),
+                "side": closed.get("side"),
+                "strategy_key": closed.get("strategy_key"),
+                "strategy_title": closed.get("strategy_title") or closed.get("strategy_name"),
+                "reason": closed.get("close_reason") or closed.get("reason"),
+            }
+        _fp.begin_auto_close_repark_window(snap=snap)
+    except Exception:
+        pass
+
+
+def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm=None, sz="FULL_BALANCE", source="formal_auto_trade", arm_token=None, internal_auto=False, entry_data=None, full_position_ratio_override=None, stop_loss_pct_override=None, leverage_override=None):
     mp = _side_map(side)
     if not mp:
         return {"ok": False, "error": "side must be long or short"}
@@ -1653,23 +1920,33 @@ def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm
     if not gate.get("ok"):
         return gate
     trade_cfg = _load_stage823_trade_config()
-    trade_leverage = int(trade_cfg.get("leverage", 20))
-    trade_stop_loss_pct = float(trade_cfg.get("stop_loss_pct", 0.009))
+    leverage_pick = _resolve_entry_leverage(
+        strategy_key, leverage_override=leverage_override, cfg=trade_cfg)
+    if not leverage_pick.get("ok"):
+        return {"ok": False, "blocked": True, "fail_closed": True,
+                "error": leverage_pick.get("error") or "strategy leverage missing",
+                "strategy_key": strategy_key, "leverage_pick": leverage_pick}
+    trade_leverage = leverage_pick.get("leverage")
+    trade_stop_loss_pct = _normalize_stop_loss_pct(
+        stop_loss_pct_override,
+        default=trade_cfg.get("stop_loss_pct", 0.009),
+    )
     lock = _lock_acquire("formal_submit_entry", ttl=90)
     if not lock:
         return {"ok": False, "blocked": True, "error": "formal executor lock busy"}
+    cash_helped = False
     try:
         st = _load_state()
         if _active(st.get("current")):
             return {"ok": False, "blocked": True, "error": "formal current exists", "current": st.get("current")}
         pre = preflight()
         if not pre.get("ok"):
-            pre.update(_notification_result_fields(_maybe_notify("open_failed", {"side": mp["side"], "error": pre.get("error") or "preflight failed", "leverage": trade_leverage})))
+            pre.update(_notify_open_blocked(pre, mp["side"], strategy_key, trade_leverage))
             return pre
         lev = _set_leverage(mp["posSide"], leverage=trade_leverage)
         if not lev.get("ok"):
             out = {"ok": False, "error": "set leverage failed", "leverage": lev}
-            out.update(_notification_result_fields(_maybe_notify("open_failed", {"side": mp["side"], "error": "set leverage failed", "leverage": trade_leverage})))
+            out.update(_notify_open_blocked(out, mp["side"], strategy_key, trade_leverage))
             return out
         configured_ratio = float(trade_cfg.get("full_position_ratio", 1.0))
         grade_ratio = 1.0 if full_position_ratio_override is None else float(full_position_ratio_override)
@@ -1682,13 +1959,35 @@ def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm
         # contribute only about +0.56% to account equity after costs.
         effective_ratio = _effective_position_ratio(
             configured_ratio, full_position_ratio_override)
+        cash_helped = _day_lock_cash_release_for_open()
         built = _build_entry_payload(
             mp["side"], leverage=trade_leverage,
             stop_loss_pct=trade_stop_loss_pct,
             full_position_ratio=effective_ratio,
         )
         if not built.get("ok"):
-            built.update(_notification_result_fields(_maybe_notify("open_failed", {"side": mp["side"], "error": built.get("error"), "reason": built.get("sizing"), "leverage": trade_leverage})))
+            extra = {
+                "needed_ratio": effective_ratio,
+                "full_position_ratio": effective_ratio,
+                "sizing": built.get("sizing") or built.get("reason"),
+            }
+            if _is_capital_skip(built):
+                try:
+                    import auto_trade_portfolio_risk as portfolio_risk
+                    pos = _account_wide_open_positions()
+                    occ = portfolio_risk.reserved_capital(
+                        pos.get("positions") if pos.get("ok") else [])
+                    extra["occupancy"] = occ
+                    extra["occupancy_fingerprint"] = portfolio_risk.occupancy_fingerprint(
+                        occ, effective_ratio, SYMBOL)
+                    extra["occupancy_skip"] = True
+                    built["occupancy_skip"] = True
+                    built["error"] = "资金占用不足，无法按本策略档位开仓"
+                except Exception:
+                    extra["occupancy_skip"] = True
+                    built["occupancy_skip"] = True
+            built.update(_notify_open_blocked(
+                built, mp["side"], strategy_key, trade_leverage, extra=extra))
             return built
         payload = built["payload"]
         attached = built["attached_stop_loss"]
@@ -1698,7 +1997,7 @@ def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm
         arm_check = _consume_arm_locked(st, mp["side"], payload.get("sz"), arm_token, internal_auto=internal_auto)
         if not arm_check.get("ok"):
             return arm_check
-        cur = {"position_id": "formal_v6_" + uuid.uuid4().hex, "execution_id": "exec_formal_v6_" + uuid.uuid4().hex, "strategy_key": strategy_key, "strategy_name": _formal_strategy_name(strategy_key), "entry_data": dict(entry_data or {}), "source": source, "status": "opening", "symbol": SYMBOL, "side": mp["side"], "order_side": mp["order_side"], "close_side": mp["close_side"], "posSide": mp["posSide"], "position_mode": "full_balance", "full_position_ratio": sizing.get("full_position_ratio"), "configured_position_ratio": configured_ratio, "strategy_grade_ratio": grade_ratio, "reserve_usdt": sizing.get("reserve_usdt"), "fee_buffer_usdt": sizing.get("fee_buffer_usdt"), "sz": payload.get("sz"), "sizing": sizing, "leverage": trade_leverage, "stop_loss_pct": trade_stop_loss_pct, "opened_at": _now(), "opened_at_ts": time.time(), "reference_price": sizing.get("price"), "entry_order_payload": payload, "entry_order_payload_has_attachAlgoOrds": True, "attached_to_entry_order": True, "attached_stop_loss": attached, "exchange_side_stop_verified": False, "stop_loss_price": attached.get("stop_loss_price"), "stop_loss_risk_not_exceed_configured_pct": True, "real_order": True, "formal_executor": True, "temp_test": False, "gate": gate, "arm": arm_check, "preflight": pre, "leverage_result": lev}
+        cur = {"position_id": "formal_v6_" + uuid.uuid4().hex, "execution_id": "exec_formal_v6_" + uuid.uuid4().hex, "strategy_key": strategy_key, "strategy_name": _formal_strategy_name(strategy_key), "entry_data": dict(entry_data or {}), "source": source, "status": "opening", "symbol": SYMBOL, "side": mp["side"], "order_side": mp["order_side"], "close_side": mp["close_side"], "posSide": mp["posSide"], "position_mode": "full_balance", "td_mode": _td_mode(), "mgnMode": _td_mode(), "full_position_ratio": sizing.get("full_position_ratio"), "configured_position_ratio": configured_ratio, "strategy_grade_ratio": grade_ratio, "reserve_usdt": sizing.get("reserve_usdt"), "fee_buffer_usdt": sizing.get("fee_buffer_usdt"), "sz": payload.get("sz"), "sizing": sizing, "leverage": trade_leverage, "stop_loss_pct": trade_stop_loss_pct, "opened_at": _now(), "opened_at_ts": time.time(), "reference_price": sizing.get("price"), "entry_order_payload": payload, "entry_order_payload_has_attachAlgoOrds": True, "attached_to_entry_order": True, "attached_stop_loss": attached, "exchange_side_stop_verified": False, "stop_loss_price": attached.get("stop_loss_price"), "stop_loss_risk_not_exceed_configured_pct": True, "real_order": True, "formal_executor": True, "temp_test": False, "gate": gate, "arm": arm_check, "preflight": pre, "leverage_result": lev}
         st["current"] = cur
         st["last_entry_order_payload"] = payload
         st["last_attached_stop_loss"] = attached
@@ -1714,7 +2013,7 @@ def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm
             _save_state(st)
             _append_event("strategy_open_failed", {"strategy": strategy_key, "side": mp["side"], "symbol": SYMBOL, "leverage": trade_leverage, "stop_loss_pct": trade_stop_loss_pct, "position_mode": "full_balance", "open_order": open_order, "error": "formal entry rejected", "time": _now()}, strategy_key)
             out = {"ok": False, "error": "formal entry order with attachAlgoOrds rejected", "open_order": open_order}
-            out.update(_notification_result_fields(_maybe_notify("open_failed", {"side": mp["side"], "error": "formal entry order rejected", "leverage": trade_leverage})))
+            out.update(_notify_open_blocked(out, mp["side"], strategy_key, trade_leverage))
             return out
         filled = _wait_filled(ack.get("ordId"), payload.get("clOrdId"))
         cur["open_order"]["filled"] = filled
@@ -1767,10 +2066,20 @@ def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm
             return out
         notify_res = _maybe_notify("open_success", {"current": cur, "open_order": open_order})
         _append_event("strategy_opened", {"strategy": strategy_key, "strategy_name": _formal_strategy_name(strategy_key), "side": mp["side"], "symbol": SYMBOL, "leverage": trade_leverage, "stop_loss_pct": trade_stop_loss_pct, "position_mode": "full_balance", "sz": cur.get("real_position_sz"), "entry_price": cur.get("entry_price"), "stop_loss_price": attached.get("stop_loss_price"), "ordId": ack.get("ordId"), "clOrdId": payload.get("clOrdId"), "attachAlgoOrds": payload.get("attachAlgoOrds"), "exchange_side_stop_verified": True, "notification_sent": bool((notify_res or {}).get("sent")), "time": cur.get("opened_at")}, strategy_key)
+        try:
+            import auto_trade_roster_display_metrics as _roster_metrics
+            _roster_metrics.on_live_trade_opened(
+                SYMBOL,
+                os.environ.get("VECTOR_TRADE_TIMEFRAME", TRADE_TIMEFRAME or "1h"),
+                strategy_key,
+            )
+        except Exception:
+            pass
         out = {"ok": True, "opened": True, "formal_executor": True, "temp_test": False, "position_mode": "full_balance", "entry_order_payload_has_attachAlgoOrds": True, "attached_to_entry_order": True, "exchange_side_stop_verified": True, "current": cur, "open_order": open_order}
         out.update(_notification_result_fields(notify_res))
         return out
     finally:
+        _day_lock_cash_repark_after_open(cash_helped)
         _lock_release(lock)
 
 _stage823_final_safe_base_close_current = close_current
@@ -1787,7 +2096,7 @@ def _avg_px_from_close_result(res):
             pass
     return None, None
 
-def close_current(reason="formal_manual_close"):
+def close_current(reason="formal_manual_close", exit_type=None):
     res = _stage823_final_safe_base_close_current(reason=reason)
     if not res.get("ok") or not res.get("closed"):
         return res
@@ -1801,7 +2110,8 @@ def close_current(reason="formal_manual_close"):
         close_px = avg
     closed["close_price"] = close_px
     closed["close_price_source"] = src
-    closed["close_type"] = "定时强制平仓" if "timed_forced" in str(reason) else ("策略止盈" if "take_profit" in str(reason) else ("策略失效" if "invalidated" in str(reason) else ("保护性平仓" if "protective" in str(reason) or "attached_sl" in str(reason) else "手动平仓")))
+    if exit_type:
+        closed["exit_type"] = exit_type
     try:
         entry = _safe_float(closed.get("entry_price"), None)
         sz = _d(closed.get("real_position_sz") or closed.get("sz") or "0")
@@ -1809,6 +2119,27 @@ def close_current(reason="formal_manual_close"):
         closed["pnl"] = _decimal_to_plain(((Decimal(str(entry)) - Decimal(str(close_px))) if closed.get("side") == "short" else (Decimal(str(close_px)) - Decimal(str(entry)))) * sz * ct_val) if entry is not None and close_px is not None else None
     except Exception:
         closed["pnl"] = None
+    try:
+        import auto_trade_formal_notify as _notify
+        closed["close_type"] = _notify.close_type_from_reason(
+            reason, exit_type=exit_type, pnl=closed.get("pnl"),
+        )
+    except Exception:
+        rs = str(reason or "")
+        if "timed_forced" in rs:
+            closed["close_type"] = "定时强制平仓"
+        elif "take_profit" in rs:
+            closed["close_type"] = "策略止盈"
+        elif "invalidated" in rs:
+            closed["close_type"] = "策略失效"
+        elif "attached_sl_fill" in rs:
+            closed["close_type"] = "交易所止损"
+        elif "protective" in rs or "attached_sl_not_verified" in rs or "daemon_protective" in rs:
+            closed["close_type"] = "保护性平仓"
+        elif "manual" in rs.lower():
+            closed["close_type"] = "手动平仓"
+        else:
+            closed["close_type"] = "手动平仓"
     notify_res = _maybe_notify("close", closed)
     event_type = "strategy_closed"
     if "timed_forced" in str(reason):
@@ -1819,7 +2150,17 @@ def close_current(reason="formal_manual_close"):
         event_type = "strategy_invalidated_closed"
     elif "protective" in str(reason) or "attached_sl" in str(reason):
         event_type = "protective_close_attempted"
-    _append_event(event_type, {"strategy": closed.get("strategy_key") or "ema6_center_down_then_fall", "side": closed.get("side"), "symbol": SYMBOL, "close_reason": reason, "close_price": closed.get("close_price"), "close_price_source": closed.get("close_price_source"), "pnl": closed.get("pnl"), "position_absent_verified": closed.get("position_absent_verified"), "cancel_attached_sl": closed.get("cancel_attached_sl"), "notification_sent": bool((notify_res or {}).get("sent")), "time": closed.get("closed_at") or _now()}, closed.get("strategy_key") or "ema6_center_down_then_fall")
+    _day_lock_mark_auto_close(closed)
+    _append_event(event_type, {"strategy": closed.get("strategy_key") or "ema6_center_down_then_fall", "side": closed.get("side"), "symbol": SYMBOL, "close_reason": reason, "close_type": closed.get("close_type"), "exit_type": closed.get("exit_type"), "close_price": closed.get("close_price"), "close_price_source": closed.get("close_price_source"), "pnl": closed.get("pnl"), "position_absent_verified": closed.get("position_absent_verified"), "cancel_attached_sl": closed.get("cancel_attached_sl"), "notification_sent": bool((notify_res or {}).get("sent")), "time": closed.get("closed_at") or _now()}, closed.get("strategy_key") or "ema6_center_down_then_fall")
+    try:
+        import auto_trade_roster_display_metrics as _roster_metrics
+        _roster_metrics.on_live_trade_closed(
+            SYMBOL,
+            os.environ.get("VECTOR_TRADE_TIMEFRAME", TRADE_TIMEFRAME or "1h"),
+            closed.get("strategy_key"),
+        )
+    except Exception:
+        pass
     res["position"] = closed
     res.update(_notification_result_fields(notify_res))
     return res
@@ -1972,7 +2313,10 @@ def _vector_symbol():
     return globals().get("SYMBOL") or "BTC-USDT-SWAP"
 
 def _vector_td_mode():
-    return globals().get("TD_MODE") or "cross"
+    try:
+        return _td_mode()
+    except Exception:
+        return globals().get("TD_MODE") or "isolated"
 
 def _vector_cache_write(name, obj):
     try:
@@ -2101,6 +2445,8 @@ def _vector_collect_stop_rows(posSide=None):
             if _vector_code_ok(r):
                 for row in r.get("data") or []:
                     if isinstance(row, dict):
+                        if not _filter_auto_rows([row], extra_modes=_managed_td_modes()):
+                            continue
                         row2 = dict(row)
                         row2.setdefault("ordType", ord_type)
                         rows.extend(_vector_expand_stop_rows(row2, "orders-algo-pending." + ord_type))
@@ -2115,6 +2461,8 @@ def _vector_collect_stop_rows(posSide=None):
                 if not isinstance(row, dict):
                     continue
                 if posSide and row.get("posSide") and row.get("posSide") != posSide:
+                    continue
+                if not _filter_auto_rows([row], extra_modes=_managed_td_modes()):
                     continue
                 rows.extend(_vector_expand_stop_rows(row, "account-positions"))
     except Exception as e:
@@ -2192,7 +2540,8 @@ def _vector_real_position(posSide=None):
     r = _vector_okx("GET", "/api/v5/account/positions", params={"instType": "SWAP", "instId": _vector_symbol()}, auth=True)
     if not _vector_code_ok(r):
         return {"ok": False, "error": "POSITIONS_QUERY_FAILED", "raw_code": r.get("code") if isinstance(r, dict) else None}
-    for row in r.get("data") or []:
+    managed = _filter_auto_rows(r.get("data") or [], extra_modes=_managed_td_modes())
+    for row in managed:
         if not isinstance(row, dict):
             continue
         if row.get("instId") and row.get("instId") != _vector_symbol():
@@ -2232,7 +2581,7 @@ def _vector_create_fallback_order_algo(attached, close_side=None, posSide=None):
     algo_cl = ("fbsl" + _vector_uuid.uuid4().hex)[:32]
     payload = {
         "instId": _vector_symbol(),
-        "tdMode": _vector_td_mode(),
+        "tdMode": _close_td_mode((pos or {}).get("row")),
         "side": close_side,
         "posSide": posSide,
         "ordType": "conditional",
@@ -2424,6 +2773,8 @@ def vector_real_okx_preflight_readonly():
                 if not p or abs(p) <= 0:
                     p = _vector_float(row.get("pos"))
                 if p and abs(p) > 0:
+                    if not _filter_auto_rows([row], extra_modes=_managed_td_modes()):
+                        continue
                     out["active_position_found"] = True
                     out["active_position"] = row
                     break
@@ -2525,7 +2876,8 @@ def vector_take_profit_path_verify():
     }
 
     try:
-        cfg_path = root / "auto_trade" / "formal_daemon_config.json"
+        cfg_path = root / "auto_trade" / slot_paths.daemon_config_name(
+            SYMBOL, TRADE_TIMEFRAME)
         cfg = _vector_json.loads(cfg_path.read_text(encoding="utf-8", errors="ignore") or "{}") if cfg_path.exists() else {}
         checks["config_take_profit_pct_present"] = bool(cfg.get("take_profit_pct") is not None)
         checks["allow_auto_close_present"] = bool(cfg.get("allow_auto_close"))
@@ -2749,20 +3101,111 @@ def _recent_close_fill(cur):
     order = got.get("order") if got.get("ok") and isinstance(got.get("order"), dict) else fill
     return {"ok": True, "row": order, "fill": fill, "raw": raw}
 
-def _close_type_from_reconciled(row, reason=None):
+def _close_type_from_reconciled(row, reason=None, cur=None):
+    """Classify a disappeared-position fill: never mix 交易所止损 with 手动平仓."""
     reason = str(reason or "")
-    cl_ord_id = str((row or {}).get("clOrdId") or "")
+    row = row if isinstance(row, dict) else {}
+    cur = cur if isinstance(cur, dict) else {}
+    cl_ord_id = str(row.get("clOrdId") or "")
+    algo_id = row.get("algoId") or row.get("algoClOrdId") or row.get("attachAlgoClOrdId")
+    ord_type = str(row.get("ordType") or "").lower()
+    category = str(row.get("category") or row.get("execType") or "").lower()
+
     if cl_ord_id.startswith("fcl"):
-        if "timed_forced" in reason:
-            return "定时强制平仓"
-        if "take_profit" in reason:
-            return "策略止盈"
-        if "protective" in reason or "attached_sl" in reason:
-            return "保护性平仓"
-        return "自动策略平仓"
-    if (row or {}).get("algoId") or (row or {}).get("algoClOrdId"):
+        try:
+            import auto_trade_formal_notify as _notify
+            return _notify.close_type_from_reason(
+                reason, exit_type=cur.get("exit_type"),
+            )
+        except Exception:
+            if "timed_forced" in reason:
+                return "定时强制平仓"
+            if "take_profit" in reason:
+                return "策略止盈"
+            if "invalidated" in reason:
+                return "策略失效"
+            if "protective" in reason or "attached_sl_not_verified" in reason:
+                return "保护性平仓"
+            if "rule_exit" in reason:
+                return "策略规则退出"
+            return "自动策略平仓"
+
+    attached = cur.get("attached_stop_loss") if isinstance(cur.get("attached_stop_loss"), dict) else {}
+    known_algo_ids = set()
+    for key in (
+        "attachAlgoClOrdId", "algoClOrdId", "algoId",
+        "attached_stop_loss_fallback_algoClOrdId", "attached_stop_loss_fallback_algoId",
+    ):
+        val = attached.get(key) or cur.get(key)
+        if val:
+            known_algo_ids.add(str(val))
+    fill_ids = {
+        str(x) for x in (
+            algo_id, row.get("clOrdId"), row.get("ordId"), row.get("algoClOrdId"),
+        ) if x
+    }
+    algo_linked = bool(
+        algo_id
+        or ord_type in ("conditional", "oco", "trigger", "move_order_stop")
+        or "sl" in category
+        or (known_algo_ids and fill_ids.intersection(known_algo_ids))
+    )
+
+    # Explicit plain market/limit reduce-only fill with no algo markers is a
+    # manual/external close. Do NOT use near-stop price alone: a manual exit
+    # can sit within 0.4% of the protective stop and was mislabeled
+    # 交易所止损 (ETH short 2026-08-27: stop 2469.48, manual fill 2463.6).
+    plain_manual = (
+        not algo_linked
+        and ord_type in ("market", "limit", "ioc", "fok", "post_only")
+        and category in ("normal", "", "0")
+    )
+    if plain_manual:
+        return "手动平仓"
+
+    near_stop = False
+    try:
+        stop_px = _safe_float(
+            attached.get("stop_loss_price")
+            or (attached.get("payload") or {}).get("slTriggerPx")
+            or cur.get("stop_loss_price"),
+            None,
+        )
+        close_px = _safe_float(row.get("avgPx") or row.get("fillPx") or row.get("px"), None)
+        side = str(cur.get("side") or cur.get("posSide") or "").lower()
+        if stop_px and close_px and stop_px > 0:
+            # Only count near-stop when the fill is on the adverse side of the
+            # protective stop (short: at/above; long: at/below), within 0.4%.
+            rel = abs(float(close_px) - float(stop_px)) / float(stop_px)
+            if rel <= 0.004:
+                if side in ("short",):
+                    near_stop = float(close_px) >= float(stop_px) * (1.0 - 0.001)
+                elif side in ("long",):
+                    near_stop = float(close_px) <= float(stop_px) * (1.0 + 0.001)
+                else:
+                    near_stop = True
+    except Exception:
+        near_stop = False
+
+    looks_exchange_sl = bool(algo_linked or near_stop)
+    if looks_exchange_sl:
         return "交易所止损"
-    return "交易所止损/外部平仓确认"
+
+    if reason and reason not in (
+        "exchange_position_disappeared_reconciled",
+        "",
+    ):
+        try:
+            import auto_trade_formal_notify as _notify
+            return _notify.close_type_from_reason(
+                reason, exit_type=cur.get("exit_type"),
+            )
+        except Exception:
+            pass
+
+    # Market/limit close without algo markers = user/manual (or external) close.
+    return "手动平仓"
+
 
 def _reconcile_disappeared_position(cur):
     known = _close_order_from_attempt(cur)
@@ -2799,13 +3242,22 @@ def _reconcile_disappeared_position(cur):
         "ack": {"ok": bool(ord_id), "ordId": ord_id, "clOrdId": cl_ord_id},
         "filled": {"ok": bool(row), "filled": bool(row), "order": row},
     }
+    close_type = _close_type_from_reconciled(row, reason, cur=cur)
+    if not reason or reason == "exchange_position_disappeared_reconciled":
+        if close_type == "交易所止损":
+            reason = "attached_sl_fill"
+        elif close_type == "手动平仓":
+            reason = "manual_close_reconciled"
+        else:
+            reason = reason or "exchange_position_disappeared_reconciled"
     closed = dict(cur)
     closed.update({
         "status": "closed",
         "closed_at": closed_at,
         "closed_at_ts": closed_at_ts,
-        "close_reason": reason or "exchange_position_disappeared_reconciled",
-        "close_type": _close_type_from_reconciled(row, reason),
+        "close_reason": reason,
+        "close_type": close_type,
+        "exit_type": cur.get("exit_type") or close_type,
         "close_price": close_px,
         "close_price_source": "okx_trade_order_reconciled" if row else "unavailable",
         "pnl": pnl,
@@ -2847,9 +3299,11 @@ def manage_current_position(policy="protective"):
                           "reason": "attached_stop_already_absent",
                           "initial_cancel": cancel, "absence_check": absent_algos}
         disappeared["cancel_attached_sl"] = cancel
+        disappeared = _attach_close_growth(disappeared)
         st.setdefault("history", []).append(disappeared)
         st["current"] = None
         _save_state(st)
+        _day_lock_mark_auto_close(disappeared)
         notify_res = _maybe_notify("close", disappeared)
         _append_event("strategy_closed_reconciled", {
             "strategy": disappeared.get("strategy_key"),
@@ -2864,6 +3318,18 @@ def manage_current_position(policy="protective"):
         return {"ok": True, "action": "position_absent_state_cleared", "checked": True,
                 "reconciled": True, "closed": disappeared,
                 "notification_sent": bool((notify_res or {}).get("sent"))}
+
+    try:
+        import auto_trade_session_clock as session_clock
+        if not session_clock.in_session(symbol=SYMBOL):
+            return {
+                "ok": True,
+                "action": "outside_trading_session",
+                "checked": True,
+                "session": session_clock.session_snapshot(symbol=SYMBOL),
+            }
+    except Exception:
+        return {"ok": True, "action": "outside_trading_session", "checked": True}
 
     attached = cur.get("attached_stop_loss") or {}
     close_side = cur.get("close_side") or _vector_close_side(side=cur.get("side"), posSide=cur.get("posSide"))
@@ -3014,6 +3480,7 @@ def _account_wide_open_positions():
                 positions.append(row)
         except Exception:
             positions.append(row)
+    positions = _filter_auto_rows(positions)
     return {"ok": True, "positions": positions, "raw": raw}
 
 def _account_wide_pending_orders():
@@ -3021,35 +3488,63 @@ def _account_wide_pending_orders():
                        params={"instType": "SWAP"}, auth=True)
     if not _strict_code_ok(raw):
         return {"ok": False, "error": "account-wide pending order query failed", "raw": raw}
-    return {"ok": True, "orders": [row for row in (raw.get("data") or []) if isinstance(row, dict)],
-            "raw": raw}
+    orders = [row for row in (raw.get("data") or []) if isinstance(row, dict)]
+    orders = _filter_auto_rows(orders)
+    return {"ok": True, "orders": orders, "raw": raw}
 
 def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm=None,
                  sz="FULL_BALANCE", source="formal_auto_trade", arm_token=None,
                  internal_auto=False, entry_data=None,
-                 full_position_ratio_override=None):
+                 full_position_ratio_override=None,
+                 stop_loss_pct_override=None, leverage_override=None):
+    try:
+        import auto_trade_session_clock as session_clock
+        if not session_clock.in_session(symbol=SYMBOL):
+            return {
+                "ok": False,
+                "blocked": True,
+                "error": session_clock.OUTSIDE_SESSION_ERROR,
+                "session": session_clock.session_snapshot(symbol=SYMBOL),
+                "symbol": SYMBOL,
+                "strategy_key": strategy_key,
+            }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "blocked": True,
+            "error": "outside_trading_session",
+            "session_error": str(exc),
+            "symbol": SYMBOL,
+            "strategy_key": strategy_key,
+        }
     global_lock = _global_entry_lock_acquire()
     if not global_lock:
         out = {"ok": False, "blocked": True,
                "error": "account-wide entry lock busy",
                "symbol": SYMBOL,
+               "strategy_key": strategy_key,
                "portfolio_risk_policy": True}
-        out.update(_notification_result_fields(_maybe_notify("open_failed", out)))
+        out.update(_notify_open_blocked(out, side, strategy_key,
+                                        leverage_override))
         return out
     try:
         positions = _account_wide_open_positions()
         if not positions.get("ok"):
             out = {"ok": False, "blocked": True, "fail_closed": True,
                    "error": positions.get("error"), "account_positions": positions,
+                   "symbol": SYMBOL, "strategy_key": strategy_key,
                    "portfolio_risk_policy": True}
-            out.update(_notification_result_fields(_maybe_notify("open_failed", out)))
+            out.update(_notify_open_blocked(out, side, strategy_key,
+                                            leverage_override))
             return out
         pending = _account_wide_pending_orders()
         if not pending.get("ok"):
             out = {"ok": False, "blocked": True, "fail_closed": True,
                    "error": pending.get("error"), "account_pending_orders": pending,
+                   "symbol": SYMBOL, "strategy_key": strategy_key,
                    "portfolio_risk_policy": True}
-            out.update(_notification_result_fields(_maybe_notify("open_failed", out)))
+            out.update(_notify_open_blocked(out, side, strategy_key,
+                                            leverage_override))
             return out
         cfg = _load_stage823_trade_config()
         configured_ratio = float(cfg.get("full_position_ratio", 1.0))
@@ -3059,29 +3554,56 @@ def submit_entry(side, strategy_key="ema6_center_down_then_fall", manual_confirm
                     "error": "full_position_ratio_override must be within (0,1]"}
         effective_ratio = _effective_position_ratio(
             configured_ratio, full_position_ratio_override)
+        strategy_stop_loss_pct = _normalize_stop_loss_pct(
+            stop_loss_pct_override,
+            default=cfg.get("stop_loss_pct", 0.009),
+        )
+        leverage_pick = _resolve_entry_leverage(
+            strategy_key, leverage_override=leverage_override, cfg=cfg)
+        if not leverage_pick.get("ok"):
+            out = {"ok": False, "blocked": True, "fail_closed": True,
+                   "error": leverage_pick.get("error") or "strategy leverage missing",
+                   "symbol": SYMBOL, "strategy_key": strategy_key,
+                   "leverage_pick": leverage_pick,
+                   "portfolio_risk_policy": True}
+            out.update(_notify_open_blocked(out, side, strategy_key, None))
+            return out
+        strategy_leverage = leverage_pick.get("leverage")
         try:
             import auto_trade_portfolio_risk as portfolio_risk
             risk_check = portfolio_risk.preflight(
                 SYMBOL, TRADE_TIMEFRAME,
                 effective_ratio,
-                cfg.get("leverage", 20), cfg.get("stop_loss_pct", 0.009),
+                strategy_leverage, strategy_stop_loss_pct,
                 positions.get("positions"), pending.get("orders"),
+                td_mode=_td_mode(),
+                strategy_key=strategy_key,
             )
         except Exception as exc:
             risk_check = {"ok": False, "blocked": True, "fail_closed": True,
                           "error": "portfolio risk preflight failed: %s" % exc}
         if not risk_check.get("ok"):
             out = dict(risk_check)
-            out.update({"symbol": SYMBOL, "portfolio_risk_policy": True,
+            out.update({"symbol": SYMBOL, "strategy_key": strategy_key,
+                        "side": side, "leverage": strategy_leverage,
+                        "needed_ratio": effective_ratio,
+                        "full_position_ratio": effective_ratio,
+                        "timeframe": TRADE_TIMEFRAME,
+                        "portfolio_risk_policy": True,
                         "account_positions": positions.get("positions"),
                         "account_pending_orders": pending.get("orders")})
-            out.update(_notification_result_fields(_maybe_notify("open_failed", out)))
+            out.update(_notify_open_blocked(
+                out, side, strategy_key, strategy_leverage,
+                extra={"needed_ratio": effective_ratio,
+                       "full_position_ratio": effective_ratio}))
             return out
         opened = _priority_base_submit_entry(
             side=side, strategy_key=strategy_key, manual_confirm=manual_confirm,
             sz=sz, source=source, arm_token=arm_token, internal_auto=internal_auto,
             entry_data=entry_data,
             full_position_ratio_override=grade_ratio,
+            stop_loss_pct_override=strategy_stop_loss_pct,
+            leverage_override=strategy_leverage,
         )
         opened["portfolio_risk_policy"] = True
         opened["portfolio_risk_preflight"] = risk_check
