@@ -1,0 +1,11 @@
+[Unit]
+Description=Run qiyu-web RSS soft-restart watchdog every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Unit=qiyu-web-rss-watch.service
+
+[Install]
+WantedBy=timers.target

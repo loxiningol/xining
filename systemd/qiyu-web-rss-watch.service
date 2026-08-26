@@ -1,0 +1,10 @@
+[Unit]
+Description=Soft-restart qiyu-web when RSS approaches OOM (oneshot check)
+After=qiyu-web.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /root/scripts/qiyu_web_rss_watchdog.sh
+Nice=10
+# Keep the watcher itself tiny.
+MemoryMax=32M
