@@ -5,8 +5,8 @@
 <title>Macaron &amp; Daifuku Quant 🍡</title>
 <link rel="icon" type="image/png" href="/static/macaron-title.png">
 <link rel="preload" as="image" href="/housekeeper/manor-world-v7.webp" fetchpriority="high">
-<link rel="preload" as="style" href="/housekeeper/manor-layout-20260823.css?v=holdorb6">
-<link rel="preload" as="script" href="/housekeeper/manor-layout-20260823exp.js?v=holdorb6">
+<link rel="preload" as="style" href="/housekeeper/manor-layout-20260823.css?v=girlp19">
+<link rel="preload" as="script" href="/housekeeper/manor-layout-20260823exp.js?v=girlp19">
 <style>
 :root{
   --bg:#fdf6f2;--bg-grad-top:#fff9f6;--bg-grad-mid:#f8efe8;--bg-grad-bot:#f3e4d8;
@@ -189,6 +189,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
   .atm-assist-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .atm-assist-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:11px;color:var(--muted);border:1px solid var(--line);background:rgba(255,255,255,.28)}
   .atm-assist-reason{margin-top:8px;font-size:12px;line-height:1.55;color:var(--text)}
+  .atm-assist-guide{margin-top:6px;font-size:12px;line-height:1.55;color:var(--text);font-weight:600}
   .atm-assist-foot{margin-top:8px;font-size:11px;color:var(--muted)}
   @media(max-width:620px){.atm-assist-odds{grid-template-columns:1fr}}
   .mdq-exp-sides{display:flex;gap:8px;flex-wrap:wrap}
@@ -675,7 +676,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     <div class="atm-section-head">
       <div>
         <h2 class="atm-section-title">系统组合数据</h2>
-        <div class="atm-section-sub">预计成交/皮尔逊来自等权未加杠杆周收益；周几何按账户占用回放（最多3仓、同品种1仓、风险帽15.2%）。方向型/赔率型为同类策略单独占用回放，百分数不与合计相加。</div>
+        <div class="atm-section-sub">两套账：预计成交 / 皮尔逊 / 凯利来自等权未加杠杆周收益，不改实盘杠杆。方向型/赔率为同一混合路径上的贡献，百分数不与合计相加。</div>
       </div>
       <div class="atm-section-meta">
         <button type="button" class="atm-btn" onclick="window.refreshForecastStatistics()">重算并刷新</button>
@@ -688,12 +689,11 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
       <div class="atm-metric"><span>策略间皮尔逊相关系数</span><strong id="atmFcPearson">暂无</strong></div>
       <div class="atm-metric"><span>未加杠杆组合周期望收益率</span><strong id="atmFcMuWeekly">暂无</strong></div>
       <div class="atm-metric"><span>未加杠杆组合周收益波动率</span><strong id="atmFcSigmaWeekly">暂无</strong></div>
-      <div class="atm-metric"><span>占用回放成交率</span><strong id="atmFcOccTake">暂无</strong></div>
-      <div class="atm-metric"><span>周几何增长率（占用路径）</span><strong id="atmFcGeoWeekly">暂无</strong></div>
-      <div class="atm-metric"><span>周几何增长率（占用路径·样本外）</span><strong id="atmFcGeoWeeklyOos">暂无</strong></div>
-      <div class="atm-metric"><span>周几何增长率（方向型·占用路径）</span><strong id="atmFcGeoWeeklyDir">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率</span><strong id="atmFcGeoWeekly">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（样本外）</span><strong id="atmFcGeoWeeklyOos">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（方向型）</span><strong id="atmFcGeoWeeklyDir">暂无</strong></div>
       <div class="atm-metric"><span>周几何增长率（方向型·样本外）</span><strong id="atmFcGeoWeeklyOosDir">暂无</strong></div>
-      <div class="atm-metric"><span>周几何增长率（赔率型·占用路径）</span><strong id="atmFcGeoWeeklyOdds">暂无</strong></div>
+      <div class="atm-metric"><span>周几何增长率（赔率型）</span><strong id="atmFcGeoWeeklyOdds">暂无</strong></div>
       <div class="atm-metric"><span>周几何增长率（赔率型·样本外）</span><strong id="atmFcGeoWeeklyOosOdds">暂无</strong></div>
     </div>
     <p class="atm-forecast-summary" id="atmFcGenerated"></p>
@@ -708,7 +708,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
         <div class="atm-section-sub" id="atmDailySub">统计周期：每天 00:00 至 23:59（北京时间），次日自动刷新。</div>
       </div>
       <div class="atm-section-meta">
-        <button type="button" class="atm-btn" onclick="loadDailySummary()">刷新</button>
+        <button type="button" class="atm-btn" onclick="loadDailySummary(true)">刷新</button>
         <div class="atm-count" id="atmDailyCount">今日</div>
       </div>
     </div>
@@ -814,7 +814,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     <div class="atm-section-head">
       <div>
         <h2 class="atm-section-title">观风金球</h2>
-        <div class="atm-section-sub">DeepSeek-v4 对仍持仓自动单的剩余路径研判（止盈 / 止损 / 定时）。观察中的仓也会列出；警告与加急仍会留在这里。对应仓位平仓后自动删除。不改交易所止损。</div>
+        <div class="atm-section-sub">按本策略退出计划对当前价算先触。DeepSeek-v4 整点与半点解释概率，并另写一行智能指引（只建议人工、不改保护止损、系统不下单）。微信也按这个节拍发送。</div>
       </div>
       <div class="atm-section-meta">
         <button type="button" class="atm-btn" onclick="loadHoldAssistTriggers(true)">刷新</button>
@@ -1248,6 +1248,10 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
       const fm=row.formulas||{};
       const cciN=Number(fm.cci);
       const chips=[
+        holdChip('退出', row.exit_mode_zh||''),
+        holdChip('止盈位', fmtPx(row.take_profit_price)),
+        holdChip('追踪', fmtPx(row.trail_price)),
+        holdChip('剩余', (row.bars_left!=null && row.bars_left!=='')?(String(row.bars_left)+' 根'):''),
         holdChip('回吐', (fm.giveback_frac!=null && fm.giveback_frac!=='')?pctText(fm.giveback_frac):''),
         holdChip('转弱', (fm.weakening_intensity!=null && Number(fm.weakening_intensity)>0.005)?Number(fm.weakening_intensity).toFixed(2):''),
         holdChip('结构', swingZh(fm.swing_state)),
@@ -1259,6 +1263,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
       const pxBits=[];
       if(fmtPx(row.entry_price)) pxBits.push('<div><span>开仓</span> '+zoneEsc(fmtPx(row.entry_price))+'</div>');
       if(fmtPx(row.mark_price)) pxBits.push('<div><span>现价</span> '+zoneEsc(fmtPx(row.mark_price))+'</div>');
+      if(fmtPx(row.take_profit_price)) pxBits.push('<div><span>止盈位</span> '+zoneEsc(fmtPx(row.take_profit_price))+'</div>');
       if(fmtPx(row.stop_loss_price)) pxBits.push('<div><span>保护止损</span> '+zoneEsc(fmtPx(row.stop_loss_price))+'</div>');
       const odds=authored
         ? ('<div class="atm-assist-odds">'+
@@ -1266,9 +1271,10 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
             '<div><span>止损</span><strong>'+zoneEsc(pctText(row.p_stop))+'</strong></div>'+
             '<div><span>定时</span><strong>'+zoneEsc(pctText(row.p_timed))+'</strong></div>'+
           '</div>')
-        : '<div class="atm-assist-reason">DeepSeek-v4 尚未写出剩余路径，稍后再看。</div>';
+        : '<div class="atm-assist-reason">退出障碍尚未算出，稍后再看。</div>';
       const reason=row.reason_zh?'<div class="atm-assist-reason">'+zoneEsc(row.reason_zh)+'</div>':'';
-      const footBits=[row.voter_zh||'DeepSeek-v4'];
+      const guide=row.guidance_zh?'<div class="atm-assist-guide">智能指引：'+zoneEsc(row.guidance_zh)+'</div>':'';
+      const footBits=[row.voter_zh||'退出先触'];
       if(row.estimated_at) footBits.push('研判 '+row.estimated_at);
       if(row.notified_at) footBits.push('微信已发 '+row.notified_at);
       const foot='<div class="atm-assist-foot">'+zoneEsc(footBits.join(' · '))+'</div>';
@@ -1280,7 +1286,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
         odds+
         (pxBits.length?'<div class="atm-assist-meta">'+pxBits.join('')+'</div>':'')+
         (chips?'<div class="atm-assist-chips">'+chips+'</div>':'')+
-        reason+foot+
+        reason+guide+foot+
       '</div>';
     }).join('');
   }
@@ -1324,7 +1330,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
             const hint = (res.status === 401 || res.status === 403)
               ? '登录已失效，请刷新页面重新登录'
               : (res.status >= 500 ? '服务暂时不可用（可能正在重启）' : '接口返回非 JSON');
-            throw new Error(hint + (snippet ? ('：' + snippet) : ''));
+            throw new Error(res.status >= 500 ? hint : (hint + (snippet ? ('：' + snippet) : '')));
           }
         }
         return {res:res, j:j};
@@ -1440,7 +1446,7 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     if(!rep||!rep.generated_at){
       if(!opts.keepStatus){
         if(panel) panel.textContent='尚无组合数据报告（请点「重算并刷新」）';
-        ['atmFcDaily','atmFcWeekly','atmFcPearson','atmFcMuWeekly','atmFcSigmaWeekly','atmFcOccTake','atmFcGeoWeekly','atmFcGeoWeeklyOos','atmFcGeoWeeklyDir','atmFcGeoWeeklyOosDir','atmFcGeoWeeklyOdds','atmFcGeoWeeklyOosOdds'].forEach(function(id){
+        ['atmFcDaily','atmFcWeekly','atmFcPearson','atmFcMuWeekly','atmFcSigmaWeekly','atmFcGeoWeekly','atmFcGeoWeeklyOos','atmFcGeoWeeklyDir','atmFcGeoWeeklyOosDir','atmFcGeoWeeklyOdds','atmFcGeoWeeklyOosOdds'].forEach(function(id){
           if($(id)) $(id).textContent='暂无';
         });
         if($('atmFcGenerated')) $('atmFcGenerated').textContent='';
@@ -1462,9 +1468,6 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     const geoOos=(combo.weekly_geometric_growth_oos!=null)?combo.weekly_geometric_growth_oos:o.weekly_geometric_growth_oos;
     if($('atmFcMuWeekly')) $('atmFcMuWeekly').textContent=fcFmtPctFromDecimal(mu, 3);
     if($('atmFcSigmaWeekly')) $('atmFcSigmaWeekly').textContent=fcFmtPctFromDecimal(sigma, 3);
-    var occ=(combo.occupancy_replay)||{};
-    if($('atmFcOccTake')) $('atmFcOccTake').textContent=
-      (occ.take_rate==null)?'暂无':fcFmtRate(occ.take_rate, 4);
     if($('atmFcGeoWeekly')) $('atmFcGeoWeekly').textContent=fcFmtPctFromDecimal(geo, 3);
     if($('atmFcGeoWeeklyOos')) $('atmFcGeoWeeklyOos').textContent=fcFmtPctFromDecimal(geoOos, 3);
     var hitchGeo=(combo.weekly_geometric_growth_by_hitch_class)||o.weekly_geometric_growth_by_hitch_class||{};
@@ -1477,14 +1480,11 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     if(combo&&combo.missing){
       missHint=' · 组合未就绪'+(combo.missing_reason?('：'+combo.missing_reason):'');
     }
-    var skip=occ.skip_reasons||{};
-    var skipBits=[];
-    ['risk_cap','symbol_mutex','max_open','daily_cap','consecutive_losses'].forEach(function(k){
-      if(skip[k]) skipBits.push(k+' '+skip[k]);
-    });
-    var occHint=skipBits.length?(' · 占用跳过：'+skipBits.join('、')):'';
+    var genAt=String(rep.generated_at||'');
+    var genHour=genAt.match(/^(\d{4}-\d{2}-\d{2} \d{2}):/);
+    if(genHour) genAt=genHour[1]+':00:00';
     if($('atmFcGenerated')) $('atmFcGenerated').textContent=
-      (stale?'过期快照 · ':'')+'生成时间：'+(rep.generated_at||'')+missHint+occHint;
+      (stale?'过期快照 · ':'')+'生成时间：'+genAt+missHint;
   }
   let _forecastRefreshInflight=false;
   async function loadForecastLatest(){
@@ -1510,11 +1510,27 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
         renderForecastReport(cached.j.report||cached.j, !!cached.j.stale, {keepStatus:true});
         if(panel) panel.textContent='正在按当前挂载策略重算组合数据（不调用AI、不发WxPusher）…';
       }catch(e){}
-      const pack=await fetchJson('/api/forecast/refresh_statistical', {
-        method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
-      }, 20000);
-      if(!pack.res.ok||pack.j.ok!==true){
-        throw new Error(pack.j.error||('HTTP '+pack.res.status));
+      let pack=null;
+      let lastErr=null;
+      for(let attempt=0; attempt<4; attempt++){
+        try{
+          pack=await fetchJson('/api/forecast/refresh_statistical', {
+            method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
+          }, 20000);
+          if(!pack.res.ok||pack.j.ok!==true){
+            throw new Error(pack.j.error||('HTTP '+pack.res.status));
+          }
+          lastErr=null;
+          break;
+        }catch(e){
+          lastErr=e;
+          const msg=String((e&&e.message)||e||'');
+          if(attempt>=3 || !/502|503|暂时不可用|重启/.test(msg)) throw e;
+          await new Promise(function(resolve){ setTimeout(resolve, 800+attempt*700); });
+        }
+      }
+      if(!pack){
+        throw lastErr||new Error('组合数据重算失败');
       }
       if(pack.j.report){
         renderForecastReport(pack.j.report, !!pack.j.stale, {keepStatus:true});
@@ -1617,7 +1633,12 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     box.innerHTML=rows.map(renderLivePositionRow).join('');
     bindPositionCloseButtons();
   }
-  window.loadDailySummary=async function(){
+  window.loadDailySummary=async function(force){
+    if(force){
+      delete _atmPollInflight.daily_summary;
+      _atmPollBackoffMs.daily_summary=0;
+      _atmPollBlockedUntil.daily_summary=0;
+    }
     return atmPollOnce('daily_summary', async function(){
       const pending='未到起始计数时间';
       function setMetric(id, text, isPending){
@@ -1702,7 +1723,12 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
       }
     });
   };
-  window.loadWeeklySummary=async function(){
+  window.loadWeeklySummary=async function(force){
+    if(force){
+      delete _atmPollInflight.weekly_summary;
+      _atmPollBackoffMs.weekly_summary=0;
+      _atmPollBlockedUntil.weekly_summary=0;
+    }
     return atmPollOnce('weekly_summary', async function(){
       const pending='未到起始计数时间';
       function setMetric(id, text, isPending){
@@ -2049,6 +2075,8 @@ th{color:var(--focus);font-weight:400;background:var(--surface-2)}
     }
     if(a.technical_failed) extra=(extra?extra+' · ':'')+'技术失败';
     if(a.stale) extra=(extra?extra+' · ':'')+'账本已变';
+    if(a.cannot_read_trend) extra=(extra?extra+' · ':'')+'读不出趋势';
+    if(a.structure_family && a.cannot_read_trend) extra=(extra?extra+' · ':'')+a.structure_family;
     let cls='atm-qi-author';
     if(a.technical_failed) cls+=' is-tech';
     else if(a.verdict==='suggest_sign') cls+=' is-sign';
@@ -3657,9 +3685,9 @@ window.addEventListener('DOMContentLoaded', init);
 
 <link rel="stylesheet" href="/housekeeper/housekeeper.css?v=5">
 <link rel="stylesheet" href="/housekeeper/estate.css?v=5">
-<link rel="stylesheet" href="/housekeeper/manor-layout-20260823.css?v=holdorb6">
+<link rel="stylesheet" href="/housekeeper/manor-layout-20260823.css?v=girlp19">
 <script src="/housekeeper/housekeeper-20260823.js?v=perf3"></script>
 <script src="/housekeeper/pets.js?v=6"></script>
-<script src="/housekeeper/manor-layout-20260823exp.js?v=holdorb6"></script>
+<script src="/housekeeper/manor-layout-20260823exp.js?v=girlp19"></script>
 </body>
 </html>
