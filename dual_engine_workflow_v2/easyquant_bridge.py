@@ -24,6 +24,58 @@ def _root():
     return Path(os.environ.get("VECTOR_ROOT") or "/root")
 
 
+def _apply_symbol_session_filter(rows, symbol):
+    """US/HK equities: keep only exchange open-hour bars for research."""
+    try:
+        import auto_trade_session_clock as session_clock
+    except Exception:
+        return list(rows or []), None
+    if not session_clock.uses_exchange_rth(symbol):
+        return list(rows or []), None
+    before = len(rows or [])
+    kept = session_clock.filter_candles_to_session(rows, symbol=symbol)
+    return kept, {
+        "venue": session_clock.venue_for_symbol(symbol),
+        "before": before,
+        "after": len(kept),
+        "dropped": max(0, before - len(kept)),
+        "note_zh": "美股/港股研究样本仅保留开盘时段，隔夜与休市已剔除",
+    }
+
+
+# Process-level factor matrix cache: same symbol/tf/window reuses one build.
+# Cleared at each creation job start so a new task never sees stale features.
+_FACTOR_MATRIX_CACHE = {}
+
+
+def clear_factor_matrix_cache():
+    """Invalidate process-level factor matrix cache (call at job start)."""
+    _FACTOR_MATRIX_CACHE.clear()
+
+
+def _factor_matrix_cache_key(candles, symbol=None, timeframe=None):
+    n = len(candles or [])
+    if n <= 0:
+        return None
+    try:
+        t0 = int((candles[0] or {}).get("ts") or 0)
+        t1 = int((candles[-1] or {}).get("ts") or 0)
+        c0 = float((candles[0] or {}).get("close") or 0.0)
+        c1 = float((candles[-1] or {}).get("close") or 0.0)
+    except Exception:
+        t0 = t1 = 0
+        c0 = c1 = 0.0
+    return (
+        str(symbol or "").upper(),
+        str(timeframe or "").lower(),
+        int(n),
+        int(t0),
+        int(t1),
+        round(c0, 8),
+        round(c1, 8),
+    )
+
+
 def probe_easyquant():
     """Capability snapshot (eqlib optional + local OKX miner always available)."""
     mode = str(os.environ.get("QIYU_EASYQUANT_MODE") or "mine").strip().lower()
@@ -99,8 +151,9 @@ def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookbac
     lookback_days = int(
         lookback_days
         if lookback_days is not None
-        else (os.environ.get("QIYU_RESEARCH_LOOKBACK_DAYS") or 400)
+        else (os.environ.get("QIYU_RESEARCH_LOOKBACK_DAYS") or 180)
     )
+    lookback_days = max(180, lookback_days)
 
     research_meta = None
     require_research = str(
@@ -125,9 +178,10 @@ def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookbac
             }
             if got.get("ok") and got.get("candles"):
                 rows = got["candles"]
+                rows, session_meta = _apply_symbol_session_filter(rows, symbol)
                 if max_bars and len(rows) > int(max_bars):
                     rows = rows[-int(max_bars):]
-                return {
+                out = {
                     "ok": True,
                     "path": "research_store:%s" % got.get("backend"),
                     "n": len(rows),
@@ -138,6 +192,9 @@ def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookbac
                     "symbol": symbol,
                     "timeframe": timeframe,
                 }
+                if session_meta:
+                    out["session_filter"] = session_meta
+                return out
             if require_research:
                 return {
                     "ok": False,
@@ -197,7 +254,8 @@ def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookbac
             })
         except Exception:
             continue
-    return {
+    rows, session_meta = _apply_symbol_session_filter(rows, symbol)
+    out = {
         "ok": len(rows) >= 80,
         "path": str(path),
         "n": len(rows),
@@ -213,6 +271,9 @@ def load_candles(symbol, timeframe, max_bars=1200, prefer_research=None, lookbac
         "symbol": symbol,
         "timeframe": timeframe,
     }
+    if session_meta:
+        out["session_filter"] = session_meta
+    return out
 
 
 def _sma(xs, n):
@@ -273,7 +334,77 @@ def _slope_series(values, window=6):
     return out
 
 
-def _build_factor_matrix(candles):
+def _ewm_mean(values, span):
+    """EWMA aligned with pandas Series.ewm(span=span, adjust=False).mean()."""
+    span = max(1, int(span or 1))
+    alpha = 2.0 / (float(span) + 1.0)
+    out = [None] * len(values)
+    prev = None
+    for i, raw in enumerate(values):
+        if raw is None:
+            out[i] = None
+            continue
+        val = float(raw)
+        if prev is None:
+            prev = val
+        else:
+            prev = alpha * val + (1.0 - alpha) * prev
+        out[i] = prev
+    return out
+
+
+def _compute_adx(high, low, close, period=14):
+    """Wilder-style ADX on OHLC lists; NaN gaps become 0.0."""
+    period = max(1, int(period or 14))
+    n = len(close)
+    adx = [0.0] * n
+    if n < period + 2:
+        return adx
+    tr = [0.0] * n
+    plus_dm = [0.0] * n
+    minus_dm = [0.0] * n
+    for i in range(1, n):
+        up_move = float(high[i]) - float(high[i - 1])
+        down_move = float(low[i - 1]) - float(low[i])
+        plus_dm[i] = up_move if (up_move > down_move and up_move > 0) else 0.0
+        minus_dm[i] = down_move if (down_move > up_move and down_move > 0) else 0.0
+        tr[i] = max(
+            float(high[i]) - float(low[i]),
+            abs(float(high[i]) - float(close[i - 1])),
+            abs(float(low[i]) - float(close[i - 1])),
+        )
+    atr = _ewm_mean(tr, period)
+    plus_di = [0.0] * n
+    minus_di = [0.0] * n
+    pdm_smooth = _ewm_mean(plus_dm, period)
+    mdm_smooth = _ewm_mean(minus_dm, period)
+    dx = [0.0] * n
+    for i in range(n):
+        if atr[i] is None or float(atr[i]) <= 1e-12:
+            continue
+        plus_di[i] = 100.0 * float(pdm_smooth[i] or 0.0) / float(atr[i])
+        minus_di[i] = 100.0 * float(mdm_smooth[i] or 0.0) / float(atr[i])
+        denom = plus_di[i] + minus_di[i]
+        if denom > 1e-12:
+            dx[i] = 100.0 * abs(plus_di[i] - minus_di[i]) / denom
+    adx_smooth = _ewm_mean(dx, period)
+    for i in range(n):
+        adx[i] = float(adx_smooth[i] or 0.0)
+    return adx
+
+
+def _build_factor_matrix(candles, symbol=None, timeframe=None):
+    """Build factor columns; cache by symbol/timeframe/window fingerprint."""
+    cache_key = _factor_matrix_cache_key(candles, symbol=symbol, timeframe=timeframe)
+    if cache_key is not None and cache_key in _FACTOR_MATRIX_CACHE:
+        return _FACTOR_MATRIX_CACHE[cache_key]
+    matrix = _build_factor_matrix_uncached(candles)
+    if cache_key is not None:
+        _FACTOR_MATRIX_CACHE[cache_key] = matrix
+    return matrix
+
+
+def _build_factor_matrix_uncached(candles):
     c = [r["close"] for r in candles]
     h = [r["high"] for r in candles]
     l = [r["low"] for r in candles]
@@ -471,6 +602,25 @@ def _build_factor_matrix(candles):
         if sma50[i] is not None and sma200[i] is not None and c[i]:
             trend_bias_50_200[i] = (sma50[i] - sma200[i]) / c[i]
 
+    # EMA12/EMA26/ADX — aligned with backtest_engine_v2 precompute_indicators.
+    ema_12 = _ewm_mean(c, 12)
+    ema_26 = _ewm_mean(c, 26)
+    ema_diff = [None] * n
+    ema_ratio = [None] * n
+    for i in range(n):
+        if ema_12[i] is not None and ema_26[i] is not None:
+            ema_diff[i] = float(ema_12[i]) - float(ema_26[i])
+        if ema_12[i] is not None and c[i]:
+            ema_ratio[i] = float(c[i]) / float(ema_12[i]) - 1.0
+    adx_14 = _compute_adx(h, l, c, period=14)
+
+    # bearish_candle: formal registry feature used by live semantic ASTs.
+    # 1.0 = closed strictly below open (阴线); else 0.0. Length must match n.
+    bearish_candle = [
+        (1.0 if (c[i] is not None and o[i] is not None and float(c[i]) < float(o[i])) else 0.0)
+        for i in range(n)
+    ]
+
     # Bollinger(20,2) — sample std aligned with formal precompute_indicators.
     bb_lower_dist = [None] * n
     bb_upper_dist = [None] * n
@@ -519,6 +669,12 @@ def _build_factor_matrix(candles):
         "reclaim_strength": reclaim_strength,
         "bullish_reclaim": reclaim_strength,
         "trend_bias_50_200": trend_bias_50_200,
+        "ema_12": ema_12,
+        "ema_26": ema_26,
+        "ema_diff": ema_diff,
+        "ema_ratio": ema_ratio,
+        "adx_14": adx_14,
+        "bearish_candle": bearish_candle,
         "donchian20_long_break": donchian20_long_break,
         "donchian20_short_break": donchian20_short_break,
         "bb_lower_dist": bb_lower_dist,

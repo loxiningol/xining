@@ -6,6 +6,7 @@ timeframe-specific registry in backtest_engine_v2 with parameters from the
 same experimental_strategies.json used by the website backtester.
 """
 from pathlib import Path
+import hashlib
 import json
 import os
 import tempfile
@@ -24,11 +25,12 @@ TIMEFRAME = (
     "5m" if TIMEFRAME in ("5m", "5min", "5minute")
     else ("15m" if TIMEFRAME in ("15m", "15min", "15minute") else "1h")
 )
-INSTANCE_SUFFIX = (
-    "_" + INSTANCE_KEY + "_" + TIMEFRAME
-    if TIMEFRAME in ("15m", "5m")
-    else ("" if SYMBOL == "BTC-USDT-SWAP" else "_" + INSTANCE_KEY)
-)
+# Confirm() may mount conditional_exits with close_fraction < 1 only when this
+# evaluator reports should_partial_close and the formal executor can reduce.
+LIVE_CONDITIONAL_PARTIAL_EXITS = True
+import auto_trade_slot_paths as slot_paths
+TIMEFRAME = slot_paths.normalize_timeframe(TIMEFRAME)
+INSTANCE_SUFFIX = slot_paths.instance_suffix(SYMBOL, TIMEFRAME)
 SIGNAL_FILE = AUTO_DIR / ("formal_ema6_signal%s.json" % INSTANCE_SUFFIX)
 CANDLE_CACHE_FILE = AUTO_DIR / (
     "formal_%s_%s_candles_cache.json" % (INSTANCE_KEY, TIMEFRAME)
@@ -97,7 +99,6 @@ STRATEGIES = {
     "ng5_exhaustion_fade_short_ai": {"name":"NG 5分钟冲高衰竭回落（AI创造）","side":"short","signal_file":AUTO_DIR/("formal_ng5_exhaustion_fade_short_ai_signal%s.json"%INSTANCE_SUFFIX)},
     "ng5_session_exhaustion_reclaim_long_ai": {"name":"NG 5分钟时段超跌收回（AI创造）","side":"long","signal_file":AUTO_DIR/("formal_ng5_session_exhaustion_reclaim_long_ai_signal%s.json"%INSTANCE_SUFFIX)},
     "xag5_session_breakdown_short_ai": {"name":"XAG 5分钟时段顺势破位（AI创造）","side":"short","signal_file":AUTO_DIR/("formal_xag5_session_breakdown_short_ai_signal%s.json"%INSTANCE_SUFFIX)},
-    "ltc5_exhaustion_fade_short_ai": {"name":"LTC 5分钟冲高衰竭回落（AI创造）","side":"short","signal_file":AUTO_DIR/("formal_ltc5_exhaustion_fade_short_ai_signal%s.json"%INSTANCE_SUFFIX)},
     "ada5_session_trend_pullback_short_ai": {"name":"ADA 5分钟时段趋势反抽（AI创造）","side":"short","signal_file":AUTO_DIR/("formal_ada5_session_trend_pullback_short_ai_signal%s.json"%INSTANCE_SUFFIX)},
     "xau15_h1_breakout_long_ai": {"name":"XAU 15分钟顺势放量突破（AI创造）","side":"long","signal_file":AUTO_DIR/("formal_xau15_h1_breakout_long_ai_signal%s.json"%INSTANCE_SUFFIX)},
 }
@@ -119,10 +120,603 @@ MIN_CANDLES = 1400 if TIMEFRAME == "5m" else (1200 if TIMEFRAME == "15m" else 12
 BAR_MILLISECONDS = {"5m": 300000, "15m": 900000, "1h": 3600000}[TIMEFRAME]
 _FRAME_CONTEXT_CACHE = {"key": None, "value": None}
 _NO_TRIGGER_DIAG_CACHE = {}
+DSL_CONFIG_FILE = ROOT / "strategy_configs" / "ai_dsl_strategies.json"
+SEMANTIC_CONFIG_FILE = ROOT / "strategy_configs" / "semantic_live_strategies.json"
+_STRATEGY_CONFIG_MTIMES = {"dsl": None, "semantic": None}
+_SEMANTIC_STRATEGIES = {}
 
 
 def _now():
     return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _mtime_ns(path):
+    try:
+        stat = Path(path).stat()
+        return getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1000000000))
+    except Exception:
+        return None
+
+
+def _refresh_configured_strategies(force=False):
+    """Hot-load approved strategies without waiting for a service restart.
+
+    A strategy file may be updated after the daemon process starts.  The old
+    process used a registry frozen at import time and then reported every new
+    approved strategy as unsupported.  Validation is completed before the
+    last-known-good in-memory registry is changed.
+    """
+    dsl_mtime = _mtime_ns(DSL_CONFIG_FILE)
+    if force or dsl_mtime != _STRATEGY_CONFIG_MTIMES.get("dsl"):
+        try:
+            bt._register_dsl_strategies()
+            for key, definition in getattr(bt, "DSL_STRATEGY_DEFINITIONS", {}).items():
+                if (
+                    definition.get("live_enabled") is True
+                    and definition.get("timeframe") == TIMEFRAME
+                    and SYMBOL in (definition.get("supported_instruments") or [])
+                ):
+                    STRATEGIES[key] = {
+                        "name": definition.get("name") or key,
+                        "side": definition.get("direction"),
+                        "signal_file": AUTO_DIR / (
+                            "formal_dsl_%s_signal%s.json" % (key, INSTANCE_SUFFIX)
+                        ),
+                    }
+            _STRATEGY_CONFIG_MTIMES["dsl"] = dsl_mtime
+        except Exception:
+            pass
+
+    semantic_mtime = _mtime_ns(SEMANTIC_CONFIG_FILE)
+    if force or semantic_mtime != _STRATEGY_CONFIG_MTIMES.get("semantic"):
+        try:
+            from dual_engine_workflow_v2 import ast_compiler
+            from dual_engine_workflow_v2.exit_dsl import validate_exit_plan
+
+            payload = _read_json(SEMANTIC_CONFIG_FILE, {"strategies": []})
+            desired = {}
+            formal_features = ast_compiler.formal_feature_registry()
+            for raw in payload.get("strategies") or []:
+                if not isinstance(raw, dict):
+                    continue
+                if raw.get("timeframe") != TIMEFRAME:
+                    continue
+                if SYMBOL not in (raw.get("supported_instruments") or []):
+                    continue
+                key = str(raw.get("key") or "")
+                direction = str(raw.get("direction") or "").lower()
+                stop_pct = float(raw.get("protective_stop_pct"))
+                entry_check = ast_compiler.validate_ast(
+                    raw.get("entry_ast"), feature_registry_list=formal_features,
+                )
+                exit_check = validate_exit_plan(
+                    raw.get("exit_plan"), feature_registry_list=formal_features,
+                )
+                if (
+                    not key or direction not in ("long", "short")
+                    or not (0.0 < stop_pct < 1.0)
+                    or not entry_check.get("ok") or not exit_check.get("ok")
+                ):
+                    raise ValueError("invalid semantic live strategy: %s" % (key or "-"))
+                definition = dict(raw)
+                definition["entry_ast"] = entry_check.get("normalized")
+                definition["exit_plan"] = exit_check.get("normalized")
+                desired[key] = definition
+            for old_key in list(_SEMANTIC_STRATEGIES):
+                if old_key not in desired:
+                    STRATEGIES.pop(old_key, None)
+            _SEMANTIC_STRATEGIES.clear()
+            _SEMANTIC_STRATEGIES.update(desired)
+            for key, definition in desired.items():
+                STRATEGIES[key] = {
+                    "name": definition.get("name") or key,
+                    "side": definition.get("direction"),
+                    "signal_file": AUTO_DIR / (
+                        "formal_semantic_%s_signal%s.json" % (key, INSTANCE_SUFFIX)
+                    ),
+                }
+            _STRATEGY_CONFIG_MTIMES["semantic"] = semantic_mtime
+        except Exception:
+            # Fail-safe hot reload: malformed new files never erase the last
+            # validated in-memory version used to manage an open position.
+            pass
+
+
+def _semantic_entry_evaluation(definition, candles):
+    from dual_engine_workflow_v2 import ast_compiler
+    from dual_engine_workflow_v2.easyquant_bridge import _build_factor_matrix
+
+    matrix = _build_factor_matrix(candles, symbol=SYMBOL, timeframe=TIMEFRAME)
+    compiled = ast_compiler.compile_ast_to_mask(
+        definition.get("entry_ast"), matrix,
+        feature_registry_list=ast_compiler.formal_feature_registry(),
+    )
+    mask = list(compiled.get("mask") or [])
+    if not compiled.get("ok") or len(mask) != len(candles):
+        missing = []
+        stack = [definition.get("entry_ast")]
+        seen = set()
+        while stack:
+            node = stack.pop()
+            if not isinstance(node, dict):
+                continue
+            feat = node.get("feature")
+            if feat and feat not in seen:
+                seen.add(feat)
+                series = list(matrix.get(feat) or [])
+                if len(series) != len(candles):
+                    missing.append("%s(len=%d)" % (feat, len(series)))
+            for child in (node.get("children") or []):
+                stack.append(child)
+            if isinstance(node.get("child"), dict):
+                stack.append(node.get("child"))
+            for step in (node.get("steps") or []):
+                if isinstance(step, dict):
+                    stack.append(step.get("event"))
+        detail = compiled.get("error") or (compiled.get("compile_report") or {}).get("errors")
+        raise ValueError(
+            "semantic entry compile failed: mask_len=%d candles=%d missing=%s detail=%s"
+            % (len(mask), len(candles), missing or None, detail)
+        )
+    atr_values = list(matrix.get("atr_pct_14") or [])
+    atr_pct = atr_values[-1] if atr_values else None
+    candle_ts = int(candles[-1]["ts"])
+    identity = hashlib.sha256(json.dumps(
+        {
+            "entry_ast": definition.get("entry_ast"),
+            "exit_plan": definition.get("exit_plan"),
+            "protective_stop_pct": definition.get("protective_stop_pct"),
+        }, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8")).hexdigest()
+    return {
+        "entry": bool(mask[-1]),
+        "candle_ts": candle_ts,
+        "candle_id": "%s:%s:%s:%d" % (
+            definition.get("key"), SYMBOL, BAR, candle_ts,
+        ),
+        "entry_info": {
+            "price": float(candles[-1]["close"]),
+            "entry_signal_ts": candle_ts,
+            "entry_atr_pct": float(atr_pct) if atr_pct is not None else None,
+            "protective_stop_pct": float(definition.get("protective_stop_pct")),
+            "semantic_strategy_hash": identity,
+            "exit_plan": definition.get("exit_plan"),
+            "execution_contract": "closed_signal_bar_then_market_entry",
+            "atr_reference_contract": "last_fully_closed_signal_bar",
+        },
+    }
+
+
+def _semantic_trigger_unit(trigger):
+    """Map creator DSL units onto the live evaluator.
+
+    `exit_dsl.TRIGGER_UNITS` is `percent|atr`.  Older live code only accepted
+    `pct`, so a valid `percent` plan never produced a take-profit distance.
+    """
+    unit = str((trigger or {}).get("unit") or "").strip().lower()
+    if unit in ("percent", "pct", "%", "percentage"):
+        return "percent"
+    if unit == "atr":
+        return "atr"
+    return ""
+
+
+def _semantic_trigger_distance(trigger, entry_price, atr_value):
+    trigger = trigger or {}
+    value = float(trigger.get("value") or 0.0)
+    unit = _semantic_trigger_unit(trigger)
+    if unit == "atr":
+        return value * atr_value
+    if unit == "percent":
+        return value * entry_price
+    return None
+
+
+def _exit_plan_needs_atr(plan):
+    """True when any authored trigger is ATR-denominated."""
+    triggers = []
+    plan = plan or {}
+    triggers.append(plan.get("primary_take_profit"))
+    trailing = plan.get("trailing") or {}
+    if isinstance(trailing, dict):
+        triggers.extend([trailing.get("activation"), trailing.get("distance")])
+    breakeven = plan.get("breakeven") or {}
+    if isinstance(breakeven, dict):
+        triggers.append(breakeven.get("activation"))
+    for row in list(plan.get("partial_exits") or []):
+        triggers.append((row or {}).get("trigger"))
+    return any(_semantic_trigger_unit(item) == "atr" for item in triggers)
+
+
+def _atr_pct_from_candles(candles, period=14):
+    rows = [
+        row for row in (candles or [])
+        if row.get("high") is not None and row.get("low") is not None
+        and row.get("close") is not None
+    ]
+    if len(rows) < period + 1:
+        return None
+    trs = []
+    start = len(rows) - period
+    for j in range(start, len(rows)):
+        high = float(rows[j]["high"])
+        low = float(rows[j]["low"])
+        prev_close = float(rows[j - 1]["close"])
+        trs.append(max(high - low, abs(high - prev_close), abs(low - prev_close)))
+    close = float(rows[-1]["close"])
+    if close <= 0.0:
+        return None
+    return (sum(trs) / float(period)) / close
+
+
+def _with_live_price_bar(candles, live_price, bar_seconds, now_ts=None):
+    """Overlay the in-progress bar so conditions can fire before the close."""
+    rows = [dict(row) for row in (candles or [])]
+    try:
+        live_price = float(live_price)
+    except (TypeError, ValueError):
+        return rows
+    if live_price <= 0.0 or bar_seconds <= 0:
+        return rows
+    now_ms = int((time.time() if now_ts is None else float(now_ts)) * 1000.0)
+    bar_ms = int(float(bar_seconds) * 1000.0)
+    period_start = (now_ms // bar_ms) * bar_ms
+    if rows and int(rows[-1].get("ts") or 0) >= period_start:
+        last = dict(rows[-1])
+        last["close"] = live_price
+        last["high"] = max(float(last.get("high") or live_price), live_price)
+        last["low"] = min(float(last.get("low") or live_price), live_price)
+        rows[-1] = last
+        return rows
+    open_px = float(rows[-1]["close"]) if rows else live_price
+    rows.append({
+        "ts": period_start,
+        "open": open_px,
+        "high": max(open_px, live_price),
+        "low": min(open_px, live_price),
+        "close": live_price,
+    })
+    return rows
+
+
+def _conditional_exit_ast(when):
+    if isinstance(when, dict) and when.get("type") == "market_ast":
+        return when.get("ast")
+    return when
+
+
+def _compile_conditional_mask(when, candles, symbol, timeframe):
+    from dual_engine_workflow_v2 import ast_compiler
+    from dual_engine_workflow_v2.easyquant_bridge import _build_factor_matrix
+    matrix = _build_factor_matrix(candles, symbol=symbol, timeframe=timeframe)
+    compiled = ast_compiler.compile_ast_to_mask(
+        _conditional_exit_ast(when), matrix,
+        feature_registry_list=ast_compiler.formal_feature_registry(),
+    )
+    mask = list(compiled.get("mask") or [])
+    return bool(compiled.get("ok") and mask and mask[-1])
+
+
+def _strip_unclosed_bars(candles, bar_seconds, now_ts=None):
+    """Drop the in-progress timeframe bucket even if a caller passed it in."""
+    try:
+        bar_ms = int(float(bar_seconds) * 1000.0)
+    except (TypeError, ValueError):
+        return list(candles or [])
+    if bar_ms <= 0:
+        return list(candles or [])
+    now_ms = int((time.time() if now_ts is None else float(now_ts)) * 1000.0)
+    period_start = (now_ms // bar_ms) * bar_ms
+    out = []
+    for bar in candles or []:
+        try:
+            ts = int((bar or {}).get("ts") or 0)
+        except (TypeError, ValueError):
+            continue
+        if 0 < ts < period_start:
+            out.append(bar)
+    return out
+
+
+def _has_closed_bar_after_signal(closed_candles, signal_ts):
+    """True once at least one completed bar exists after the entry signal bar.
+
+    Invalidation AST must not see the in-progress live bar. Without this gate a
+    1h short can scratch on the same forming hour that just filled.
+    """
+    try:
+        gate = int(signal_ts or 0)
+    except (TypeError, ValueError):
+        gate = 0
+    if gate <= 0:
+        return False
+    for bar in closed_candles or []:
+        try:
+            ts = int((bar or {}).get("ts") or 0)
+        except (TypeError, ValueError):
+            continue
+        if ts > gate:
+            return True
+    return False
+
+
+def _clamp_trail_stop(stop_price, entry_price, direction):
+    """Once trailing is armed, never give back past entry."""
+    if direction == "long":
+        return max(float(stop_price), float(entry_price))
+    return min(float(stop_price), float(entry_price))
+
+
+def _filled_original_fraction(receipts):
+    """Sum filled reductions as fractions of the original filled size."""
+    total = 0.0
+    for rec in (receipts or {}).values():
+        if not isinstance(rec, dict):
+            continue
+        if rec.get("status") != "filled":
+            continue
+        try:
+            value = float(rec.get("fraction_of_original") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if value > 0.0:
+            total += value
+    if total < 0.0:
+        return 0.0
+    if total > 1.0:
+        return 1.0
+    return total
+
+
+def _conditional_close_fraction(row):
+    """Backtest contract: fraction of the *remaining* position, default all."""
+    try:
+        value = float((row or {}).get("close_fraction"))
+    except (TypeError, ValueError):
+        return 1.0
+    if value <= 0.0 or value > 1.0:
+        return 1.0
+    return value
+
+
+def _semantic_live_exit(definition, current, candles):
+    """Evaluate the continuous creator exit against actual filled entry data."""
+    entry_data = dict(current.get("entry_data") or {})
+    entry_price = float(current.get("entry_price") or entry_data.get("price") or 0.0)
+    if entry_price <= 0.0:
+        return {"ok": False, "should_close": False, "reason": "entry_price_missing"}
+    plan = definition.get("exit_plan") or {}
+    atr_pct = float(entry_data.get("entry_atr_pct") or 0.0)
+    if atr_pct <= 0.0:
+        recovered = _atr_pct_from_candles(candles)
+        atr_pct = float(recovered or 0.0)
+    if _exit_plan_needs_atr(plan) and atr_pct <= 0.0:
+        return {"ok": False, "should_close": False, "reason": "entry_atr_pct_missing"}
+    direction = str(definition.get("direction") or "long").lower()
+    sign = 1.0 if direction == "long" else -1.0
+    atr_value = entry_price * atr_pct
+    signal_ts = int(float(entry_data.get("entry_signal_ts") or 0))
+    insts = definition.get("supported_instruments") or []
+    inst_id = str(insts[0] if insts else SYMBOL)
+    bar_seconds = {"5m": 300, "15m": 900, "1h": 3600}.get(TIMEFRAME, 3600)
+    raw = _okx_request(
+        "GET", "/api/v5/market/ticker", params={"instId": inst_id}, auth=False,
+    )
+    ticker_rows = raw.get("data") if isinstance(raw, dict) and str(raw.get("code")) == "0" else []
+    live_price = float((ticker_rows or [{}])[0].get("last"))
+    eval_candles = _with_live_price_bar(candles, live_price, bar_seconds)
+    active_rows = [row for row in eval_candles if int(row.get("ts") or 0) > signal_ts]
+    highs = [float(row["high"]) for row in active_rows]
+    lows = [float(row["low"]) for row in active_rows]
+    best_price = (
+        max([entry_price, live_price] + highs) if direction == "long"
+        else min([entry_price, live_price] + lows)
+    )
+    favorable = sign * (best_price - entry_price) / entry_price
+
+    # Partial exits are expressed as fractions of the original filled size in
+    # the creator/backtest contract.  The executor owns the durable receipt;
+    # this evaluator only reports the next unfired target.  A prepared or
+    # uncertain receipt is deliberately reported again so the executor can
+    # reconcile the same clOrdId instead of submitting a second reduction.
+    partial_receipts = dict(current.get("partial_exit_receipts") or {})
+    for index, row in enumerate(list(plan.get("partial_exits") or [])):
+        event_id = "semantic_partial_exit_%d" % index
+        receipt = dict(partial_receipts.get(event_id) or {})
+        if receipt.get("status") == "filled":
+            continue
+        distance = _semantic_trigger_distance(
+            row.get("trigger"), entry_price, atr_value,
+        )
+        target = entry_price + sign * distance if distance is not None else None
+        target_hit = target is not None and (
+            live_price >= target if direction == "long" else live_price <= target
+        )
+        historical_hit = target is not None and any(
+            (float(bar["high"]) >= target if direction == "long"
+             else float(bar["low"]) <= target)
+            for bar in active_rows
+        )
+        if target_hit or historical_hit or receipt:
+            return {
+                "ok": True,
+                "should_close": False,
+                "should_partial_close": True,
+                "reason": "semantic_partial_exit",
+                "partial_event_id": event_id,
+                "fraction_of_original": float(row.get("fraction")),
+                "exit_info": {
+                    "exit_type": "分批止盈",
+                    "partial_exit_index": index,
+                    "target_price": target,
+                    "live_price": live_price,
+                    "historical_hit": historical_hit,
+                    "receipt_status": receipt.get("status"),
+                },
+            }
+
+    primary = plan.get("primary_take_profit")
+    if primary:
+        distance = _semantic_trigger_distance(primary, entry_price, atr_value)
+        target = entry_price + sign * distance if distance is not None else None
+        target_hit = target is not None and (
+            live_price >= target if direction == "long" else live_price <= target
+        )
+        historical_hit = target is not None and any(
+            (float(row["high"]) >= target if direction == "long" else float(row["low"]) <= target)
+            for row in active_rows
+        )
+        if target_hit or historical_hit:
+            return {
+                "ok": True, "should_close": True,
+                "reason": "semantic_primary_take_profit",
+                "exit_info": {"exit_type": "连续目标止盈", "target_price": target,
+                              "live_price": live_price, "historical_hit": historical_hit},
+            }
+
+    eval_bar_ts = int((eval_candles[-1] or {}).get("ts") or 0) if eval_candles else 0
+    closed_candles = _strip_unclosed_bars(list(candles or []), bar_seconds)
+    invalidation_ready = _has_closed_bar_after_signal(closed_candles, signal_ts)
+    for index, row in enumerate(list(plan.get("conditional_exits") or [])):
+        role = str(row.get("role") or "invalidation")
+        if role == "take_profit":
+            candles_for_mask = eval_candles
+            intrabar = True
+        else:
+            if not invalidation_ready:
+                continue
+            candles_for_mask = closed_candles
+            intrabar = False
+        try:
+            condition_met = _compile_conditional_mask(
+                row.get("when"), candles_for_mask, inst_id, TIMEFRAME,
+            )
+        except Exception:
+            condition_met = False
+        if not condition_met:
+            continue
+        exit_type = "条件止盈" if role == "take_profit" else "条件失效平仓"
+        close_fraction = _conditional_close_fraction(row)
+        condition_id = str(
+            row.get("condition_id") or ("condition_%02d" % (index + 1))
+        )
+        info = {
+            "exit_type": exit_type,
+            "condition_id": condition_id,
+            "live_price": live_price,
+            "intrabar": intrabar,
+            "close_fraction": close_fraction,
+        }
+        if close_fraction >= 1.0 - 1e-12:
+            return {
+                "ok": True, "should_close": True,
+                "reason": "semantic_conditional_exit",
+                "exit_info": info,
+            }
+        remaining = 1.0 - _filled_original_fraction(partial_receipts)
+        live_frac = remaining * close_fraction
+        event_id = "semantic_conditional_partial_%s_%s" % (
+            condition_id, eval_bar_ts,
+        )
+        receipt = dict(partial_receipts.get(event_id) or {})
+        if receipt.get("status") == "filled":
+            continue
+        if live_frac <= 1e-12:
+            continue
+        info["remaining_original_fraction"] = remaining
+        info["receipt_status"] = receipt.get("status")
+        return {
+            "ok": True,
+            "should_close": False,
+            "should_partial_close": True,
+            "reason": "semantic_conditional_partial_exit",
+            "partial_event_id": event_id,
+            "fraction_of_original": live_frac,
+            "exit_info": info,
+        }
+
+    dynamic_stops = []
+    breakeven = plan.get("breakeven")
+    if breakeven:
+        activation = _semantic_trigger_distance(
+            breakeven.get("activation"), entry_price, atr_value,
+        )
+        if activation is not None and favorable + 1e-12 >= activation / entry_price:
+            dynamic_stops.append((
+                entry_price * (1.0 + sign * float(breakeven.get("offset_pct") or 0.0)),
+                "保本退出",
+            ))
+    trailing = plan.get("trailing")
+    if trailing:
+        activation = _semantic_trigger_distance(
+            trailing.get("activation"), entry_price, atr_value,
+        )
+        distance = _semantic_trigger_distance(
+            trailing.get("distance"), entry_price, atr_value,
+        )
+        if (
+            activation is not None and distance is not None
+            and favorable + 1e-12 >= activation / entry_price
+        ):
+            raw_stop = best_price - sign * distance
+            dynamic_stops.append((
+                _clamp_trail_stop(raw_stop, entry_price, direction),
+                "动态追踪退出",
+            ))
+    elif plan.get("primary_take_profit"):
+        primary_distance = _semantic_trigger_distance(
+            plan.get("primary_take_profit"), entry_price, atr_value,
+        )
+        if primary_distance:
+            activation = 0.5 * primary_distance
+            distance = 0.25 * primary_distance
+            if favorable + 1e-12 >= activation / entry_price:
+                raw_stop = best_price - sign * distance
+                dynamic_stops.append((
+                    _clamp_trail_stop(raw_stop, entry_price, direction),
+                    "派生追踪退出",
+                ))
+    for stop_price, exit_type in dynamic_stops:
+        hit = live_price <= stop_price if direction == "long" else live_price >= stop_price
+        if hit:
+            return {
+                "ok": True, "should_close": True, "reason": "semantic_dynamic_exit",
+                "exit_info": {"exit_type": exit_type, "stop_price": stop_price,
+                              "live_price": live_price, "best_price": best_price},
+            }
+
+    max_bars = int(plan.get("max_holding_bars") or 0)
+    bar_seconds = {"5m": 300, "15m": 900, "1h": 3600}.get(TIMEFRAME, 3600)
+    opened_at = float(current.get("opened_at_ts") or 0.0)
+    if (
+        max_bars > 0 and signal_ts
+        and definition.get("timed_exit_anchor") == "closed_signal_bar_boundary"
+    ):
+        signal_seconds = (
+            float(signal_ts) / 1000.0 if float(signal_ts) > 100000000000.0
+            else float(signal_ts)
+        )
+        scheduled_ts = signal_seconds + (max_bars + 1) * bar_seconds
+        if time.time() >= scheduled_ts:
+            return {
+                "ok": True, "should_close": True,
+                "reason": "semantic_second_candle_open_exit",
+                "exit_info": {
+                    "exit_type": "第二根K线开盘平仓",
+                    "max_holding_bars": max_bars,
+                    "scheduled_ts": scheduled_ts,
+                },
+            }
+    if max_bars > 0 and opened_at and time.time() >= opened_at + max_bars * bar_seconds:
+        return {
+            "ok": True, "should_close": True, "reason": "semantic_timed_exit",
+            "exit_info": {"exit_type": "定时强制平仓", "max_holding_bars": max_bars},
+        }
+    return {
+        "ok": True, "should_close": False, "reason": "semantic_exit_not_met",
+        "exit_info": {"live_price": live_price, "best_price": best_price,
+                      "favorable_excursion": favorable},
+    }
 
 
 def _read_json(path, default):
@@ -266,9 +860,20 @@ def load_closed_candles(limit=None):
 def _frame(candles):
     df = pd.DataFrame(candles)
     df.index = pd.to_datetime(df.pop("ts"), unit="ms", utc=True)
-    return bt.precompute_indicators(
+    frame = bt.precompute_indicators(
         df[["open", "high", "low", "close"]], timeframe=TIMEFRAME
     )
+    # The research/backtest path defines h1_slope4 on a native 1h frame as
+    # the four-bar percentage change of EMA19.  The generic indicator builder
+    # only adds its resampled form for 5m/15m frames, so reproduce the exact
+    # research definition here instead of making every native-1h DSL strategy
+    # fail permanently with a missing feature.
+    if TIMEFRAME == "1h" and "h1_slope4" not in frame.columns:
+        frame["h1_slope4"] = (
+            frame["ema19"].astype(float)
+            / frame["ema19"].astype(float).shift(4) - 1.0
+        )
+    return frame
 
 
 def _frame_context(candles):
@@ -415,6 +1020,7 @@ def _diagnose_not_triggered(strategy_key, candles):
 
 
 def compute_signal_for(strategy_key, candles=None):
+    _refresh_configured_strategies()
     meta = STRATEGIES.get(strategy_key)
     if not meta:
         return {"ok": False, "signal": "not_ready", "strategy_key": strategy_key,
@@ -423,6 +1029,33 @@ def compute_signal_for(strategy_key, candles=None):
     if not loaded.get("ok"):
         result = {"ok": False, "signal": "not_ready", "strategy_key": strategy_key,
                   "reason": loaded.get("error"), "data": loaded, "time": _now()}
+    elif strategy_key in _SEMANTIC_STRATEGIES:
+        try:
+            ev = _semantic_entry_evaluation(
+                _SEMANTIC_STRATEGIES[strategy_key], loaded["candles"],
+            )
+            result = {
+                "ok": True,
+                "strategy_key": strategy_key,
+                "strategy_name": meta["name"],
+                "symbol": SYMBOL,
+                "timeframe": BAR,
+                "uses_authoritative_semantic_creator_logic": True,
+                "confirmed_candles_only": True,
+                "signal": meta["side"] if ev["entry"] else "none",
+                "side": meta["side"] if ev["entry"] else None,
+                "signal_candle_ts": ev["candle_ts"],
+                "signal_candle_id": ev["candle_id"],
+                "entry_info": ev["entry_info"],
+                "source": loaded.get("source"),
+                "time": _now(),
+            }
+        except Exception as exc:
+            result = {
+                "ok": False, "signal": "not_ready", "strategy_key": strategy_key,
+                "reason": "semantic live evaluation failed: %s" % str(exc)[:240],
+                "time": _now(),
+            }
     else:
         ev = _evaluate(loaded["candles"], strategy_key=strategy_key)
         entry_info = dict(ev["entry_info"] or {})
@@ -453,9 +1086,14 @@ def compute_signal(candles=None):
 def should_close_position_for(strategy_key, current=None, signal=None, candles=None):
     if not isinstance(current, dict):
         return {"ok": True, "should_close": False, "reason": "no current position"}
+    _refresh_configured_strategies()
     loaded = {"ok": True, "candles": candles, "source": "provided"} if candles is not None else load_closed_candles()
     if not loaded.get("ok"):
         return {"ok": False, "should_close": False, "reason": loaded.get("error")}
+    if strategy_key in _SEMANTIC_STRATEGIES:
+        return _semantic_live_exit(
+            _SEMANTIC_STRATEGIES[strategy_key], current, loaded["candles"],
+        )
     ev = _evaluate(loaded["candles"], current=current, strategy_key=strategy_key)
     timed_exit = False
     live_price_exit = False
@@ -466,7 +1104,6 @@ def should_close_position_for(strategy_key, current=None, signal=None, candles=N
         "ng5_exhaustion_fade_short_ai",
         "ng5_session_exhaustion_reclaim_long_ai",
         "xag5_session_breakdown_short_ai",
-        "ltc5_exhaustion_fade_short_ai",
         "ada5_session_trend_pullback_short_ai",
         "xau15_h1_breakout_long_ai",
     }

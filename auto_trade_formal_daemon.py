@@ -5,18 +5,12 @@ import os, sys, json, time, tempfile, subprocess
 
 ROOT = Path("/root")
 AUTO_DIR = ROOT / "auto_trade"
+import auto_trade_slot_paths as slot_paths
 TRADE_SYMBOL = os.environ.get("VECTOR_TRADE_SYMBOL", "BTC-USDT-SWAP").strip().upper()
 INSTANCE_KEY = TRADE_SYMBOL.split("-")[0].lower()
-TRADE_TIMEFRAME = os.environ.get("VECTOR_TRADE_TIMEFRAME", "1h").strip().lower()
-TRADE_TIMEFRAME = (
-    "5m" if TRADE_TIMEFRAME in ("5m", "5min", "5minute")
-    else ("15m" if TRADE_TIMEFRAME in ("15m", "15min", "15minute") else "1h")
-)
-INSTANCE_SUFFIX = (
-    "_" + INSTANCE_KEY + "_" + TRADE_TIMEFRAME
-    if TRADE_TIMEFRAME in ("15m", "5m")
-    else ("" if TRADE_SYMBOL == "BTC-USDT-SWAP" else "_" + INSTANCE_KEY)
-)
+TRADE_TIMEFRAME = slot_paths.normalize_timeframe(
+    os.environ.get("VECTOR_TRADE_TIMEFRAME", "1h"))
+INSTANCE_SUFFIX = slot_paths.instance_suffix(TRADE_SYMBOL, TRADE_TIMEFRAME)
 CONFIG_FILE = AUTO_DIR / ("formal_daemon_config%s.json" % INSTANCE_SUFFIX)
 PID_FILE = AUTO_DIR / ("formal_daemon%s.pid" % INSTANCE_SUFFIX)
 LOG_FILE = ROOT / "logs" / "backtest" / ("formal_daemon%s.log" % INSTANCE_SUFFIX)
@@ -240,7 +234,7 @@ def run_forever():
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
     PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
     _append_event("daemon_started", {"pid": os.getpid()})
-    asset_rank = {"BTC-USDT-SWAP":0,"CL-USDT-SWAP":1,"XAU-USDT-SWAP":2,"NG-USDT-SWAP":3,"XAG-USDT-SWAP":4,"LTC-USDT-SWAP":5,"ADA-USDT-SWAP":6}.get(TRADE_SYMBOL,7)
+    asset_rank = {"BTC-USDT-SWAP":0,"CL-USDT-SWAP":1,"XAU-USDT-SWAP":2,"NG-USDT-SWAP":3,"XAG-USDT-SWAP":4,"ADA-USDT-SWAP":5}.get(TRADE_SYMBOL,6)
     timeframe_rank = {"1h":0,"15m":1,"5m":2}.get(TRADE_TIMEFRAME,2)
     startup_stagger_sec = asset_rank*3 + timeframe_rank
     if startup_stagger_sec:
@@ -272,7 +266,7 @@ def run_forever():
         else:
             sleep_for = max(10, interval)
             bar_seconds = {"5m": 300, "15m": 900, "1h": 3600}[TRADE_TIMEFRAME]
-            asset_rank = {"BTC-USDT-SWAP":0,"CL-USDT-SWAP":1,"XAU-USDT-SWAP":2,"NG-USDT-SWAP":3,"XAG-USDT-SWAP":4,"LTC-USDT-SWAP":5,"ADA-USDT-SWAP":6}.get(TRADE_SYMBOL,7)
+            asset_rank = {"BTC-USDT-SWAP":0,"CL-USDT-SWAP":1,"XAU-USDT-SWAP":2,"NG-USDT-SWAP":3,"XAG-USDT-SWAP":4,"ADA-USDT-SWAP":5}.get(TRADE_SYMBOL,6)
             # Wake just after a close boundary in priority order, even when the
             # ordinary polling phase would otherwise miss that boundary.
             boundary_phase = 2.0 + min(asset_rank, 8)
@@ -348,16 +342,18 @@ def _stage823_merge_defaults(cfg):
     out["position_mode"] = "full_balance"
     out["full_position_ratio"] = float(out.get("full_position_ratio", 1.0))
     try:
-        out["leverage"] = int(out.get("leverage", 20))
+        out["leverage"] = float(out.get("leverage", 20))
     except Exception:
-        out["leverage"] = 20
-    if out["leverage"] not in (20, 30, 50):
-        out["leverage"] = 20
+        out["leverage"] = 20.0
+    if not (0.0 < out["leverage"] <= 125.0):
+        out["leverage"] = 20.0
     try:
         out["stop_loss_pct"] = float(out.get("stop_loss_pct", 0.009))
     except Exception:
         out["stop_loss_pct"] = 0.009
-    if out["stop_loss_pct"] not in (0.003, 0.006, 0.009):
+    # Creator-authored protective stops (e.g. 0.78%) must not be rewritten
+    # to the legacy 0.3/0.6/0.9% menu.
+    if not (0.0 < out["stop_loss_pct"] < 1.0):
         out["stop_loss_pct"] = 0.009
     out.setdefault("take_profit_pct", 0.009)
     out.setdefault("notification_enabled", True)
@@ -388,10 +384,23 @@ def force_safe_defaults_for_install():
     return {"ok": True, "config": cfg}
 
 def _tick_core(strategy, executor, cfg, persist=True):
+    result = {"ok": True, "time": _now(), "stage": "formal_daemon_tick_stage8_23_final_safe",
+              "config": cfg, "action": "observe_only", "persist": persist}
+    try:
+        import auto_trade_session_clock as session_clock
+        if not session_clock.in_session(symbol=TRADE_SYMBOL):
+            result["action"] = "outside_trading_session"
+            result["session"] = session_clock.session_snapshot(symbol=TRADE_SYMBOL)
+            return result
+    except Exception as exc:
+        result["action"] = "outside_trading_session"
+        result["session_error"] = str(exc)
+        return result
     sig = strategy.compute_signal()
     ex_status = executor.get_status()
     cur = ex_status.get("current")
-    result = {"ok": True, "time": _now(), "stage": "formal_daemon_tick_stage8_23_final_safe", "config": cfg, "signal": sig, "executor": {"current": cur}, "action": "observe_only", "persist": persist}
+    result["signal"] = sig
+    result["executor"] = {"current": cur}
     if not cfg.get("enabled"):
         result["action"]="daemon_disabled"
         return result
@@ -510,7 +519,6 @@ MULTI_STRATEGY_KEYS = [
     "ng5_exhaustion_fade_short_ai",
     "ng5_session_exhaustion_reclaim_long_ai",
     "xag5_session_breakdown_short_ai",
-    "ltc5_exhaustion_fade_short_ai",
     "ada5_session_trend_pullback_short_ai",
     "xau15_h1_breakout_long_ai",
 ]
@@ -518,6 +526,18 @@ AUTO_TRADE_DISQUALIFIED_KEYS = {
     # Permanently removed from auto-trade; never ghost-remount via empty defaults.
     "ema7_center_down_short",
     "ema6_center_down_then_fall",
+    "kimi_b4ff432088365cd175325671",  # 布林带扩张末段下行排列中的反弹衰竭做空
+    "kimi_b5a7b6e067e1eae0d88519b6",  # EMA空头排列+强趋势中等波动顺势做空（优化四：紧追踪）
+    "ltc5_exhaustion_fade_short_ai",
+    "kimi_20e464e4ac3a234643173220",  # LTC 趋势动量衰减环境过滤做空
+    "kimi_aea1e1ca833630868a8c0f20",  # LTC 超买动量衰竭均值回归做空
+    # 2026-08-20: RSI/KDJ-named leftover strategies. CCI is not banned.
+    "j_cross_79_short",
+    "j_cross_7_8_long",
+    "eth5m_vol_expand_long_kdj_mid_j80",
+    "kimi_d45762d746b57d543bf23d63",
+    "kimi_92a8fb5688e1138c21ec2fa1",
+    "kimi_2b50b015cde71a8c012bd35b",
 }
 
 def _approved_dsl_live_keys():
@@ -533,9 +553,29 @@ def _approved_dsl_live_keys():
     except Exception:
         return set()
 
+def _approved_semantic_live_keys():
+    """Creator AST strategies mounted after the single quality inspector."""
+    try:
+        path = Path("/root/strategy_configs/semantic_live_strategies.json")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return set(
+            row.get("key") for row in data.get("strategies", [])
+            if row.get("live_enabled") is True
+            and row.get("timeframe") == TRADE_TIMEFRAME
+            and TRADE_SYMBOL in (row.get("supported_instruments") or [])
+        )
+    except Exception:
+        return set()
+
 def _strategy_auto_trade_allowed(key):
     if key in AUTO_TRADE_DISQUALIFIED_KEYS:
         return False
+    try:
+        from dual_engine_workflow_v2.legacy_indicator_strategy_ban import is_banned_key
+        if is_banned_key(key):
+            return False
+    except Exception:
+        pass
     try:
         path = Path("/root/strategy_configs/experimental_strategies.json")
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -690,26 +730,39 @@ def _strategy_runtime_allowed(key):
         return True
 
 
-def _probe_position_ratio_cap(strategy_key, grade_ratio):
-    """Apply S/A/B/C max_position_ratio from runtime assignment only.
-
-    Old E/D probe caps, cold-start half-C, and environment-approximate
-    overlays are removed (designer 2026-07-24).
-    """
+def _tier_position_ratio(strategy_key):
+    """马卡龙 50% / 大福 25% only. Leftover SABC ratios are ignored."""
+    key = str(strategy_key or "")
+    if not key:
+        return None
     try:
-        assignment, row, _controls = _assignment_control_row(strategy_key)
+        import auto_trade_live_roster as roster
+        import auto_trade_strategy_tiers as tiers
+        for row in roster.load_roster():
+            if str(row.get("strategy_key") or "") != key:
+                continue
+            ratio = tiers.position_ratio(row.get("strategy_tier"))
+            if ratio:
+                return float(ratio)
+            try:
+                return float(row.get("explicit_position_ratio"))
+            except Exception:
+                pass
     except Exception:
-        return float(grade_ratio)
-    cap = row.get("max_position_ratio")
+        pass
     try:
-        if cap is None:
-            return float(grade_ratio)
-        cap = float(cap)
+        import auto_trade_strategy_tiers as tiers
+        _aid, row, _controls = _assignment_control_row(key)
+        ratio = tiers.position_ratio(
+            row.get("strategy_tier") or row.get("strategy_tier_label"))
+        if ratio:
+            return float(ratio)
+        code = tiers.normalize(position_ratio=row.get("explicit_position_ratio"))
+        if code:
+            return float(tiers.position_ratio(code))
     except Exception:
-        return float(grade_ratio)
-    if cap <= 0:
-        return 0.0
-    return min(float(grade_ratio), cap)
+        pass
+    return None
 
 
 def _active_strategy_keys(cfg):
@@ -720,7 +773,11 @@ def _active_strategy_keys(cfg):
     elif not isinstance(keys, list):
         keys = []
     out = []
-    allowed_keys = set(MULTI_STRATEGY_KEYS) | _approved_dsl_live_keys()
+    allowed_keys = (
+        set(MULTI_STRATEGY_KEYS)
+        | _approved_dsl_live_keys()
+        | _approved_semantic_live_keys()
+    )
     for key in keys:
         key = str(key or "")
         if (
@@ -824,11 +881,106 @@ def _clear_kline_close_pending(cfg, strategy_key):
     pending_map.pop(strategy_key, None)
     return True
 
+
+_PORTFOLIO_SUPPRESS_ERRORS = (
+    "portfolio max open positions reached",
+    "symbol already has an active position",
+    "account has pending swap orders",
+    "portfolio estimated risk limit exceeded",
+    "daily entry limit reached",
+    "daily realized loss circuit breaker",
+    "consecutive loss circuit breaker",
+)
+
+
+def _open_fail_consumes_signal(opened):
+    """True when this candle must not be retried after a failed/skipped open.
+
+    Occupancy and other account-policy blocks miss the closed-bar market
+    window. Retrying after another position frees margin is a delayed fill,
+    not the strategy's intended entry.
+    """
+    if not isinstance(opened, dict) or opened.get("ok"):
+        return False
+    if opened.get("occupancy_skip"):
+        return True
+    err = str(opened.get("error") or "")
+    if "资金占用已满" in err:
+        return True
+    if err == "full balance sizing failed":
+        return True
+    blob = err
+    sizing = opened.get("sizing")
+    if isinstance(sizing, dict):
+        blob += " %s" % (sizing.get("error") or "")
+    if "insufficient available margin" in blob:
+        return True
+    if opened.get("portfolio_risk_policy") is True and err in _PORTFOLIO_SUPPRESS_ERRORS:
+        return True
+    return False
+
+
+def _open_fail_suppress_action(opened):
+    if not isinstance(opened, dict):
+        return "signal_suppressed_by_portfolio_risk_policy"
+    err = str(opened.get("error") or "")
+    blob = err
+    sizing = opened.get("sizing")
+    if isinstance(sizing, dict):
+        blob += " %s" % (sizing.get("error") or "")
+    if (
+        opened.get("occupancy_skip")
+        or "资金占用已满" in err
+        or err == "full balance sizing failed"
+        or "insufficient available margin" in blob
+    ):
+        return "signal_suppressed_by_capital_occupancy"
+    return "signal_suppressed_by_portfolio_risk_policy"
+
+
+def _mark_seen_closed_candles(cfg, signals):
+    """Consume the latest closed bar for every mounted key while in a position.
+
+    Cooldown is measured from last OPEN, so a hold longer than
+    cooldown_sec_after_open leaves the door open. last_signal_candle_ids only
+    recorded the entry bar. After 止盈/止损 the same still-true breakout on the
+    latest closed bar would open again on the next tick.
+    """
+    processed = cfg.get("last_signal_candle_ids")
+    if not isinstance(processed, dict):
+        processed = {}
+    changed = False
+    last_id = cfg.get("last_signal_candle_id")
+    for sig in signals or []:
+        key = sig.get("strategy_key")
+        cid = sig.get("signal_candle_id")
+        if not key or not cid:
+            continue
+        if processed.get(key) != cid:
+            processed[key] = cid
+            changed = True
+        last_id = cid
+    if changed:
+        cfg["last_signal_candle_ids"] = processed
+        if last_id:
+            cfg["last_signal_candle_id"] = last_id
+    return changed
+
 def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signals=None):
     result = {"ok": True, "time": _now(), "stage": "formal_daemon_multi_strategy_v1",
               "config": cfg, "action": "observe_only", "persist": persist}
     if not cfg.get("enabled"):
         result["action"] = "daemon_disabled"
+        return result
+    try:
+        import auto_trade_session_clock as session_clock
+        if not session_clock.in_session(symbol=TRADE_SYMBOL):
+            result["action"] = "outside_trading_session"
+            result["session"] = session_clock.session_snapshot(symbol=TRADE_SYMBOL)
+            return result
+    except Exception as exc:
+        result["action"] = "outside_trading_session"
+        result["session_error"] = str(exc)
         return result
 
     if candles is None:
@@ -861,27 +1013,12 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
             )
             signal["strategy_rating"] = {
                 key: live_rating.get(key) for key in (
-                    "grade", "grade_rank", "expected_win_rate_pct",
+                    "expected_win_rate_pct",
                     "expected_return_per_trade_pct", "recommended_action",
+                    "strategy_tier", "strategy_tier_label", "position_ratio",
                 )
             } if live_rating else {}
-            # Runtime controls are the authoritative grade source.  Overlay
-            # them even if the one-minute projection file is briefly stale.
-            try:
-                _aid, _control, _controls = _assignment_control_row(
-                    signal.get("strategy_key"))
-                _grade = str(_control.get("lifecycle_grade") or "").upper()
-                if _grade in ("S", "A", "B", "C"):
-                    signal.setdefault("strategy_rating", {})["grade"] = _grade
-                    signal["strategy_rating"]["grade_rank"] = {
-                        "S": 4, "A": 3, "B": 2, "C": 1,
-                    }[_grade]
-                    signal["strategy_rating"]["grade_source"] = (
-                        "strategy_runtime_controls")
-            except Exception:
-                pass
         signals.sort(key=lambda signal: (
-            -int((signal.get("strategy_rating") or {}).get("grade_rank") or 0),
             -float((signal.get("strategy_rating") or {}).get("expected_return_per_trade_pct") or -999),
             -float((signal.get("strategy_rating") or {}).get("expected_win_rate_pct") or 0),
         ))
@@ -895,12 +1032,16 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
     result["executor"] = {"current": cur}
 
     if cur:
+        seen_closed = _mark_seen_closed_candles(cfg, signals)
         cleared_pending = [
             key for key in _KLINE_CLOSE_DELAY_SECONDS
             if _clear_kline_close_pending(cfg, key)
         ]
-        if cleared_pending and persist:
+        if persist and (seen_closed or cleared_pending):
             _write_json(CONFIG_FILE, cfg)
+        if seen_closed:
+            result["consumed_closed_candles_while_in_position"] = True
+        if cleared_pending:
             result["kline_close_entry_delay"] = {
                 "status": "cleared_position_exists",
                 "strategy_keys": cleared_pending,
@@ -928,9 +1069,10 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
         result["strategy_close_check"] = close_check
         if close_check.get("should_close"):
             exit_type = str((close_check.get("exit_info") or {}).get("exit_type") or "")
-            reason = "strategy_timed_forced_close" if exit_type == "定时强制平仓" else "strategy_take_profit_authoritative_exit"
+            import auto_trade_formal_notify as _notify
+            reason = _notify.close_reason_from_exit_type(exit_type)
             if cfg.get("allow_auto_close"):
-                close = executor.close_current(reason=reason)
+                close = executor.close_current(reason=reason, exit_type=exit_type)
                 result.update({"action": "strategy_close_attempted", "close_reason": reason,
                                "close_result": close,
                                "notification_sent": bool(close.get("notification_sent")),
@@ -941,13 +1083,10 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
         result["action"] = "position_exists_managed"
         return result
 
-    # Grade controls real capital, not only signal ordering.  These are
-    # absolute account-equity allocations.  They must never be multiplied by
-    # a timeframe/profile ratio (the former 15m double-scaling defect).
-    grade_position_ratios = {"S": 0.70, "A": 0.50, "B": 0.30, "C": 0.10}
+    # Capital class is 马卡龙/大福 only. SABC letter grades are retired.
     candidate = None
-    blocked_grade_signals = []
     blocked_lifecycle_signals = []
+    blocked_untiered_signals = []
     for sig in signals:
         if sig.get("ok") and sig.get("signal") in ("long", "short"):
             if not _strategy_runtime_allowed(sig.get("strategy_key")):
@@ -956,19 +1095,16 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
                     "reason": "生命周期监测已暂停该策略的新开仓；已有持仓仍继续止盈/止损管理",
                 })
                 continue
-            grade = str((sig.get("strategy_rating") or {}).get("grade") or "B").upper()
-            if grade_position_ratios.get(grade, 0.30) <= 0:
-                blocked_grade_signals.append({
+            if _tier_position_ratio(sig.get("strategy_key")) is None:
+                blocked_untiered_signals.append({
                     "strategy_key": sig.get("strategy_key"),
-                    "grade": grade,
-                    "reason": "C级策略禁止新开仓，继续监测与复核",
+                    "reason": "未标注马卡龙/大福，禁止开仓",
                 })
                 continue
             candidate = sig
             break
-    result["grade_position_policy"] = grade_position_ratios
-    result["signals_blocked_by_grade"] = blocked_grade_signals
     result["signals_blocked_by_lifecycle"] = blocked_lifecycle_signals
+    result["signals_blocked_without_tier"] = blocked_untiered_signals
     candidate, delay_state, delay_changed = _kline_close_delay_transition(
         cfg, candidate
     )
@@ -989,8 +1125,8 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
     if not candidate:
         if blocked_lifecycle_signals:
             result["action"] = "signal_blocked_by_lifecycle"
-        elif blocked_grade_signals:
-            result["action"] = "signal_blocked_by_grade"
+        elif blocked_untiered_signals:
+            result["action"] = "signal_blocked_without_tier"
         else:
             result["action"] = "no_signal"
         return result
@@ -1037,7 +1173,7 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
                 TRADE_SYMBOL, candle_id, strategy_key, side,
                 timeframe=TRADE_TIMEFRAME,
                 score=(candidate.get("entry_info") or {}).get("signal_score"),
-                strategy_grade=(candidate.get("strategy_rating") or {}).get("grade"),
+                strategy_grade=None,
                 expected_win_rate=(candidate.get("strategy_rating") or {}).get("expected_win_rate_pct"),
                 expected_return=(candidate.get("strategy_rating") or {}).get("expected_return_per_trade_pct"),
             )
@@ -1074,28 +1210,36 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
     # use of the same strategy on another timeframe cannot contaminate its
     # realised-performance rating.
     rated_entry_data["timeframe"] = TRADE_TIMEFRAME
-    strategy_grade = str((candidate.get("strategy_rating") or {}).get("grade") or "B").upper()
-    grade_position_ratio = grade_position_ratios.get(strategy_grade, 0.30)
-    # Prefer live assignment lifecycle grade/ratio (B=30%/C=10%).
-    # Applied strategies size from runtime controls, not rating alone.
-    try:
-        _aid, _row, _controls = _assignment_control_row(strategy_key)
-        lg = str(_row.get("lifecycle_grade") or "").upper()
-        if lg not in grade_position_ratios and (
-                _row.get("human_confirm_pipeline") or _row.get("human_confirmed")):
-            lg = "B"
-        if lg in grade_position_ratios:
-            strategy_grade = lg
-            grade_position_ratio = float(
-                _row.get("max_position_ratio")
-                if _row.get("max_position_ratio") is not None
-                else grade_position_ratios[lg])
-    except Exception:
-        pass
-    grade_position_ratio = _probe_position_ratio_cap(strategy_key, grade_position_ratio)
-    rated_entry_data["strategy_grade"] = strategy_grade
-    rated_entry_data["grade_position_ratio"] = grade_position_ratio
+    tier_position_ratio = _tier_position_ratio(strategy_key)
+    if tier_position_ratio is None:
+        result["action"] = "signal_blocked_without_tier"
+        return result
+    rated_entry_data["strategy_tier"] = (
+        (candidate.get("strategy_rating") or {}).get("strategy_tier")
+    )
+    rated_entry_data["grade_position_ratio"] = tier_position_ratio
     rated_entry_data["strategy_rating_snapshot"] = dict(candidate.get("strategy_rating") or {})
+    strategy_stop_loss_pct = rated_entry_data.get("protective_stop_pct")
+    if strategy_stop_loss_pct is None:
+        strategy_stop_loss_pct = (rated_entry_data.get("strategy_params") or {}).get(
+            "stop_loss_pct"
+        )
+    strategy_leverage = None
+    try:
+        import auto_trade_dynamic_leverage as dynamic_leverage
+        leverage_pick = dynamic_leverage.pick_from_config(cfg, strategy_key)
+        if not leverage_pick.get("ok"):
+            result["ok"] = False
+            result["action"] = "signal_blocked_missing_strategy_leverage"
+            result["leverage_pick"] = leverage_pick
+            return result
+        strategy_leverage = leverage_pick.get("leverage")
+        result["leverage_pick"] = leverage_pick
+    except Exception as exc:
+        result["ok"] = False
+        result["action"] = "signal_blocked_missing_strategy_leverage"
+        result["error"] = "strategy leverage lookup failed: %s" % exc
+        return result
     opened = executor.submit_entry(
         side=side,
         strategy_key=strategy_key,
@@ -1104,7 +1248,9 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
         source="formal_daemon_multi_strategy_v1_auto_full_balance",
         internal_auto=True,
         entry_data=rated_entry_data,
-        full_position_ratio_override=grade_position_ratio,
+        full_position_ratio_override=tier_position_ratio,
+        stop_loss_pct_override=strategy_stop_loss_pct,
+        leverage_override=strategy_leverage,
     )
     result.update({"action": "auto_open_attempted_gate_authorized",
                    "gate_authorized_auto_trading": True,
@@ -1124,28 +1270,14 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
             )
         except Exception as exc:
             result["priority_execution"] = {"ok": False, "error": str(exc)}
-    account_policy_suppressed = (
-        persist
-        and not opened.get("ok")
-        and opened.get("portfolio_risk_policy") is True
-        and opened.get("error") in (
-            "portfolio max open positions reached",
-            "symbol already has an active position",
-            "account has pending swap orders",
-            "portfolio estimated risk limit exceeded",
-            "daily entry limit reached",
-            "daily realized loss circuit breaker",
-            "consecutive loss circuit breaker",
-        )
-    )
-    if account_policy_suppressed:
+    if persist and not opened.get("ok") and _open_fail_consumes_signal(opened):
         _clear_kline_close_pending(cfg, strategy_key)
         processed[strategy_key] = candle_id
         cfg["last_signal_candle_ids"] = processed
         cfg["last_signal_candle_id"] = candle_id
         _write_json(CONFIG_FILE, cfg)
-        result["action"] = "signal_suppressed_by_portfolio_risk_policy"
-        _append_event("signal_suppressed_by_portfolio_risk_policy", result)
+        result["action"] = _open_fail_suppress_action(opened)
+        _append_event(result["action"], result)
         return result
     if opened.get("ok") and persist:
         _clear_kline_close_pending(cfg, strategy_key)
@@ -1160,8 +1292,10 @@ def _multi_tick_core(strategy, executor, cfg, persist=True, candles=None, signal
 def tick():
     import auto_trade_strategy_ema6_center_down as strategy
     import auto_trade_formal_v6_executor as executor
-    # Recompute grade before scanning/opening so a just-completed losing
-    # window cannot receive one more order at the previous grade.
+    # Capital class is 马卡龙/大福 (human-locked). Do not block open/close/Wx
+    # on leftover SABC grade-monitor + outbox retries.
+    result = _multi_tick_core(
+        strategy, executor, get_config(write_back=True), persist=True)
     mon = None
     mon_error = None
     try:
@@ -1169,8 +1303,6 @@ def tick():
         mon = pipeline.monitor_live_grades()
     except Exception as exc:
         mon_error = str(exc)
-    result = _multi_tick_core(
-        strategy, executor, get_config(write_back=True), persist=True)
     if isinstance(result, dict):
         result["grade_monitor"] = {
             "actions": (mon or {}).get("actions") or [],
@@ -1188,12 +1320,392 @@ def tick():
 
 _multi_strategy_old_status = status
 
+_EXEC_READY_CACHE = {"ts": 0.0, "payload": None}
+_EXEC_READY_TTL_SEC = 60.0
+
+
+def _execution_readiness():
+    """Credential file checks + cached live OKX private auth probe."""
+    now = time.time()
+    cached = _EXEC_READY_CACHE.get("payload")
+    if isinstance(cached, dict) and (now - float(_EXEC_READY_CACHE.get("ts") or 0)) < _EXEC_READY_TTL_SEC:
+        return dict(cached)
+    try:
+        import auto_trade_okx as okx
+        credentials = okx.get_okx_credentials_status()
+        present = bool(credentials.get("credentials_present"))
+        private_read = bool(credentials.get("private_read_enabled"))
+        permission = credentials.get("credential_file_permission") or {}
+        permission_ok = bool(permission.get("strict") or not permission.get("exists"))
+        live_auth_ok = False
+        live_auth_error = None
+        live_auth_code = None
+        if present and private_read and permission_ok:
+            try:
+                cfg = okx.get_okx_account_config()
+                live_auth_ok = bool(okx._okx_response_ok(cfg))
+                live_auth_code = str((cfg or {}).get("code") or "")
+                if not live_auth_ok:
+                    live_auth_error = str((cfg or {}).get("msg") or "account/config failed")
+            except Exception as exc:
+                live_auth_ok = False
+                live_auth_error = str(exc)[:200]
+        ready = bool(present and private_read and permission_ok and live_auth_ok)
+        if not present:
+            reason = "OKX凭证缺失"
+        elif not private_read:
+            reason = "OKX私有读取未启用"
+        elif not permission_ok:
+            reason = "OKX凭证文件权限不安全"
+        elif not live_auth_ok:
+            reason = "OKX私有鉴权失败:%s" % (live_auth_error or live_auth_code or "unknown")
+        else:
+            reason = None
+        out = {
+            "ok": ready,
+            "execution_ready": ready,
+            "public_signal_monitoring_ready": True,
+            "credentials_present": present,
+            "private_read_enabled": private_read,
+            "credential_permission_strict": permission_ok,
+            "live_auth_ok": live_auth_ok,
+            "live_auth_code": live_auth_code,
+            "live_auth_error": live_auth_error,
+            "live_auth_checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "reason": reason,
+        }
+        _EXEC_READY_CACHE["ts"] = now
+        _EXEC_READY_CACHE["payload"] = dict(out)
+        return out
+    except Exception as exc:
+        out = {
+            "ok": False,
+            "execution_ready": False,
+            "public_signal_monitoring_ready": True,
+            "live_auth_ok": False,
+            "reason": "执行就绪检查异常:%s" % str(exc)[:160],
+        }
+        _EXEC_READY_CACHE["ts"] = now
+        _EXEC_READY_CACHE["payload"] = dict(out)
+        return out
+
 def status():
     s = _multi_strategy_old_status()
     cfg = get_config(write_back=True)
+    readiness = _execution_readiness()
     s.update({"stage": "formal_daemon_multi_strategy_v1",
               "strategy_keys": _active_strategy_keys(cfg),
               "strategy_count": len(_active_strategy_keys(cfg)),
-              "last_signal_candle_ids": cfg.get("last_signal_candle_ids") or {}})
+              "last_signal_candle_ids": cfg.get("last_signal_candle_ids") or {},
+              "execution_ready": bool(readiness.get("execution_ready")),
+              "execution_readiness": readiness})
     return s
 # MULTI_STRATEGY_AUTO_TRADE_V1_END
+
+
+# ─── Portfolio supervisor: all symbols / all mounted strategies ─────────
+PORTFOLIO_PID_FILE = AUTO_DIR / "formal_daemon_portfolio.pid"
+PORTFOLIO_RUNTIME_FILE = AUTO_DIR / "formal_daemon_portfolio_runtime.json"
+CONTROL_PATH = AUTO_DIR / "strategy_runtime_controls.json"
+
+
+def _config_path_for_slot(symbol, timeframe):
+    name = slot_paths.daemon_config_name(symbol, timeframe)
+    if not name:
+        raise ValueError("cannot resolve daemon config path")
+    return AUTO_DIR / name
+
+
+def list_roster_slots_from_assignments(min_grades=None):
+    """Group live 马卡龙/大福 roster rows into symbol|timeframe slots."""
+    slots = {}
+    rows = []
+    try:
+        import auto_trade_live_roster as roster
+        rows = list(roster.load_roster() or [])
+    except Exception:
+        rows = []
+    if not rows:
+        controls = _read_json(CONTROL_PATH, {"assignments": {}})
+        for aid, row in (controls.get("assignments") or {}).items():
+            if not isinstance(row, dict):
+                continue
+            if row.get("deleted_at") or row.get("pause_new_entries"):
+                continue
+            try:
+                import auto_trade_strategy_tiers as tiers
+                if not tiers.normalize(row.get("strategy_tier"),
+                                       row.get("explicit_position_ratio")):
+                    continue
+            except Exception:
+                continue
+            parts = str(aid).split("|", 2)
+            if len(parts) != 3:
+                continue
+            rows.append({
+                "symbol": parts[0].upper(),
+                "timeframe": parts[1].lower(),
+                "strategy_key": str(row.get("strategy_key") or parts[2]),
+            })
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        symbol = str(row.get("symbol") or "").upper()
+        timeframe = str(row.get("timeframe") or "").lower()
+        strategy_key = str(row.get("strategy_key") or "")
+        if not symbol or not timeframe or not strategy_key:
+            continue
+        try:
+            from dual_engine_workflow_v2.legacy_indicator_strategy_ban import (
+                is_banned_identity, is_banned_key,
+            )
+            if is_banned_key(strategy_key) or is_banned_identity(
+                name=row.get("strategy_name") or row.get("name"),
+                key=strategy_key,
+            ):
+                continue
+        except Exception:
+            pass
+        slot_id = "%s|%s" % (symbol, timeframe)
+        bucket = slots.setdefault(slot_id, {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "strategy_keys": [],
+        })
+        if strategy_key not in bucket["strategy_keys"]:
+            bucket["strategy_keys"].append(strategy_key)
+    return [slots[k] for k in sorted(slots.keys())]
+
+
+def sync_roster_daemon_configs(enable_auto_open=True):
+    """Write strategy_keys from 运行策略 roster into each formal_daemon_config*."""
+    synced = []
+    errors = []
+    leverage_gaps = []
+    roster_leverage = {}
+    try:
+        roster = _read_json(AUTO_DIR / "current_live_strategy_roster.json", {})
+        for row in (roster.get("strategies") or []):
+            if not isinstance(row, dict):
+                continue
+            sk = row.get("strategy_key")
+            if not sk:
+                continue
+            for cand in (
+                row.get("applied_leverage"),
+                row.get("exchange_applied_leverage"),
+                row.get("dynamic_target_leverage"),
+                row.get("leverage"),
+            ):
+                try:
+                    val = float(cand)
+                except Exception:
+                    continue
+                if val == val and val > 0.0:
+                    roster_leverage[sk] = val
+                    break
+    except Exception:
+        roster_leverage = {}
+    for slot in list_roster_slots_from_assignments():
+        path = _config_path_for_slot(slot["symbol"], slot["timeframe"])
+        try:
+            cfg = _read_json(path, {})
+            if not isinstance(cfg, dict):
+                cfg = {}
+            cfg["symbol"] = slot["symbol"]
+            cfg["timeframe"] = slot["timeframe"]
+            cfg["strategy_keys"] = list(slot["strategy_keys"])
+            if slot["strategy_keys"]:
+                cfg["strategy_key"] = slot["strategy_keys"][0]
+            cfg["enabled"] = True
+            if enable_auto_open:
+                cfg["allow_auto_open"] = True
+                cfg["allow_auto_close"] = True
+                cfg["formal_auto_trading_authorized"] = True
+                cfg["gate_authorized_auto_trading"] = True
+            prev_map = cfg.get("strategy_leverages")
+            strategy_leverages = dict(prev_map) if isinstance(prev_map, dict) else {}
+            live_keys = list(slot.get("strategy_keys") or [])
+            try:
+                import auto_trade_dynamic_leverage as dynamic_leverage
+                for strategy_key in live_keys:
+                    resolved = dynamic_leverage.resolve(
+                        slot["symbol"], slot["timeframe"], strategy_key,
+                        refresh_if_missing=True,
+                    )
+                    applied = resolved.get("exchange_applied_leverage")
+                    if resolved.get("ok") and applied:
+                        strategy_leverages[strategy_key] = float(applied)
+                        continue
+                    fallback = roster_leverage.get(strategy_key)
+                    if fallback:
+                        strategy_leverages[strategy_key] = float(fallback)
+                        continue
+                    if strategy_key not in strategy_leverages:
+                        leverage_gaps.append({
+                            "symbol": slot["symbol"],
+                            "timeframe": slot["timeframe"],
+                            "strategy_key": strategy_key,
+                            "error": (resolved or {}).get("error") or "leverage_unresolved",
+                        })
+            except Exception as exc:
+                leverage_gaps.append({
+                    "symbol": slot["symbol"],
+                    "timeframe": slot["timeframe"],
+                    "error": "dynamic_leverage_loop_failed: %s" % exc,
+                })
+            # Keep only currently mounted keys.
+            strategy_leverages = {
+                k: float(v) for k, v in strategy_leverages.items()
+                if k in live_keys
+            }
+            missing_keys = [k for k in live_keys if k not in strategy_leverages]
+            if live_keys and not missing_keys:
+                cfg["strategy_leverages"] = strategy_leverages
+                pick = strategy_leverages.get(live_keys[0])
+                if pick is not None:
+                    cfg["leverage"] = pick
+            elif live_keys and missing_keys:
+                # Never persist a half-filled map (fail-closes the missing keys).
+                cfg.pop("strategy_leverages", None)
+                for strategy_key in live_keys:
+                    if strategy_key in roster_leverage:
+                        cfg["leverage"] = float(roster_leverage[strategy_key])
+                        break
+                if "leverage" not in cfg:
+                    cfg["leverage"] = 20
+                leverage_gaps.append({
+                    "symbol": slot["symbol"],
+                    "timeframe": slot["timeframe"],
+                    "missing_keys": missing_keys,
+                    "action": "cleared_partial_strategy_leverages",
+                })
+            elif "leverage" not in cfg:
+                cfg["leverage"] = 20
+            if "full_position_ratio" not in cfg:
+                cfg["full_position_ratio"] = 0.30
+            if "stop_loss_pct" not in cfg:
+                cfg["stop_loss_pct"] = 0.009
+            if "tick_interval_sec" not in cfg:
+                cfg["tick_interval_sec"] = 60
+            _write_json(path, cfg)
+            synced.append({
+                "path": str(path.name),
+                "symbol": slot["symbol"],
+                "timeframe": slot["timeframe"],
+                "strategy_keys": list(slot["strategy_keys"]),
+                "strategy_leverages": dict(cfg.get("strategy_leverages") or {}),
+            })
+        except Exception as exc:
+            errors.append({"slot": slot, "error": str(exc)})
+    return {
+        "ok": not errors,
+        "synced": synced,
+        "errors": errors,
+        "leverage_gaps": leverage_gaps,
+    }
+
+
+def _tick_slot_subprocess(symbol, timeframe, timeout_sec=180):
+    """Run one slot tick in an isolated process (module globals are per-symbol)."""
+    env = os.environ.copy()
+    env["VECTOR_ROOT"] = str(ROOT)
+    env["PYTHONPATH"] = str(ROOT) + (
+        (os.pathsep + env["PYTHONPATH"]) if env.get("PYTHONPATH") else ""
+    )
+    env["VECTOR_TRADE_SYMBOL"] = str(symbol).upper()
+    env["VECTOR_TRADE_TIMEFRAME"] = str(timeframe).lower()
+    # Portfolio supervisor owns open/close Wx via strategy notify path only.
+    # Do not emit extra presence SMS from this loop.
+    code = (
+        "import auto_trade_formal_daemon as d; "
+        "import json; "
+        "r=d.tick(); "
+        "print(json.dumps({"
+        "'ok': bool(r.get('ok')), "
+        "'action': r.get('action'), "
+        "'strategy_keys': (r.get('config') or {}).get('strategy_keys'), "
+        "'symbol': d.TRADE_SYMBOL, "
+        "'timeframe': d.TRADE_TIMEFRAME"
+        "}, ensure_ascii=False))"
+    )
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(ROOT),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout_sec,
+            universal_newlines=True,
+        )
+        out = (proc.stdout or "").strip().splitlines()
+        payload = {}
+        if out:
+            try:
+                payload = json.loads(out[-1])
+            except Exception:
+                payload = {"raw": out[-1][:500]}
+        return {
+            "ok": proc.returncode == 0 and bool(payload.get("ok", True)),
+            "returncode": proc.returncode,
+            "result": payload,
+            "stderr": (proc.stderr or "")[-500:],
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "tick_timeout", "symbol": symbol, "timeframe": timeframe}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "symbol": symbol, "timeframe": timeframe}
+
+
+def run_portfolio_forever(tick_interval_sec=60):
+    """BTC service entry: continuously monitor all roster symbols/strategies."""
+    PORTFOLIO_PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PORTFOLIO_PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
+    _append_event("portfolio_daemon_started", {"pid": os.getpid(), "mode": "all_roster_slots"})
+    while True:
+        started = time.time()
+        sync = sync_roster_daemon_configs(enable_auto_open=True)
+        slot_results = []
+        for row in sync.get("synced") or []:
+            keys = row.get("strategy_keys") or []
+            if not keys:
+                continue
+            one = _tick_slot_subprocess(row["symbol"], row["timeframe"])
+            slot_results.append({
+                "symbol": row["symbol"],
+                "timeframe": row["timeframe"],
+                "strategy_keys": keys,
+                "ok": bool(one.get("ok")),
+                "action": ((one.get("result") or {}).get("action")),
+                "error": one.get("error") or one.get("stderr") or None,
+            })
+        runtime = {
+            "ok": True,
+            "mode": "portfolio_all_roster",
+            "updated_at": _now(),
+            "updated_at_ts": time.time(),
+            "tick_duration_sec": round(time.time() - started, 4),
+            "synced_slots": sync.get("synced") or [],
+            "slot_results": slot_results,
+            "wx_extra_disabled": True,
+        }
+        _write_json(PORTFOLIO_RUNTIME_FILE, runtime)
+        sleep_for = max(5.0, float(tick_interval_sec) - (time.time() - started))
+        time.sleep(sleep_for)
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--portfolio", action="store_true",
+                        help="Run all-roster portfolio supervisor loop")
+    parser.add_argument("--sync-roster", action="store_true",
+                        help="One-shot sync assignment roster into daemon configs")
+    args = parser.parse_args()
+    if args.sync_roster:
+        print(json.dumps(sync_roster_daemon_configs(), ensure_ascii=False, indent=2))
+    elif args.portfolio:
+        run_portfolio_forever()
+    else:
+        run_forever()
