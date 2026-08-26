@@ -529,16 +529,51 @@ def is_manual_position(pos):
     return False
 
 
-def manual_fingerprint(pos):
-    pid = str(pos.get("pos_id") or "").strip()
+def manual_bare_id(pos):
+    """Stable exchange/local id for one instrument slot (may be reused after close)."""
+    pid = str((pos or {}).get("pos_id") or "").strip()
     if pid:
         return pid
-    return str(pos.get("position_id") or pos.get("inst_id") or "")
+    return str(
+        (pos or {}).get("position_id")
+        or (pos or {}).get("inst_id")
+        or ""
+    ).strip()
 
 
-def size_warn_fingerprint(pos):
+def manual_open_stamp(pos):
+    """Open-time marker. OKX reuses posId on reopen, but cTime/opened_at changes."""
+    return str(
+        (pos or {}).get("c_time")
+        or (pos or {}).get("opened_at")
+        or (pos or {}).get("ctime")
+        or ""
+    ).strip()
+
+
+def manual_fingerprint(pos, state=None):
+    """Unique id for one manual open event (not just one symbol/side).
+
+    Prefer posId|open_stamp. When stamp is missing and *state* is provided,
+    use the per-day reopen generation so close+reopen still counts.
+    """
+    bare = manual_bare_id(pos)
+    if not bare:
+        return ""
+    stamp = manual_open_stamp(pos)
+    if stamp:
+        return "%s|%s" % (bare, stamp)
+    if state is not None:
+        gens = state.get("manual_bare_generations") or {}
+        gen = int(gens.get(bare) or 0)
+        if gen > 0:
+            return "%s#%s" % (bare, gen)
+    return bare
+
+
+def size_warn_fingerprint(pos, state=None):
     """Stable id for one manual open. Survives occupancy oscillating in 50–75%."""
-    return str(manual_fingerprint(pos) or "").strip()
+    return str(manual_fingerprint(pos, state=state) or "").strip()
 
 
 def prune_size_warn_notified(state, positions):
@@ -718,7 +753,7 @@ def sync_hitch_bindings(state, positions):
     for pos in positions or []:
         if not is_manual_position(pos) or not _is_live_holding(pos):
             continue
-        fp = manual_fingerprint(pos)
+        fp = manual_fingerprint(pos, state=state)
         if fp:
             live_manual[fp] = pos
         if is_hitchhiker(pos, auto_keys=auto_keys):
@@ -1136,6 +1171,9 @@ def normalize_day_state(state, now_ts=None):
             "hitch_extra_count": 0,
             "hitch_extra_ids": [],
             "manual_denied_ids": [],
+            "manual_active_bare_ids": [],
+            "manual_closed_bare_ids": [],
+            "manual_bare_generations": {},
             "hitch_notified_ids": [],
             # Delivery is independent from the Beijing-day quota.  Preserve
             # failed notifications across midnight until WxPusher confirms
@@ -1165,6 +1203,9 @@ def normalize_day_state(state, now_ts=None):
     state.setdefault("hitch_extra_count", 0)
     state.setdefault("hitch_extra_ids", [])
     state.setdefault("manual_denied_ids", [])
+    state.setdefault("manual_active_bare_ids", [])
+    state.setdefault("manual_closed_bare_ids", [])
+    state.setdefault("manual_bare_generations", {})
     state.setdefault("hitch_notified_ids", [])
     state.setdefault("pending_manual_notifications", {})
     state.setdefault("hitch_bindings", {})
@@ -1198,6 +1239,9 @@ def _persist_state(state):
         "hitch_extra_count": int(state.get("hitch_extra_count") or 0),
         "hitch_extra_ids": list(state.get("hitch_extra_ids") or []),
         "manual_denied_ids": list(state.get("manual_denied_ids") or []),
+        "manual_active_bare_ids": list(state.get("manual_active_bare_ids") or []),
+        "manual_closed_bare_ids": list(state.get("manual_closed_bare_ids") or []),
+        "manual_bare_generations": dict(state.get("manual_bare_generations") or {}),
         "hitch_notified_ids": list(state.get("hitch_notified_ids") or []),
         "pending_manual_notifications": dict(
             state.get("pending_manual_notifications") or {}),
@@ -1555,6 +1599,10 @@ def apply_manual_open_quota(state, positions):
     Regular cap is 2. After that, 顺风车 (same inst+side as a live
     方向型 auto position) get a separate extra cap of 3. 赔率型自动仓
     即使同向也不算顺风车。
+
+    OKX may reuse the same posId after close+reopen. Open stamp (cTime)
+    distinguishes events; when stamp is missing, a bare id that left the
+    live set and later returns gets a new generation fingerprint.
     """
     regular = list(state.get("manual_open_ids") or [])
     extra = list(state.get("hitch_extra_ids") or [])
@@ -1570,15 +1618,29 @@ def apply_manual_open_quota(state, positions):
     known.update(extra)
     known.update(denied)
     auto_keys = auto_side_keys(positions)
+    active_prev = set(state.get("manual_active_bare_ids") or [])
+    closed_seen = set(state.get("manual_closed_bare_ids") or [])
+    generations = dict(state.get("manual_bare_generations") or {})
+    active_now = set()
     new_rows = []
     over_limit = []
     hitch_live = []
     for pos in positions or []:
         if not is_manual_position(pos):
             continue
-        fp = manual_fingerprint(pos)
-        if not fp:
+        bare = manual_bare_id(pos)
+        if not bare:
             continue
+        stamp = manual_open_stamp(pos)
+        if stamp:
+            fp = "%s|%s" % (bare, stamp)
+        elif bare in closed_seen:
+            generations[bare] = int(generations.get(bare) or 1) + 1
+            closed_seen.discard(bare)
+            fp = "%s#%s" % (bare, generations[bare])
+        else:
+            fp = bare
+        active_now.add(bare)
         hitch = is_hitchhiker(pos, auto_keys=auto_keys)
         is_new = fp not in known
         used_extra = fp in extra
@@ -1615,11 +1677,16 @@ def apply_manual_open_quota(state, positions):
             over_limit.append(row)
         if hitch and not over:
             hitch_live.append(row)
+    for bare in active_prev - active_now:
+        closed_seen.add(bare)
     state["manual_open_ids"] = regular
     state["manual_open_count"] = len(regular)
     state["hitch_extra_ids"] = extra
     state["hitch_extra_count"] = len(extra)
     state["manual_denied_ids"] = denied
+    state["manual_active_bare_ids"] = sorted(active_now)
+    state["manual_closed_bare_ids"] = sorted(closed_seen)
+    state["manual_bare_generations"] = generations
     return {"new": new_rows, "over_limit": over_limit, "hitch_live": hitch_live}
 
 

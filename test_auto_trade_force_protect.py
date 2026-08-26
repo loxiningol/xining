@@ -593,7 +593,84 @@ class ForceProtectRulesTest(unittest.TestCase):
         self.assertNotIn("开仓标的", notes[0][0])
         self.assertEqual("manual_open_detect", notes[0][1].get("kind"))
 
-    def test_failed_manual_notification_retries_without_recount(self):
+    def test_same_pos_id_reopen_notifies_and_counts_again(self):
+        """OKX may reuse posId after close; reopen must still remind + consume quota."""
+        notes = []
+        kwargs = dict(
+            close_fn=lambda *a, **k: self.fail("allowed manual should stay"),
+            notify_fn=lambda msg, meta: notes.append((msg, meta)) or {"ok": True},
+            equity=self._equity(),
+            transfer_fn=lambda *a, **k: self.fail("no transfer"),
+            trading_fn=lambda: self._equity(),
+        )
+        first = _pos(
+            manual=True, source="manual_okx", strategy_key="",
+            pos_id="reuse-pos", position_id="BEAT-USDT-SWAP|long|cross",
+            inst_id="BEAT-USDT-SWAP", symbol_label="BEAT",
+            c_time="1000", margin_usdt=100, leverage=10,
+        )
+        out1 = fp.protect_once(listed=self._listed([first]), **kwargs)
+        self.assertEqual(1, out1["manual_open_count"])
+        self.assertEqual(1, out1["manual_remaining"])
+        self.assertEqual(1, len(notes))
+        self.assertIn("今天还剩 1 次手动敲门机会", notes[0][0])
+
+        # Closed: clear active bare id without resetting the day quota.
+        out_gap = fp.protect_once(listed=self._listed([]), **kwargs)
+        self.assertEqual(1, out_gap["manual_open_count"])
+        self.assertEqual(1, len(notes))
+
+        second = _pos(
+            manual=True, source="manual_okx", strategy_key="",
+            pos_id="reuse-pos", position_id="BEAT-USDT-SWAP|long|cross",
+            inst_id="BEAT-USDT-SWAP", symbol_label="BEAT",
+            c_time="2000", margin_usdt=120, leverage=10,
+        )
+        out2 = fp.protect_once(listed=self._listed([second]), **kwargs)
+        self.assertEqual(2, out2["manual_open_count"])
+        self.assertEqual(0, out2["manual_remaining"])
+        self.assertEqual(2, len(notes))
+        self.assertIn("今日 2 次手动额度已经用完", notes[1][0])
+
+    def test_same_pos_id_without_stamp_reopen_uses_generation(self):
+        notes = []
+        kwargs = dict(
+            close_fn=lambda *a, **k: self.fail("allowed manual should stay"),
+            notify_fn=lambda msg, meta: notes.append((msg, meta)) or {"ok": True},
+            equity=self._equity(),
+            transfer_fn=lambda *a, **k: self.fail("no transfer"),
+            trading_fn=lambda: self._equity(),
+        )
+        first = _pos(
+            manual=True, source="manual_okx", strategy_key="",
+            pos_id="bare-only", margin_usdt=100, leverage=10,
+        )
+        out1 = fp.protect_once(listed=self._listed([first]), **kwargs)
+        self.assertEqual(1, out1["manual_open_count"])
+        fp.protect_once(listed=self._listed([]), **kwargs)
+        out2 = fp.protect_once(listed=self._listed([first]), **kwargs)
+        self.assertEqual(2, out2["manual_open_count"])
+        self.assertEqual(2, len(notes))
+
+    def test_holding_same_manual_does_not_double_count(self):
+        notes = []
+        pos = _pos(
+            manual=True, source="manual_okx", strategy_key="",
+            pos_id="hold-pos", c_time="111", margin_usdt=100, leverage=10,
+        )
+        kwargs = dict(
+            close_fn=lambda *a, **k: self.fail("should stay"),
+            notify_fn=lambda msg, meta: notes.append((msg, meta)) or {"ok": True},
+            listed=self._listed([pos]),
+            equity=self._equity(),
+            transfer_fn=lambda *a, **k: self.fail("no transfer"),
+            trading_fn=lambda: self._equity(),
+        )
+        first = fp.protect_once(**kwargs)
+        second = fp.protect_once(**kwargs)
+        self.assertEqual(1, first["manual_open_count"])
+        self.assertEqual(1, second["manual_open_count"])
+        self.assertEqual(1, len(notes))
         pos = _pos(
             position_id="BEAT-USDT-SWAP|long|isolated",
             inst_id="BEAT-USDT-SWAP", symbol_label="BEAT", side="long",
