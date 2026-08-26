@@ -277,18 +277,26 @@ def _dedupe_clauses(text):
     blob = str(text or "").strip()
     if not blob:
         return blob
-    parts = re.split(r"(?<=[。；])", blob)
+    parts = []
+    buf = ""
+    for ch in blob:
+        buf += ch
+        if ch in "。；":
+            piece = buf.strip()
+            if piece:
+                parts.append(piece)
+            buf = ""
+    tail = buf.strip()
+    if tail:
+        parts.append(tail)
     out = []
     seen = set()
-    for part in parts:
-        piece = part.strip()
-        if not piece:
-            continue
+    for piece in parts:
         key = _normalize_clause(piece)
         if not key or key in seen:
             continue
         seen.add(key)
-        out.append(piece if piece.endswith(("。", "；")) else piece)
+        out.append(piece)
     merged = "".join(out).strip()
     return merged or blob
 
