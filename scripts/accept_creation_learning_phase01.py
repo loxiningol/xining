@@ -153,7 +153,14 @@ def main():
                 "ingest": {"ok": out.get("ok"), "ingested": out.get("ingested")},
                 "case_exists": case_file.is_file(),
             })
-            add("ingest_historical_quality_failure", out.get("ok") is True, hist_detail)
+            # Compact historical receipts often lack attempts/failed_rules; ingest
+            # must still succeed. Case materialization is required only when the
+            # receipt carries a learning signal (phase-2 backfill covers the rest).
+            add(
+                "ingest_historical_quality_failure",
+                out.get("ok") is True,
+                hist_detail,
+            )
         except Exception as exc:
             hist_detail["error"] = str(exc)[:240]
             add("ingest_historical_quality_failure", False, hist_detail)
