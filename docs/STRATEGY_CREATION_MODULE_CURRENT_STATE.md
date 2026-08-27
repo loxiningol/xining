@@ -1,8 +1,9 @@
 # 策略创造模块 — 当前实现全步骤说明书（给另一 AI）
 
 > 仓库：`intraday_live_v1_20260720`  
-> 用途：把**今天实际跑的代码路径**讲清楚（含旁路/软通过），不是理想教义，也不是未落地的 E>0 重构计划。  
-> 入口铁律：人类/Cursor/Codex 创造指令 → **只许** `scripts/strategy_create_sole.py` / `creation_sole_entry.create_strategy` / `parallel_creation.submit_job`。禁止直接写 DSL、ecosystem/mass/factory 旁路创造。
+> 用途：把**今天实际跑的代码路径**讲清楚。  
+> 入口铁律：人类/Cursor/Codex 创造指令 → **只许** `scripts/strategy_create_sole.py` / `creation_sole_entry.create_strategy` / `parallel_creation.submit_job`。禁止直接写 DSL、ecosystem/mass/factory 旁路创造。  
+> 更新：2026-08-27 — 主链为 Kimi sole；创造学习课包契约见 §0.5。
 
 ---
 
@@ -10,25 +11,19 @@
 
 ### 0.1 对外宣称的三步教义（文档层）
 
-来源：`dual_engine_workflow_v2/creation_quality_doctrine.py`
+来源：`creation_sole_entry.py` / skill `strategy-create-collab`
 
-1. **研究发现**：委员会 + 探针 + 多重检验  
-2. **门槛**：WR>50%、去最大盈利不崩、漏斗 L0–L3、门槛 0–7、寒霜贰/crec  
-3. **四阶段复核**：只有过第二步才交复核  
+1. **cognitive_designer（Kimi K3，with-llm）**：假设沙箱 → 候选 → IS / 结构 / 盲 OOS  
+2. **quality_gate**：10 项 IS 数字 + 趋势识字 + 盲 OOS（唯一机器否决）  
+3. **human_confirm**：人工签发后才可能挂载（永不自动上线）  
+
+`skip_llm=True` 仍走 `CreationOrchestrator`（单测/无模型），非正式创造默认路径。
 
 ### 0.2 今天实际生效的运行模式（代码层）
 
-关键开关：`dual_engine_workflow_v2/manufacture_batch_policy.py`
-
-```text
-PRE_REVIEW_HARD_GATES_DISABLED = True
-```
-
-因此**今天默认是「制造批次模式 + 精简多 AI 复核」**：
-
-- 探针 / 委员会 / 反证 / EFR / OOS / 组装中的 WR>50% 等大量门槛被 **soft-pass 或跳过**
-- 真正硬杀主要落在：**交接 E>0 + 周开仓≥0.5**（以及复核侧同类口径）
-- 传统「四阶段复核 + Gate0–7 + 漏斗」在 slim 路径下**不到达**
+- **with-llm**：`KimiCreatorRuntime` → `quality_gate` →（过门）`human_confirm`  
+- **禁止**把 `creation_blueprint` / `research_discovery` 当作人类创造指令的主路径  
+- 旧制造批次 / slim 复核仅作历史旁路，见后文  
 
 ### 0.3 端到端拓扑
 
@@ -38,16 +33,26 @@ Human / Cursor / Codex
   → parallel_creation.submit_job
   → qiyu-creation-worker@{0,1}
   → creation_sole_entry.create_strategy
-  → creation_blueprint.run_creation_blueprint
-       ├─ research_discovery.run_discovery
-       └─ _assemble_admitted_population + manufacture_batch_policy
-  → [candidate_ready] formal_review_bridge.submit_blueprint_to_formal_review
-       → pipeline_step_a.run_creation_pipeline_step_a  (slim multiai)
-            → auto_trade_human_confirm_pipeline.ingest_and_screen
-                 ├─ strategy_pending_human_confirm.json
-                 └─ strategy_pending_optimize/strategies.json
+       └─ [with-llm] KimiCreatorRuntime → quality_gate → human_confirm
+  → parallel_creation 收工
+       └─ quality_inspector.ingest_from_creation_job
+            └─ creation_case_store.record_creation_outcome → learning_pack
   → 人工确认后才可能挂载（永不自动上线）
 ```
+
+### 0.5 创造学习课包契约（阶段 0/1）
+
+| 项 | 定稿 |
+|---|---|
+| 写入 | `ingest_from_creation_job` → `record_creation_outcome` → `refresh_pack` |
+| 读出 | `public_creator_library()` → Kimi `tool_bundle.case_library`（咨询） |
+| 簇键 | `structure_family + feature_fingerprint + fail_bucket`；不含研究方向/标的/多空 |
+| 升格 | ≥3 标的且 ≥5 任务；人否决藏簇不删案例 |
+| 质检 | 课包 `not_a_gate`，不改 10 项门槛 |
+| 路径词 | 止盈 / 止损 / 定时；占用周几何不是奖励 |
+| 回滚 | `QIYU_CREATION_LEARNING=0`；回炉入队默认关 `QIYU_LIVE_REMELT_ENQUEUE=0` |
+
+实现：`creation_case_store.py` / `creation_attribution.py` / `creation_learning_pack.py` / `creation_live_lessons.py`。
 
 ### 0.4 进度条阶段（UI）
 
