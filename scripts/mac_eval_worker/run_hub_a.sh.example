@@ -8,8 +8,12 @@ PY="${QIYU_PYTHON:-/Library/Frameworks/Python.framework/Versions/3.11/bin/python
 # P2: if QIYU_CODE_TAG is set, refuse to start unless HEAD matches that tag.
 if [[ -n "${QIYU_CODE_TAG:-}" ]]; then
   cd "$ROOT"
-  git fetch --tags --quiet 2>/dev/null || true
-  WANT="$(git rev-parse "${QIYU_CODE_TAG}^{commit}")"
+  # Offline-safe: pin must already exist locally (no network fetch).
+  WANT="$(git rev-parse --verify "${QIYU_CODE_TAG}^{commit}" 2>/dev/null || true)"
+  if [[ -z "$WANT" ]]; then
+    echo "REFUSE: unknown local tag/ref $QIYU_CODE_TAG (fetch manually if needed)" >&2
+    exit 3
+  fi
   HAVE="$(git rev-parse HEAD)"
   if [[ "$WANT" != "$HAVE" ]]; then
     echo "REFUSE: HEAD=$HAVE != QIYU_CODE_TAG=$QIYU_CODE_TAG ($WANT)" >&2

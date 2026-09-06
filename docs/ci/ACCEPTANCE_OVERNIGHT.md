@@ -35,3 +35,9 @@ ssh … 'systemctl is-active qiyu-kimi-thin-hub qiyu-kimi-thin-hub-b'
 ```
 
 （具体跑分结果写在同目录 `ACCEPTANCE_OVERNIGHT_RUNLOG.txt`）
+
+## 隔夜执行备注（自动）
+
+- 本机 Mac `run.sh` / `run_b.sh` 已对齐 tag-pin example（默认不设 `QIYU_CODE_TAG`，工人照常跑）。
+- `31cf280`（P1/P2）曾因 GitHub 443 未推上；后台 `push_watch` 会在网络恢复后 push → merge PR#3 → tag `create-collab-20260906.1` → 写 `/root/deployed.sha`。
+- 查进度：`cat /tmp/push_watch.log`
