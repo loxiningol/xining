@@ -17,3 +17,25 @@ push_watch:
 started
 PR: https://github.com/loxiningol/xining/pull/3 (needs push of 31cf280)
 BLOCKERS: 1) GitHub 443 intermittent 2) workflow OAuth scope 3) private free branch protection 403
+=== post-merge Sun Sep  6 23:36:48 CST 2026 ===
+merged_sha=dd988be17e5220e702d289f1b542bd5b75294938
+tag=create-collab-20260906.1
+local:  dd988be17e5220e702d289f1b542bd5b75294938 (dd988be)
+remote: dd988be17e5220e702d289f1b542bd5b75294938
+OK: deployed.sha matches HEAD
+protection:
+./scripts/enable_main_branch_protection.sh: line 29: EOF: command not found
+{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","documentation_url":"https://docs.github.com/rest/branches/branch-protection#update-branch-protection","status":"403"}gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)
+
+Branch protection API failed (often 403 on private free plans).
+Options:
+  1) GitHub Pro / Team
+  2) gh repo edit loxiningol/xining --visibility public --accept-visibility-change-consequences
+  3) UI: Settings → Branches → Add rule (if available)
+{"mergedAt":"2026-09-06T15:35:01Z","state":"MERGED","url":"https://github.com/loxiningol/xining/pull/3"}
+
+=== tag/sha correction Sun Sep  6 23:38:09 CST 2026 ===
+merged_main=5e24502a203cb1d7d05c72a002925ede60465c05
+tag create-collab-20260906.1 retargeted
+deployed.sha rewritten
+check_deployed_sha: local:  5e24502a203cb1d7d05c72a002925ede60465c05 (5e24502) remote: 5e24502a203cb1d7d05c72a002925ede60465c05 OK: deployed.sha matches HEAD 

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Enable GitHub branch protection on main (P0). Requires: gh auth login
 # Private free repos: API returns 403 — upgrade to Pro OR make repo public.
-# Usage: ./scripts/enable_main_branch_protection.sh [owner/repo] [branch]
 set -euo pipefail
 REPO="${1:-loxiningol/xining}"
 BRANCH="${2:-main}"
@@ -11,10 +10,8 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
-set +e
-OUT="$(gh api -X PUT "repos/${REPO}/branches/${BRANCH}/protection" \
-  -H "Accept: application/vnd.github+json" \
-  --input - <<'EOF' 2>&1)"
+TMP="$(mktemp)"
+cat >"$TMP" <<'EOF'
 {
   "required_status_checks": null,
   "enforce_admins": true,
@@ -27,19 +24,21 @@ OUT="$(gh api -X PUT "repos/${REPO}/branches/${BRANCH}/protection" \
   "allow_deletions": false
 }
 EOF
+
+set +e
+OUT="$(gh api -X PUT "repos/${REPO}/branches/${BRANCH}/protection" \
+  -H "Accept: application/vnd.github+json" \
+  --input "$TMP" 2>&1)"
 RC=$?
 set -e
+rm -f "$TMP"
 
 if [[ $RC -ne 0 ]]; then
   echo "$OUT" >&2
   echo "" >&2
   echo "Branch protection API failed (often 403 on private free plans)." >&2
-  echo "Options:" >&2
-  echo "  1) GitHub Pro / Team" >&2
-  echo "  2) gh repo edit $REPO --visibility public --accept-visibility-change-consequences" >&2
-  echo "  3) UI: Settings → Branches → Add rule (if available)" >&2
+  echo "Options: GitHub Pro/Team, or make repo public, or UI branch rules." >&2
   exit "$RC"
 fi
 
 echo "OK: protected ${REPO}@${BRANCH} (PR required, no force-push)."
-echo "Next: after Actions green, require check: kimi-provider-failover / unittest"
