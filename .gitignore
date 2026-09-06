@@ -56,6 +56,8 @@ logs/
 *.dump
 *_backup/
 .cursor/
+!.cursor/rules/
+!.cursor/rules/**/*.mdc
 agent-transcripts/
 backups/
 _scratch/
@@ -86,3 +88,5 @@ strategies/_scratch/
 # Optional: keep example env
 !*.env.example
 !auto_trade/ai_ecosystem.env.example
+.research_vector/
+.research_thin/
