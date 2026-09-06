@@ -1,0 +1,42 @@
+name: deploy-vps-approve
+
+# Optional P2: human-approved deploy stub.
+# Requires: environment "vps-prod" with required reviewers.
+# Does NOT auto-scp secrets. Fill deploy steps after workflow scope is granted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag already on main (e.g. create-collab-20260906.1)"
+        required: true
+        type: string
+      confirm:
+        description: "Type DEPLOY to confirm"
+        required: true
+        type: string
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm phrase
+        run: |
+          test "${{ inputs.confirm }}" = "DEPLOY"
+
+  deploy:
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: vps-prod
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Record intended sha
+        run: |
+          echo "Deploy intent tag=${{ inputs.tag }} sha=$(git rev-parse HEAD)"
+          echo "Wire SSH + scp of shared files here; then write /root/deployed.sha"
+      - name: Placeholder
+        run: |
+          echo "No automatic VPS mutation until secrets/SSH are configured."
+          echo "Use scripts/write_deployed_sha.sh from an operator machine after manual scp."

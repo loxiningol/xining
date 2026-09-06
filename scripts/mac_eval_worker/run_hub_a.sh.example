@@ -1,0 +1,29 @@
+#!/bin/bash
+# Hub-a Mac research-host eval worker (example).
+# Copy to ~/qiyu_mac_eval_worker/run.sh and adjust ROOT/PY paths.
+set -euo pipefail
+ROOT="${QIYU_CODE_ROOT:-/Users/lele/Documents/Codex/2026-07-12/ru-g/work/intraday_live_v1_20260720}"
+PY="${QIYU_PYTHON:-/Library/Frameworks/Python.framework/Versions/3.11/bin/python3}"
+
+# P2: if QIYU_CODE_TAG is set, refuse to start unless HEAD matches that tag.
+if [[ -n "${QIYU_CODE_TAG:-}" ]]; then
+  cd "$ROOT"
+  git fetch --tags --quiet 2>/dev/null || true
+  WANT="$(git rev-parse "${QIYU_CODE_TAG}^{commit}")"
+  HAVE="$(git rev-parse HEAD)"
+  if [[ "$WANT" != "$HAVE" ]]; then
+    echo "REFUSE: HEAD=$HAVE != QIYU_CODE_TAG=$QIYU_CODE_TAG ($WANT)" >&2
+    echo "Checkout the tag (or unset QIYU_CODE_TAG) before starting worker-a." >&2
+    exit 3
+  fi
+  echo "tag-pin OK: $QIYU_CODE_TAG ($HAVE)"
+fi
+
+export VECTOR_ROOT="${VECTOR_ROOT:-$ROOT/.research_vector}"
+export PYTHONPATH="$ROOT:$ROOT/scripts"
+export KDH_THIN_HOST="${KDH_THIN_HOST:-admin@47.81.25.235}"
+export KDH_THIN_KEY="${KDH_THIN_KEY:-/Users/lele/Documents/Codex/2026-07-12/ru-g/work/ssh/vultr_codex_ed25519}"
+export KDH_THIN_WORKERS="${KDH_THIN_WORKERS:-4}"
+export KDH_THIN_ROOTS="${KDH_THIN_ROOTS:-/tmp/kdh_thin}"
+cd "$ROOT"
+exec "$PY" -u "$ROOT/scripts/research_host_eval_worker.py" --poll 5 --workers "$KDH_THIN_WORKERS" --roots "$KDH_THIN_ROOTS"
