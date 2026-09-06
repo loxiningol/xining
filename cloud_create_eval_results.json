@@ -1,0 +1,68 @@
+{
+  "run_id": "cloud_create_eval_20260906",
+  "worker": "cursor_cloud_vm",
+  "repo": "loxiningol/xining",
+  "branch": "cursor/cloud-create-eval-results-b276",
+  "timestamp_utc": "2026-09-06T07:28:00Z",
+  "constraints_honored": {
+    "no_ssh_vps_47_81_25_235": true,
+    "no_overload_vps": true,
+    "no_remelt_KEEP4": true,
+    "no_delete_STOP_KIMI_CREATION": true,
+    "no_restart_formal_trade": true
+  },
+  "pass_bar": {
+    "n": ">=30",
+    "hitch": "<0.30",
+    "weekly": ">=0.50",
+    "E": ">=0.003",
+    "C_week": ">=0.1%",
+    "C_week_oos": ">=0.05%",
+    "capability_from_trades": {
+      "hitch": true,
+      "DSR": true,
+      "min_trl": true
+    }
+  },
+  "search_targets": {
+    "symbols": ["ETH", "BNB", "XAU", "LINK", "DOGE", "BCH"],
+    "recipes": [
+      {"style": "xu_long", "like": "SKHYNIX", "timing": ["SKDJ", "MACD"]},
+      {"style": "pb_long", "like": "EWY", "timing": ["SKDJ", "MACD"]}
+    ]
+  },
+  "scanned_N": 0,
+  "passed": [],
+  "best_scores": null,
+  "any_pass_gate": false,
+  "status": "blocked",
+  "blockers": [
+    {
+      "code": "MISSING_HELPER_SCRIPT",
+      "path": "scripts/kimi_dual_http_create_20260906.py",
+      "detail": "Not present in repo (workspace contains only README.md). Cannot invoke create helpers."
+    },
+    {
+      "code": "MISSING_DUAL_ENGINE",
+      "path": "dual_engine_workflow_v2",
+      "detail": "Not present in repo (file or package). Cannot run dual-engine recipe evaluation."
+    },
+    {
+      "code": "MISSING_CANDLES_AND_LOADERS",
+      "detail": "No candle data and no in-repo candle loaders found under /workspace. Repo tree is README-only."
+    },
+    {
+      "code": "VPS_OUT_OF_SCOPE",
+      "host": "47.81.25.235",
+      "detail": "SSH/fetch-from-VPS forbidden by task instructions (do not SSH into or overload VPS). Light HTTP HEAD to http://47.81.25.235/ returned 401; no further probing performed."
+    }
+  ],
+  "repo_inventory": {
+    "tracked_files": ["README.md"],
+    "scripts_dir_present": false,
+    "candle_files_found": 0,
+    "KEEP4_touched": false,
+    "STOP_KIMI_CREATION_touched": false
+  },
+  "notes_zh": "云端VM无法评测：仓库缺少 kimi_dual_http_create_20260906.py、dual_engine_workflow_v2 与K线/加载器；禁止SSH VPS。scanned_N=0，无过门。"
+}
