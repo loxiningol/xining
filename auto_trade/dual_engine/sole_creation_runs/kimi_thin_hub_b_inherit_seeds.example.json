@@ -1,0 +1,53 @@
+{
+  "_doc": "TEMPLATE only — copy to kimi_thin_hub_b_inherit_seeds.json on VPS (do not commit the live file).",
+  "primary": {
+    "family": "xu_long",
+    "symbol": "AMD-USDT-SWAP",
+    "held": 28,
+    "xwin": 12,
+    "z": 1.0,
+    "atr": 2.18,
+    "hold": 10,
+    "timing": [
+      {"factor": "skdj_k", "operator": "above", "value": 0, "window": 22},
+      {"factor": "macd_hist", "operator": "above", "value": -100}
+    ],
+    "_inherit_note": "example hub-b primary; live values stay on VPS only"
+  },
+  "backup": {
+    "family": "xu_long",
+    "symbol": "BCH-USDT-SWAP",
+    "held": 28,
+    "xwin": 12,
+    "z": 1.0,
+    "atr": 2.18,
+    "hold": 10,
+    "timing": [
+      {"factor": "skdj_k", "operator": "above", "value": 40, "window": 9},
+      {"factor": "macd_hist", "operator": "above", "value": 0}
+    ],
+    "_inherit_note": "example hub-b backup"
+  },
+  "eq2": {
+    "family": "xu_long",
+    "symbol": "AVGO-USDT-SWAP",
+    "held": 28,
+    "xwin": 12,
+    "z": 1.0,
+    "atr": 2.18,
+    "hold": 10,
+    "timing": [],
+    "_inherit_note": "optional"
+  },
+  "cr2": {
+    "family": "xu_long",
+    "symbol": "UNI-USDT-SWAP",
+    "held": 28,
+    "xwin": 12,
+    "z": 1.0,
+    "atr": 2.18,
+    "hold": 10,
+    "timing": [],
+    "_inherit_note": "optional"
+  }
+}

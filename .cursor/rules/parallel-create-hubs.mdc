@@ -1,0 +1,38 @@
+---
+description: 双 Cursor 并行创造时禁止互碰对方 hub；共享文件不经 PR 不上 VPS
+alwaysApply: true
+---
+
+# 并行创造 Hub 隔离（强制）
+
+完整约定见 `docs/PARALLEL_CREATE_HUBS.md`。
+
+## 禁碰对方
+
+- 本侧默认拥有 **hub-a**：`qiyu-kimi-thin-hub`、`/tmp/kdh_thin`、worker-a。  
+- 对侧拥有 **hub-b**：`qiyu-kimi-thin-hub-b`、`/tmp/kdh_thin_b`、worker-b。  
+- **禁止** restart/stop/改 unit/清队列 **对方**的 hub 或工人。  
+- **禁止**把两边 `KDH_THIN_ROOTS` 并回单一共享池抢活（除非用户明确要求且走 `cursor/shared-*` PR）。
+
+## 分支前缀
+
+- `cursor/hub-a-*` — 本侧  
+- `cursor/hub-b-*` — 对侧  
+- `cursor/shared-*` — 共享清单  
+
+## 共享文件不经 PR 不上 VPS
+
+改下列任一文件后，**禁止**直接 `scp`/`cp` 到 VPS 当发布：
+
+- `dual_engine_workflow_v2/kimi_provider.py`
+- `scripts/kimi_thin_recipe_loop.py`
+- `scripts/research_host_eval_worker.py`
+- `scripts/kimi_dual_http_create_20260906.py`
+
+必须：`cursor/shared-*` → PR → CI（`kimi-provider-failover`）绿 → 合并 `main` → tag → 再部署 → `write_deployed_sha.sh`。
+
+仅本侧 drop-in / inherit 实例可以热改，但不得夹带上述共享文件的未合并改动。
+
+## 验收 Python 路径
+
+生产验收仍遵守 `prod-python-path`：`cd /root && PYTHONPATH=/root`，禁止在 `/home/admin` 下 import 交易模块。

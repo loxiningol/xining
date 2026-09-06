@@ -1,0 +1,19 @@
+=== overnight runlog Sun Sep  6 23:33:22 CST 2026 ===
+31cf280 Add P1/P2 collab: sha deploy checks, inherit examples, PR template, tag pin.
+5bd0350 Park Actions workflow pending gh token workflow scope.
+8228dbf Stabilize failover race assertions and track parallel-hub Cursor rule.
+842e016 Add GitHub P0: hub isolation docs, failover CI, main-protection helper.
+dd988be Update README.md
+96d1b75 Initial commit
+unittest: OK (15)
+tag-pin refuse: 3
+REFUSE: HEAD=485decceea20850eb934bec3d0f8662f3da881a3 != QIYU_CODE_TAG=no-such-tag-xyz (no-such-tag-xyz^{commit})
+Checkout the tag (or unset QIYU_CODE_TAG) before starting worker-a.
+hub-a:active
+hub-b:active
+sha:MISSING
+git ahead: 1
+push_watch:
+started
+PR: https://github.com/loxiningol/xining/pull/3 (needs push of 31cf280)
+BLOCKERS: 1) GitHub 443 intermittent 2) workflow OAuth scope 3) private free branch protection 403

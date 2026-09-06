@@ -1,0 +1,19 @@
+.cursor/
+!.cursor/rules/
+!.cursor/rules/**/*.mdc
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+.env
+*.egg-info/
+
+# Live inherit seeds (templates *.example.json are tracked)
+**/kimi_thin_hub_*_inherit_seeds.json
+!**/*.example.json
+
+# Local agent / runtime
+.research_vector/
+/tmp/
+*.log
