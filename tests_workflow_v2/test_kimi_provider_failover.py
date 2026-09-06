@@ -157,7 +157,8 @@ class TestKimiFailover(unittest.TestCase):
             posted = kp.kimi_post_json({"messages": []}, timeout=5)
         self.assertTrue(posted.get("ok"))
         self.assertEqual(posted.get("endpoint"), "backup")
-        self.assertEqual(len(calls), 2)
+        # Race may cancel the losing primary before open(); backup must run.
+        self.assertTrue(any("api2.cmkey.cn" in u for u in calls))
 
     def test_401_fails_over_to_backup(self):
         def fake_open(req, timeout):
@@ -236,9 +237,8 @@ class TestKimiFailover(unittest.TestCase):
         self.assertEqual(posted.get("endpoint"), "backup")
         self.assertTrue(posted.get("raced"))
         backup_hits = [url for url in calls if "api2.cmkey.cn" in url]
-        primary_hits = [url for url in calls if "api2.cmkey.cn" not in url]
+        # Losing primary may never open if backup wins first (shutdown wait=False).
         self.assertEqual(len(backup_hits), 1)
-        self.assertEqual(len(primary_hits), 1)
 
     def test_slow_primary_does_not_block_backup(self):
         import time
