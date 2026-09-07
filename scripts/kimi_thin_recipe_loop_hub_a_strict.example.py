@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""hub-a only wrapper example: Phase B 钝侧（统计 off）.
+"""hub-a only wrapper example: Phase D 跟随已验证 timing hard（钝侧统计仍 off）.
 
 Copy/merge into VPS `/root/scripts/kimi_thin_recipe_loop_hub_a_strict.py`.
 Hub-b Cursor must NOT restart hub-a.
 
-Phase B：与标定侧 hub-b 分默认 — 此处 placebo/LOO/MC=off。
-禁止与 hub-b 同日把统计项升 soft/hard。
+Phase D：只跟随 b 已验证的 CREATE_TIMING_BUDGET=hard；placebo/LOO/MC 保持 off。
+Phase E：此档即为冻结推荐（FROZEN_HUB_A）。
 """
 from __future__ import print_function
 
@@ -20,12 +20,19 @@ sys.path.insert(0, "/root")
 sys.path.insert(0, "/root/scripts")
 
 from dual_engine_workflow_v2.creation_small_n_rigor import (  # noqa: E402
-    PROFILE_HUB_A_PHASE_B,
+    FROZEN_HUB_A,
     apply_profile,
+    frozen_invariants,
     install_into_kdh,
 )
 
-print("hub_a_phase_b_profile: %s" % (apply_profile(PROFILE_HUB_A_PHASE_B, force=True),), flush=True)
+_inv = frozen_invariants()
+if not _inv.get("ok"):
+    print("hub_a_frozen_invariants_FAIL: %s" % (_inv.get("errors"),), flush=True)
+    sys.exit(2)
+
+print("hub_a_phase_d_profile: %s" % (apply_profile(FROZEN_HUB_A, force=True),), flush=True)
+print("hub_a_frozen_invariants_ok: %s" % (_inv.get("ok"),), flush=True)
 
 LANE_ZH = {
     "primary": "1号车道",
@@ -57,6 +64,7 @@ def emit(obj):
         obj["small_n_rigor"] = cfg
         obj["small_n_phase"] = (cfg or {}).get("phase")
         obj["small_n_hub_role"] = (cfg or {}).get("hub_role")
+        obj["small_n_frozen"] = True
     return _orig_emit(obj)
 
 

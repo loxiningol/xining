@@ -135,7 +135,10 @@ class TestPhase0Template(unittest.TestCase):
         self.assertEqual(t["phase"], "0")
         self.assertIn("hub_b", t["day0_defaults"])
         self.assertEqual(t["day0_defaults"]["hub_b"]["CREATE_TIMING_BUDGET"], "hard")
+        self.assertEqual(t["day0_defaults"]["hub_b"]["CREATE_SMALL_N_PHASE"], "E")
         self.assertEqual(t["day0_defaults"]["hub_a_suggested"]["CREATE_PLACEBO"], "off")
+        self.assertEqual(t["day0_defaults"]["hub_a_suggested"]["CREATE_TIMING_BUDGET"], "hard")
+        self.assertTrue(t["frozen_invariants"]["ok"])
 
 
 class TestPhaseBC(unittest.TestCase):
@@ -164,6 +167,47 @@ class TestPhaseBC(unittest.TestCase):
         out = rigor.evaluate(n=30, timing=timing, returns=[0.01] * 30)
         self.assertFalse(out["ok"])
         self.assertIn(rigor.CODE_TIMING_DIM, out["failed_rules"])
+
+
+class TestPhaseDE(unittest.TestCase):
+    def test_hub_a_phase_d_follows_timing_only(self):
+        out = rigor.apply_profile(rigor.FROZEN_HUB_A, force=True)
+        cfg = out["config"]
+        self.assertEqual(cfg["phase"], "D")
+        self.assertEqual(cfg["timing_budget"], "hard")
+        self.assertEqual(cfg["placebo"], "off")
+        self.assertEqual(cfg["loo"], "off")
+
+    def test_hub_b_phase_e_frozen(self):
+        out = rigor.apply_profile(rigor.FROZEN_HUB_B, force=True)
+        cfg = out["config"]
+        self.assertEqual(cfg["phase"], "E")
+        self.assertEqual(cfg["timing_budget"], "hard")
+        self.assertEqual(cfg["placebo"], "observe")
+        self.assertIn("frozen", cfg["hub_role"])
+
+    def test_frozen_invariants_ok(self):
+        inv = rigor.frozen_invariants()
+        self.assertTrue(inv["ok"], msg=inv.get("errors"))
+
+    def test_frozen_rejects_bilateral_hard_stats(self):
+        bad_b = dict(rigor.FROZEN_HUB_B)
+        bad_a = dict(rigor.FROZEN_HUB_A)
+        bad_b["CREATE_PLACEBO"] = "hard"
+        bad_a["CREATE_PLACEBO"] = "hard"
+        inv = rigor.frozen_invariants(bad_b, bad_a)
+        self.assertFalse(inv["ok"])
+        self.assertTrue(any("bilateral_hard_stats" in e for e in inv["errors"]))
+
+    def test_waive_still_dead_under_freeze(self):
+        rigor.apply_profile(rigor.FROZEN_HUB_B, force=True)
+        out, why = rigor.never_waive_trade_count({
+            "ok": False,
+            "failed_rules": ["trade_count_below_threshold"],
+            "E": 0.01,
+        })
+        self.assertIsNone(out)
+        self.assertIn("trade_count", why)
 
 
 if __name__ == "__main__":

@@ -94,12 +94,13 @@ def config():
     }
 
 
-# Phase B/C profiles (本侧 hub-b = 标定侧；对侧 hub-a = 钝侧，禁止同日升 hard 统计)
+# Phase B/C/D/E profiles
+# 本侧 hub-b = 标定侧；对侧 hub-a = 钝侧。禁止两侧同日升 hard 统计。
 PROFILE_HUB_B_PHASE_C = {
     "CREATE_ANTI_EVASION": "1",
     "CREATE_N_DISCOUNT": "1",
     "CREATE_TIMING_BUDGET": "hard",  # Phase C 首条：叶预算 soft→hard
-    "CREATE_PLACEBO": "observe",    # 统计仍 O，未满标定窗不升 soft/hard
+    "CREATE_PLACEBO": "observe",
     "CREATE_LOO": "observe",
     "CREATE_MC_SUBSET": "observe",
     "CREATE_NOISE_STRESS": "off",
@@ -111,7 +112,7 @@ PROFILE_HUB_A_PHASE_B = {
     "CREATE_ANTI_EVASION": "1",
     "CREATE_N_DISCOUNT": "1",
     "CREATE_TIMING_BUDGET": "soft",
-    "CREATE_PLACEBO": "off",        # 钝侧：统计不跑
+    "CREATE_PLACEBO": "off",
     "CREATE_LOO": "off",
     "CREATE_MC_SUBSET": "off",
     "CREATE_NOISE_STRESS": "off",
@@ -119,8 +120,78 @@ PROFILE_HUB_A_PHASE_B = {
     "CREATE_SMALL_N_HUB_ROLE": "blunt",
 }
 
+# Phase D：对侧只跟随已验证条款（timing hard），统计仍 off（不跟实验档）
+PROFILE_HUB_A_PHASE_D = {
+    "CREATE_ANTI_EVASION": "1",
+    "CREATE_N_DISCOUNT": "1",
+    "CREATE_TIMING_BUDGET": "hard",
+    "CREATE_PLACEBO": "off",
+    "CREATE_LOO": "off",
+    "CREATE_MC_SUBSET": "off",
+    "CREATE_NOISE_STRESS": "off",
+    "CREATE_SMALL_N_PHASE": "D",
+    "CREATE_SMALL_N_HUB_ROLE": "blunt_follow",
+}
+
+# Phase E：冻结推荐默认（与 C 实质相同 + phase=E + 防回潮锁）
+PROFILE_HUB_B_PHASE_E = dict(PROFILE_HUB_B_PHASE_C)
+PROFILE_HUB_B_PHASE_E["CREATE_SMALL_N_PHASE"] = "E"
+PROFILE_HUB_B_PHASE_E["CREATE_SMALL_N_HUB_ROLE"] = "calibrate_frozen"
+
+# Frozen aliases used by wrappers / CI
+FROZEN_HUB_B = PROFILE_HUB_B_PHASE_E
+FROZEN_HUB_A = PROFILE_HUB_A_PHASE_D
+
+STAT_KEYS = (
+    "CREATE_PLACEBO",
+    "CREATE_LOO",
+    "CREATE_MC_SUBSET",
+    "CREATE_NOISE_STRESS",
+)
+
 PROMOTION_MIN_ASKS = 50
 
+
+def frozen_invariants(profile_b=None, profile_a=None):
+    """Phase E locks: waive path gone; no silent bilateral hard stats; anti-evasion on."""
+    pb = dict(profile_b or FROZEN_HUB_B)
+    pa = dict(profile_a or FROZEN_HUB_A)
+    errors = []
+    if str(pb.get("CREATE_ANTI_EVASION")) not in ("1", "true", "yes"):
+        errors.append("hub_b_anti_evasion_off")
+    if str(pa.get("CREATE_ANTI_EVASION")) not in ("1", "true", "yes"):
+        errors.append("hub_a_anti_evasion_off")
+    if str(pb.get("CREATE_TIMING_BUDGET")).lower() != "hard":
+        errors.append("hub_b_timing_not_hard")
+    if str(pa.get("CREATE_TIMING_BUDGET")).lower() != "hard":
+        errors.append("hub_a_timing_not_followed")
+    # 统计不得双侧同为 hard
+    hard_stats_b = [
+        k for k in STAT_KEYS
+        if str(pb.get(k) or "").lower() == "hard"
+    ]
+    hard_stats_a = [
+        k for k in STAT_KEYS
+        if str(pa.get(k) or "").lower() == "hard"
+    ]
+    if hard_stats_b and hard_stats_a:
+        errors.append("bilateral_hard_stats:%s|%s" % (
+            ",".join(hard_stats_b), ",".join(hard_stats_a)))
+    # 钝侧统计必须 off（Phase D/E：只跟 timing hard，不跟 observe/soft/hard 统计）
+    for k in STAT_KEYS:
+        v = str(pa.get(k) or "").lower()
+        if v not in ("off", "0", "false", ""):
+            errors.append("hub_a_stats_not_off:%s=%s" % (k, v))
+    # 新条款默认不得 hard
+    if str(pb.get("CREATE_NOISE_STRESS") or "").lower() == "hard":
+        errors.append("hub_b_noise_hard_forbidden")
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "hub_b": pb,
+        "hub_a": pa,
+        "phase": "E",
+    }
 
 def apply_profile(profile, force=False):
     """Apply env profile. force=True overwrites; else skip if CREATE_SMALL_N_ENV_LOCK=1."""
@@ -617,11 +688,12 @@ def phase0_baseline_template():
             "O": "只观测",
         },
         "day0_defaults": {
-            "hub_b": dict(PROFILE_HUB_B_PHASE_C),
-            "hub_a_suggested": dict(PROFILE_HUB_A_PHASE_B),
+            "hub_b": dict(FROZEN_HUB_B),
+            "hub_a_suggested": dict(FROZEN_HUB_A),
         },
         "note_zh": (
-            "本侧=hub-b 为标定侧（Phase C 可单条升档）；"
-            "对侧=hub-a 为钝侧 Phase B（统计 off）。禁止两侧同日升 hard 统计。"
+            "Phase E 冻结：b=标定 timing hard + 统计 observe；"
+            "a=跟随 timing hard + 统计 off。禁止双侧同日 hard 统计 / 回引 waive。"
         ),
+        "frozen_invariants": frozen_invariants(),
     }

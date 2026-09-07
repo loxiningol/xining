@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Hub-b thin invent: lanes 5–8 + Phase B/C small-n rigor (标定侧).
+"""Hub-b thin invent: lanes 5–8 + Phase E frozen small-n rigor (标定侧冻结).
 
 Do not run on hub-a.
-Phase B: split from hub-a（a 钝 / b 标定）.
-Phase C: first clause only — timing_budget soft→hard；placebo/LOO/MC 仍 observe.
+Phase E = Phase C 实质冻结：timing hard + 统计 observe；禁止回引 waive / 双侧 hard 统计.
 """
 from __future__ import print_function
 
@@ -20,23 +19,30 @@ if _scripts not in sys.path:
     sys.path.insert(0, _scripts)
 
 from dual_engine_workflow_v2.creation_small_n_rigor import (  # noqa: E402
-    PROFILE_HUB_B_PHASE_C,
+    FROZEN_HUB_B,
     apply_profile,
+    frozen_invariants,
     install_into_kdh,
     record_promotion,
 )
 
-_prof = apply_profile(PROFILE_HUB_B_PHASE_C, force=True)
+_inv = frozen_invariants()
+if not _inv.get("ok"):
+    print("hub_b_frozen_invariants_FAIL: %s" % (_inv.get("errors"),), flush=True)
+    sys.exit(2)
+
+_prof = apply_profile(FROZEN_HUB_B, force=True)
 _promo = record_promotion(
-    clause="CREATE_TIMING_BUDGET",
-    from_tier="soft",
-    to_tier="hard",
+    clause="PHASE_E_FREEZE",
+    from_tier="C",
+    to_tier="E",
     hub="b",
-    reason_zh="Phase C 首条：削弱堆叶凑过；统计项仍 observe，未满窗不升",
+    reason_zh="Phase E 冻结推荐默认；新条款默认 O；禁止回引 waive / 双侧 hard 统计",
     asks=None,
 )
-print("hub_b_phase_bc_profile: %s" % (_prof,), flush=True)
-print("hub_b_phase_c_promotion: %s" % (_promo,), flush=True)
+print("hub_b_phase_e_profile: %s" % (_prof,), flush=True)
+print("hub_b_phase_e_freeze: %s" % (_promo,), flush=True)
+print("hub_b_frozen_invariants_ok: %s" % (_inv.get("ok"),), flush=True)
 
 import kimi_dual_http_create_20260906 as kdh  # noqa: E402
 
@@ -91,6 +97,7 @@ def emit(obj):
         obj["small_n_rigor"] = cfg
         obj["small_n_phase"] = (cfg or {}).get("phase")
         obj["small_n_hub_role"] = (cfg or {}).get("hub_role")
+        obj["small_n_frozen"] = True
     return _orig_emit(obj)
 
 
