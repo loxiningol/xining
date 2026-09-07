@@ -94,3 +94,18 @@ VPS 上已热改并跑着：
 - hub-a / hub-b 服务均为 active（发报时）
 - hub-a 另有本侧 strict 入口 drop-in（`kimi_thin_recipe_loop_hub_a_strict.py`）——**对侧勿改**
 - 对侧只需保证 hub-b + worker-b 按上表车道跑起来即可
+
+---
+
+## 2026-09-07 Phase 0–A 小样本严谨层（hub-b 已接通）
+
+共享模块：`dual_engine_workflow_v2/creation_small_n_rigor.py`  
+说明：`docs/ci/CREATION_SMALL_N_RIGOR_PHASE0_A.md`
+
+**对侧 hub-a 请自行**（本侧不 restart a）：
+
+1. 确认 `/root/dual_engine_workflow_v2/creation_small_n_rigor.py` 已随 tag 部署。
+2. 将 `scripts/kimi_thin_recipe_loop_hub_a_strict.example.py` 合并进现网 `kimi_thin_recipe_loop_hub_a_strict.py`（核心：`install_into_kdh(kdh)`）。
+3. 仅 restart `qiyu-kimi-thin-hub`；boot 应见 `hub_a_small_n_rigor` / `small_n_rigor`。
+4. Day-0：PLACEBO/LOO/MC 保持 `observe`，**禁止**与 hub-b 同日升 hard。
+
