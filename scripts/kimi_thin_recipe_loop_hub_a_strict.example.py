@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-"""hub-a only wrapper example: 1–4号 + Phase A small-n rigor.
+"""hub-a only wrapper example: Phase B 钝侧（统计 off）.
 
 Copy/merge into VPS `/root/scripts/kimi_thin_recipe_loop_hub_a_strict.py`.
-Hub-b Cursor must NOT restart hub-a; hub-a Cursor applies this.
+Hub-b Cursor must NOT restart hub-a.
+
+Phase B：与标定侧 hub-b 分默认 — 此处 placebo/LOO/MC=off。
+禁止与 hub-b 同日把统计项升 soft/hard。
 """
 from __future__ import print_function
 
@@ -12,17 +15,17 @@ import sys
 os.chdir("/root")
 os.environ.setdefault("VECTOR_ROOT", "/root")
 os.environ.setdefault("PYTHONPATH", "/root")
-# Phase A suggested defaults (same soft/observe as hub-b Day-0; do not raise to hard together)
-os.environ.setdefault("CREATE_ANTI_EVASION", "1")
-os.environ.setdefault("CREATE_N_DISCOUNT", "1")
-os.environ.setdefault("CREATE_TIMING_BUDGET", "soft")
-os.environ.setdefault("CREATE_PLACEBO", "observe")
-os.environ.setdefault("CREATE_LOO", "observe")
-os.environ.setdefault("CREATE_MC_SUBSET", "observe")
-os.environ.setdefault("CREATE_NOISE_STRESS", "off")
 
 sys.path.insert(0, "/root")
 sys.path.insert(0, "/root/scripts")
+
+from dual_engine_workflow_v2.creation_small_n_rigor import (  # noqa: E402
+    PROFILE_HUB_A_PHASE_B,
+    apply_profile,
+    install_into_kdh,
+)
+
+print("hub_a_phase_b_profile: %s" % (apply_profile(PROFILE_HUB_A_PHASE_B, force=True),), flush=True)
 
 LANE_ZH = {
     "primary": "1号车道",
@@ -31,8 +34,7 @@ LANE_ZH = {
     "cr2": "4号车道",
 }
 
-import kimi_dual_http_create_20260906 as kdh
-from dual_engine_workflow_v2.creation_small_n_rigor import install_into_kdh
+import kimi_dual_http_create_20260906 as kdh  # noqa: E402
 
 print("hub_a_small_n_rigor: %s" % (install_into_kdh(kdh),), flush=True)
 print("hub_a_lane_zh: %s" % LANE_ZH, flush=True)
@@ -51,7 +53,10 @@ def emit(obj):
         obj["lane_zh_map"] = dict(LANE_ZH)
         lanes = obj.get("lanes") or []
         obj["lanes_zh"] = [LANE_ZH.get(x, x) for x in lanes]
-        obj["small_n_rigor"] = getattr(kdh, "_small_n_rigor_config", None)
+        cfg = getattr(kdh, "_small_n_rigor_config", None)
+        obj["small_n_rigor"] = cfg
+        obj["small_n_phase"] = (cfg or {}).get("phase")
+        obj["small_n_hub_role"] = (cfg or {}).get("hub_role")
     return _orig_emit(obj)
 
 

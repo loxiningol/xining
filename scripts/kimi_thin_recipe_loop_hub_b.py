@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Hub-b thin invent: lanes numbered 5–8 + Phase A small-n rigor install.
+"""Hub-b thin invent: lanes 5–8 + Phase B/C small-n rigor (标定侧).
 
 Do not run on hub-a.
+Phase B: split from hub-a（a 钝 / b 标定）.
+Phase C: first clause only — timing_budget soft→hard；placebo/LOO/MC 仍 observe.
 """
 from __future__ import print_function
 
@@ -10,15 +12,6 @@ import sys
 
 os.environ.setdefault("KDH_THIN_NS", "b")
 
-# Phase A Day-0 defaults for hub-b (stats observe only — no hard one-shot)
-os.environ.setdefault("CREATE_ANTI_EVASION", "1")
-os.environ.setdefault("CREATE_N_DISCOUNT", "1")
-os.environ.setdefault("CREATE_TIMING_BUDGET", "soft")
-os.environ.setdefault("CREATE_PLACEBO", "observe")
-os.environ.setdefault("CREATE_LOO", "observe")
-os.environ.setdefault("CREATE_MC_SUBSET", "observe")
-os.environ.setdefault("CREATE_NOISE_STRESS", "off")
-
 _ROOT = os.environ.get("VECTOR_ROOT") or "/root"
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
@@ -26,20 +19,37 @@ _scripts = os.path.join(_ROOT, "scripts")
 if _scripts not in sys.path:
     sys.path.insert(0, _scripts)
 
+from dual_engine_workflow_v2.creation_small_n_rigor import (  # noqa: E402
+    PROFILE_HUB_B_PHASE_C,
+    apply_profile,
+    install_into_kdh,
+    record_promotion,
+)
+
+_prof = apply_profile(PROFILE_HUB_B_PHASE_C, force=True)
+_promo = record_promotion(
+    clause="CREATE_TIMING_BUDGET",
+    from_tier="soft",
+    to_tier="hard",
+    hub="b",
+    reason_zh="Phase C 首条：削弱堆叶凑过；统计项仍 observe，未满窗不升",
+    asks=None,
+)
+print("hub_b_phase_bc_profile: %s" % (_prof,), flush=True)
+print("hub_b_phase_c_promotion: %s" % (_promo,), flush=True)
+
 import kimi_dual_http_create_20260906 as kdh  # noqa: E402
-from dual_engine_workflow_v2.creation_small_n_rigor import install_into_kdh  # noqa: E402
 
 _rigor = install_into_kdh(kdh)
 print("hub_b_small_n_rigor_installed: %s" % (_rigor,), flush=True)
 
 import kimi_thin_recipe_loop as loop  # noqa: E402
 
-# Classic role → hub-b public lane number
 _ALIAS = {
-    "5": "primary",  # kimi primary / equity
-    "6": "backup",   # kimi backup / crypto
-    "7": "eq2",      # was qwen; mouth may share primary while qwen off
-    "8": "cr2",      # deepseek / crypto
+    "5": "primary",
+    "6": "backup",
+    "7": "eq2",
+    "8": "cr2",
 }
 
 for num, old in _ALIAS.items():
@@ -77,7 +87,10 @@ def emit(obj):
             "8": "8号车道",
         }
         obj["lane_alias"] = dict(_ALIAS)
-        obj["small_n_rigor"] = getattr(kdh, "_small_n_rigor_config", None)
+        cfg = getattr(kdh, "_small_n_rigor_config", None)
+        obj["small_n_rigor"] = cfg
+        obj["small_n_phase"] = (cfg or {}).get("phase")
+        obj["small_n_hub_role"] = (cfg or {}).get("hub_role")
     return _orig_emit(obj)
 
 

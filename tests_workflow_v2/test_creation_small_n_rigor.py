@@ -134,7 +134,36 @@ class TestPhase0Template(unittest.TestCase):
         t = rigor.phase0_baseline_template()
         self.assertEqual(t["phase"], "0")
         self.assertIn("hub_b", t["day0_defaults"])
-        self.assertEqual(t["day0_defaults"]["hub_b"]["CREATE_PLACEBO"], "observe")
+        self.assertEqual(t["day0_defaults"]["hub_b"]["CREATE_TIMING_BUDGET"], "hard")
+        self.assertEqual(t["day0_defaults"]["hub_a_suggested"]["CREATE_PLACEBO"], "off")
+
+
+class TestPhaseBC(unittest.TestCase):
+    def test_apply_hub_b_phase_c(self):
+        out = rigor.apply_profile(rigor.PROFILE_HUB_B_PHASE_C, force=True)
+        cfg = out["config"]
+        self.assertEqual(cfg["phase"], "C")
+        self.assertEqual(cfg["timing_budget"], "hard")
+        self.assertEqual(cfg["placebo"], "observe")
+        self.assertEqual(cfg["hub_role"], "calibrate")
+
+    def test_apply_hub_a_phase_b_blunt(self):
+        out = rigor.apply_profile(rigor.PROFILE_HUB_A_PHASE_B, force=True)
+        cfg = out["config"]
+        self.assertEqual(cfg["phase"], "B")
+        self.assertEqual(cfg["placebo"], "off")
+        self.assertEqual(cfg["hub_role"], "blunt")
+
+    def test_phase_c_ready_gate(self):
+        self.assertFalse(rigor.phase_c_ready(24)["ready"])
+        self.assertTrue(rigor.phase_c_ready(50)["ready"])
+
+    def test_timing_hard_rejects_over_budget(self):
+        rigor.apply_profile(rigor.PROFILE_HUB_B_PHASE_C, force=True)
+        timing = [{"factor": "a", "operator": "above", "value": 1}] * 5
+        out = rigor.evaluate(n=30, timing=timing, returns=[0.01] * 30)
+        self.assertFalse(out["ok"])
+        self.assertIn(rigor.CODE_TIMING_DIM, out["failed_rules"])
 
 
 if __name__ == "__main__":

@@ -61,7 +61,7 @@
 - `.github/workflows/kimi-provider-failover.yml`
 - 本文件与 `.cursor/rules/parallel-create-hubs.mdc`
 
-小样本严谨层说明与验收：`docs/ci/CREATION_SMALL_N_RIGOR_PHASE0_A.md`。  
+小样本严谨层说明与验收：`docs/ci/CREATION_SMALL_N_RIGOR_PHASE0_A.md`。 Phase B–C：`docs/ci/CREATION_SMALL_N_RIGOR_PHASE_B_C.md`（b=标定 timing hard；a=钝侧统计 off）。  
 hub 挂接用 `creation_small_n_rigor.install_into_kdh`；**禁止**两侧同日把 PLACEBO/LOO/MC 升为 hard。
 
 仅动本侧 unit drop-in / inherit 实例可不经 shared PR，但**不得**顺手改共享清单内文件却只 scp 到 `/root`。

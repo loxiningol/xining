@@ -109,3 +109,20 @@ VPS 上已热改并跑着：
 3. 仅 restart `qiyu-kimi-thin-hub`；boot 应见 `hub_a_small_n_rigor` / `small_n_rigor`。
 4. Day-0：PLACEBO/LOO/MC 保持 `observe`，**禁止**与 hub-b 同日升 hard。
 
+
+---
+
+## 2026-09-07 Phase B–C（hub-b 已接通标定侧）
+
+说明：`docs/ci/CREATION_SMALL_N_RIGOR_PHASE_B_C.md`
+
+**归属**：本侧 hub-b = 标定；对侧 hub-a = 钝侧 Phase B。
+
+**对侧 hub-a**：
+
+1. 合并 `scripts/kimi_thin_recipe_loop_hub_a_strict.example.py`（统计 **off**，phase=B）。
+2. 仅 restart `qiyu-kimi-thin-hub`。
+3. **禁止**把 placebo/LOO/MC 升到 soft/hard（与 b 的 timing hard 不同日跟进统计 hard）。
+
+hub-b 本轮 Phase C 仅升：`timing_budget soft→hard`。
+
