@@ -10,8 +10,18 @@
 | **hub-a（本侧默认）** | `qiyu-kimi-thin-hub` | `/tmp/kdh_thin` | `/tmp/kimi_thin_hub.log` | `com.qiyu.research-host-eval-worker`（`--roots /tmp/kdh_thin`，4 路） |
 | **hub-b（对侧）** | `qiyu-kimi-thin-hub-b` | `/tmp/kdh_thin_b` | `/tmp/kimi_thin_hub_b.log` | `com.qiyu.research-host-eval-worker-b`（`--roots /tmp/kdh_thin_b`，4 路） |
 
-发明车道（两侧对称）：`primary,backup,eq2,cr2`  
-默认口绑定：`primary→kimi primary`，`backup→kimi backup`，`eq2→qwen`，`cr2→deepseek`（429 仍按 invent 链 failover）。
+### 发明车道（2026-09-07）
+
+| 车道 | 绑定 | 上游（现网） |
+|---|---|---|
+| `primary` | kimi primary | `https://api2.cmkey.cn/v1`（原 `cmkey.cn` 易 504） |
+| `backup` | kimi backup | `https://yuanyuaicloud.cn/v1`（`kimi-k3`） |
+| `cr2` | deepseek | `https://vectide.cn/v1`（`deepseek-v4-pro-0813`） |
+| `eq2` / qwen | **关闭** | `KDH_DISABLE_QWEN_OUTLET=1` |
+
+`KDH_THIN_LANES=primary,backup,cr2`  
+`KDH_LANE_BIND=primary:primary,backup:backup,cr2:deepseek`  
+`KDH_DISABLE_CONGESTION_OUTLETS=0`
 
 若某 Cursor 会话明确声明「本侧=hub-b」，以该会话声明为准；默认文档按 hub-a=本侧。
 
@@ -59,47 +69,30 @@
 | `auto_trade/dual_engine/sole_creation_runs/kimi_thin_hub_{a,b}_inherit_seeds.example.json` | **提交**（模板） |
 | `/root/.../kimi_thin_hub_{a,b}_inherit_seeds.json`（现网） | **不提交** |
 
-现网文件由 hub 启动时 `KDH_THIN_INHERIT_SEEDS` 或默认路径读取。复制 example → 现网文件后按侧改 symbol/timing。
-
 ## 部署对账（P1）
 
 ```bash
-# 写（部署后，在 VPS）
 ./scripts/write_deployed_sha.sh <sha-or-tag>
-
-# 查（本机）
 ./scripts/check_deployed_sha.sh
-# 期望：本地 git rev-parse HEAD（或 QIYU_EXPECT_SHA）== ssh cat /root/deployed.sha
 ```
 
 ## Mac worker 跟 tag（P2）
 
 `scripts/mac_eval_worker/run_hub_a.sh.example` / `run_hub_b.sh.example`：  
-若设置 `QIYU_CODE_TAG`，启动前要求工作树 `HEAD` 精确等于该 tag，否则退出。  
-本机 `~/qiyu_mac_eval_worker/run.sh` 应对齐 example。
+若设置 `QIYU_CODE_TAG`，启动前要求工作树 `HEAD` 精确等于该 tag，否则退出。
 
 ## 合并后 tag + 可选部署 Action（P2）
 
-- 合并 `shared-*` 到 `main` 后打 `create-collab-YYYYMMDD.N`（或 semver）。  
-- `.github/workflows/deploy-vps-approve.yml`：`workflow_dispatch` + environment `vps-prod`（需人工 approve）后才跑部署步骤。  
-- 首次启用需：`gh auth refresh -s workflow`（OAuth 默认无 `workflow` scope，无法 push `.github/workflows/*`）。
+- 合并 `shared-*` 到 `main` 后打 `create-collab-YYYYMMDD.N`。  
+- `.github/workflows/deploy-vps-approve.yml`：`workflow_dispatch` + environment `vps-prod`（需人工 approve）。
 
-## 部署检查（人工）
+## 对侧重启创造
 
-```bash
-# 本侧只重启 a
-sudo systemctl restart qiyu-kimi-thin-hub.service
-
-# 对侧只重启 b
-sudo systemctl restart qiyu-kimi-thin-hub-b.service
-
-git rev-parse HEAD
-./scripts/check_deployed_sha.sh
-```
+见 `docs/ci/HANDOFF_OTHER_CURSOR_CREATE_RESTART.md`。
 
 ## 不进 Git 的运行时
 
 - `/tmp/kdh_thin*` 队列与结果  
 - `*_inherit_seeds.json` 现网实例（仅 `*.example.json` 进仓）  
-- API Key / `.env`  
+- API Key / `.env` / `vectide_deepseek.env`  
 - `.research_vector`
