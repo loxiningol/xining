@@ -1,0 +1,96 @@
+{
+  "as_of": "2026-09-07",
+  "window_zh": "改前约14天创造日志抽样",
+  "baseline": {
+    "hub_a": {
+      "atom_pass_rate": 0.025,
+      "atom_ok": 28,
+      "atom_fail": 1090,
+      "waive_true": 0,
+      "low_n_high_C": 305,
+      "avg_timing_atoms": 2.628
+    },
+    "hub_b": {
+      "atom_pass_rate": 0.0,
+      "atom_ok": 0,
+      "atom_fail": 1206,
+      "waive_true": 0,
+      "low_n_high_C": 509,
+      "avg_timing_atoms": 2.353
+    }
+  },
+  "day0_defaults": {
+    "hub_a_calibrate": {
+      "CREATE_ANTI_EVASION": "1",
+      "CREATE_N_DISCOUNT": "1",
+      "CREATE_TIMING_BUDGET": "soft",
+      "CREATE_PLACEBO": "observe",
+      "CREATE_LOO": "observe",
+      "CREATE_MC_SUBSET": "observe",
+      "CREATE_NOISE_STRESS": "off"
+    },
+    "hub_b_blunt": {
+      "CREATE_ANTI_EVASION": "1",
+      "CREATE_N_DISCOUNT": "1",
+      "CREATE_TIMING_BUDGET": "soft",
+      "CREATE_PLACEBO": "off",
+      "CREATE_LOO": "off",
+      "CREATE_MC_SUBSET": "off",
+      "CREATE_NOISE_STRESS": "off"
+    }
+  },
+  "gold_healthy": [
+    {
+      "hub": "a",
+      "id": "kdh_backup_xu_e28_x12_s2p0_h12_tm0_tm1",
+      "n": 33,
+      "ok": true,
+      "E": 0.005265648185263017,
+      "at": "2026-09-06 21:41:34",
+      "expect": "n>=30 少叶：不得被 timing hard 误杀（≤3 叶）"
+    },
+    {
+      "hub": "a",
+      "id": "kdh_backup_xu_e28_x12_s2p0_h12_tm0_tm1",
+      "n": 53,
+      "ok": true,
+      "E": 0.004490275456346701,
+      "at": "2026-09-06 21:43:13",
+      "expect": "健康全门样本"
+    }
+  ],
+  "gold_evil": [
+    {
+      "hub": "a",
+      "id": "kdh_backup_xu_e32_x10_s2p0_h12_tm0_tm1_tm2",
+      "n": 24,
+      "C_week_pct": 0.455,
+      "kind": "low_n_high_C",
+      "at": "2026-09-06 17:18:21",
+      "expect": "不得庆祝为进度；n_discount 软压；不可 waive 挂载"
+    },
+    {
+      "hub": "a",
+      "id": "kdh_eq2_xu_e28_x12_s2p18_h10_z1p0_tm0_tm1",
+      "n": 1,
+      "C_week_pct": 0.667,
+      "kind": "low_n_high_C",
+      "at": "2026-09-06 22:46:57",
+      "expect": "作恶：低 n 高 C"
+    },
+    {
+      "synthetic": true,
+      "kind": "trade_count_waive_attempt",
+      "failed_rules": ["trade_count_below_threshold"],
+      "E": 0.01,
+      "expect": "never_waive → None"
+    },
+    {
+      "synthetic": true,
+      "kind": "timing_stack",
+      "n": 30,
+      "timing_atoms": 5,
+      "expect": "timing_dim_above_budget hard fail"
+    }
+  ]
+}

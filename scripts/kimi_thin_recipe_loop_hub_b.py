@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Hub-b thin invent: lanes 5–8 + Phase E frozen small-n rigor (标定侧冻结).
+"""Hub-b thin invent: lanes 5–8 + Phase E blunt-follow freeze (蓝图 b=钝侧).
 
 Do not run on hub-a.
-Phase E = Phase C 实质冻结：timing hard + 统计 observe；禁止回引 waive / 双侧 hard 统计.
 """
 from __future__ import print_function
 
@@ -32,16 +31,14 @@ if not _inv.get("ok"):
     sys.exit(2)
 
 _prof = apply_profile(FROZEN_HUB_B, force=True)
-_promo = record_promotion(
-    clause="PHASE_E_FREEZE",
-    from_tier="C",
+record_promotion(
+    clause="PHASE_E_FREEZE_ALIGN",
+    from_tier="blueprint",
     to_tier="E",
     hub="b",
-    reason_zh="Phase E 冻结推荐默认；新条款默认 O；禁止回引 waive / 双侧 hard 统计",
-    asks=None,
+    reason_zh="蓝图对齐：b=钝侧冻结 timing hard 跟随 + 统计 off",
 )
 print("hub_b_phase_e_profile: %s" % (_prof,), flush=True)
-print("hub_b_phase_e_freeze: %s" % (_promo,), flush=True)
 print("hub_b_frozen_invariants_ok: %s" % (_inv.get("ok"),), flush=True)
 
 import kimi_dual_http_create_20260906 as kdh  # noqa: E402
@@ -98,6 +95,7 @@ def emit(obj):
         obj["small_n_phase"] = (cfg or {}).get("phase")
         obj["small_n_hub_role"] = (cfg or {}).get("hub_role")
         obj["small_n_frozen"] = True
+        obj["small_n_blueprint"] = "a_calibrate_b_blunt"
     return _orig_emit(obj)
 
 

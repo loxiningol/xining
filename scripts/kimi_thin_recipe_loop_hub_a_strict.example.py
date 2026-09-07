@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
-"""hub-a only wrapper example: Phase D 跟随已验证 timing hard（钝侧统计仍 off）.
+"""Hub-a thin invent wrapper: Phase E frozen calibrate side (蓝图 a=标定).
 
-Copy/merge into VPS `/root/scripts/kimi_thin_recipe_loop_hub_a_strict.py`.
-Hub-b Cursor must NOT restart hub-a.
-
-Phase D：只跟随 b 已验证的 CREATE_TIMING_BUDGET=hard；placebo/LOO/MC 保持 off。
-Phase E：此档即为冻结推荐（FROZEN_HUB_A）。
+Merge into VPS ExecStart drop-in. hub-b Cursor must not restart hub-a unless asked.
 """
 from __future__ import print_function
 
@@ -15,7 +11,6 @@ import sys
 os.chdir("/root")
 os.environ.setdefault("VECTOR_ROOT", "/root")
 os.environ.setdefault("PYTHONPATH", "/root")
-
 sys.path.insert(0, "/root")
 sys.path.insert(0, "/root/scripts")
 
@@ -24,6 +19,7 @@ from dual_engine_workflow_v2.creation_small_n_rigor import (  # noqa: E402
     apply_profile,
     frozen_invariants,
     install_into_kdh,
+    record_promotion,
 )
 
 _inv = frozen_invariants()
@@ -31,8 +27,15 @@ if not _inv.get("ok"):
     print("hub_a_frozen_invariants_FAIL: %s" % (_inv.get("errors"),), flush=True)
     sys.exit(2)
 
-print("hub_a_phase_d_profile: %s" % (apply_profile(FROZEN_HUB_A, force=True),), flush=True)
+print("hub_a_phase_e_profile: %s" % (apply_profile(FROZEN_HUB_A, force=True),), flush=True)
 print("hub_a_frozen_invariants_ok: %s" % (_inv.get("ok"),), flush=True)
+record_promotion(
+    clause="PHASE_E_FREEZE_ALIGN",
+    from_tier="blueprint",
+    to_tier="E",
+    hub="a",
+    reason_zh="蓝图对齐：a=标定冻结 timing hard + 统计 observe",
+)
 
 LANE_ZH = {
     "primary": "1号车道",
@@ -65,6 +68,7 @@ def emit(obj):
         obj["small_n_phase"] = (cfg or {}).get("phase")
         obj["small_n_hub_role"] = (cfg or {}).get("hub_role")
         obj["small_n_frozen"] = True
+        obj["small_n_blueprint"] = "a_calibrate_b_blunt"
     return _orig_emit(obj)
 
 
