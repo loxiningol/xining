@@ -54,11 +54,15 @@
 **共享清单：**
 
 - `dual_engine_workflow_v2/kimi_provider.py`
+- `dual_engine_workflow_v2/creation_small_n_rigor.py`（P0–A 小样本严谨层）
 - `scripts/kimi_thin_recipe_loop.py`
 - `scripts/research_host_eval_worker.py`
 - `scripts/kimi_dual_http_create_20260906.py`（若作库被 thin 引用）
 - `.github/workflows/kimi-provider-failover.yml`
 - 本文件与 `.cursor/rules/parallel-create-hubs.mdc`
+
+小样本严谨层说明与验收：`docs/ci/CREATION_SMALL_N_RIGOR_PHASE0_A.md`。  
+hub 挂接用 `creation_small_n_rigor.install_into_kdh`；**禁止**两侧同日把 PLACEBO/LOO/MC 升为 hard。
 
 仅动本侧 unit drop-in / inherit 实例可不经 shared PR，但**不得**顺手改共享清单内文件却只 scp 到 `/root`。
 
