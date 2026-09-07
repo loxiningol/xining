@@ -78,6 +78,7 @@ def config():
         kappa = DEFAULT_KAPPA
     anti = _env("CREATE_ANTI_EVASION", "1") not in ("0", "false", "off", "")
     discount = _env("CREATE_N_DISCOUNT", "1") not in ("0", "false", "off", "")
+    phase = _env("CREATE_SMALL_N_PHASE", "A").upper() or "A"
     return {
         "anti_evasion": anti,
         "n_discount": discount,
@@ -88,7 +89,105 @@ def config():
         "mc_subset": _tier("CREATE_MC_SUBSET", TIER_OBSERVE),
         "noise_stress": _tier("CREATE_NOISE_STRESS", TIER_OFF),
         "seed": int(_env("CREATE_SMALL_N_SEED", "20260907") or 20260907),
-        "phase": "A",
+        "phase": phase,
+        "hub_role": _env("CREATE_SMALL_N_HUB_ROLE", ""),
+    }
+
+
+# Phase B/C profiles (本侧 hub-b = 标定侧；对侧 hub-a = 钝侧，禁止同日升 hard 统计)
+PROFILE_HUB_B_PHASE_C = {
+    "CREATE_ANTI_EVASION": "1",
+    "CREATE_N_DISCOUNT": "1",
+    "CREATE_TIMING_BUDGET": "hard",  # Phase C 首条：叶预算 soft→hard
+    "CREATE_PLACEBO": "observe",    # 统计仍 O，未满标定窗不升 soft/hard
+    "CREATE_LOO": "observe",
+    "CREATE_MC_SUBSET": "observe",
+    "CREATE_NOISE_STRESS": "off",
+    "CREATE_SMALL_N_PHASE": "C",
+    "CREATE_SMALL_N_HUB_ROLE": "calibrate",
+}
+
+PROFILE_HUB_A_PHASE_B = {
+    "CREATE_ANTI_EVASION": "1",
+    "CREATE_N_DISCOUNT": "1",
+    "CREATE_TIMING_BUDGET": "soft",
+    "CREATE_PLACEBO": "off",        # 钝侧：统计不跑
+    "CREATE_LOO": "off",
+    "CREATE_MC_SUBSET": "off",
+    "CREATE_NOISE_STRESS": "off",
+    "CREATE_SMALL_N_PHASE": "B",
+    "CREATE_SMALL_N_HUB_ROLE": "blunt",
+}
+
+PROMOTION_MIN_ASKS = 50
+
+
+def apply_profile(profile, force=False):
+    """Apply env profile. force=True overwrites; else skip if CREATE_SMALL_N_ENV_LOCK=1."""
+    if (not force) and _env("CREATE_SMALL_N_ENV_LOCK", "") in ("1", "true", "yes"):
+        return {"locked": True, "config": config()}
+    for k, v in (profile or {}).items():
+        os.environ[str(k)] = str(v)
+    return {"applied": True, "config": config()}
+
+
+def record_promotion(clause, from_tier, to_tier, hub="b", reason_zh="", asks=None, path=None):
+    """Append one promotion row (Phase C: one clause at a time)."""
+    import json
+    from datetime import datetime
+
+    row = {
+        "at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "hub": hub,
+        "clause": clause,
+        "from": from_tier,
+        "to": to_tier,
+        "reason_zh": reason_zh,
+        "asks": asks,
+        "phase": "C",
+    }
+    if path is None:
+        root = os.environ.get("VECTOR_ROOT") or "/root"
+        path = os.path.join(
+            root, "auto_trade", "dual_engine", "sole_creation_runs",
+            "creation_small_n_promotion_log.json",
+        )
+    rows = []
+    try:
+        if os.path.isfile(path):
+            with open(path, "r") as f:
+                rows = json.load(f) or []
+    except Exception:
+        rows = []
+    if not isinstance(rows, list):
+        rows = []
+    rows.append(row)
+    try:
+        parent = os.path.dirname(path)
+        if parent and not os.path.isdir(parent):
+            os.makedirs(parent)
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(rows, f, ensure_ascii=False, indent=2)
+        os.rename(tmp, path)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200], "row": row}
+    return {"ok": True, "path": path, "row": row, "n_rows": len(rows)}
+
+
+def phase_c_ready(asks, min_asks=None):
+    """Whether placebo/LOO/MC may be considered for O→S (not auto-applied)."""
+    need = int(PROMOTION_MIN_ASKS if min_asks is None else min_asks)
+    n = int(asks or 0)
+    return {
+        "ready": n >= need,
+        "asks": n,
+        "min_asks": need,
+        "next_allowed_zh": (
+            "可考虑单侧单条 O→S（placebo 或 mc），禁止双侧同日 hard"
+            if n >= need else
+            "未满标定窗：禁止升 placebo/LOO/MC；仅允许已批准的 timing 叶预算硬档"
+        ),
     }
 
 
@@ -518,24 +617,11 @@ def phase0_baseline_template():
             "O": "只观测",
         },
         "day0_defaults": {
-            "hub_b": {
-                "CREATE_ANTI_EVASION": "1",
-                "CREATE_N_DISCOUNT": "1",
-                "CREATE_TIMING_BUDGET": "soft",
-                "CREATE_PLACEBO": "observe",
-                "CREATE_LOO": "observe",
-                "CREATE_MC_SUBSET": "observe",
-                "CREATE_NOISE_STRESS": "off",
-            },
-            "hub_a_suggested": {
-                "CREATE_ANTI_EVASION": "1",
-                "CREATE_N_DISCOUNT": "1",
-                "CREATE_TIMING_BUDGET": "soft",
-                "CREATE_PLACEBO": "observe",
-                "CREATE_LOO": "observe",
-                "CREATE_MC_SUBSET": "observe",
-                "CREATE_NOISE_STRESS": "off",
-                "note": "统计项与 b 同为 observe；禁止两侧同日升 hard",
-            },
+            "hub_b": dict(PROFILE_HUB_B_PHASE_C),
+            "hub_a_suggested": dict(PROFILE_HUB_A_PHASE_B),
         },
+        "note_zh": (
+            "本侧=hub-b 为标定侧（Phase C 可单条升档）；"
+            "对侧=hub-a 为钝侧 Phase B（统计 off）。禁止两侧同日升 hard 统计。"
+        ),
     }
