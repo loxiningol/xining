@@ -126,3 +126,19 @@ VPS 上已热改并跑着：
 
 hub-b 本轮 Phase C 仅升：`timing_budget soft→hard`。
 
+
+
+---
+
+## 2026-09-07 Phase D–E（hub-b 已冻结；请对侧跟随 timing hard）
+
+说明：`docs/ci/CREATION_SMALL_N_RIGOR_PHASE_D_E.md`
+
+**对侧 hub-a**：
+
+1. 合并最新 `kimi_thin_recipe_loop_hub_a_strict.example.py`（Phase D：`timing=hard`，统计 **off**）。
+2. 仅 restart `qiyu-kimi-thin-hub`；boot 应见 `small_n_phase=D`、`timing_budget=hard`。
+3. **禁止**把 placebo/LOO/MC 升 soft/hard（冻结不变量）。
+
+hub-b 现为 Phase E 冻结（标定侧）。
+
