@@ -142,3 +142,16 @@ hub-b 本轮 Phase C 仅升：`timing_budget soft→hard`。
 
 hub-b 现为 Phase E 冻结（标定侧）。
 
+
+
+---
+
+## 2026-09-07 蓝图对齐验收（创造停机中）
+
+**口径纠正**：hub-a=标定，hub-b=钝侧（见 `CREATION_SMALL_N_RIGOR_BLUEPRINT_ACCEPTANCE.md`）。
+
+对侧恢复创造前：
+1. 确认 `kimi_thin_recipe_loop_hub_a_strict.py` 已换成 example（FROZEN_HUB_A）。
+2. 确认 invent 已跑过 `patch_invent_kill_n_waive.py`。
+3. 勿在重构完成前 enable/start hub。
+

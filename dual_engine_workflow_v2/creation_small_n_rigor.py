@@ -94,21 +94,25 @@ def config():
     }
 
 
-# Phase B/C/D/E profiles
-# 本侧 hub-b = 标定侧；对侧 hub-a = 钝侧。禁止两侧同日升 hard 统计。
-PROFILE_HUB_B_PHASE_C = {
+# Phase profiles — 蓝图口径：hub-a=标定侧，hub-b=钝侧。禁止两侧同日 hard 统计。
+# Day-0（Phase B）：a=observe 统计 + timing soft；b=统计 off + timing soft。
+# Phase C（仅 a）：timing soft→hard（本冻结已含）。
+# Phase D（b 跟随）：仅 timing hard；统计仍 off。
+# Phase E：冻结下表。
+
+PROFILE_HUB_A_PHASE_B = {
     "CREATE_ANTI_EVASION": "1",
     "CREATE_N_DISCOUNT": "1",
-    "CREATE_TIMING_BUDGET": "hard",  # Phase C 首条：叶预算 soft→hard
+    "CREATE_TIMING_BUDGET": "soft",
     "CREATE_PLACEBO": "observe",
     "CREATE_LOO": "observe",
     "CREATE_MC_SUBSET": "observe",
     "CREATE_NOISE_STRESS": "off",
-    "CREATE_SMALL_N_PHASE": "C",
+    "CREATE_SMALL_N_PHASE": "B",
     "CREATE_SMALL_N_HUB_ROLE": "calibrate",
 }
 
-PROFILE_HUB_A_PHASE_B = {
+PROFILE_HUB_B_PHASE_B = {
     "CREATE_ANTI_EVASION": "1",
     "CREATE_N_DISCOUNT": "1",
     "CREATE_TIMING_BUDGET": "soft",
@@ -120,11 +124,14 @@ PROFILE_HUB_A_PHASE_B = {
     "CREATE_SMALL_N_HUB_ROLE": "blunt",
 }
 
-# Phase D：对侧只跟随已验证条款（timing hard），统计仍 off（不跟实验档）
-PROFILE_HUB_A_PHASE_D = {
+PROFILE_HUB_A_PHASE_C = dict(PROFILE_HUB_A_PHASE_B)
+PROFILE_HUB_A_PHASE_C["CREATE_TIMING_BUDGET"] = "hard"
+PROFILE_HUB_A_PHASE_C["CREATE_SMALL_N_PHASE"] = "C"
+
+PROFILE_HUB_B_PHASE_D = {
     "CREATE_ANTI_EVASION": "1",
     "CREATE_N_DISCOUNT": "1",
-    "CREATE_TIMING_BUDGET": "hard",
+    "CREATE_TIMING_BUDGET": "hard",  # 跟随 a 已验证条款
     "CREATE_PLACEBO": "off",
     "CREATE_LOO": "off",
     "CREATE_MC_SUBSET": "off",
@@ -133,14 +140,21 @@ PROFILE_HUB_A_PHASE_D = {
     "CREATE_SMALL_N_HUB_ROLE": "blunt_follow",
 }
 
-# Phase E：冻结推荐默认（与 C 实质相同 + phase=E + 防回潮锁）
-PROFILE_HUB_B_PHASE_E = dict(PROFILE_HUB_B_PHASE_C)
-PROFILE_HUB_B_PHASE_E["CREATE_SMALL_N_PHASE"] = "E"
-PROFILE_HUB_B_PHASE_E["CREATE_SMALL_N_HUB_ROLE"] = "calibrate_frozen"
+PROFILE_HUB_A_PHASE_E = dict(PROFILE_HUB_A_PHASE_C)
+PROFILE_HUB_A_PHASE_E["CREATE_SMALL_N_PHASE"] = "E"
+PROFILE_HUB_A_PHASE_E["CREATE_SMALL_N_HUB_ROLE"] = "calibrate_frozen"
 
-# Frozen aliases used by wrappers / CI
+PROFILE_HUB_B_PHASE_E = dict(PROFILE_HUB_B_PHASE_D)
+PROFILE_HUB_B_PHASE_E["CREATE_SMALL_N_PHASE"] = "E"
+PROFILE_HUB_B_PHASE_E["CREATE_SMALL_N_HUB_ROLE"] = "blunt_frozen"
+
+# Frozen aliases（Phase E 推荐默认）
+FROZEN_HUB_A = PROFILE_HUB_A_PHASE_E
 FROZEN_HUB_B = PROFILE_HUB_B_PHASE_E
-FROZEN_HUB_A = PROFILE_HUB_A_PHASE_D
+
+# Back-compat aliases (old inverted names → map to blueprint)
+PROFILE_HUB_B_PHASE_C = dict(PROFILE_HUB_A_PHASE_C)  # deprecated name
+PROFILE_HUB_A_PHASE_D = dict(PROFILE_HUB_B_PHASE_D)  # deprecated name
 
 STAT_KEYS = (
     "CREATE_PLACEBO",
@@ -151,46 +165,67 @@ STAT_KEYS = (
 
 PROMOTION_MIN_ASKS = 50
 
+# Failure / warning code lexicon (Phase 0)
+HARD_CODES = (
+    CODE_WAIVE_FORBIDDEN,
+    CODE_TIMING_DIM,  # when timing_budget=hard
+)
+SOFT_CODES = (
+    CODE_TIMING_DIM,  # when timing_budget=soft
+    CODE_N_DISCOUNT,
+)
+OBSERVE_CODES = (
+    CODE_PLACEBO,
+    CODE_LOO,
+    CODE_MC,
+    CODE_NOISE,
+)
 
-def frozen_invariants(profile_b=None, profile_a=None):
-    """Phase E locks: waive path gone; no silent bilateral hard stats; anti-evasion on."""
-    pb = dict(profile_b or FROZEN_HUB_B)
+
+def frozen_invariants(profile_a=None, profile_b=None):
+    """Phase E locks: a=calibrate observe stats; b=blunt stats off; both timing hard; no bilateral hard stats."""
     pa = dict(profile_a or FROZEN_HUB_A)
+    pb = dict(profile_b or FROZEN_HUB_B)
     errors = []
-    if str(pb.get("CREATE_ANTI_EVASION")) not in ("1", "true", "yes"):
-        errors.append("hub_b_anti_evasion_off")
     if str(pa.get("CREATE_ANTI_EVASION")) not in ("1", "true", "yes"):
         errors.append("hub_a_anti_evasion_off")
-    if str(pb.get("CREATE_TIMING_BUDGET")).lower() != "hard":
-        errors.append("hub_b_timing_not_hard")
+    if str(pb.get("CREATE_ANTI_EVASION")) not in ("1", "true", "yes"):
+        errors.append("hub_b_anti_evasion_off")
     if str(pa.get("CREATE_TIMING_BUDGET")).lower() != "hard":
-        errors.append("hub_a_timing_not_followed")
-    # 统计不得双侧同为 hard
-    hard_stats_b = [
-        k for k in STAT_KEYS
-        if str(pb.get(k) or "").lower() == "hard"
-    ]
-    hard_stats_a = [
-        k for k in STAT_KEYS
-        if str(pa.get(k) or "").lower() == "hard"
-    ]
-    if hard_stats_b and hard_stats_a:
+        errors.append("hub_a_timing_not_hard")
+    if str(pb.get("CREATE_TIMING_BUDGET")).lower() != "hard":
+        errors.append("hub_b_timing_not_followed")
+    hard_stats_a = [k for k in STAT_KEYS if str(pa.get(k) or "").lower() == "hard"]
+    hard_stats_b = [k for k in STAT_KEYS if str(pb.get(k) or "").lower() == "hard"]
+    if hard_stats_a and hard_stats_b:
         errors.append("bilateral_hard_stats:%s|%s" % (
-            ",".join(hard_stats_b), ",".join(hard_stats_a)))
-    # 钝侧统计必须 off（Phase D/E：只跟 timing hard，不跟 observe/soft/hard 统计）
+            ",".join(hard_stats_a), ",".join(hard_stats_b)))
+    # 钝侧 b：统计必须 off
     for k in STAT_KEYS:
-        v = str(pa.get(k) or "").lower()
+        v = str(pb.get(k) or "").lower()
         if v not in ("off", "0", "false", ""):
-            errors.append("hub_a_stats_not_off:%s=%s" % (k, v))
-    # 新条款默认不得 hard
+            errors.append("hub_b_stats_not_off:%s=%s" % (k, v))
+    # 标定侧 a：placebo/loo/mc 不得 hard（冻结为 observe）
+    for k in ("CREATE_PLACEBO", "CREATE_LOO", "CREATE_MC_SUBSET"):
+        v = str(pa.get(k) or "").lower()
+        if v == "hard":
+            errors.append("hub_a_stats_hard_forbidden:%s" % k)
+        if v not in ("observe", "off"):
+            if v in ("soft",):
+                pass  # soft allowed only after explicit C promotion; freeze uses observe
+    if str(pa.get("CREATE_PLACEBO") or "").lower() not in ("observe",):
+        errors.append("hub_a_placebo_not_observe_freeze")
+    if str(pa.get("CREATE_NOISE_STRESS") or "").lower() == "hard":
+        errors.append("hub_a_noise_hard_forbidden")
     if str(pb.get("CREATE_NOISE_STRESS") or "").lower() == "hard":
         errors.append("hub_b_noise_hard_forbidden")
     return {
         "ok": not errors,
         "errors": errors,
-        "hub_b": pb,
         "hub_a": pa,
+        "hub_b": pb,
         "phase": "E",
+        "blueprint": "a_calibrate_b_blunt",
     }
 
 def apply_profile(profile, force=False):
@@ -683,17 +718,26 @@ def phase0_baseline_template():
             "window_zh": "改前1-2周",
         },
         "tiers_zh": {
-            "H": "硬否决",
-            "S": "软扣分/警告",
-            "O": "只观测",
+            "H": "硬否决 → failed_rules",
+            "S": "软扣分/警告 → warnings + 回灌",
+            "O": "只观测 → evidence",
+        },
+        "codes": {
+            "hard": list(HARD_CODES),
+            "soft": list(SOFT_CODES),
+            "observe": list(OBSERVE_CODES),
         },
         "day0_defaults": {
+            "hub_a_calibrate": dict(PROFILE_HUB_A_PHASE_B),
+            "hub_b_blunt": dict(PROFILE_HUB_B_PHASE_B),
+        },
+        "frozen_defaults": {
+            "hub_a": dict(FROZEN_HUB_A),
             "hub_b": dict(FROZEN_HUB_B),
-            "hub_a_suggested": dict(FROZEN_HUB_A),
         },
         "note_zh": (
-            "Phase E 冻结：b=标定 timing hard + 统计 observe；"
-            "a=跟随 timing hard + 统计 off。禁止双侧同日 hard 统计 / 回引 waive。"
+            "蓝图：a=标定（统计 observe）b=钝（统计 off）。"
+            "Phase E 冻结：双侧 timing hard；a 统计 observe；b 统计 off；禁 waive / 双侧 hard 统计。"
         ),
         "frozen_invariants": frozen_invariants(),
     }

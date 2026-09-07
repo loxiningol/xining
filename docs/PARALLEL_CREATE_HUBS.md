@@ -100,3 +100,7 @@ hub 挂接用 `creation_small_n_rigor.install_into_kdh`；**禁止**两侧同日
 - `*_inherit_seeds.json` 现网实例（仅 `*.example.json` 进仓）  
 - API Key / `.env` / `vectide_deepseek.env`  
 - `.research_vector`
+
+## 小样本严谨冻结（蓝图 a=标定 / b=钝）
+
+详见 `docs/ci/CREATION_SMALL_N_RIGOR_BLUEPRINT_ACCEPTANCE.md`。Day-0 与冻结表以该文件为准。创造停机重构期间 hub 保持 disabled。
