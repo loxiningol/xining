@@ -124,7 +124,11 @@ def invent_endpoint_chain():
     Extra providers are OpenAI-compatible chat completions endpoints used when
     invent lanes bind to them or when Kimi 429/tpm/quota fails over.
     """
+    _off = str(os.environ.get("KDH_DISABLE_CONGESTION_OUTLETS") or "").strip().lower()
+    if _off in ("1", "true", "yes", "on"):
+        return list(kimi_endpoint_chain())
     rows = list(kimi_endpoint_chain())
+    _no_qwen = str(os.environ.get("KDH_DISABLE_QWEN_OUTLET") or "").strip().lower()
     qwen_key = str(os.environ.get("QIYU_QWEN_API_KEY") or "").strip()
     qwen_url = str(
         os.environ.get("QIYU_QWEN_URL")
@@ -133,10 +137,10 @@ def invent_endpoint_chain():
     qwen_model = str(
         os.environ.get("QIYU_QWEN_MODEL") or "qwen3.7-plus"
     ).strip() or "qwen3.7-plus"
-    if qwen_key and qwen_url:
+    if qwen_key and qwen_url and _no_qwen not in ("1", "true", "yes", "on"):
         rows.append({
             "name": "qwen",
-            "url": qwen_url,
+            "url": normalize_kimi_chat_url(qwen_url),
             "key": qwen_key,
             "model": qwen_model,
         })
@@ -151,7 +155,7 @@ def invent_endpoint_chain():
     if ds_key and ds_url:
         rows.append({
             "name": "deepseek",
-            "url": ds_url,
+            "url": normalize_kimi_chat_url(ds_url),
             "key": ds_key,
             "model": ds_model,
         })
