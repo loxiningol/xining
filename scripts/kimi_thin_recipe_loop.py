@@ -44,6 +44,7 @@ _load_root_only_env()
 from dual_engine_workflow_v2.timing_stage import (
     build_critique, critique_user_message, classify_stage,
     LOCK_KEYS_HARD,
+    rr_geometry_bounds_ok,
 )
 try:
     from dual_engine_workflow_v2 import thin_create_policy as tcp
@@ -112,7 +113,7 @@ SEED_PRIMARY = {
     "symbol": "AMD-USDT-SWAP" if NS == "b" else "NVDA-USDT-SWAP",
     "timeframe": "1h",
     "held": 28,
-    "xwin": 12,
+    "xwin": 8.0,
     "z": 1.0,
     "atr": 2.18,
     "hold": 10,
@@ -123,7 +124,7 @@ SEED_BACKUP = {
     "symbol": "BCH-USDT-SWAP" if NS == "b" else "BNB-USDT-SWAP",
     "timeframe": "1h",
     "held": 28,
-    "xwin": 12,
+    "xwin": 8.0,
     "z": 1.0 if NS == "b" else None,
     "atr": 2.18 if NS == "b" else 2.0,
     "hold": 10 if NS == "b" else 12,
@@ -136,7 +137,7 @@ SEED_EQ2 = {
     "symbol": "AVGO-USDT-SWAP" if NS == "b" else "META-USDT-SWAP",
     "timeframe": "1h",
     "held": 28,
-    "xwin": 12,
+    "xwin": 8.0,
     "z": 1.0 if NS == "b" else None,
     "atr": 2.18,
     "hold": 10,
@@ -148,7 +149,7 @@ SEED_CR2 = {
     "symbol": "UNI-USDT-SWAP" if NS == "b" else "DOGE-USDT-SWAP",
     "timeframe": "1h",
     "held": 28,
-    "xwin": 12,
+    "xwin": 8.0,
     "z": 1.0 if NS == "b" else None,
     "atr": 2.18 if NS == "b" else 2.0,
     "hold": 10 if NS == "b" else 12,
@@ -466,12 +467,14 @@ def _explore_bundle(current):
     return current["explore"]
 
 
-def _apply_hard_lock(recipe, lock):
+def _apply_hard_lock(recipe, lock, allow_rr=False):
     if not isinstance(lock, dict) or not isinstance(recipe, dict):
         return recipe
     hard = LOCK_KEYS_HARD
     if tcp is not None:
         hard = tcp.LOCK_KEYS_HARD
+    if allow_rr:
+        hard = tuple(k for k in hard if k not in ("xwin", "atr", "dwin"))
     for key in hard:
         if key in lock:
             recipe[key] = lock.get(key)
@@ -534,6 +537,17 @@ def channel(lane, state):
         seed0["timing"] = [
             {"factor": "skdj_diff", "operator": "above", "value": -20, "window": 9},
             {"factor": "roc", "operator": "above", "value": 0, "window": 12},
+        ]
+    elif seed0["route"] == "mean_revert":
+        seed0["family"] = "ma_long"
+        seed0["ma_kind"] = "sma"
+        seed0.setdefault("held", 20)
+        seed0.setdefault("xwin", 8.0)
+        seed0.setdefault("atr", 1.6)
+        seed0["timing"] = [
+            {"factor": "atr_pct", "operator": "below", "value": 0.3, "window": 200},
+            {"factor": "skdj_k", "operator": "cross_up", "value": 20, "window": 9},
+            {"factor": "macd_hist", "operator": "above", "value": -1},
         ]
     messages = [
         {"role": "system", "content": kdh._system_prompt()},
@@ -659,52 +673,25 @@ def channel(lane, state):
                 "content": "合同规范化失败：%s。禁止文字。" % str(exc)[:120],
             })
             continue
-        if tcp is not None:
-            tf_ok, tf_err = tcp.resolve_recipe_tf(recipe, {"tf": current.get("tf")})
-            if tf_err:
+        # mean_revert: force SMA location spine (cut EMA/xu)
+        if str(recipe.get("route") or "") == "mean_revert":
+            fam = str(recipe.get("family") or "").strip()
+            if fam in ("", "xu_long", "xd_short", "pb_long", "pb_short"):
+                recipe["family"] = "ma_long"
+                recipe["ma_kind"] = recipe.get("ma_kind") or "sma"
+            elif fam not in ("ma_long", "ma_short", "ch_long", "ch_short"):
                 messages.append({
                     "role": "user",
                     "content": (
-                        "timeframe 不在周期池（15m/1h/4h）。禁止回落伪装。"
-                        "请输出合法 timeframe。禁止文字。"
+                        "mean_revert 禁止 family=%s；须 ma_long（SMA 位置脊）。禁止文字。"
+                        % fam
                     )[:800],
                 })
                 continue
-            recipe["timeframe"] = tf_ok
-            recipe["exec_tf"] = tf_ok
-            current["tf"] = tf_ok
-        # P0-Q soft→hard dimension stack
-        try:
-            from dual_engine_workflow_v2 import creation_dimension_policy as _cdp
-            expl0 = _explore_bundle(current)
-            ok_dim, dim_code, dim_payload = _cdp.apply_dimension_policy(
-                expl0, recipe.get("timing"),
-            )
-            if dim_code == "dimension_redundant_hard":
-                emit({
-                    "phase": "dimension_redundant_hard",
-                    "lane": lane,
-                    "dimension": dim_payload,
-                })
-                # Force next active route if possible
-                if tcp is not None:
-                    nxt_route = tcp.pick_next_route(expl0)
-                    recipe["route"] = nxt_route
-                    current["route"] = nxt_route
-                    expl0["dim_soft_ignore"] = 0
-                messages.append({
-                    "role": "user",
-                    "content": (
-                        "维度冗余硬否决。请换路线或加入非 D2 维原子后重发完整 recipe。禁止文字。"
-                    )[:800],
-                })
-                continue
-            if dim_code == "dimension_redundant_soft":
-                # Will increment after eval if still soft; tag recipe for invent
-                recipe["_dim_soft_pending"] = True
-        except Exception:
-            pass
-        # Force lane seed identity until first lock
+            else:
+                recipe["ma_kind"] = recipe.get("ma_kind") or "sma"
+        # Force lane seed identity until first lock — BEFORE geometry gate
+        # (old order: gate then overwrite seed xwin → illegal xwin could enqueue).
         if not current.get("id"):
             for key in ("family", "symbol", "timeframe", "exec_tf", "filter_tfs",
                         "held", "xwin", "z", "atr", "hold"):
@@ -724,7 +711,7 @@ def channel(lane, state):
             proposed_symbol = str(recipe.get("symbol") or "").strip().upper()
             lock_family = str(lock.get("family") or "").strip()
             lock_symbol = str(lock.get("symbol") or "").strip().upper()
-            _apply_hard_lock(recipe, lock)
+            _apply_hard_lock(recipe, lock, allow_rr=bool(current.get("allow_rr_geometry")))
             family_changed = bool(proposed_family and proposed_family != lock_family)
             symbol_changed = bool(proposed_symbol and proposed_symbol != lock_symbol)
             if family_changed or symbol_changed:
@@ -791,6 +778,64 @@ def channel(lane, state):
                     )
                 messages.append({"role": "user", "content": msg[:1500]})
                 continue
+        # Escape-proof geometry bounds (after seed force / hard lock)
+        ok_rr, err_rr = rr_geometry_bounds_ok(recipe)
+        if not ok_rr:
+            emit({
+                "phase": "rr_geometry_reject",
+                "lane": lane,
+                "xwin": recipe.get("xwin"),
+                "atr": recipe.get("atr"),
+                "error": (err_rr or "")[:160],
+            })
+            messages.append({
+                "role": "user",
+                "content": (err_rr or "几何越界。禁止文字。")[:800],
+            })
+            continue
+        if tcp is not None:
+            tf_ok, tf_err = tcp.resolve_recipe_tf(recipe, {"tf": current.get("tf")})
+            if tf_err:
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "timeframe 不在周期池（15m/1h/4h）。禁止回落伪装。"
+                        "请输出合法 timeframe。禁止文字。"
+                    )[:800],
+                })
+                continue
+            recipe["timeframe"] = tf_ok
+            recipe["exec_tf"] = tf_ok
+            current["tf"] = tf_ok
+        # P0-Q soft→hard dimension stack
+        try:
+            from dual_engine_workflow_v2 import creation_dimension_policy as _cdp
+            expl0 = _explore_bundle(current)
+            ok_dim, dim_code, dim_payload = _cdp.apply_dimension_policy(
+                expl0, recipe.get("timing"),
+            )
+            if dim_code == "dimension_redundant_hard":
+                emit({
+                    "phase": "dimension_redundant_hard",
+                    "lane": lane,
+                    "dimension": dim_payload,
+                })
+                if tcp is not None:
+                    nxt_route = tcp.pick_next_route(expl0)
+                    recipe["route"] = nxt_route
+                    current["route"] = nxt_route
+                    expl0["dim_soft_ignore"] = 0
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "维度冗余硬否决。请换路线或加入非 D2 维原子后重发完整 recipe。禁止文字。"
+                    )[:800],
+                })
+                continue
+            if dim_code == "dimension_redundant_soft":
+                recipe["_dim_soft_pending"] = True
+        except Exception:
+            pass
         ident = kdh._identity(recipe)
         if current["id"] and ident and ident != current["id"]:
             # Geometry / tf drift after hard lock — reject
@@ -967,6 +1012,48 @@ def channel(lane, state):
             current["stage"] = pair.get("stage")
         current["last_pair"] = json.dumps(pair, ensure_ascii=False, default=str)[:500]
         current["tf"] = recipe.get("timeframe") or current.get("tf")
+        # Surgery②: next invent may edit xwin/atr after S2 hitch
+        current["allow_rr_geometry"] = (str(pair.get("stage") or "") == "S2_hitch")
+        try:
+            n_oos_i = int(pair.get("n_oos") or result.get("n_oos") or 0)
+        except Exception:
+            n_oos_i = 0
+        if n_oos_i > 0 and n_oos_i < 20:
+            emit({
+                "phase": "OOS_SPARSE",
+                "lane": lane,
+                "n_oos": n_oos_i,
+                "C_week_oos_pct": pair.get("C_week_oos_pct"),
+                "note_zh": "样本外不足（仅%d笔），能力不可信" % n_oos_i,
+            })
+        # Surgery④: last 5 strongly negative C as critique negatives
+        try:
+            cwp = pair.get("C_week_pct")
+            cwp = None if cwp is None else float(cwp)
+        except Exception:
+            cwp = None
+        if cwp is not None and cwp < -1.0:
+            negs = list(expl.get("neg_summaries") or [])
+            fp = ""
+            try:
+                if tcp is not None:
+                    fp = tcp.fingerprint_key(
+                        tcp.structure_fingerprint(recipe.get("timing"))
+                    )
+            except Exception:
+                fp = ""
+            negs.append({
+                "summary": "route=%s atr=%s xwin=%s hitch=%s C=%s%% fp=%s" % (
+                    recipe.get("route"),
+                    recipe.get("atr"),
+                    recipe.get("xwin"),
+                    pair.get("hitch"),
+                    round(cwp, 2),
+                    fp,
+                ),
+                "C_week_pct": cwp,
+            })
+            expl["neg_summaries"] = negs[-5:]
         # P0-S route failure penalty + P0-Q soft-ignore increment
         if tcp is not None and pair.get("phase") != "mounted":
             cool_info = tcp.note_route_pair_outcome(
