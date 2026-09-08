@@ -1,0 +1,65 @@
+name: create-shared-invent-gate
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "dual_engine_workflow_v2/thin_timing_atoms.py"
+      - "dual_engine_workflow_v2/semantic_executor.py"
+      - "dual_engine_workflow_v2/creation_route_registry.py"
+      - "dual_engine_workflow_v2/creation_atom_data_contract.py"
+      - "dual_engine_workflow_v2/creation_tf_data_gate.py"
+      - "dual_engine_workflow_v2/thin_create_policy.py"
+      - "dual_engine_workflow_v2/timing_stage.py"
+      - "dual_engine_workflow_v2/invent_contract_audit.py"
+      - "dual_engine_workflow_v2/invent_element_ops.py"
+      - "dual_engine_workflow_v2/invent_step_reward.py"
+      - "dual_engine_workflow_v2/invent_hypothesis_loop.py"
+      - "dual_engine_workflow_v2/kimi_provider.py"
+      - "scripts/kimi_thin_recipe_loop.py"
+      - "scripts/kimi_thin_recipe_loop_hub_unified.py"
+      - "scripts/kimi_thin_recipe_loop_hub_a_strict.py"
+      - "scripts/kimi_thin_recipe_loop_hub_b.py"
+      - "scripts/kimi_dual_http_create_20260906.py"
+      - "scripts/research_host_eval_worker.py"
+      - "scripts/invent_contract_preflight.sh"
+      - "auto_trade/creation_green_pool/CREATION_GREEN_POOL.json"
+      - "docs/ci/fixtures/CREATION_GREEN_POOL_CI.json"
+      - "tests_workflow_v2/test_data_green_pool.py"
+      - "tests_workflow_v2/test_creation_p1_unlock.py"
+      - "tests_workflow_v2/test_invent_contract_audit.py"
+      - "tests_workflow_v2/test_invent_hypothesis_reward.py"
+      - ".github/workflows/create-shared-invent-gate.yml"
+  push:
+    branches: [main, master]
+    paths:
+      - "dual_engine_workflow_v2/**"
+      - "scripts/kimi_thin_recipe_loop.py"
+      - "scripts/kimi_dual_http_create_20260906.py"
+      - "scripts/research_host_eval_worker.py"
+      - "scripts/invent_contract_preflight.sh"
+      - "tests_workflow_v2/test_data_green_pool.py"
+      - "tests_workflow_v2/test_invent_contract_audit.py"
+      - ".github/workflows/create-shared-invent-gate.yml"
+  workflow_dispatch:
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Atom data / green-pool contract (test_data_green_pool)
+        run: python tests_workflow_v2/test_data_green_pool.py
+      - name: P1 invent unlock smoke
+        run: python tests_workflow_v2/test_creation_p1_unlock.py
+      - name: Invent seed↔gate↔lock contract audit
+        run: bash scripts/invent_contract_preflight.sh --no-live
+      - name: Provider failover (shared invent adjacency)
+        run: python -m unittest tests_workflow_v2.test_kimi_provider_failover -v
+      - name: Invent hypothesis / step reward / strict bind
+        run: python -m unittest tests_workflow_v2.test_invent_hypothesis_reward -v

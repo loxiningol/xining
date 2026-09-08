@@ -1,0 +1,47 @@
+---
+description: 改庄园四区相关代码前先读区状态、做冲突检查
+alwaysApply: true
+---
+
+# 庄园四区协同（强制）
+
+庄园已是**四区协同账本**：实盘工作区（面包房+仓位）、策略制造区（温室/进度/双熔炉/风车）、研究档案区（档案室）、观风区（观风塔）。
+
+**点区域开状态卡**看进程与变更，不单跳转。后端更新 / 维修 / 试验 / 部署后必须向对应 zone ledger 登记（actor / 时间 / 简述 / sha / 文档）；动手前先 `manor_zone_boot.py --zone … --check`。
+
+改实盘 / 创造 / 档案 / 观风相关代码或现网配置前，先读区状态，禁止盲改。
+
+## 四区
+
+| 区 | id | 楼栋 | 典型改动 |
+|---|---|---|---|
+| 实盘工作区 | `live` | bakery、pos_greenhouse | 运行策略、仓位、真诚发言 |
+| 策略制造区 | `manufacture` | furnace1/2、experimental、optimizer、quality | 创造车道、发明口、确认队列 |
+| 研究档案区 | `archive` | strategies（档案室） | 档案面板 |
+| 观风区 | `watch` | market（观风塔） | hold 观风 / 法庭仓位 |
+
+观风塔属 **watch**，不归仓位工作坊或档案室独占。
+
+## Agent 开机 / 改前检查
+
+VPS（务必 `cd /root`）：
+
+```bash
+sudo bash -lc 'cd /root && PYTHONPATH=/root VECTOR_ROOT=/root python3 /root/scripts/manor_zone_boot.py --all'
+sudo bash -lc 'cd /root && PYTHONPATH=/root VECTOR_ROOT=/root python3 /root/scripts/manor_zone_boot.py --zone watch --check --actor cursor-hub-a'
+```
+
+或：`GET /api/manor/zones?overview=1`、`GET /api/manor/zones/<id>/status`、`GET /api/manor/zones/<id>/conflict?actor=…`。
+
+有 `conflict=true` / blockers 时：先读状态卡，再与对方对齐或等其闭合进程；不要覆盖对方 running 条目。
+
+## 登记与收尾
+
+动手：`scripts/manor_zone_note.py --zone … --kind experiment --status running --id …`  
+结束：同 id `--status done`（含 actor、简述、sha、相关文档路径）。  
+部署封印可走 `write_deployed_sha` 的 zone 注记。
+
+## 并行创造
+
+已退役双 hub。制造区只有**一套** invent（`qiyu-kimi-thin-hub`）；勿再按左右熔炉拆 Cursor 抢队列。
+

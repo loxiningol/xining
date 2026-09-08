@@ -54,6 +54,8 @@ class TestKimiFailover(unittest.TestCase):
             "QIYU_KIMI_BACKUP_URL": "https://api2.cmkey.cn/v1",
             "QIYU_KIMI_BACKUP_API_KEY": "backup-key",
             "QIYU_KIMI_BACKUP_MODEL": "kimi-k3",
+            # Legacy failover suite: disable invent strict bind (default ON).
+            "KDH_INVENT_STRICT_BIND": "0",
         }, clear=False)
         self.env.start()
 
@@ -157,8 +159,7 @@ class TestKimiFailover(unittest.TestCase):
             posted = kp.kimi_post_json({"messages": []}, timeout=5)
         self.assertTrue(posted.get("ok"))
         self.assertEqual(posted.get("endpoint"), "backup")
-        # Race may cancel the losing primary before open(); backup must run.
-        self.assertTrue(any("api2.cmkey.cn" in u for u in calls))
+        self.assertEqual(len(calls), 2)
 
     def test_401_fails_over_to_backup(self):
         def fake_open(req, timeout):
@@ -237,8 +238,9 @@ class TestKimiFailover(unittest.TestCase):
         self.assertEqual(posted.get("endpoint"), "backup")
         self.assertTrue(posted.get("raced"))
         backup_hits = [url for url in calls if "api2.cmkey.cn" in url]
-        # Losing primary may never open if backup wins first (shutdown wait=False).
+        primary_hits = [url for url in calls if "api2.cmkey.cn" not in url]
         self.assertEqual(len(backup_hits), 1)
+        self.assertEqual(len(primary_hits), 1)
 
     def test_slow_primary_does_not_block_backup(self):
         import time
@@ -300,6 +302,79 @@ class TestTransportBackoff(unittest.TestCase):
         self.assertEqual(10, kp.kimi_transport_backoff_seconds("HTTP Error 502: Bad Gateway", 1))
         self.assertEqual(30, kp.kimi_transport_backoff_seconds("timed out", 4))
         self.assertEqual(60, kp.kimi_transport_backoff_seconds("HTTP 500 Internal Server Error", 0))
+
+
+class TestEndpointQuotaSoftBlock(unittest.TestCase):
+    def setUp(self):
+        kp.reset_endpoint_quota_for_tests()
+        self.env = mock.patch.dict(os.environ, {
+            "QIYU_KIMI_URL": "https://cmkey.cn/v1",
+            "QIYU_KIMI_API_KEY": "primary-key",
+            "QIYU_KIMI_MODEL": "kimi-k3",
+            "QIYU_KIMI_BACKUP_URL": "https://api2.cmkey.cn/v1",
+            "QIYU_KIMI_BACKUP_API_KEY": "backup-key",
+            "QIYU_DEEPSEEK_API_KEY": "ds-key",
+            "QIYU_DEEPSEEK_URL": "https://api.deepseek.com/chat/completions",
+            "KDH_ENDPOINT_LIMIT_deepseek": "5",
+            "KDH_ENDPOINT_QUOTA_SOFT_RATIO": "0.8",
+            "KDH_ENDPOINT_QUOTA_PATH": "/tmp/kdh_endpoint_quota_test.json",
+            "KDH_INVENT_STRICT_BIND": "0",
+        }, clear=False)
+        self.env.start()
+        try:
+            os.unlink("/tmp/kdh_endpoint_quota_test.json")
+        except Exception:
+            pass
+        kp.reset_endpoint_quota_for_tests()
+
+    def tearDown(self):
+        self.env.stop()
+        kp.reset_endpoint_quota_for_tests()
+
+    def test_soft_block_skips_deepseek_failover(self):
+        for _ in range(4):
+            kp.record_endpoint_attempt("deepseek")
+        blocked, count, limit = kp.endpoint_soft_blocked("deepseek")
+        self.assertTrue(blocked)
+        self.assertEqual(limit, 5)
+        self.assertGreaterEqual(count, 4)
+
+        deepseek_calls = []
+
+        def fake_open(req, timeout):
+            url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+            if "api.deepseek.com" in url:
+                deepseek_calls.append(url)
+                raise AssertionError("deepseek should be soft-blocked")
+            if "api2.cmkey.cn" in url:
+                return _Resp(_ok_raw('{"recipe":{"ok":true}}'))
+            raise _http_error(
+                429, "Too Many Requests",
+                '{"error":{"message":"tpm","code":"429001"}}',
+            )
+
+        with mock.patch.dict(os.environ, {"QIYU_QWEN_API_KEY": ""}, clear=False):
+            with mock.patch.object(kp, "_open_no_proxy", side_effect=fake_open):
+                posted = kp.kimi_post_named("primary", {"messages": []}, timeout=5)
+        self.assertTrue(posted.get("ok"))
+        self.assertEqual(posted.get("endpoint"), "backup")
+        self.assertEqual(deepseek_calls, [])
+        # Direct soft-block response when preferred mouth is exhausted
+        ds = {
+            "name": "deepseek",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "key": "ds-key",
+            "model": "deepseek-v4-pro",
+        }
+        blocked_post = kp._kimi_post_one(ds, {"messages": []}, 5, 0)
+        self.assertFalse(blocked_post.get("ok"))
+        self.assertTrue(blocked_post.get("soft_block"))
+        self.assertIn("rate_limit_soft_block", str(blocked_post.get("error") or ""))
+
+    def test_json_parse_critique_mentions_schema(self):
+        msg = kp.json_parse_critique("not json at all")
+        self.assertIn("JSON 校验失败", msg)
+        self.assertIn("recipe", msg)
 
 
 if __name__ == "__main__":
