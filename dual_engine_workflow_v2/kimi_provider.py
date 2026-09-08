@@ -13,6 +13,7 @@ from __future__ import print_function
 import json
 import os
 import socket
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -21,6 +22,18 @@ from concurrent.futures import as_completed
 from concurrent.futures import TimeoutError as FuturesTimeout
 
 _NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+# Per-endpoint sliding-window quota (invent failover must not avalanche bill).
+_QUOTA_LOCK = threading.Lock()
+_QUOTA_HITS = {}  # name -> [unix_ts, ...]
+QUOTA_WINDOW_SEC = int(os.environ.get("KDH_ENDPOINT_QUOTA_WINDOW_SEC") or str(5 * 3600))
+QUOTA_SOFT_RATIO = float(os.environ.get("KDH_ENDPOINT_QUOTA_SOFT_RATIO") or "0.8")
+_QUOTA_DEFAULT_LIMITS = {
+    "deepseek": int(os.environ.get("KDH_ENDPOINT_LIMIT_deepseek") or "250"),
+}
+_QUOTA_STATE_PATH = str(
+    os.environ.get("KDH_ENDPOINT_QUOTA_PATH") or "/tmp/kdh_endpoint_quota.json"
+)
 
 KIMI_FAILOVER_MARKERS = (
     "401", "403", "unauthorized", "鉴权", "令牌无效", "已过期",
@@ -43,6 +56,133 @@ SAME_ENDPOINT_TRANSIENT_RETRIES = 1
 SAME_ENDPOINT_RETRY_SLEEP_SEC = 8
 # Python 3.6 SSL sockets can ignore urlopen(timeout=) and hang in poll().
 WALL_CLOCK_GRACE_SEC = 15
+# Cap how far we scan for a balanced JSON value (avoid pathological huge dumps).
+JSON_PARSE_MAX_CHARS = int(os.environ.get("KDH_JSON_PARSE_MAX_CHARS") or "48000")
+
+
+def endpoint_quota_limit(name):
+    """Per-mouth hard cap in the sliding window. None/0 = unlimited."""
+    key = str(name or "").strip()
+    if not key:
+        return None
+    env = str(os.environ.get("KDH_ENDPOINT_LIMIT_%s" % key) or "").strip()
+    if env:
+        try:
+            n = int(env)
+            return n if n > 0 else None
+        except (TypeError, ValueError):
+            return None
+    if key in _QUOTA_DEFAULT_LIMITS:
+        try:
+            n = int(_QUOTA_DEFAULT_LIMITS[key])
+            return n if n > 0 else None
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _quota_prune_locked(name, now=None):
+    now = float(now if now is not None else time.time())
+    window = max(60, int(QUOTA_WINDOW_SEC or 18000))
+    hits = list(_QUOTA_HITS.get(name) or [])
+    kept = [float(t) for t in hits if now - float(t) <= window]
+    _QUOTA_HITS[name] = kept
+    return kept
+
+
+def _quota_persist_unlocked():
+    try:
+        payload = {
+            "window_sec": int(QUOTA_WINDOW_SEC),
+            "hits": dict((k, list(v)) for k, v in _QUOTA_HITS.items()),
+            "saved_at": time.time(),
+        }
+        tmp = _QUOTA_STATE_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(payload, fh)
+        os.replace(tmp, _QUOTA_STATE_PATH)
+    except Exception:
+        pass
+
+
+def _quota_load_once():
+    if getattr(_quota_load_once, "_done", False):
+        return
+    setattr(_quota_load_once, "_done", True)
+    try:
+        with open(_QUOTA_STATE_PATH, "r") as fh:
+            data = json.load(fh)
+        hits = data.get("hits") or {}
+        with _QUOTA_LOCK:
+            for name, rows in hits.items():
+                if isinstance(rows, list):
+                    _QUOTA_HITS[str(name)] = [float(t) for t in rows]
+    except Exception:
+        pass
+
+
+def endpoint_window_count(name, now=None):
+    _quota_load_once()
+    key = str(name or "").strip()
+    with _QUOTA_LOCK:
+        return len(_quota_prune_locked(key, now=now))
+
+
+def endpoint_soft_blocked(name, now=None):
+    """True when window count >= limit * soft ratio (default 0.8)."""
+    limit = endpoint_quota_limit(name)
+    if not limit:
+        return False, 0, None
+    count = endpoint_window_count(name, now=now)
+    soft = max(1, int(float(limit) * float(QUOTA_SOFT_RATIO or 0.8)))
+    return count >= soft, count, limit
+
+
+def record_endpoint_attempt(name, now=None):
+    """Record one real HTTP attempt against a named mouth."""
+    _quota_load_once()
+    key = str(name or "").strip()
+    if not key:
+        return 0
+    ts = float(now if now is not None else time.time())
+    with _QUOTA_LOCK:
+        kept = _quota_prune_locked(key, now=ts)
+        kept.append(ts)
+        _QUOTA_HITS[key] = kept
+        n = len(kept)
+        _quota_persist_unlocked()
+        return n
+
+
+def reset_endpoint_quota_for_tests():
+    with _QUOTA_LOCK:
+        _QUOTA_HITS.clear()
+    setattr(_quota_load_once, "_done", True)
+
+
+def json_parse_critique(raw_text, max_show=400):
+    """Structured user critique when invent JSON parse fails (NO_JSON)."""
+    text = str(raw_text or "")
+    snap = text.strip().replace("\n", " ")[: max(80, int(max_show))]
+    reasons = []
+    if not text.strip():
+        reasons.append("空内容")
+    elif "{" not in text:
+        reasons.append("缺少 {")
+    else:
+        obj = _first_json_value(text)
+        if obj is None:
+            reasons.append("无法抽取平衡括号 JSON（可能被截断或夹杂散文）")
+        elif not isinstance(obj, dict):
+            reasons.append("根节点不是 object")
+        elif not (obj.get("recipe") or obj.get("recipes")):
+            reasons.append("缺少 recipe / recipes 字段")
+    why = "；".join(reasons) or "解析失败"
+    return (
+        "JSON 校验失败：%s。预览：%s。禁止文字与 markdown。"
+        "只输出 1 条 {\"recipe\":{...}}，第一个字符必须是 {，"
+        "须含 route/timeframe/timing。"
+    ) % (why, snap or "(empty)")
 
 
 def normalize_kimi_chat_url(url):
@@ -227,6 +367,8 @@ def _choice_text(raw):
 
 def _first_json_value(text):
     s = str(text or "")
+    if len(s) > JSON_PARSE_MAX_CHARS:
+        s = s[:JSON_PARSE_MAX_CHARS]
     start_obj = s.find("{")
     start_arr = s.find("[")
     starts = [i for i in (start_obj, start_arr) if i >= 0]
@@ -280,10 +422,37 @@ def _transient_http_code(exc):
         return 0
 
 
+def _http_code_from_error(error_text):
+    text = str(error_text or "")
+    if "HTTP Error " in text:
+        try:
+            part = text.split("HTTP Error ", 1)[1]
+            return int(part.split(":", 1)[0].strip().split()[0])
+        except Exception:
+            return None
+    if "rate_limit_soft_block" in text:
+        return 429
+    return None
+
+
 def _kimi_post_one(endpoint, body, timeout, same_endpoint_retries):
     """POST one channel. same_endpoint_retries is 0 when racing a backup."""
+    name = str((endpoint or {}).get("name") or "unknown")
+    blocked, window_count, limit = endpoint_soft_blocked(name)
+    if blocked:
+        return {
+            "ok": False,
+            "error": "rate_limit_soft_block:%s:%s/%s" % (name, window_count, limit),
+            "endpoint": name,
+            "used": ["%s:rate_limit_soft_block" % name],
+            "http_code": 429,
+            "soft_block": True,
+            "window_count": window_count,
+            "window_limit": limit,
+        }
     last_error = "kimi_provider_not_configured"
     used = []
+    last_http_code = None
     payload = dict(body or {})
     payload["model"] = endpoint.get("model") or payload.get("model") or "kimi-k3"
     req = urllib.request.Request(
@@ -297,22 +466,31 @@ def _kimi_post_one(endpoint, body, timeout, same_endpoint_retries):
     )
     attempts = 1 + max(0, int(same_endpoint_retries or 0))
     for attempt in range(attempts):
+        record_endpoint_attempt(name)
         try:
             with _open_with_deadline(req, timeout) as response:
                 raw = json.loads(response.read().decode("utf-8"))
+                try:
+                    last_http_code = int(getattr(response, "status", 0) or 200)
+                except Exception:
+                    last_http_code = 200
             if not _choice_text(raw):
                 last_error = "kimi_empty_content"
-                used.append("%s:%s" % (endpoint["name"], last_error))
+                used.append("%s:%s" % (name, last_error))
                 break
-            used.append(endpoint["name"])
-            raw["_qiyu_kimi_endpoint"] = endpoint["name"]
+            used.append(name)
+            raw["_qiyu_kimi_endpoint"] = name
             return {
                 "ok": True, "raw": raw,
-                "endpoint": endpoint["name"], "used": used,
+                "endpoint": name, "used": used,
+                "http_code": last_http_code or 200,
+                "window_count": endpoint_window_count(name),
+                "window_limit": endpoint_quota_limit(name),
             }
         except urllib.error.HTTPError as exc:
             last_error = _http_error_text(exc)
-            used.append("%s:%s" % (endpoint["name"], last_error[:80]))
+            last_http_code = _transient_http_code(exc) or None
+            used.append("%s:%s" % (name, last_error[:80]))
             code = _transient_http_code(exc)
             if (
                 code in SAME_ENDPOINT_TRANSIENT_CODES
@@ -323,11 +501,14 @@ def _kimi_post_one(endpoint, body, timeout, same_endpoint_retries):
             break
         except Exception as exc:
             last_error = "%s:%s" % (type(exc).__name__, str(exc)[:240])
-            used.append("%s:%s" % (endpoint["name"], last_error[:80]))
+            used.append("%s:%s" % (name, last_error[:80]))
             break
     return {
         "ok": False, "error": last_error,
-        "endpoint": endpoint["name"], "used": used,
+        "endpoint": name, "used": used,
+        "http_code": last_http_code or _http_code_from_error(last_error),
+        "window_count": endpoint_window_count(name),
+        "window_limit": endpoint_quota_limit(name),
     }
 
 
@@ -336,10 +517,34 @@ def _kimi_race(endpoints, body, timeout):
     timeout = float(timeout or 540)
     used = []
     last = {"ok": False, "error": "kimi_all_endpoints_failed", "used": used}
-    pool = ThreadPoolExecutor(max_workers=max(1, len(endpoints)))
+    live = []
+    for endpoint in endpoints:
+        blocked, window_count, limit = endpoint_soft_blocked(endpoint.get("name"))
+        if blocked:
+            used.append("%s:rate_limit_soft_block" % endpoint.get("name"))
+            last = {
+                "ok": False,
+                "error": "rate_limit_soft_block:%s:%s/%s" % (
+                    endpoint.get("name"), window_count, limit,
+                ),
+                "endpoint": endpoint.get("name"),
+                "used": list(used),
+                "http_code": 429,
+                "soft_block": True,
+                "window_count": window_count,
+                "window_limit": limit,
+                "raced": True,
+            }
+            continue
+        live.append(endpoint)
+    if not live:
+        last["used"] = list(used)
+        last["raced"] = True
+        return last
+    pool = ThreadPoolExecutor(max_workers=max(1, len(live)))
     futs = [
         pool.submit(_kimi_post_one, endpoint, body, timeout, 0)
-        for endpoint in endpoints
+        for endpoint in live
     ]
     try:
         wait_s = timeout + float(WALL_CLOCK_GRACE_SEC) + 2.0
@@ -380,7 +585,7 @@ def kimi_post_named(endpoint_name, body, timeout=540):
 
     Preferred may be kimi primary/backup or congestion outlets qwen/deepseek.
     On 429 / tpm / quota / other failover-class faults, try the remaining
-    invent endpoints sequentially (does not race).
+    invent endpoints sequentially (does not race). Soft-blocked mouths are skipped.
     """
     name = str(endpoint_name or "").strip()
     chain = invent_endpoint_chain()
@@ -397,17 +602,52 @@ def kimi_post_named(endpoint_name, body, timeout=540):
             "error": "kimi_endpoint_not_configured:%s" % name,
             "used": [],
         }
-    posted = _kimi_post_one(
-        preferred, body, timeout, SAME_ENDPOINT_TRANSIENT_RETRIES,
-    )
+    blocked, window_count, limit = endpoint_soft_blocked(preferred.get("name"))
+    if blocked:
+        posted = {
+            "ok": False,
+            "error": "rate_limit_soft_block:%s:%s/%s" % (
+                preferred.get("name"), window_count, limit,
+            ),
+            "endpoint": preferred.get("name"),
+            "used": ["%s:rate_limit_soft_block" % preferred.get("name")],
+            "http_code": 429,
+            "soft_block": True,
+            "window_count": window_count,
+            "window_limit": limit,
+        }
+    else:
+        posted = _kimi_post_one(
+            preferred, body, timeout, SAME_ENDPOINT_TRANSIENT_RETRIES,
+        )
     if posted.get("ok"):
         return posted
     err = str(posted.get("error") or "")
-    if not others or not kimi_should_failover(err):
+    # Soft-block on preferred still allows failover to remaining mouths.
+    allow_fo = posted.get("soft_block") or kimi_should_failover(err)
+    if not others or not allow_fo:
         return posted
     used = list(posted.get("used") or [])
     last = dict(posted)
     for row in others:
+        b2, c2, lim2 = endpoint_soft_blocked(row.get("name"))
+        if b2:
+            used.append("%s:rate_limit_soft_block" % row.get("name"))
+            last = {
+                "ok": False,
+                "error": "rate_limit_soft_block:%s:%s/%s" % (
+                    row.get("name"), c2, lim2,
+                ),
+                "endpoint": row.get("name"),
+                "used": list(used),
+                "http_code": 429,
+                "soft_block": True,
+                "window_count": c2,
+                "window_limit": lim2,
+                "failover": True,
+                "failover_from": preferred.get("name"),
+            }
+            continue
         alt = _kimi_post_one(
             row, body, timeout, SAME_ENDPOINT_TRANSIENT_RETRIES,
         )
