@@ -54,6 +54,8 @@ class TestKimiFailover(unittest.TestCase):
             "QIYU_KIMI_BACKUP_URL": "https://api2.cmkey.cn/v1",
             "QIYU_KIMI_BACKUP_API_KEY": "backup-key",
             "QIYU_KIMI_BACKUP_MODEL": "kimi-k3",
+            # Legacy failover suite: disable invent strict bind (default ON).
+            "KDH_INVENT_STRICT_BIND": "0",
         }, clear=False)
         self.env.start()
 
@@ -316,6 +318,7 @@ class TestEndpointQuotaSoftBlock(unittest.TestCase):
             "KDH_ENDPOINT_LIMIT_deepseek": "5",
             "KDH_ENDPOINT_QUOTA_SOFT_RATIO": "0.8",
             "KDH_ENDPOINT_QUOTA_PATH": "/tmp/kdh_endpoint_quota_test.json",
+            "KDH_INVENT_STRICT_BIND": "0",
         }, clear=False)
         self.env.start()
         try:

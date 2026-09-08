@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Hub-b thin invent: unified blunt + FREE_CREATE; NS=b queue.
+"""Hub-a thin invent: unified blunt + FREE_CREATE (was calibrate Phase E).
 
-Lanes 1/2 (equity/crypto). Legacy 5–8 aliases still accepted via loop SEEDS.
+Delegates to kimi_thin_recipe_loop_hub_unified.py with empty NS.
 """
 from __future__ import print_function
 
 import os
 import sys
 
-os.environ.setdefault("KDH_THIN_NS", "b")
+os.environ.setdefault("KDH_THIN_NS", "")
 os.environ.setdefault("KDH_FREE_CREATE", "1")
 os.environ.setdefault("KDH_INVENT_STRICT_BIND", "1")
 

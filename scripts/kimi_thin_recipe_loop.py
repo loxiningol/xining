@@ -84,7 +84,7 @@ EVAL_WAIT_SEC = int(os.environ.get("KDH_THIN_EVAL_WAIT") or "900")
 POLL = float(os.environ.get("KDH_THIN_POLL") or "3")
 LANES = [
     x.strip() for x in (
-        os.environ.get("KDH_THIN_LANES") or "primary,backup,eq2,cr2"
+        os.environ.get("KDH_THIN_LANES") or "1,2"
     ).split(",")
     if x.strip()
 ]
@@ -164,6 +164,9 @@ SEED_CR2 = {
     "timing": [dict(x) for x in _SEED_TIMING],
 }
 SEEDS = {
+    "1": SEED_PRIMARY,
+    "2": SEED_BACKUP,
+    # Legacy aliases (inherit / old units)
     "primary": SEED_PRIMARY,
     "backup": SEED_BACKUP,
     "eq2": SEED_EQ2,
@@ -185,9 +188,8 @@ if _INHERIT_PATH and _INHERIT_PATH.exists():
         pass
 # Optional global pin (overrides per-lane bind). Prefer KDH_LANE_BIND instead.
 KIMI_BIND = str(os.environ.get("KDH_KIMI_BIND") or "").strip()
-# Congestion outlets: eq2→qwen, cr2→deepseek (Kimi 429 then still failsover).
-# Format: lane:endpoint,lane:endpoint
-_DEFAULT_LANE_BIND = "eq2:qwen,cr2:deepseek,primary:primary,backup:backup"
+# Dual-lane invent: 1→kimi1(primary), 2→kimi2(backup). Strict one-mouth bind.
+_DEFAULT_LANE_BIND = "1:primary,2:backup"
 
 
 def _parse_lane_bind(raw):
@@ -232,13 +234,24 @@ def _kimi_for_lane(lane):
     name = str(lane or "").strip()
     if name in LANE_BIND:
         return LANE_BIND[name]
-    if name in ("backup", "cr2") or name.startswith("backup"):
+    if name in ("2", "backup", "cr2") or name.startswith("backup"):
         return "backup"
     if name in ("eq2", "qwen"):
         return "qwen"
     if name in ("deepseek",):
         return "deepseek"
+    # lane 1 / primary / default → kimi1
     return "primary"
+
+
+def _lane_pool(lane):
+    """Lane → equity/crypto symbol pool (1=equity, 2=crypto)."""
+    name = str(lane or "").strip()
+    if name in ("2", "backup", "cr2", "6", "8") or name.startswith("backup"):
+        return kdh.CRYPTO
+    if name in ("1", "primary", "eq2", "5", "7") or name.startswith("primary"):
+        return kdh.EQUITY
+    return kdh.LANES.get(name) or kdh.EQUITY
 
 
 def emit(obj):
@@ -273,7 +286,8 @@ def _trim_messages_seed(messages, seed_user_content):
     return head
 
 
-def remote_isolated_cap(cand, recipe, lane, state, mode="eval", diagnosis=None):
+def remote_isolated_cap(cand, recipe, lane, state, mode="eval", diagnosis=None,
+                        parent_id=None, step_id=None):
     """Enqueue for Mac; wait for result. Never run isolated_cap locally.
 
     On eval_timeout, re-enqueue the same recipe up to MAC_EVAL_RETRIES times.
@@ -302,6 +316,10 @@ def remote_isolated_cap(cand, recipe, lane, state, mode="eval", diagnosis=None):
             "at": kdh._now(),
             "mac_attempt": attempt + 1,
         }
+        if parent_id:
+            payload["parent_id"] = parent_id
+        if step_id:
+            payload["step_id"] = step_id
         qpath = QUEUE / ("%s.recipe.json" % job_id)
         rpath = RESULTS / ("%s.result.json" % job_id)
         if rpath.exists():
@@ -313,6 +331,7 @@ def remote_isolated_cap(cand, recipe, lane, state, mode="eval", diagnosis=None):
         emit({
             "phase": "enqueue", "id": job_id, "lane": lane, "mode": mode,
             "symbol": cand.get("symbol"), "mac_attempt": attempt + 1,
+            "parent_id": parent_id, "step_id": step_id,
         })
         t0 = time.time()
         while time.time() - t0 < wait_sec:
@@ -352,7 +371,7 @@ def remote_isolated_cap(cand, recipe, lane, state, mode="eval", diagnosis=None):
     return last
 
 
-def eval_one_thin(cand, recipe, state, lane):
+def eval_one_thin(cand, recipe, state, lane, parent_id=None, step_id=None):
     """Mac isolated_cap; then VPS quality_gate + trial_mount once.
 
     hit_floor / combo C / occupancy are NOT mount admission gates.
@@ -366,7 +385,10 @@ def eval_one_thin(cand, recipe, state, lane):
     if rh in (state.get("done_ids") or []):
         return {"ok": False, "phase": "dup", "rh": rh}
     emit({"phase": "atom_start", "lane": lane, "id": cand["id"], "symbol": cand["symbol"]})
-    cap_row = remote_isolated_cap(cand, recipe, lane, state, mode="eval")
+    cap_row = remote_isolated_cap(
+        cand, recipe, lane, state, mode="eval",
+        parent_id=parent_id, step_id=step_id,
+    )
     stage = cap_row.get("stage") or classify_stage(cap_row)
     emit({
         "phase": "isolated_cap_remote",
@@ -383,11 +405,30 @@ def eval_one_thin(cand, recipe, state, lane):
         "host": cap_row.get("host"),
         "diagnosis_hint": (cap_row.get("diagnosis") or {}).get("hint"),
         "error": cap_row.get("error") or cap_row.get("reject"),
+        "parent_id": parent_id,
+        "step_id": step_id,
     })
+    # Cap metrics for invent step reward (even when mount path continues).
+    cap_metrics = {
+        "C_week_pct": cap_row.get("C_week_pct"),
+        "C_week_oos_pct": cap_row.get("C_week_oos_pct"),
+        "n": cap_row.get("n"),
+        "n_oos": cap_row.get("n_oos"),
+        "hitch": cap_row.get("hitch"),
+        "E": cap_row.get("E") or cap_row.get("E_path"),
+        "weekly": cap_row.get("weekly"),
+        "usable": cap_row.get("usable"),
+        "oos_usable": cap_row.get("oos_usable"),
+        "hit_floor": cap_row.get("hit_floor"),
+        "blockers": cap_row.get("blockers"),
+        "stage": stage,
+        "phase": cap_row.get("phase"),
+        "diagnosis": cap_row.get("diagnosis"),
+    }
     if cap_row.get("reject"):
         state.setdefault("done_ids", []).append(rh)
         kdh._save_state(state)
-        return {
+        out = {
             "ok": False,
             "phase": "pair_reject",
             "reject": cap_row.get("reject"),
@@ -395,9 +436,11 @@ def eval_one_thin(cand, recipe, state, lane):
             "stage": stage,
             "diagnosis": cap_row.get("diagnosis"),
         }
+        out.update(cap_metrics)
+        return out
     if cap_row.get("phase") == "eval_timeout" or cap_row.get("error"):
         # Keep refining; do not treat timeout as a permanent done_id.
-        return {
+        out = {
             "ok": False,
             "phase": cap_row.get("phase") or "eval_fail",
             "rh": rh,
@@ -405,6 +448,8 @@ def eval_one_thin(cand, recipe, state, lane):
             "stage": stage,
             "diagnosis": cap_row.get("diagnosis"),
         }
+        out.update(cap_metrics)
+        return out
     # Proceed to VPS gate+mount regardless of Mac hit_floor (floor is diagnostic only).
     try:
         ev = kdh.evaluate_atom(cand)
@@ -416,7 +461,7 @@ def eval_one_thin(cand, recipe, state, lane):
     state.setdefault("done_ids", []).append(rh)
     kdh._save_state(state)
     if not ev.get("ok"):
-        return {
+        out = {
             "ok": False, "phase": "gate_fail", "rh": rh, **kdh._gate_extra(ev),
             "C_week_pct": cap_row.get("C_week_pct"),
             "C_week_oos_pct": cap_row.get("C_week_oos_pct"),
@@ -424,17 +469,23 @@ def eval_one_thin(cand, recipe, state, lane):
             "stage": stage, "diagnosis": cap_row.get("diagnosis"),
             "hit_floor": cap_row.get("hit_floor"),
         }
+        out.update(cap_metrics)
+        return out
     if kdh.trial_mount_if_floor(cand, ev, state):
         kdh._STOP.set()
         kdh._MOUNTED.append({"lane": lane, "id": cand["id"], "symbol": cand["symbol"]})
-        return {"ok": True, "phase": "mounted", "id": cand["id"],
+        out = {"ok": True, "phase": "mounted", "id": cand["id"],
                 "C_week_pct": cap_row.get("C_week_pct"),
                 "C_week_oos_pct": cap_row.get("C_week_oos_pct"),
                 "stage": stage, "hit_floor": cap_row.get("hit_floor")}
-    return {"ok": False, "phase": "mount_skip", "rh": rh,
+        out.update(cap_metrics)
+        return out
+    out = {"ok": False, "phase": "mount_skip", "rh": rh,
             "C_week_pct": cap_row.get("C_week_pct"),
             "C_week_oos_pct": cap_row.get("C_week_oos_pct"),
             "stage": stage, "hit_floor": cap_row.get("hit_floor")}
+    out.update(cap_metrics)
+    return out
 
 
 def _seed_for(lane):
@@ -499,15 +550,24 @@ def _seed_brief(lane, symbols):
 
 def _seed_brief_with(lane, symbols, seed_rec):
     base = kdh._user_brief(lane, symbols)
-    seed = json.dumps({"recipe": seed_rec}, ensure_ascii=False)
+    seed = json.dumps({
+        "hypothesis": {
+            "intent": "replace_spine",
+            "rationale_keys": ["seed_ref"],
+            "recipe": seed_rec,
+        }
+    }, ensure_ascii=False)
     free = ",".join(symbols[:16])
     if _free_create():
         return (
             base
             + "\n本通道可用标的（勿碰现网/禁用）：%s\n" % free
-            + "自由创造：输出完整可执行 recipe（family/symbol/timeframe/route/"
-            "几何/timing 均可自选）。下面仅是可选参考示例，禁止被示例绑死，"
-            "禁止只拧 timing 复读同一壳子：\n"
+            + "自由创造：输出 {\"hypothesis\":{\"intent\":\"add_location|add_relation|"
+            "add_timing|adjust_geometry|replace_spine\",\"rationale_keys\":[...],"
+            "\"recipe\":{...}}}（兼容裸 recipe）。"
+            "family/symbol/timeframe/route/几何/timing 均可自选。"
+            "优先叠加 location/relation（价格相对MA/EMA），禁止只拧 timing 复读。"
+            "下面仅是可选参考示例，禁止被示例绑死：\n"
             + seed
             + "\n"
         )
@@ -521,12 +581,7 @@ def _seed_brief_with(lane, symbols, seed_rec):
 
 
 def channel(lane, state):
-    if lane in ("backup", "cr2") or str(lane).startswith("backup"):
-        pool = kdh.CRYPTO
-    elif lane in ("primary", "eq2") or str(lane).startswith("primary"):
-        pool = kdh.EQUITY
-    else:
-        pool = kdh.LANES.get(lane) or kdh.EQUITY
+    pool = _lane_pool(lane)
     symbols = [s for s in pool if s not in kdh._banned()]
     seed0 = _seed_for(lane)
     current = {
@@ -535,6 +590,10 @@ def channel(lane, state):
         "last_pair": "",
         "tf": seed0.get("timeframe") or "1h",
         "symbol": seed0.get("symbol"),
+        "parent_recipe": None,
+        "parent_eval": None,
+        "parent_id": "",
+        "last_intent": None,
     }
     expl0 = _explore_bundle(current)
     # Bind RR-picked route into seed before first Kimi turn
@@ -617,15 +676,40 @@ def channel(lane, state):
             time.sleep(wait)
             messages.append({
                 "role": "user",
-                "content": "通道失败。禁止文字。只输出 {\"recipe\":{...}}。",
+                "content": (
+                    "通道失败。禁止文字。只输出 "
+                    "{\"hypothesis\":{\"intent\":\"add_location\",\"recipe\":{...}}}。"
+                    if _free_create()
+                    else "通道失败。禁止文字。只输出 {\"recipe\":{...}}。"
+                ),
             })
             continue
         text = kdh._choice_text(posted.get("raw") or {})
         obj = kdh.kimi_json_from_raw(posted.get("raw") or {})
-        recipe = kdh._first_recipe(obj)
+        declared_intent = None
+        rationale_keys = []
+        try:
+            from dual_engine_workflow_v2.invent_hypothesis_loop import parse_hypothesis
+            hyp = parse_hypothesis(obj, extract_recipe_fn=kdh._first_recipe)
+            if hyp.get("ok"):
+                recipe = hyp.get("recipe")
+                declared_intent = hyp.get("intent")
+                rationale_keys = list(hyp.get("rationale_keys") or [])
+            else:
+                recipe = kdh._first_recipe(obj)
+        except Exception:
+            recipe = kdh._first_recipe(obj)
         if not recipe:
             recipe = kdh._first_recipe(kdh._extract_json(text))
         snap = json.dumps({"recipe": kdh._recipe_snap(recipe)}, ensure_ascii=False) if recipe else ""
+        if recipe and declared_intent:
+            snap = json.dumps({
+                "hypothesis": {
+                    "intent": declared_intent,
+                    "rationale_keys": rationale_keys,
+                    "recipe": kdh._recipe_snap(recipe),
+                }
+            }, ensure_ascii=False)
         emit({
             "phase": "kimi_raw",
             "lane": lane,
@@ -633,9 +717,11 @@ def channel(lane, state):
             "text": snap or "NO_JSON",
             "endpoint": posted.get("endpoint"),
             "failover": bool(posted.get("failover")),
+            "strict_bind": posted.get("strict_bind"),
             "http_code": posted.get("http_code"),
             "window_count": posted.get("window_count"),
             "window_limit": posted.get("window_limit"),
+            "intent": declared_intent,
         })
         if not recipe:
             # 避免空包连打烧光 TPM
@@ -646,6 +732,8 @@ def channel(lane, state):
             })
             continue
         messages.append({"role": "assistant", "content": snap})
+        current["last_intent"] = declared_intent
+        current["last_rationale"] = rationale_keys
         # Ensure timeframe on recipe
         if not recipe.get("timeframe"):
             recipe["timeframe"] = current.get("tf") or seed0.get("timeframe") or "1h"
@@ -893,19 +981,74 @@ def channel(lane, state):
                     "id": "", "adjusts": 0, "last_pair": "",
                     "tf": seed0.get("timeframe") or "1h",
                     "explore": current.get("explore"),
+                    "parent_recipe": None, "parent_eval": None, "parent_id": "",
                 }
             continue
+        parent_id = current.get("parent_id") or current.get("id") or ""
+        try:
+            from dual_engine_workflow_v2.invent_hypothesis_loop import make_step_id
+            step_id = make_step_id(lane, rnd, ident)
+        except Exception:
+            step_id = "%s:%s:%s" % (lane, rnd, (ident or "anon")[:60])
         with kdh._LOCK:
             if kdh._STOP.is_set():
                 return
             try:
-                result = eval_one_thin(cand, recipe, state, lane)
+                result = eval_one_thin(
+                    cand, recipe, state, lane,
+                    parent_id=parent_id or None,
+                    step_id=step_id,
+                )
             except Exception as exc:
                 result = {"ok": False, "phase": "eval_exc", "error": str(exc)[:200],
                           "trace": traceback.format_exc()[-200:]}
             kdh._STATE["live"] = None
             kdh._STATE["base_combo"] = None
             gc.collect()
+        # Invent step reward / ledger (relative to parent; thresholds unchanged)
+        scored = None
+        try:
+            from dual_engine_workflow_v2.invent_hypothesis_loop import record_step
+            scored = record_step(
+                lane=lane, rnd=rnd, ns=NS or "a",
+                parent_id=parent_id, step_id=step_id,
+                parent_recipe=current.get("parent_recipe"),
+                child_recipe=kdh._recipe_snap(recipe),
+                parent_eval=current.get("parent_eval"),
+                child_eval=result,
+                declared_intent=current.get("last_intent"),
+                rationale_keys=current.get("last_rationale"),
+            )
+            emit({
+                "phase": "step_reward",
+                "lane": lane,
+                "round": rnd,
+                "step_id": step_id,
+                "parent_id": parent_id,
+                "intent": scored.get("intent"),
+                "reward_total": scored.get("total"),
+                "reward_tags": scored.get("tags"),
+                "delta": scored.get("delta"),
+                "next_intents": scored.get("next_intents"),
+            })
+        except Exception as exc:
+            emit({"phase": "step_reward_fail", "lane": lane, "error": str(exc)[:160]})
+        current["parent_recipe"] = kdh._recipe_snap(recipe)
+        current["parent_eval"] = {
+            "C_week_pct": result.get("C_week_pct"),
+            "C_week_oos_pct": result.get("C_week_oos_pct"),
+            "n": result.get("n"),
+            "n_oos": result.get("n_oos"),
+            "hitch": result.get("hitch"),
+            "E": result.get("E") or result.get("E_path"),
+            "weekly": result.get("weekly"),
+            "usable": result.get("usable"),
+            "oos_usable": result.get("oos_usable"),
+            "hit_floor": result.get("hit_floor"),
+            "stage": result.get("stage"),
+            "blockers": result.get("blockers"),
+        }
+        current["parent_id"] = ident or step_id
         # P1: exact-hash dup → force diversify (fingerprint untouched)
         if result.get("phase") == "dup":
             current["adjusts"] = int(current.get("adjusts") or 0) + 1
@@ -1346,9 +1489,23 @@ def channel(lane, state):
             critique["hint"] = (
                 (critique.get("hint") or "") + " " + decision["explore_hint_zh"]
             ).strip()
+        try:
+            from dual_engine_workflow_v2.invent_hypothesis_loop import (
+                enrich_critique, hypothesis_user_message,
+            )
+            if scored:
+                critique = enrich_critique(
+                    critique, scored, free_create=_free_create(),
+                )
+            if _free_create():
+                msg = hypothesis_user_message(critique)
+            else:
+                msg = critique_user_message(critique)
+        except Exception:
+            msg = critique_user_message(critique)
         messages.append({
             "role": "user",
-            "content": critique_user_message(critique),
+            "content": msg,
         })
         if len(messages) > 10:
             messages = [messages[0], messages[1]] + messages[-8:]
@@ -1373,8 +1530,10 @@ def main():
     names = [row.get("name") for row in chain]
     if "primary" not in names or "backup" not in names:
         raise RuntimeError("need_both_kimi_endpoints %s" % names)
-    # Extra invent lanes: map to equity/crypto pools.
+    # Invent lanes: 1=equity (kimi1), 2=crypto (kimi2); keep legacy aliases.
     lane_map = dict(kdh.LANES or {})
+    lane_map["1"] = list(kdh.EQUITY)
+    lane_map["2"] = list(kdh.CRYPTO)
     lane_map["eq2"] = list(kdh.EQUITY)
     lane_map["cr2"] = list(kdh.CRYPTO)
     kdh.LANES = lane_map
@@ -1388,6 +1547,11 @@ def main():
         route_boot = _reg.active_routes()
     except Exception as exc:
         route_boot = {"error": str(exc)[:120]}
+    try:
+        from dual_engine_workflow_v2.kimi_provider import invent_strict_bind as _strict
+        strict_bind = bool(_strict())
+    except Exception:
+        strict_bind = True
     emit({
         "phase": "boot",
         "mode": "thin_hub",
@@ -1417,6 +1581,8 @@ def main():
         ],
         "contract_fields": ["route", "exec_tf", "filter_tfs", "timeframe"],
         "free_create": _free_create(),
+        "strict_bind": strict_bind,
+        "hypothesis_loop": True,
     })
     kdh._ensure_patch()
     threads = []

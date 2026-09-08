@@ -1678,9 +1678,13 @@ def _system_prompt():
         return (
             "你是现网合约策略作者（多周期池 %s；默认 %s）。过关前禁止输出任何自然语言、思考过程、解释、英文、markdown。"
             "只输出一个 JSON 对象，第一个字符必须是 {，最后一个必须是 }。\n"
+            "输出形状：{\"hypothesis\":{\"intent\":\"add_location|add_relation|add_timing|"
+            "adjust_geometry|replace_spine\",\"rationale_keys\":[\"...\"],\"recipe\":{...}}}。"
+            "也可兼容 {\"recipe\":{...}}，但优先 hypothesis。\n"
             "自由创造：family/symbol/timeframe/route/几何(held,xwin,atr,hold,z,dwin…)/timing 均可自选与重写。"
             "禁止被种子或上一条身份焊死；换标的、换族、换周期、改几何都允许（换周期=新研究合同，重算 n/C）。\n"
-            "不合格时请大胆改完整 recipe，不要只会拧 timing。\n"
+            "不合格时请大胆改完整 recipe：优先叠加 location/relation（价格相对MA/EMA held|cross|reclaim），"
+            "不要只会拧 timing。\n"
             "diversity：禁止复读同一壳子；新一轮须实质改变结构（路线/家族/几何/timing 至少两维）。\n"
             "family 只能是 xu_long / xd_short / pb_long / pb_short / ch_long / ch_short / ma_long / ma_short。"
             "mean_revert 路线：family 用 ma_long（SMA）。"
@@ -2091,6 +2095,14 @@ def _recipe_complete(recipe):
 
 def _first_recipe(parsed):
     if isinstance(parsed, dict):
+        hyp = parsed.get("hypothesis")
+        if isinstance(hyp, dict):
+            rec = hyp.get("recipe")
+            if _recipe_complete(rec):
+                return rec
+            got = _first_recipe(hyp)
+            if got:
+                return got
         rec = parsed.get("recipe")
         if _recipe_complete(rec):
             return rec

@@ -12,8 +12,14 @@ on:
       - "dual_engine_workflow_v2/thin_create_policy.py"
       - "dual_engine_workflow_v2/timing_stage.py"
       - "dual_engine_workflow_v2/invent_contract_audit.py"
+      - "dual_engine_workflow_v2/invent_element_ops.py"
+      - "dual_engine_workflow_v2/invent_step_reward.py"
+      - "dual_engine_workflow_v2/invent_hypothesis_loop.py"
       - "dual_engine_workflow_v2/kimi_provider.py"
       - "scripts/kimi_thin_recipe_loop.py"
+      - "scripts/kimi_thin_recipe_loop_hub_unified.py"
+      - "scripts/kimi_thin_recipe_loop_hub_a_strict.py"
+      - "scripts/kimi_thin_recipe_loop_hub_b.py"
       - "scripts/kimi_dual_http_create_20260906.py"
       - "scripts/research_host_eval_worker.py"
       - "scripts/invent_contract_preflight.sh"
@@ -22,6 +28,7 @@ on:
       - "tests_workflow_v2/test_data_green_pool.py"
       - "tests_workflow_v2/test_creation_p1_unlock.py"
       - "tests_workflow_v2/test_invent_contract_audit.py"
+      - "tests_workflow_v2/test_invent_hypothesis_reward.py"
       - ".github/workflows/create-shared-invent-gate.yml"
   push:
     branches: [main, master]
@@ -54,3 +61,5 @@ jobs:
         run: bash scripts/invent_contract_preflight.sh --no-live
       - name: Provider failover (shared invent adjacency)
         run: python -m unittest tests_workflow_v2.test_kimi_provider_failover -v
+      - name: Invent hypothesis / step reward / strict bind
+        run: python -m unittest tests_workflow_v2.test_invent_hypothesis_reward -v

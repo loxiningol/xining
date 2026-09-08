@@ -580,12 +580,26 @@ def _kimi_race(endpoints, body, timeout):
         pool.shutdown(wait=False)
 
 
+def invent_strict_bind():
+    """One API mouth per invent lane: no cross-mouth invent failover.
+
+    Default ON (KDH_INVENT_STRICT_BIND=1). Set 0 only for legacy congestion
+    failover across kimi/qwen/deepseek mouths.
+    """
+    return str(os.environ.get("KDH_INVENT_STRICT_BIND") or "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
+
+
 def kimi_post_named(endpoint_name, body, timeout=540):
     """POST preferred named invent mouth first.
 
     Preferred may be kimi primary/backup or congestion outlets qwen/deepseek.
     On 429 / tpm / quota / other failover-class faults, try the remaining
-    invent endpoints sequentially (does not race). Soft-blocked mouths are skipped.
+    invent endpoints sequentially (does not race) — unless
+    KDH_INVENT_STRICT_BIND is on (default), in which case only the bound
+    mouth is used (same-mouth transient retries still allowed).
+    Soft-blocked mouths are skipped when failover is allowed.
     """
     name = str(endpoint_name or "").strip()
     chain = invent_endpoint_chain()
@@ -615,14 +629,23 @@ def kimi_post_named(endpoint_name, body, timeout=540):
             "soft_block": True,
             "window_count": window_count,
             "window_limit": limit,
+            "strict_bind": invent_strict_bind(),
         }
     else:
         posted = _kimi_post_one(
             preferred, body, timeout, SAME_ENDPOINT_TRANSIENT_RETRIES,
         )
+        posted = dict(posted)
+        posted["strict_bind"] = invent_strict_bind()
     if posted.get("ok"):
         return posted
     err = str(posted.get("error") or "")
+    # Strict bind: never cross to another invent mouth (lane attribution).
+    if invent_strict_bind():
+        posted = dict(posted)
+        posted["strict_bind"] = True
+        posted["failover"] = False
+        return posted
     # Soft-block on preferred still allows failover to remaining mouths.
     allow_fo = posted.get("soft_block") or kimi_should_failover(err)
     if not others or not allow_fo:
