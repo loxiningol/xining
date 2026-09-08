@@ -80,6 +80,19 @@ hub 挂接用 `creation_small_n_rigor.install_into_kdh`；**禁止**两侧同日
 ./scripts/check_deployed_sha.sh
 ```
 
+### 发明合同一致性（强制，防种子↔门禁自撞）
+
+部署 / 紧急 scp 共享发明文件后，除 `deployed.sha` 外必须跑：
+
+```bash
+# Mac（仓内）
+./scripts/invent_contract_preflight.sh --no-live
+# VPS（含现网 inherit）
+sudo bash -lc 'cd /root && PYTHONPATH=/root python3 -m dual_engine_workflow_v2.invent_contract_audit --live'
+```
+
+覆盖：种子/ inherit 字面量 ∈ RR 几何门禁、身份强制写回须在门禁之前、`LOCK_KEYS_HARD` 两侧一致。  
+`deployed.sha` 只证明「哪一版代码在跑」，**不**证明种子与门禁无自撞。
 ## Mac worker 跟 tag（P2）
 
 `scripts/mac_eval_worker/run_hub_a.sh.example` / `run_hub_b.sh.example`：  
