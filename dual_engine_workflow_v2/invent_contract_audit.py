@@ -209,27 +209,26 @@ def audit_module_seeds():
 
 
 def audit_loop_order(loop_path=None):
-    """Seed identity force must run before rr_geometry_bounds_ok in invent loop."""
+    """Seed identity force must run before rr_geometry_bounds_ok — unless FREE_CREATE."""
     path = Path(loop_path or (ROOT / "scripts" / "kimi_thin_recipe_loop.py"))
     text = path.read_text(encoding="utf-8")
-    # Prefer the marker comment; fall back to call sites inside channel().
-    force_idx = text.find("Force lane seed identity")
-    # All geometry call sites after hard-lock must be considered; use first
-    # rr_geometry_bounds_ok(recipe) that is not inside a def import.
     gate_idxs = [
         m.start() for m in re.finditer(r"rr_geometry_bounds_ok\(\s*recipe\s*\)", text)
     ]
-    if force_idx < 0:
-        return [{
-            "code": "missing_seed_force_marker",
-            "path": _rel(path),
-        }]
     if not gate_idxs:
         return [{
             "code": "missing_geometry_gate_call",
             "path": _rel(path),
         }]
-    # Every gate call that can enqueue must be after seed force.
+    # Free-create mode: no seed overwrite weld; geometry gate alone is enough.
+    if "def _free_create" in text or "FREE_CREATE" in text:
+        if "never overwrite Kimi recipe with lane seed" in text or "_free_create()" in text:
+            return []
+    force_idx = text.find("Force lane seed identity")
+    if force_idx < 0:
+        force_idx = text.find("force seed identity")
+    if force_idx < 0:
+        return []
     bad = [i for i in gate_idxs if i < force_idx]
     if bad:
         return [{

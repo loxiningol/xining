@@ -41,6 +41,14 @@ os.chdir("/root")
 from auto_trade_ai_consensus import _load_root_only_env
 _load_root_only_env()
 
+# FREE_CREATE (default ON): no seed overwrite, no geometry hard-lock, no family/symbol soft-lock.
+# Set KDH_FREE_CREATE=0 only to revive the old identity-weld invent mode.
+def _free_create():
+    return str(os.environ.get("KDH_FREE_CREATE") or "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
+
+
 from dual_engine_workflow_v2.timing_stage import (
     build_critique, critique_user_message, classify_stage,
     LOCK_KEYS_HARD,
@@ -493,6 +501,16 @@ def _seed_brief_with(lane, symbols, seed_rec):
     base = kdh._user_brief(lane, symbols)
     seed = json.dumps({"recipe": seed_rec}, ensure_ascii=False)
     free = ",".join(symbols[:16])
+    if _free_create():
+        return (
+            base
+            + "\n本通道可用标的（勿碰现网/禁用）：%s\n" % free
+            + "自由创造：输出完整可执行 recipe（family/symbol/timeframe/route/"
+            "几何/timing 均可自选）。下面仅是可选参考示例，禁止被示例绑死，"
+            "禁止只拧 timing 复读同一壳子：\n"
+            + seed
+            + "\n"
+        )
     return (
         base
         + "\n本通道可用标的（勿碰现网/禁用）：%s\n" % free
@@ -560,7 +578,7 @@ def channel(lane, state):
         emit({"phase": "kimi_ask", "lane": lane, "round": rnd})
         body = {
             "messages": messages,
-            "temperature": 0.2,
+            "temperature": 0.55 if _free_create() else 0.2,
             "max_tokens": INVENT_MAX_TOKENS,
             "response_format": {"type": "json_object"},
         }
@@ -690,9 +708,9 @@ def channel(lane, state):
                 continue
             else:
                 recipe["ma_kind"] = recipe.get("ma_kind") or "sma"
-        # Force lane seed identity until first lock — BEFORE geometry gate
-        # (old order: gate then overwrite seed xwin → illegal xwin could enqueue).
-        if not current.get("id"):
+        # FREE_CREATE: never overwrite Kimi recipe with lane seed / hard-lock geometry.
+        # Legacy mode only: force seed identity before geometry gate (was weld-to-seed).
+        if (not _free_create()) and (not current.get("id")):
             for key in ("family", "symbol", "timeframe", "exec_tf", "filter_tfs",
                         "held", "xwin", "z", "atr", "hold"):
                 if key in seed0:
@@ -704,8 +722,8 @@ def channel(lane, state):
             if not recipe.get("timing"):
                 recipe["timing"] = list(seed0.get("timing") or [])
         expl = _explore_bundle(current)
-        # Hard-lock geometry (+ timeframe) from lock; soft family/symbol via explore budget
-        if current.get("lock_recipe") and current.get("id"):
+        # Legacy identity weld only when FREE_CREATE is off.
+        if (not _free_create()) and current.get("lock_recipe") and current.get("id"):
             lock = current["lock_recipe"]
             proposed_family = str(recipe.get("family") or "").strip()
             proposed_symbol = str(recipe.get("symbol") or "").strip().upper()
@@ -741,7 +759,6 @@ def channel(lane, state):
                         recipe["timing"] = tcp.default_timing() if hasattr(tcp, "default_timing") else list(
                             (_SEED_TIMING if _SEED_TIMING else [])
                         )
-                        # Re-seed geometry for new family
                         for gk in ("held", "xwin", "fast", "slow", "z", "atr", "hold"):
                             recipe.pop(gk, None)
                         current["lock_recipe"] = None
@@ -757,7 +774,6 @@ def channel(lane, state):
                             )[:1500],
                         })
                         continue
-                # Reject soft identity change until explore depth met
                 recipe["family"] = lock_family
                 recipe["symbol"] = lock_symbol
                 msg = (
@@ -778,7 +794,7 @@ def channel(lane, state):
                     )
                 messages.append({"role": "user", "content": msg[:1500]})
                 continue
-        # Escape-proof geometry bounds (after seed force / hard lock)
+        # Escape-proof geometry bounds (physical range only; not seed weld)
         ok_rr, err_rr = rr_geometry_bounds_ok(recipe)
         if not ok_rr:
             emit({
@@ -838,16 +854,30 @@ def channel(lane, state):
             pass
         ident = kdh._identity(recipe)
         if current["id"] and ident and ident != current["id"]:
-            # Geometry / tf drift after hard lock — reject
-            messages.append({
-                "role": "user",
-                "content": (
-                    "身份已锁死 %s。禁止换标的/家族/held/xwin/timeframe。"
-                    "禁止文字。只改 timing 后输出 {\"recipe\":{...}}。"
-                    % current["id"]
-                )[:1500],
-            })
-            continue
+            if _free_create():
+                # New research contract: accept identity change, do not weld back.
+                emit({
+                    "phase": "identity_switch",
+                    "lane": lane,
+                    "from": current.get("id"),
+                    "to": ident,
+                })
+                current["id"] = ""
+                current["lock_recipe"] = None
+                current["stalled"] = 0
+                current["micro_done"] = False
+                current["adjusts"] = 0
+                current["allow_rr_geometry"] = True
+            else:
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "身份已锁死 %s。禁止换标的/家族/held/xwin/timeframe。"
+                        "禁止文字。只改 timing 后输出 {\"recipe\":{...}}。"
+                        % current["id"]
+                    )[:1500],
+                })
+                continue
         cand, err = kdh._cand_from_recipe(recipe, lane)
         if err:
             result = {"reject": err, "symbol": recipe.get("symbol"), "phase": "pair_reject"}
@@ -916,7 +946,7 @@ def channel(lane, state):
                 seed_snap = json.dumps({"recipe": seed}, ensure_ascii=False)
                 seed_content = (
                     critique + " " + str(sw.get("prompt") or "")
-                    + " 种子骨架：" + seed_snap
+                    + (" 可选参考（禁止绑死）：" if _free_create() else " 种子骨架：") + seed_snap
                     + " 禁止文字。只输出完整 {\"recipe\":{...}}。"
                 )[:1500]
             emit({
@@ -964,7 +994,7 @@ def channel(lane, state):
                 seed_snap = json.dumps({"recipe": seed}, ensure_ascii=False)
                 seed_content = (
                     seed_content + " " + str(sw.get("prompt") or "")
-                    + " 种子骨架：" + seed_snap
+                    + (" 可选参考（禁止绑死）：" if _free_create() else " 种子骨架：") + seed_snap
                 )[:1500]
             time.sleep(min(DUP_COOLDOWN_SEC, 45))
             messages = _trim_messages_seed(messages, seed_content)
@@ -1012,8 +1042,11 @@ def channel(lane, state):
             current["stage"] = pair.get("stage")
         current["last_pair"] = json.dumps(pair, ensure_ascii=False, default=str)[:500]
         current["tf"] = recipe.get("timeframe") or current.get("tf")
-        # Surgery②: next invent may edit xwin/atr after S2 hitch
-        current["allow_rr_geometry"] = (str(pair.get("stage") or "") == "S2_hitch")
+        # FREE_CREATE: geometry always editable. Legacy: unlock RR only after S2.
+        if _free_create():
+            current["allow_rr_geometry"] = True
+        else:
+            current["allow_rr_geometry"] = (str(pair.get("stage") or "") == "S2_hitch")
         try:
             n_oos_i = int(pair.get("n_oos") or result.get("n_oos") or 0)
         except Exception:
@@ -1106,7 +1139,7 @@ def channel(lane, state):
                     "role": "user",
                     "content": (
                         str(sw.get("prompt") or "")
-                        + " 种子骨架：" + seed_snap
+                        + (" 可选参考（禁止绑死）：" if _free_create() else " 种子骨架：") + seed_snap
                         + " 禁止文字。只输出完整 {\"recipe\":{...}}。"
                     )[:1500],
                 })
@@ -1164,7 +1197,7 @@ def channel(lane, state):
                 "role": "user",
                 "content": (
                     str(decision.get("prompt") or "")
-                    + " 种子骨架：" + seed_snap
+                    + (" 可选参考（禁止绑死）：" if _free_create() else " 种子骨架：") + seed_snap
                     + " 禁止文字。只输出完整 {\"recipe\":{...}}。"
                 )[:1500],
             })
@@ -1190,7 +1223,7 @@ def channel(lane, state):
                 "role": "user",
                 "content": (
                     str(decision.get("prompt") or "")
-                    + " 种子骨架：" + seed_snap
+                    + (" 可选参考（禁止绑死）：" if _free_create() else " 种子骨架：") + seed_snap
                     + " 禁止文字。只输出完整 {\"recipe\":{...}}。"
                 )[:1500],
             })
@@ -1383,6 +1416,7 @@ def main():
             for r in (route_boot.get("frozen") or [])
         ],
         "contract_fields": ["route", "exec_tf", "filter_tfs", "timeframe"],
+        "free_create": _free_create(),
     })
     kdh._ensure_patch()
     threads = []
