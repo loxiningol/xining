@@ -50,6 +50,14 @@ try:
 except Exception:
     tcp = None
 
+try:
+    from dual_engine_workflow_v2.kimi_provider import json_parse_critique
+except Exception:
+    def json_parse_critique(raw_text, max_show=400):
+        return (
+            "禁止文字。只输出 1 条 {\"recipe\":{...}}，第一个字符必须是 {。"
+        )
+
 # Import create helpers as library (main must not auto-run).
 import importlib.util
 
@@ -242,65 +250,97 @@ def _assert_no_local_isolated_cap_in_callstack():
     return True
 
 
+MAC_EVAL_RETRIES = max(1, int(os.environ.get("KDH_MAC_EVAL_RETRIES") or "2"))
+DUP_COOLDOWN_SEC = max(30, int(os.environ.get("KDH_DUP_COOLDOWN_SEC") or "30"))
+INVENT_MAX_TOKENS = max(256, int(os.environ.get("KDH_INVENT_MAX_TOKENS") or "1024"))
+
+
+def _trim_messages_seed(messages, seed_user_content):
+    """Keep system (+ optional first seed) then one fresh seed user turn."""
+    head = []
+    if messages and messages[0].get("role") == "system":
+        head.append(messages[0])
+    head.append({"role": "user", "content": str(seed_user_content or "")[:1500]})
+    return head
+
+
 def remote_isolated_cap(cand, recipe, lane, state, mode="eval", diagnosis=None):
-    """Enqueue for Mac; wait for result. Never run isolated_cap locally."""
+    """Enqueue for Mac; wait for result. Never run isolated_cap locally.
+
+    On eval_timeout, re-enqueue the same recipe up to MAC_EVAL_RETRIES times.
+    Does not call LLM — invent remains one-shot per outer round.
+    """
     _assert_no_local_isolated_cap_in_callstack()
     QUEUE.mkdir(parents=True, exist_ok=True)
     RESULTS.mkdir(parents=True, exist_ok=True)
-    job_id = "thin_%s_%s_%s" % (lane, int(time.time()), cand.get("id") or "x")
-    if mode == "micro_search":
-        job_id = "micro_%s_%s" % (lane, int(time.time()))
-    job_id = job_id.replace("/", "_")[:120]
-    payload = {
-        "id": job_id,
-        "lane": lane,
-        "mode": mode,
-        "recipe": kdh._recipe_snap(recipe),
-        "cand_id": cand.get("id"),
-        "symbol": cand.get("symbol"),
-        "diagnosis": diagnosis or {},
-        "at": kdh._now(),
-    }
-    qpath = QUEUE / ("%s.recipe.json" % job_id)
-    rpath = RESULTS / ("%s.result.json" % job_id)
-    if rpath.exists():
-        try:
-            rpath.unlink()
-        except Exception:
-            pass
-    qpath.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    emit({"phase": "enqueue", "id": job_id, "lane": lane, "mode": mode, "symbol": cand.get("symbol")})
     wait_sec = EVAL_WAIT_SEC
     if mode == "micro_search":
         wait_sec = max(EVAL_WAIT_SEC, 1800)
-    t0 = time.time()
-    while time.time() - t0 < wait_sec:
-        if kdh._STOP.is_set():
-            return {"ok": False, "phase": "stopped"}
+    last = {"ok": False, "phase": "eval_timeout", "mode": mode}
+    for attempt in range(MAC_EVAL_RETRIES):
+        job_id = "thin_%s_%s_%s" % (lane, int(time.time()), cand.get("id") or "x")
+        if mode == "micro_search":
+            job_id = "micro_%s_%s" % (lane, int(time.time()))
+        job_id = job_id.replace("/", "_")[:120]
+        payload = {
+            "id": job_id,
+            "lane": lane,
+            "mode": mode,
+            "recipe": kdh._recipe_snap(recipe),
+            "cand_id": cand.get("id"),
+            "symbol": cand.get("symbol"),
+            "diagnosis": diagnosis or {},
+            "at": kdh._now(),
+            "mac_attempt": attempt + 1,
+        }
+        qpath = QUEUE / ("%s.recipe.json" % job_id)
+        rpath = RESULTS / ("%s.result.json" % job_id)
         if rpath.exists():
-            try:
-                raw = rpath.read_text(encoding="utf-8")
-                result = json.loads(raw)
-            except Exception as exc:
-                return {"ok": False, "phase": "bad_result", "error": str(exc)[:160]}
             try:
                 rpath.unlink()
             except Exception:
                 pass
-            if qpath.exists():
+        qpath.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        emit({
+            "phase": "enqueue", "id": job_id, "lane": lane, "mode": mode,
+            "symbol": cand.get("symbol"), "mac_attempt": attempt + 1,
+        })
+        t0 = time.time()
+        while time.time() - t0 < wait_sec:
+            if kdh._STOP.is_set():
+                return {"ok": False, "phase": "stopped"}
+            if rpath.exists():
                 try:
-                    qpath.unlink()
+                    raw = rpath.read_text(encoding="utf-8")
+                    result = json.loads(raw)
+                except Exception as exc:
+                    return {"ok": False, "phase": "bad_result", "error": str(exc)[:160]}
+                try:
+                    rpath.unlink()
                 except Exception:
                     pass
-            return result
-        time.sleep(POLL)
-    emit({"phase": "eval_timeout", "id": job_id, "wait": wait_sec, "mode": mode})
-    if qpath.exists():
-        try:
-            qpath.unlink()
-        except Exception:
-            pass
-    return {"ok": False, "phase": "eval_timeout", "id": job_id, "mode": mode}
+                if qpath.exists():
+                    try:
+                        qpath.unlink()
+                    except Exception:
+                        pass
+                return result
+            time.sleep(POLL)
+        emit({
+            "phase": "eval_timeout", "id": job_id, "wait": wait_sec,
+            "mode": mode, "mac_attempt": attempt + 1,
+            "mac_retries_left": MAC_EVAL_RETRIES - attempt - 1,
+        })
+        if qpath.exists():
+            try:
+                qpath.unlink()
+            except Exception:
+                pass
+        last = {
+            "ok": False, "phase": "eval_timeout", "id": job_id,
+            "mode": mode, "mac_attempt": attempt + 1,
+        }
+    return last
 
 
 def eval_one_thin(cand, recipe, state, lane):
@@ -394,21 +434,34 @@ def _seed_for(lane):
         row["timeframe"] = "1h"
     if tcp is not None:
         row["timeframe"] = tcp.resolve_tf(row.get("timeframe"))
+    row["exec_tf"] = row.get("exec_tf") or row.get("timeframe")
+    # Route comes from process-wide RR at explore init — do not hardcode ema_osc.
+    if "filter_tfs" not in row:
+        row["filter_tfs"] = []
     return row
 
 
 def _explore_bundle(current):
-    """Lane-local explore state (combos / tf_tried / timing_history)."""
+    """Lane-local explore state (combos / tf_tried / timing_history / route)."""
     if current.get("explore") is None:
         tf = "1h"
         if tcp is not None:
             tf = tcp.resolve_tf(current.get("tf") or "1h")
-            current["explore"] = tcp.empty_lane_explore_state(tf)
+            current["explore"] = tcp.empty_lane_explore_state(
+                tf,
+                route=current.get("route"),
+                symbol=current.get("symbol"),
+            )
+            current["route"] = current["explore"].get("route")
+            current["filter_tfs"] = list(current["explore"].get("filter_tfs") or [])
         else:
             current["explore"] = {
-                "tf": tf, "combos": {}, "tf_tried": [tf],
+                "tf": tf, "exec_tf": tf, "route": "ema_osc", "filter_tfs": [],
+                "combos": {}, "tf_tried": [tf],
                 "families_tried": [], "timing_history": [],
                 "last_group_diverse": True,
+                "route_rr_index": 0, "route_cooldowns": {},
+                "route_no_improve": {}, "dim_soft_ignore": 0,
             }
     return current["explore"]
 
@@ -422,21 +475,25 @@ def _apply_hard_lock(recipe, lock):
     for key in hard:
         if key in lock:
             recipe[key] = lock.get(key)
-    # Timeframe is contract-locked during refine (not soft family).
-    if "timeframe" in lock:
-        recipe["timeframe"] = lock.get("timeframe")
+    # Contract locks during refine
+    for key in ("timeframe", "exec_tf", "route", "filter_tfs"):
+        if key in lock:
+            recipe[key] = lock.get(key)
     return recipe
 
 
 def _seed_brief(lane, symbols):
+    return _seed_brief_with(lane, symbols, _seed_for(lane))
+
+
+def _seed_brief_with(lane, symbols, seed_rec):
     base = kdh._user_brief(lane, symbols)
-    seed_rec = _seed_for(lane)
     seed = json.dumps({"recipe": seed_rec}, ensure_ascii=False)
     free = ",".join(symbols[:16])
     return (
         base
         + "\n本通道可用标的（勿碰现网/禁用）：%s\n" % free
-        + "锁死起点：先输出这条再只改 timing，不许换标的/家族/held/xwin（换周期/换族须等机器合同）：\n"
+        + "锁死起点：先输出这条再只改 timing（换周期/换族/换路线须等机器合同）：\n"
         + seed
         + "\n"
     )
@@ -450,18 +507,38 @@ def channel(lane, state):
     else:
         pool = kdh.LANES.get(lane) or kdh.EQUITY
     symbols = [s for s in pool if s not in kdh._banned()]
-    messages = [
-        {"role": "system", "content": kdh._system_prompt()},
-        {"role": "user", "content": _seed_brief(lane, symbols)},
-    ]
     seed0 = _seed_for(lane)
     current = {
         "id": "",
         "adjusts": 0,
         "last_pair": "",
         "tf": seed0.get("timeframe") or "1h",
+        "symbol": seed0.get("symbol"),
     }
-    _explore_bundle(current)
+    expl0 = _explore_bundle(current)
+    # Bind RR-picked route into seed before first Kimi turn
+    seed0["route"] = current.get("route") or expl0.get("route") or "ema_osc"
+    seed0["filter_tfs"] = list(current.get("filter_tfs") or expl0.get("filter_tfs") or [])
+    if seed0["route"] == "channel":
+        seed0["family"] = "ch_long"
+        seed0.setdefault("dwin", 20)
+    elif seed0["route"] == "ma_family":
+        seed0["family"] = "ma_long"
+        seed0.setdefault("ma_kind", "sma")
+    elif seed0["route"] == "vol_confirm":
+        seed0["timing"] = [
+            {"factor": "skdj_diff", "operator": "above", "value": -20, "window": 9},
+            {"factor": "volume_ratio", "operator": "above", "value": 1.2, "window": 20},
+        ]
+    elif seed0["route"] == "momentum":
+        seed0["timing"] = [
+            {"factor": "skdj_diff", "operator": "above", "value": -20, "window": 9},
+            {"factor": "roc", "operator": "above", "value": 0, "window": 12},
+        ]
+    messages = [
+        {"role": "system", "content": kdh._system_prompt()},
+        {"role": "user", "content": _seed_brief_with(lane, symbols, seed0)},
+    ]
     for rnd in range(1, kdh.ROUNDS + 1):
         if kdh._STOP.is_set():
             emit({"phase": "lane_stop", "lane": lane, "round": rnd})
@@ -470,7 +547,7 @@ def channel(lane, state):
         body = {
             "messages": messages,
             "temperature": 0.2,
-            "max_tokens": 700,
+            "max_tokens": INVENT_MAX_TOKENS,
             "response_format": {"type": "json_object"},
         }
         kimi_name = _kimi_for_lane(lane)
@@ -491,11 +568,17 @@ def channel(lane, state):
                 "endpoint": posted.get("endpoint"),
                 "used": posted.get("used"),
                 "failover": posted.get("failover"),
+                "http_code": posted.get("http_code"),
+                "soft_block": posted.get("soft_block"),
+                "window_count": posted.get("window_count"),
+                "window_limit": posted.get("window_limit"),
             })
             wait = 8
             low = err.lower()
             # Both mouths already tried inside kimi_post_named; still back off.
-            if "429" in err or "tpm" in low or "quota" in low or "insufficien" in low:
+            if posted.get("soft_block") or "rate_limit_soft_block" in low:
+                wait = 90
+            elif "429" in err or "tpm" in low or "quota" in low or "insufficien" in low:
                 wait = 120
             elif "504" in err or "503" in err or "502" in err:
                 wait = 15
@@ -518,26 +601,119 @@ def channel(lane, state):
             "text": snap or "NO_JSON",
             "endpoint": posted.get("endpoint"),
             "failover": bool(posted.get("failover")),
+            "http_code": posted.get("http_code"),
+            "window_count": posted.get("window_count"),
+            "window_limit": posted.get("window_limit"),
         })
         if not recipe:
             # 避免空包连打烧光 TPM
             time.sleep(12)
             messages.append({
                 "role": "user",
-                "content": "禁止文字。只输出 1 条 {\"recipe\":{...}}，第一个字符必须是 {。",
+                "content": json_parse_critique(text)[:1500],
             })
             continue
         messages.append({"role": "assistant", "content": snap})
         # Ensure timeframe on recipe
         if not recipe.get("timeframe"):
             recipe["timeframe"] = current.get("tf") or seed0.get("timeframe") or "1h"
+        if not recipe.get("route"):
+            recipe["route"] = current.get("route") or seed0.get("route") or "ema_osc"
+        if "filter_tfs" not in recipe:
+            recipe["filter_tfs"] = list(
+                current.get("filter_tfs") or seed0.get("filter_tfs") or []
+            )
+        # P0-C: normalize contract (skip absolute data here; invent path gates)
+        try:
+            from dual_engine_workflow_v2 import creation_contract as _cc
+            norm, nerr = _cc.normalize_contract(
+                recipe,
+                lane_state={
+                    "tf": current.get("tf"),
+                    "route": current.get("route") or recipe.get("route"),
+                },
+                skip_data_gate=True,
+            )
+            if nerr:
+                if nerr == "route_frozen_atom_missing":
+                    emit({
+                        "phase": "route_frozen_atom_missing",
+                        "lane": lane,
+                        "route": recipe.get("route"),
+                    })
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "合同非法：%s。请输出含 route/exec_tf(=timeframe)/filter_tfs 的合法 recipe。"
+                        "禁止文字。" % nerr
+                    )[:800],
+                })
+                continue
+            recipe = norm
+            current["tf"] = recipe.get("exec_tf") or recipe.get("timeframe")
+            current["route"] = recipe.get("route")
+            current["filter_tfs"] = list(recipe.get("filter_tfs") or [])
+        except Exception as exc:
+            messages.append({
+                "role": "user",
+                "content": "合同规范化失败：%s。禁止文字。" % str(exc)[:120],
+            })
+            continue
         if tcp is not None:
-            recipe["timeframe"] = tcp.resolve_tf(recipe.get("timeframe"))
+            tf_ok, tf_err = tcp.resolve_recipe_tf(recipe, {"tf": current.get("tf")})
+            if tf_err:
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "timeframe 不在周期池（15m/1h/4h）。禁止回落伪装。"
+                        "请输出合法 timeframe。禁止文字。"
+                    )[:800],
+                })
+                continue
+            recipe["timeframe"] = tf_ok
+            recipe["exec_tf"] = tf_ok
+            current["tf"] = tf_ok
+        # P0-Q soft→hard dimension stack
+        try:
+            from dual_engine_workflow_v2 import creation_dimension_policy as _cdp
+            expl0 = _explore_bundle(current)
+            ok_dim, dim_code, dim_payload = _cdp.apply_dimension_policy(
+                expl0, recipe.get("timing"),
+            )
+            if dim_code == "dimension_redundant_hard":
+                emit({
+                    "phase": "dimension_redundant_hard",
+                    "lane": lane,
+                    "dimension": dim_payload,
+                })
+                # Force next active route if possible
+                if tcp is not None:
+                    nxt_route = tcp.pick_next_route(expl0)
+                    recipe["route"] = nxt_route
+                    current["route"] = nxt_route
+                    expl0["dim_soft_ignore"] = 0
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "维度冗余硬否决。请换路线或加入非 D2 维原子后重发完整 recipe。禁止文字。"
+                    )[:800],
+                })
+                continue
+            if dim_code == "dimension_redundant_soft":
+                # Will increment after eval if still soft; tag recipe for invent
+                recipe["_dim_soft_pending"] = True
+        except Exception:
+            pass
         # Force lane seed identity until first lock
         if not current.get("id"):
-            for key in ("family", "symbol", "timeframe", "held", "xwin", "z", "atr", "hold"):
+            for key in ("family", "symbol", "timeframe", "exec_tf", "filter_tfs",
+                        "held", "xwin", "z", "atr", "hold"):
                 if key in seed0:
                     recipe[key] = seed0.get(key)
+            if current.get("route"):
+                recipe["route"] = current.get("route")
+            elif seed0.get("route"):
+                recipe["route"] = seed0.get("route")
             if not recipe.get("timing"):
                 recipe["timing"] = list(seed0.get("timing") or [])
         expl = _explore_bundle(current)
@@ -655,6 +831,100 @@ def channel(lane, state):
             kdh._STATE["live"] = None
             kdh._STATE["base_combo"] = None
             gc.collect()
+        # P1: exact-hash dup → force diversify (fingerprint untouched)
+        if result.get("phase") == "dup":
+            current["adjusts"] = int(current.get("adjusts") or 0) + 1
+            current["dup_streak"] = int(current.get("dup_streak") or 0) + 1
+            emit({
+                "phase": "dup_force",
+                "lane": lane,
+                "round": rnd,
+                "rh": result.get("rh"),
+                "identity": ident,
+                "adjusts": current["adjusts"],
+                "dup_streak": current["dup_streak"],
+            })
+            critique = (
+                "上一轮 IR 与已评测配方完全重复（精确 hash）。禁止原样重交。"
+                "必须切换 route，或切换 timeframe，或改变至少 2 个 timing 原子；"
+                "否则本车道记为空转。"
+            )
+            seed_content = critique + " 禁止文字。只输出完整 {\"recipe\":{...}}。"
+            if tcp is not None:
+                sw = tcp.switch_route_contract(expl, recipe)
+                emit({
+                    "phase": "switch_route",
+                    "lane": lane,
+                    "from": sw.get("from_route"),
+                    "to": sw.get("to_route"),
+                    "reason": "dup_force",
+                })
+                seed = dict(sw.get("recipe_seed") or {})
+                current["lock_recipe"] = None
+                current["id"] = ""
+                current["stalled"] = 0
+                current["micro_done"] = False
+                current["adjusts"] = 0
+                current["route"] = seed.get("route")
+                current["filter_tfs"] = list(seed.get("filter_tfs") or [])
+                expl["route"] = seed.get("route")
+                seed_snap = json.dumps({"recipe": seed}, ensure_ascii=False)
+                seed_content = (
+                    critique + " " + str(sw.get("prompt") or "")
+                    + " 种子骨架：" + seed_snap
+                    + " 禁止文字。只输出完整 {\"recipe\":{...}}。"
+                )[:1500]
+            emit({
+                "phase": "idle_spin_cooldown",
+                "lane": lane,
+                "sec": DUP_COOLDOWN_SEC,
+                "dup_streak": current.get("dup_streak"),
+            })
+            time.sleep(DUP_COOLDOWN_SEC)
+            messages = _trim_messages_seed(messages, seed_content)
+            continue
+        # P0.5: Mac timeout — never burn invent LLM on same identity
+        if result.get("phase") == "eval_timeout":
+            emit({
+                "phase": "eval_timeout_no_llm",
+                "lane": lane,
+                "round": rnd,
+                "identity": ident,
+                "id": result.get("id"),
+                "mac_attempt": result.get("mac_attempt"),
+            })
+            seed_content = (
+                "回测回包超时（非发明失败）。禁止同身份再发明。"
+                "请换 route 或 timeframe 后输出完整 {\"recipe\":{...}}。禁止文字。"
+            )
+            if tcp is not None:
+                sw = tcp.switch_route_contract(expl, recipe)
+                emit({
+                    "phase": "switch_route",
+                    "lane": lane,
+                    "from": sw.get("from_route"),
+                    "to": sw.get("to_route"),
+                    "reason": "eval_timeout",
+                })
+                seed = dict(sw.get("recipe_seed") or {})
+                current["lock_recipe"] = None
+                current["id"] = ""
+                current["stalled"] = 0
+                current["micro_done"] = False
+                current["adjusts"] = 0
+                current["dup_streak"] = 0
+                current["route"] = seed.get("route")
+                current["filter_tfs"] = list(seed.get("filter_tfs") or [])
+                expl["route"] = seed.get("route")
+                seed_snap = json.dumps({"recipe": seed}, ensure_ascii=False)
+                seed_content = (
+                    seed_content + " " + str(sw.get("prompt") or "")
+                    + " 种子骨架：" + seed_snap
+                )[:1500]
+            time.sleep(min(DUP_COOLDOWN_SEC, 45))
+            messages = _trim_messages_seed(messages, seed_content)
+            continue
+        current["dup_streak"] = 0
         pair = {
             "id": cand.get("id"),
             "symbol": cand.get("symbol"),
@@ -697,7 +967,73 @@ def channel(lane, state):
             current["stage"] = pair.get("stage")
         current["last_pair"] = json.dumps(pair, ensure_ascii=False, default=str)[:500]
         current["tf"] = recipe.get("timeframe") or current.get("tf")
-        # Explore depth + S1 TF/family migration
+        # P0-S route failure penalty + P0-Q soft-ignore increment
+        if tcp is not None and pair.get("phase") != "mounted":
+            cool_info = tcp.note_route_pair_outcome(
+                expl, recipe, pair.get("stage"), prev_stage,
+            )
+            if cool_info.get("cooled"):
+                emit({
+                    "phase": "route_cooldown",
+                    "lane": lane,
+                    "key": cool_info.get("cooled"),
+                    "slots": cool_info.get("slots"),
+                })
+                # Equal-floor: after cooldown, force next active route contract
+                sw = tcp.switch_route_contract(expl, recipe)
+                decision = sw
+                pair["explore"] = tcp.explore_actions_for_critique(
+                    expl, recipe, pair.get("stage"),
+                )
+                emit({
+                    "phase": "pair", "lane": lane, "round": rnd,
+                    "identity": ident, "adjusts": current["adjusts"],
+                    "eval_phase": result.get("phase"),
+                    "stage": pair.get("stage"),
+                    "stalled": current.get("stalled"),
+                    "tf": current.get("tf"),
+                    "route": recipe.get("route") or current.get("route"),
+                    "explore_action": "switch_route",
+                    "C_week_pct": pair.get("C_week_pct"),
+                    "C_week_oos_pct": pair.get("C_week_oos_pct"),
+                    "n": pair.get("n"), "hitch": pair.get("hitch"),
+                    "E": pair.get("E"),
+                })
+                emit({
+                    "phase": "switch_route",
+                    "lane": lane,
+                    "from": sw.get("from_route"),
+                    "to": sw.get("to_route"),
+                })
+                seed = dict(sw.get("recipe_seed") or {})
+                current["lock_recipe"] = None
+                current["id"] = ""
+                current["stalled"] = 0
+                current["micro_done"] = False
+                current["adjusts"] = 0
+                current["route"] = seed.get("route")
+                current["filter_tfs"] = list(seed.get("filter_tfs") or [])
+                expl["route"] = seed.get("route")
+                seed_snap = json.dumps({"recipe": seed}, ensure_ascii=False)
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        str(sw.get("prompt") or "")
+                        + " 种子骨架：" + seed_snap
+                        + " 禁止文字。只输出完整 {\"recipe\":{...}}。"
+                    )[:1500],
+                })
+                continue
+        try:
+            from dual_engine_workflow_v2 import creation_dimension_policy as _cdp
+            assess = _cdp.assess_dimension_stack(recipe.get("timing"))
+            if assess.get("soft_warn"):
+                _cdp.note_soft_ignored(expl)
+            else:
+                expl["dim_soft_ignore"] = 0
+        except Exception:
+            pass
+        # Explore depth + S1 TF/family/route migration
         decision = {"action": "continue"}
         if tcp is not None and pair.get("phase") != "mounted":
             decision = tcp.on_eval_done(expl, recipe, pair)
@@ -711,6 +1047,7 @@ def channel(lane, state):
             "stage": pair.get("stage"),
             "stalled": current.get("stalled"),
             "tf": current.get("tf"),
+            "route": recipe.get("route") or current.get("route"),
             "explore_action": decision.get("action"),
             "C_week_pct": pair.get("C_week_pct"),
             "C_week_oos_pct": pair.get("C_week_oos_pct"),
@@ -719,6 +1056,32 @@ def channel(lane, state):
         })
         if result.get("phase") == "mounted":
             return
+        if decision.get("action") == "switch_route":
+            emit({
+                "phase": "switch_route",
+                "lane": lane,
+                "from": decision.get("from_route"),
+                "to": decision.get("to_route"),
+            })
+            seed = dict(decision.get("recipe_seed") or {})
+            current["lock_recipe"] = None
+            current["id"] = ""
+            current["stalled"] = 0
+            current["micro_done"] = False
+            current["adjusts"] = 0
+            current["route"] = seed.get("route")
+            current["filter_tfs"] = list(seed.get("filter_tfs") or [])
+            expl["route"] = seed.get("route")
+            seed_snap = json.dumps({"recipe": seed}, ensure_ascii=False)
+            messages.append({
+                "role": "user",
+                "content": (
+                    str(decision.get("prompt") or "")
+                    + " 种子骨架：" + seed_snap
+                    + " 禁止文字。只输出完整 {\"recipe\":{...}}。"
+                )[:1500],
+            })
+            continue
         if decision.get("action") == "new_contract":
             emit({
                 "phase": "cross_tf_contract",
@@ -756,6 +1119,9 @@ def channel(lane, state):
                 "family": decision.get("family"),
                 "symbol": recipe.get("symbol"),
                 "timeframe": recipe.get("timeframe") or current.get("tf"),
+                "exec_tf": recipe.get("exec_tf") or recipe.get("timeframe") or current.get("tf"),
+                "route": recipe.get("route") or current.get("route") or "ema_osc",
+                "filter_tfs": list(recipe.get("filter_tfs") or current.get("filter_tfs") or []),
                 "timing": list(decision.get("timing") or []),
             }
             current["lock_recipe"] = None
@@ -766,17 +1132,22 @@ def channel(lane, state):
             messages.append({
                 "role": "user",
                 "content": (
-                    "探索深度已满且周期池耗尽。换族至 %s。"
+                    "探索深度已满且周期池耗尽。换族至 %s（路线保持 %s）。"
                     "请按新家族重填几何+timing。种子：%s 禁止文字。"
-                    % (decision.get("family"), json.dumps({"recipe": seed}, ensure_ascii=False))
+                    % (
+                        decision.get("family"),
+                        seed.get("route"),
+                        json.dumps({"recipe": seed}, ensure_ascii=False),
+                    )
                 )[:1500],
             })
             continue
         if decision.get("action") == "close":
             emit({
-                "phase": "explore_close",
+                "phase": "lane_exhausted_evidence",
                 "lane": lane,
                 "reason": decision.get("reason") or "evidence_exhausted",
+                "note_zh": "跨周期验证与探索预算已耗尽；证据不足结案",
             })
             messages.append({
                 "role": "user",
@@ -785,6 +1156,7 @@ def channel(lane, state):
             current = {
                 "id": "", "adjusts": 0, "last_pair": "",
                 "tf": seed0.get("timeframe") or "1h",
+                "symbol": (recipe or {}).get("symbol") or seed0.get("symbol"),
             }
             _explore_bundle(current)
             continue
@@ -890,6 +1262,12 @@ def main():
     RESULTS.mkdir(parents=True, exist_ok=True)
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     state = kdh._load_state()
+    route_boot = {}
+    try:
+        from dual_engine_workflow_v2 import creation_route_registry as _reg
+        route_boot = _reg.active_routes()
+    except Exception as exc:
+        route_boot = {"error": str(exc)[:120]}
     emit({
         "phase": "boot",
         "mode": "thin_hub",
@@ -908,6 +1286,16 @@ def main():
         "stop_present": True,
         "no_local_isolated_cap": True,
         "channels": names,
+        "p0_wave": "C+R+S+Q",
+        "min_evals_per_combo": getattr(tcp, "MIN_EVALS_PER_COMBO", None) if tcp else None,
+        "min_structure_fps": getattr(tcp, "MIN_DISTINCT_COMBO_FPS", None) if tcp else None,
+        "active_routes": route_boot.get("active"),
+        "frozen_routes": [
+            {"route": r.get("route"), "missing_atoms": r.get("missing_atoms"),
+             "missing_caps": r.get("missing_caps")}
+            for r in (route_boot.get("frozen") or [])
+        ],
+        "contract_fields": ["route", "exec_tf", "filter_tfs", "timeframe"],
     })
     kdh._ensure_patch()
     threads = []
