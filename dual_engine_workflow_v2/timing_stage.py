@@ -165,6 +165,10 @@ def blockers_from_row(row, stage):
 
 def build_critique(recipe, machine, identity, adjusts, diagnosis=None, explore_state=None):
     """Machine critic payload for Kimi refine (JSON-only instruction)."""
+    import os as _os
+    free = str(_os.environ.get("KDH_FREE_CREATE") or "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
     stage = classify_stage(machine or {})
     diagnosis = diagnosis or (machine or {}).get("diagnosis") or {}
     critique = {
@@ -172,19 +176,27 @@ def build_critique(recipe, machine, identity, adjusts, diagnosis=None, explore_s
         "stage": stage,
         "identity": identity,
         "adjusts": int(adjusts or 0),
-        "lock": list(LOCK_KEYS),
-        "lock_hard": list(LOCK_KEYS_HARD),
-        "lock_soft": list(LOCK_KEYS_SOFT),
-        "edit_budget": 1,
+        "lock": [] if free else list(LOCK_KEYS),
+        "lock_hard": [] if free else list(LOCK_KEYS_HARD),
+        "lock_soft": [] if free else list(LOCK_KEYS_SOFT),
+        "edit_budget": 4 if free else 1,
+        "free_create": free,
         "allowed_factors": list(ALLOWED_TIMING),
         "allowed_timing_pairs": [
             "%s %s" % (a, b) for a, b in (ALLOWED_TIMING_PAIRS or ())
         ],
         "forbid": list(FORBID),
         "actions_allowed": (
-            ["refine_timing_diverse"]
-            if stage == "S1_n"
-            else ["refine_timing"]
+            [
+                "refine_timing_diverse", "refine_geometry_rr",
+                "switch_family", "switch_tf", "switch_route",
+            ]
+            if free
+            else (
+                ["refine_timing_diverse"]
+                if stage == "S1_n"
+                else ["refine_timing"]
+            )
         ),
         "blockers": blockers_from_row(machine or {}, stage),
         "diagnosis": {
@@ -203,11 +215,15 @@ def build_critique(recipe, machine, identity, adjusts, diagnosis=None, explore_s
             "hit_floor": (machine or {}).get("hit_floor"),
         },
         "need_next": stage_need(stage),
-        "hint": stage_hint(stage, diagnosis),
+        "hint": (
+            "自由创造：可改完整 recipe（标的/家族/周期/几何/timing）。禁止复读同一壳子。"
+            if free
+            else stage_hint(stage, diagnosis)
+        ),
         "recipe": recipe or {},
     }
     # S2: temporarily unlock RR geometry (xwin/atr); force structure edit not value nudge.
-    if stage == "S2_hitch":
+    if (not free) and stage == "S2_hitch":
         critique["lock_hard"] = [
             k for k in list(LOCK_KEYS_HARD) if k not in ("xwin", "atr", "dwin")
         ]
@@ -223,6 +239,14 @@ def build_critique(recipe, machine, identity, adjusts, diagnosis=None, explore_s
             "atr_min": RR_ATR_MIN,
             "atr_max": RR_ATR_MAX,
         }
+    if free:
+        critique["rr_hint"] = {
+            "xwin_min": RR_XWIN_MIN,
+            "xwin_max": RR_XWIN_MAX,
+            "atr_min": RR_ATR_MIN,
+            "atr_max": RR_ATR_MAX,
+            "note_zh": "物理区间约束，不是身份焊死",
+        }
     # OOS_SPARSE: prefer switch_tf (new contract resets geometry). Do NOT ask to edit hold.
     try:
         n_oos = int((machine or {}).get("n_oos") or 0)
@@ -235,21 +259,29 @@ def build_critique(recipe, machine, identity, adjusts, diagnosis=None, explore_s
             or "1h"
         )
         critique["oos_phase"] = "OOS_SPARSE"
-        critique["hint"] = (
-            "统计窗口内交易机会偏少（仅%d笔）。几何锁限制修改 hold。"
-            "解决路径：① 接受 switch_tf，从 %s 切到更密周期（如15m）；"
-            "新合同会重置几何，须按K线密度重算 hold"
-            "（同墙钟持有在更密周期对应更多根，例1h hold=20≈15m hold=80，不是÷4成5）。"
-            "② 等待研究窗扩深生效。禁止为凑笔数放宽 timing，禁止本轮改 hold。"
-            % (n_oos, exec_tf)
-        ).strip()
+        if free:
+            critique["hint"] = (
+                "统计窗口内交易机会偏少（仅%d笔）。可换周期/换几何/换标的开新合同；"
+                "禁止为凑笔数放宽 timing。"
+                % n_oos
+            ).strip()
+        else:
+            critique["hint"] = (
+                "统计窗口内交易机会偏少（仅%d笔）。几何锁限制修改 hold。"
+                "解决路径：① 接受 switch_tf，从 %s 切到更密周期（如15m）；"
+                "新合同会重置几何，须按K线密度重算 hold"
+                "（同墙钟持有在更密周期对应更多根，例1h hold=20≈15m hold=80，不是÷4成5）。"
+                "② 等待研究窗扩深生效。禁止为凑笔数放宽 timing，禁止本轮改 hold。"
+                % (n_oos, exec_tf)
+            ).strip()
         acts = list(critique.get("actions_allowed") or [])
         if "switch_tf" not in acts:
             acts.append("switch_tf")
         critique["actions_allowed"] = acts
-        critique["forbid"] = list(critique.get("forbid") or []) + [
-            "change_hold", "loosen_timing",
-        ]
+        if not free:
+            critique["forbid"] = list(critique.get("forbid") or []) + [
+                "change_hold", "loosen_timing",
+            ]
     # Negative-sample summaries (C<-1%): ONLY S2/S3 — never pollute S1_n
     neg = []
     if stage in ("S2_hitch", "S3_E") and isinstance(explore_state, dict):

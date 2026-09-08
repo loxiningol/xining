@@ -5,6 +5,8 @@ Python 3.6 compatible.
 """
 from __future__ import print_function
 
+import os
+
 try:
     from .thin_timing_atoms import default_timing, DEFAULT_TIMING, diversity_counts
 except Exception:  # pragma: no cover
@@ -475,6 +477,10 @@ def note_route_pair_outcome(state, recipe, stage, prev_stage=None):
 
 
 def may_switch_family(state, recipe):
+    if str(os.environ.get("KDH_FREE_CREATE") or "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    ):
+        return True
     tf = (recipe or {}).get("exec_tf") or (recipe or {}).get("timeframe")
     fam = (recipe or {}).get("family")
     route = (recipe or {}).get("route") or (state or {}).get("route") or "ema_osc"
@@ -717,17 +723,25 @@ def explore_actions_for_critique(state, recipe, stage):
         "force_extend_left": (state or {}).get("force_extend_left"),
     }
     if stage == "S1_n":
-        if not depth_ok:
+        if str(os.environ.get("KDH_FREE_CREATE") or "1").strip().lower() not in (
+            "0", "false", "no", "off",
+        ):
+            out["actions_allowed"] = [
+                "refine_timing_diverse", "refine_geometry_rr",
+                "switch_tf", "switch_family", "switch_route", "close",
+            ]
+            out["forbid_extra"] = ["loosen_timing"]
+        elif not depth_ok:
             out["actions_allowed"] = ["refine_timing_diverse"]
             out["forbid_extra"] = ["switch_tf", "switch_family", "close", "loosen_timing", "switch_route"]
         else:
             out["actions_allowed"] = ["switch_tf", "switch_family", "switch_route", "close"]
             out["forbid_extra"] = ["loosen_timing"]
     elif stage == "S2_hitch":
-        out["actions_allowed"] = ["refine_geometry_rr", "refine_timing_structure"]
+        out["actions_allowed"] = ["refine_geometry_rr", "refine_timing_structure", "switch_family", "switch_route"]
         out["forbid_extra"] = ["loosen_timing", "value_only_tweak", "widen_atr"]
     else:
-        out["actions_allowed"] = ["refine_timing"]
+        out["actions_allowed"] = ["refine_timing", "refine_geometry_rr", "switch_family", "switch_route"]
         out["forbid_extra"] = ["loosen_timing"]
     return out
 
