@@ -20,13 +20,12 @@ INTENTS = tuple(sorted(ADD_INTENTS | frozenset(("noop", "refine_timing"))))
 
 
 def _ledger_path(ns=""):
-    ns = str(ns or "").strip().strip("_") or "a"
+    # Single invent system: one ledger (ignore legacy hub-a/hub-b ns).
     override = str(os.environ.get("KDH_INVENT_STEP_LEDGER") or "").strip()
     if override:
         return Path(override)
     return Path(
-        "/root/auto_trade/dual_engine/sole_creation_runs/invent_step_ledger_%s.jsonl"
-        % ns
+        "/root/auto_trade/dual_engine/sole_creation_runs/invent_step_ledger.jsonl"
     )
 
 

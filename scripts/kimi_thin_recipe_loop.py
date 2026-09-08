@@ -174,9 +174,17 @@ SEEDS = {
 }
 # Optional restart inherit: lane -> recipe snap (keeps near-threshold work).
 _INHERIT_DEFAULT = (
-    "/root/auto_trade/dual_engine/sole_creation_runs/kimi_thin_hub_%s_inherit_seeds.json" % (NS or "a")
+    "/root/auto_trade/dual_engine/sole_creation_runs/kimi_thin_invent_inherit_seeds.json"
+)
+# Legacy fall-backs (single invent system prefers kimi_thin_invent_*; a/b retired).
+_INHERIT_LEGACY = (
+    "/root/auto_trade/dual_engine/sole_creation_runs/kimi_thin_hub_a_inherit_seeds.json"
 )
 _INHERIT_PATH = Path(os.environ.get("KDH_THIN_INHERIT_SEEDS") or _INHERIT_DEFAULT or "")
+if not _INHERIT_PATH.exists():
+    _leg = Path(_INHERIT_LEGACY)
+    if _leg.exists():
+        _INHERIT_PATH = _leg
 if _INHERIT_PATH and _INHERIT_PATH.exists():
     try:
         _inh = json.loads(_INHERIT_PATH.read_text(encoding="utf-8"))
@@ -1010,7 +1018,7 @@ def channel(lane, state):
         try:
             from dual_engine_workflow_v2.invent_hypothesis_loop import record_step
             scored = record_step(
-                lane=lane, rnd=rnd, ns=NS or "a",
+                lane=lane, rnd=rnd, ns="invent",
                 parent_id=parent_id, step_id=step_id,
                 parent_recipe=current.get("parent_recipe"),
                 child_recipe=kdh._recipe_snap(recipe),

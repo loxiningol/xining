@@ -1,23 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Hub-b thin invent: unified blunt + FREE_CREATE; NS=b queue.
+"""Legacy hub-b entry — retired. Invent is a single system.
 
-Lanes 1/2 (equity/crypto). Legacy 5–8 aliases still accepted via loop SEEDS.
+Do not start this unit. Use scripts/kimi_thin_recipe_loop_hub.py /
+qiyu-kimi-thin-hub only.
 """
 from __future__ import print_function
 
-import os
 import sys
 
-os.environ.setdefault("KDH_THIN_NS", "b")
-os.environ.setdefault("KDH_FREE_CREATE", "1")
-os.environ.setdefault("KDH_INVENT_STRICT_BIND", "1")
-
-_ROOT = os.environ.get("VECTOR_ROOT") or "/root"
-os.chdir(_ROOT)
-sys.path.insert(0, _ROOT)
-sys.path.insert(0, os.path.join(_ROOT, "scripts"))
-
-import kimi_thin_recipe_loop_hub_unified as hub  # noqa: E402
-
-if __name__ == "__main__":
-    sys.exit(hub.main() or 0)
+sys.stderr.write(
+    "REFUSED: hub-b invent isolation retired. "
+    "Use qiyu-kimi-thin-hub / kimi_thin_recipe_loop_hub.py only.\n"
+)
+sys.exit(3)

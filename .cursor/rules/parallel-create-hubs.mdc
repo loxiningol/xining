@@ -1,38 +1,30 @@
----
-description: 双 Cursor 并行创造时禁止互碰对方 hub；共享文件不经 PR 不上 VPS
-alwaysApply: true
----
+# 单一创造系统（强制）
 
-# 并行创造 Hub 隔离（强制）
+完整约定见 `docs/PARALLEL_CREATE_HUBS.md`（标题保留，内容已改为单系统）。
 
-完整约定见 `docs/PARALLEL_CREATE_HUBS.md`。
+## 现网
 
-## 禁碰对方
+- **唯一** invent：`qiyu-kimi-thin-hub` → `scripts/kimi_thin_recipe_loop_hub.py`
+- 队列 `/tmp/kdh_thin`；Mac worker 只盯这一根（建议 8 路）
+- 车道：`1→kimi1(primary)`，`2→kimi2(backup)`；`KDH_INVENT_STRICT_BIND=1`
+- **禁止**再启 `qiyu-kimi-thin-hub-b` / `/tmp/kdh_thin_b` / worker-b
 
-- 本侧默认拥有 **hub-a**：`qiyu-kimi-thin-hub`、`/tmp/kdh_thin`、worker-a。  
-- 对侧拥有 **hub-b**：`qiyu-kimi-thin-hub-b`、`/tmp/kdh_thin_b`、worker-b。  
-- **禁止** restart/stop/改 unit/清队列 **对方**的 hub 或工人。  
-- **禁止**把两边 `KDH_THIN_ROOTS` 并回单一共享池抢活（除非用户明确要求且走 `cursor/shared-*` PR）。
+## 分支
 
-## 分支前缀
-
-- `cursor/hub-a-*` — 本侧  
-- `cursor/hub-b-*` — 对侧  
-- `cursor/shared-*` — 共享清单  
+- 创造主链改动用 `cursor/shared-*`
+- `cursor/hub-a-*` / `cursor/hub-b-*` 废弃
 
 ## 共享文件不经 PR 不上 VPS
 
-改下列任一文件后，**禁止**直接 `scp`/`cp` 到 VPS 当发布：
+改下列任一后禁止直接当正式发布（紧急 scp 须封印）：
 
 - `dual_engine_workflow_v2/kimi_provider.py`
+- `dual_engine_workflow_v2/invent_*.py`
 - `scripts/kimi_thin_recipe_loop.py`
+- `scripts/kimi_thin_recipe_loop_hub.py`
 - `scripts/research_host_eval_worker.py`
 - `scripts/kimi_dual_http_create_20260906.py`
 
-必须：`cursor/shared-*` → PR → CI（`kimi-provider-failover`）绿 → 合并 `main` → tag → 再部署 → `write_deployed_sha.sh`。
-
-仅本侧 drop-in / inherit 实例可以热改，但不得夹带上述共享文件的未合并改动。
-
 ## 验收 Python 路径
 
-生产验收仍遵守 `prod-python-path`：`cd /root && PYTHONPATH=/root`，禁止在 `/home/admin` 下 import 交易模块。
+`cd /root && PYTHONPATH=/root`，禁止在 `/home/admin` 下 import 交易模块。
